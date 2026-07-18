@@ -86,16 +86,14 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
 
   return (
     <div style={s.wrap}>
-      {b && (
+      {b && ((b.quadras?.length ?? 0) > 0 || (b.materiais?.length ?? 0) > 0) && (
         <div style={s.briefing}>
-          <div style={s.saudacao}>{b.saudacao}</div>
-          <div style={s.meta}>{b.meta}</div>
-          {b.quadras.length > 0 && <div style={s.linha}>📍 Quadras: {b.quadras.join(", ")}</div>}
-          {b.atencoes.map((a, i) => (
-            <div key={i} style={s.atencao}>⚠️ {a}</div>
-          ))}
-          {b.materiais.length > 0 && <div style={s.atencao}>🧴 Repor: {b.materiais.join(", ")}</div>}
-          {b.pendencias > 0 && <div style={s.linha}>📋 {b.pendencias} de outros dias esperando</div>}
+          {(b.quadras?.length ?? 0) > 0 && (
+            <div style={s.linha}>📍 Hoje nas quadras: {(b.quadras || []).join(", ")}</div>
+          )}
+          {(b.materiais?.length ?? 0) > 0 && (
+            <div style={s.atencao}>🧴 Está faltando: {(b.materiais || []).join(", ")}</div>
+          )}
         </div>
       )}
 
@@ -113,7 +111,7 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
             {msgs.length === 0 && (
               <p style={s.dica}>Me conta como está indo, ou toque num atalho abaixo.</p>
             )}
-            {msgs.map((m, i) => (
+            {(msgs || []).map((m, i) => (
               <div key={i} style={{ textAlign: m.papel === "ajudante" ? "right" : "left", marginBottom: 8 }}>
                 <span style={m.papel === "ajudante" ? s.balaoMinha : s.balaoDele}>{m.texto}</span>
               </div>
@@ -123,7 +121,7 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
           </div>
 
           <div style={s.atalhos}>
-            {atalhos.map((a) => (
+            {(atalhos || []).map((a) => (
               <button key={a} style={s.atalho} onClick={() => enviar(a)}>{a}</button>
             ))}
           </div>

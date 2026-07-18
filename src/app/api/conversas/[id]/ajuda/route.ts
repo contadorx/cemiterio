@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           `${instrucaoTom[tom] || instrucaoTom.acolhedor}\n\n` +
           `FAMÍLIA: ${ctx.nome} · tratamento: ${ctx.tratamento || "não definido"}\n` +
           `Pagamento: ${ctx.saldoTexto}\n` +
-          `Jazigos: ${ctx.tumulos.map((t) => t.identificacao).join(", ") || "—"}\n` +
+          `Jazigos: ${(ctx.tumulos || []).map((t) => t.identificacao).join(", ") || "—"}\n` +
           (ctx.perfilIa ? `O que sei dela: ${ctx.perfilIa}\n` : "") +
           `\nCONVERSA ATÉ AQUI:\n${conversa || "(sem histórico)"}\n` +
           (b?.contexto ? `\nO QUE EU QUERO DIZER (use isto como base):\n${b.contexto}\n` : ""),

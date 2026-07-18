@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
   const b = await montarBriefing(executoraId, nome);
   const contexto = [
     `Faltam ${b.totalHoje} túmulos hoje.`,
-    b.quadras.length ? `Quadras: ${b.quadras.join(", ")}.` : "",
-    b.materiais.length ? `Materiais acabando: ${b.materiais.join(", ")}.` : "",
+    (b.quadras || []).length ? `Quadras: ${(b.quadras || []).join(", ")}.` : "",
+    (b.materiais || []).length ? `Materiais acabando: ${(b.materiais || []).join(", ")}.` : "",
     b.precisamAtencao ? `${b.precisamAtencao} jazigo(s) pedem atenção especial hoje.` : "",
   ]
     .filter(Boolean)

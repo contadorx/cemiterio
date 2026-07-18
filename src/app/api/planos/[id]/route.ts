@@ -26,7 +26,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (b.momento_cobranca && ["antes", "depois", "contra_foto"].includes(b.momento_cobranca)) {
     patch.momento_cobranca = b.momento_cobranca;
   }
-  if (b.qtd_por_passagem !== undefined) patch.qtd_por_passagem = Math.max(1, Number(b.qtd_por_passagem) || 1);
+  // quantas lavagens dentro do período (mensal + 2 = a cada 15 dias)
+  const lav = b.lavagens_por_ciclo ?? b.qtd_por_passagem;
+  if (lav !== undefined) {
+    const n = Math.max(1, Math.min(12, Number(lav) || 1));
+    patch.lavagens_por_ciclo = n;
+    patch.qtd_por_passagem = n;
+  }
 
   // cadência e/ou valor mensal mudaram? recalcula a cobrança do ciclo
   if (b.cadencia !== undefined || b.valor_mensal !== undefined) {

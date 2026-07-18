@@ -71,6 +71,20 @@ export default function Conversas() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Ao voltar para esta tela (depois de responder numa conversa, por exemplo),
+  // a lista se atualiza sozinha. Sem isto, ela mostrava o estado de antes.
+  useEffect(() => {
+    const aoVoltar = () => { if (document.visibilityState === "visible") carregar(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    window.addEventListener("pageshow", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+      window.removeEventListener("pageshow", aoVoltar);
+    };
+  }, [carregar]);
+
   // confere de tempos em tempos: é o que permite avisar sem precisar recarregar
   useEffect(() => {
     const t = setInterval(carregar, 45000);
@@ -172,11 +186,12 @@ export default function Conversas() {
         {lista.map((c) => (
           <div key={c.id} style={{ ...painel.card,
             background: c.tipo === "equipe" ? "#f0fdfa" : "#fff",
-            borderLeft: c.estado === "sem_resposta" ? "4px solid #dc2626"
-              : c.tipo === "equipe" ? `4px solid ${cor.teal}`
-              : (c.horasEsperando ?? 0) >= 24 ? "4px solid #b91c1c"
-              : c.aguardandoDesde ? "4px solid #d97706"
-              : c.escalada ? "4px solid #dc2626" : `1px solid ${cor.linha}` }}>
+            borderLeft:
+              c.tipo === "equipe" ? `4px solid ${cor.teal}`
+              : (c.horasEsperando ?? 0) >= 24 ? "4px solid #b91c1c"     // esperando há mais de um dia
+              : c.estado === "sem_resposta" || c.estado === "lida_sem_resposta" ? "4px solid #d97706"
+              : c.escalada ? "4px solid #dc2626"
+              : `1px solid ${cor.linha}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <Link href={`/painel/conversas/${c.id}`} style={{ textDecoration: "none" }}>
@@ -192,17 +207,20 @@ export default function Conversas() {
                   </div>
                 </Link>
                 <div style={{ fontSize: 15, marginTop: 3 }}>
-                  {c.aguardandoDesde ? (
-                    <span style={{ color: (c.horasEsperando ?? 0) >= 24 ? "#b91c1c" : "#92400e", fontWeight: 600 }}>
+                  {/* um só lugar decide o status: a coluna estado, mantida pelo banco */}
+                  {c.estado === "sem_resposta" || c.estado === "lida_sem_resposta" ? (
+                    <span style={{ color: (c.horasEsperando ?? 0) >= 24 ? "#b91c1c" : "#92400e",
+                                   fontWeight: 600 }}>
                       ⬅ esperando resposta
                       {(c.horasEsperando ?? 0) >= 24
                         ? ` há ${Math.floor((c.horasEsperando ?? 0) / 24)} dia(s)`
                         : (c.horasEsperando ?? 0) >= 1 ? ` há ${c.horasEsperando}h` : " agora"}
+                      {c.estado === "lida_sem_resposta" && " · você já viu"}
                     </span>
-                  ) : c.ultimoAutor === "humano" ? (
-                    <span style={{ color: cor.teal }}>✓ você respondeu</span>
-                  ) : c.ultimoAutor === "ia" ? (
-                    <span style={{ color: cor.teal }}>✓ respondida</span>
+                  ) : c.estado === "respondida" ? (
+                    <span style={{ color: cor.teal }}>
+                      ✓ {c.ultimoAutor === "ia" ? "a IA respondeu" : "você respondeu"}
+                    </span>
                   ) : (
                     <span style={{ color: cor.cinza }}>sem movimento</span>
                   )}

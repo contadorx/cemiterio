@@ -49,7 +49,7 @@ export default function NaoDeu({ it, onFechar, onPronto }: {
           Sem problema. Me conta o que houve que eu deixo para amanhã, no começo da lista.
         </p>
 
-        {motivos.map((m) => (
+        {(motivos || []).map((m) => (
           <button key={m}
             style={{ ...s.opcao, ...(motivo === m ? s.opcaoMarcada : {}) }}
             onClick={() => setMotivo(m)}>

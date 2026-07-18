@@ -87,7 +87,7 @@ export default function Thread() {
 
         <div style={{ ...painel.card, maxHeight: 420, overflowY: "auto" }}>
           {d.mensagens.length === 0 && <p style={{ color: cor.cinza }}>Sem mensagens ainda.</p>}
-          {d.mensagens.map((m: any, i: number) => (
+          {(d.mensagens || []).map((m: any, i: number) => (
             <div key={i} style={{ margin: "8px 0", textAlign: m.autor === "cliente" ? "left" : "right" }}>
               <span style={{ display: "inline-block", maxWidth: "80%", padding: "8px 12px", borderRadius: 12, background: m.autor === "cliente" ? "#e2e8f0" : m.autor === "ia" ? "#0f766e" : "#1e293b", color: m.autor === "cliente" ? cor.navy : "#fff", fontSize: 14 }}>
                 {m.transcrita && (

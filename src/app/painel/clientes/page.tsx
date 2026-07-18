@@ -135,10 +135,10 @@ export default function Clientes() {
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <strong style={{ color: cor.navy, fontSize: 16 }}>{c.nome}</strong>
                   <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
-                    {c.jazigos.map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
+                    {(c.jazigos || []).map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
                   </div>
                   <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
-                    {c.cadencias.join(", ") || "sem plano"}
+                    {(c.cadencias || []).join(", ") || "sem plano"}
                     {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}

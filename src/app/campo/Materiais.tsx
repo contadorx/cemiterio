@@ -65,7 +65,7 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
 
         <div style={s.lista}>
           {itens.length === 0 && <p style={s.dica}>Nenhum material cadastrado ainda — use o campo abaixo.</p>}
-          {itens.map((i) => {
+          {(itens || []).map((i) => {
             const baixo = Number(i.estoque) <= Number(i.alerta_minimo);
             return (
               <label key={i.id} style={{ ...s.item, ...(marcados[i.id] ? s.itemMarcado : {}) }}>

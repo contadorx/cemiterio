@@ -82,7 +82,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 
   const { data: planos } = await db
     .from("planos")
-    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,valor_vigente,proximo_servico")
+    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,proximo_servico")
     .eq("org_id", org)
     .eq("ativo", true)
     .in("cadencia", Object.keys(DIAS_CICLO));
@@ -95,7 +95,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 
   for (const p of planos || []) {
     const cicloDias = DIAS_CICLO[(p as any).cadencia];
-    const qtd = Math.max(1, Number((p as any).qtd_por_passagem) || 1);
+    const qtd = Math.max(1, Number((p as any).lavagens_por_ciclo ?? (p as any).qtd_por_passagem) || 1);
     const passo = Math.max(1, Math.round(cicloDias / qtd));
 
     let prox: string = (p as any).proximo_servico || isoHoje();
@@ -331,7 +331,7 @@ export async function gerarCalendarioMes(
 
   const { data: planos } = await db
     .from("planos")
-    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,valor_vigente,proximo_servico")
+    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,proximo_servico")
     .eq("org_id", org)
     .eq("ativo", true);
 
@@ -365,7 +365,7 @@ export async function gerarCalendarioMes(
 
     // recorrentes: percorre o ciclo até cobrir o mês pedido
     const cicloDias = DIAS_CICLO[p.cadencia];
-    const qtd = Math.max(1, Number(p.qtd_por_passagem) || 1);
+    const qtd = Math.max(1, Number(p.lavagens_por_ciclo ?? p.qtd_por_passagem) || 1);
     const passo = Math.max(1, Math.round(cicloDias / qtd));
 
     let prox: string = p.proximo_servico || isoHoje();

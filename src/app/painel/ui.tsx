@@ -86,7 +86,7 @@ export function PainelNav({ atual }: { atual: string }) {
         {GRUPOS.map((g) => (
           <div key={g.titulo} className="navGrupo" style={nav.grupo}>
             <span className="navGrupoTitulo" style={nav.grupoTitulo}>{g.titulo}</span>
-            {g.itens.map((i) => (
+            {(g.itens || []).map((i) => (
               <Link
                 key={i.href}
                 href={i.href}

@@ -41,10 +41,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // conversa para sempre — e a IA parava de acompanhar aquela família, voltando
   // a tratar tudo como novo depois. Agora ela continua junto, aprendendo do que
   // você escreveu. Para assumir de vez, use "Assumir" na tela da conversa.
-  await db.from("conversas").update({
-    resolvida: false,
-    ultimo_autor: "humano",
-  }).eq("id", params.id);
+  // O estado da conversa (respondida, aguardando, último autor) é mantido pelo
+  // gatilho no banco, a partir da mensagem que acabou de ser gravada.
+  // Escrever aqui à mão criava divergência: era a causa de a conversa continuar
+  // marcada como "esperando resposta" mesmo depois de você responder.
 
   // o que você escreveu é a melhor lição sobre esta família: marca para redestilar
   if ((conv as any).cliente_id) {

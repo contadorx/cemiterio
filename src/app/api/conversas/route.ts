@@ -12,19 +12,15 @@ export const dynamic = "force-dynamic";
  * ?de / ?ate = período (data da última movimentação)
  */
 /**
- * Em que pé está a conversa:
- *  sem_resposta       — a família falou e ninguém respondeu ainda
- *  lida_sem_resposta  — alguém abriu, mas não respondeu
- *  respondida         — respondemos depois da última fala dela
- *  sem_movimento      — a família não falou nada desde a última resposta
+ * O estado vem PRONTO do banco (coluna conversas.estado, mantida por gatilho).
+ *
+ * Antes era calculado aqui comparando respondida_em > ultima_msg_cliente_em, e
+ * isso falhava: no Postgres now() devolve o horário do início da transação, então
+ * responder logo após a mensagem chegar deixava os dois horários iguais — e a
+ * conversa continuava aparecendo como "esperando resposta" mesmo já respondida.
  */
 function estadoDa(c: any): string {
-  const familia = c.ultima_msg_cliente_em ? new Date(c.ultima_msg_cliente_em).getTime() : 0;
-  if (!familia) return "sem_movimento";
-  const resposta = c.respondida_em ? new Date(c.respondida_em).getTime() : 0;
-  if (resposta > familia) return "respondida";
-  const lida = c.lida_em ? new Date(c.lida_em).getTime() : 0;
-  return lida > familia ? "lida_sem_resposta" : "sem_resposta";
+  return c.estado || "sem_movimento";
 }
 
 /** Há quanto tempo a família espera. */
@@ -56,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   let sel = db
     .from("conversas")
-    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,tipo,fixada,membro_id,ultimo_autor,ultima_msg_em,aguardando_desde,respondida_em,clientes(nome,telefone,foto_url)")
+    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,tipo,fixada,membro_id,ultimo_autor,ultima_msg_em,aguardando_desde,respondida_em,estado,ultima_msg_cliente_em,lida_em,clientes(nome,telefone,foto_url)")
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -66,7 +62,8 @@ export async function GET(req: NextRequest) {
   if (situacao === "escaladas") sel = sel.eq("escalada_humano", true);
   if (situacao === "resolvidas") sel = sel.eq("resolvida", true);
   if (situacao === "pendentes") sel = sel.eq("resolvida", false);
-  if (situacao === "aguardando") sel = sel.not("aguardando_desde", "is", null);
+  if (situacao === "sem_resposta") sel = sel.in("estado", ["sem_resposta", "lida_sem_resposta"]);
+  if (situacao === "aguardando") sel = sel.in("estado", ["sem_resposta", "lida_sem_resposta"]);
 
   if (assunto) sel = sel.eq("ultimo_assunto", assunto);
   if (de) sel = sel.gte("updated_at", de);
@@ -166,10 +163,11 @@ export async function GET(req: NextRequest) {
     .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("escalada_humano", true);
   const { count: nAguard } = await db.from("conversas")
     .select("id", { count: "exact", head: true }).is("arquivada_em", null)
-    .not("aguardando_desde", "is", null);
-  const { data: todasAbertas } = await db.from("conversas")
-    .select("ultima_msg_cliente_em,lida_em,respondida_em").is("arquivada_em", null);
-  const semResposta = (todasAbertas || []).filter((c: any) => estadoDa(c) === "sem_resposta").length;
+    .in("estado", ["sem_resposta", "lida_sem_resposta"]);
+  const { count: semResposta } = await db.from("conversas")
+    .select("id", { count: "exact", head: true })
+    .is("arquivada_em", null)
+    .in("estado", ["sem_resposta", "lida_sem_resposta"]);
 
   const { count: nArq } = await db.from("conversas")
     .select("id", { count: "exact", head: true }).not("arquivada_em", "is", null);

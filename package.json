@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "checar": "node testes/checar-render.js",
     "auditar": "bash testes/auditar.sh",
     "testar": "tsx --tsconfig testes/tsconfig.json testes/simular.ts"
   },

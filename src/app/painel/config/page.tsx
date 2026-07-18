@@ -193,7 +193,7 @@ function Agregados({ aba }: { aba: string }) {
           </div>
         )}
         {d.avaliacoes.length === 0 && <p style={{ color: cor.cinza }}>Nenhuma avaliação ainda.</p>}
-        {d.avaliacoes.map((a: any, i: number) => (
+        {(d.avaliacoes || []).map((a: any, i: number) => (
           <div key={i} style={painel.card}>
             <div style={{ fontSize: 18 }}>{"⭐".repeat(a.nota)}</div>
             {a.comentario && <p style={{ color: cor.navy, margin: "6px 0 0" }}>&ldquo;{a.comentario}&rdquo;</p>}
@@ -210,7 +210,7 @@ function Agregados({ aba }: { aba: string }) {
     return (
       <>
         {d.indicacoes.length === 0 && <p style={{ color: cor.cinza }}>Nenhuma indicação ainda.</p>}
-        {d.indicacoes.map((x: any) => (
+        {(d.indicacoes || []).map((x: any) => (
           <div key={x.id} style={painel.card}>
             <strong style={{ color: cor.navy }}>{x.indicado_nome || "Sem nome"} · {x.indicado_tel || "sem telefone"}</strong>
             <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
@@ -291,7 +291,7 @@ function Agregados({ aba }: { aba: string }) {
       <>
         <p style={{ color: cor.cinza, fontSize: 14 }}>Registro das ações sensíveis feitas no sistema.</p>
         {d.auditoria.length === 0 && <p style={{ color: cor.cinza }}>Nada registrado ainda.</p>}
-        {d.auditoria.map((a: any, i: number) => (
+        {(d.auditoria || []).map((a: any, i: number) => (
           <div key={i} style={{ ...painel.card, padding: 12 }}>
             <strong style={{ color: cor.navy }}>{String(a.acao).replace(/_/g, " ")}</strong>
             {a.alvo_tipo && <span style={{ color: cor.cinza, fontSize: 15 }}> · {a.alvo_tipo}</span>}
@@ -309,7 +309,7 @@ function Agregados({ aba }: { aba: string }) {
     <>
       <p style={{ color: cor.cinza, fontSize: 14 }}>Últimos erros registrados pelo sistema (para diagnóstico).</p>
       {d.erros.length === 0 && <p style={{ color: cor.teal }}>Nenhum erro registrado. ✓</p>}
-      {d.erros.map((e: any, i: number) => (
+      {(d.erros || []).map((e: any, i: number) => (
         <div key={i} style={{ ...painel.card, borderLeft: "4px solid #dc2626" }}>
           <strong style={{ color: cor.navy }}>{e.contexto}</strong>
           <p style={{ color: cor.cinza, fontSize: 15, margin: "4px 0" }}>{e.mensagem}</p>

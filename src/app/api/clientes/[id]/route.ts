@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
     db.from("tumulos").select("id,identificacao,numero,falecido_nome,datas_gatilho,qr_token,rua,quadra_id,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,foto_enquadramento_url,quadras(codigo)").eq("cliente_id", id),
-    db.from("planos").select("id,tumulo_id,cadencia,qtd_por_passagem,valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate,proxima_cobranca,proximo_servico,migrado_em,momento_cobranca").eq("cliente_id", id),
+    db.from("planos").select("id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate,proxima_cobranca,proximo_servico,migrado_em,momento_cobranca").eq("cliente_id", id),
     db.from("movimentos").select("id,tipo,valor,status_conc,data,descricao").eq("cliente_id", id).order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
   ]);

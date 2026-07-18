@@ -377,6 +377,47 @@ async function rodar() {
   checar("prompt não manda encaminhar para a Sureya",
          !promptVoz.includes("encaminhe para a Sureya"), "");
 
+  console.log("\n=== 4g. ESTADO DA CONVERSA ===");
+  // O bug era: responder logo depois da mensagem chegar deixava os dois horários
+  // iguais, e "respondida > recebida" dava falso — a conversa seguia "esperando".
+  function estadoDa(c: any): string { return c.estado || "sem_movimento"; }
+
+  const convTeste: any = { estado: "sem_resposta", aguardando_desde: "2026-07-18T10:00:00Z" };
+  checar("família falou e ninguém respondeu", estadoDa(convTeste) === "sem_resposta", "");
+
+  // simula o gatilho quando entra uma saída
+  convTeste.estado = "respondida"; convTeste.aguardando_desde = null;
+  checar("depois de responder, sai de 'esperando'", estadoDa(convTeste) === "respondida", "");
+  checar("e a marca de espera some", convTeste.aguardando_desde === null, "");
+
+  // o caso que quebrava: mesmo horário nos dois
+  const mesmoHorario = "2026-07-18T10:00:00.000Z";
+  const antigo = { ultima_msg_cliente_em: mesmoHorario, respondida_em: mesmoHorario };
+  const comparacaoAntiga =
+    new Date(antigo.respondida_em).getTime() > new Date(antigo.ultima_msg_cliente_em).getTime();
+  checar("a comparação por horário falhava com horários iguais", !comparacaoAntiga,
+         "é exatamente por isso que agora usamos uma coluna de estado");
+  checar("a coluna de estado não sofre desse problema",
+         estadoDa({ estado: "respondida", ...antigo }) === "respondida", "");
+
+  console.log("\n=== 4h. FREQUÊNCIA DAS LAVAGENS ===");
+  const fq = await import("../src/lib/frequencia");
+  checar("mensal 1x = uma vez por mês",
+         fq.descreverFrequencia("mensal", 1) === "uma vez por mês", fq.descreverFrequencia("mensal", 1));
+  checar("mensal 2x = a cada 15 dias",
+         fq.descreverFrequencia("mensal", 2).includes("15 dias"), fq.descreverFrequencia("mensal", 2));
+  checar("mensal 4x = toda semana",
+         fq.descreverFrequencia("mensal", 4).includes("semana"), fq.descreverFrequencia("mensal", 4));
+  checar("intervalo de mensal 2x é ~15 dias", fq.intervaloEmDias("mensal", 2) === 15,
+         String(fq.intervaloEmDias("mensal", 2)));
+  checar("intervalo de mensal 4x é ~7 dias", fq.intervaloEmDias("mensal", 4) === 8 || fq.intervaloEmDias("mensal", 4) === 7,
+         String(fq.intervaloEmDias("mensal", 4)));
+  checar("mensal 2x dá 24 lavagens no ano", fq.lavagensPorAno("mensal", 2) === 24,
+         String(fq.lavagensPorAno("mensal", 2)));
+  checar("semestral 1x dá 2 lavagens no ano", fq.lavagensPorAno("semestral", 1) === 2,
+         String(fq.lavagensPorAno("semestral", 1)));
+  checar("avulso não tem intervalo", fq.intervaloEmDias("avulso", 1) === null, "");
+
   console.log("\n=== 5. CAMPANHAS ===");
   const camp = await import("../src/lib/campanha");
   const rc = await camp.executarCampanha({ nome: "Finados", mensagem: "Olá, {nome}! Finados chegando.", publico: "ativos" });

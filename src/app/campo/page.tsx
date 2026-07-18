@@ -157,7 +157,7 @@ export default function Campo() {
       {[...grupos.entries()].map(([local, itens]) => (
         <section key={local}>
           <div style={s.tituloRua}>{local}</div>
-          {itens.map((it) => (
+          {(itens || []).map((it) => (
             <Card
               key={it.id}
               it={it}

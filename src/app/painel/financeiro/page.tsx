@@ -144,7 +144,7 @@ function Relatorio() {
           <div style={painel.card}>
             <strong style={{ color: cor.navy }}>Em aberto (a cobrar)</strong>
             {d.emAberto.length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém em aberto. 🎉</p>}
-            {d.emAberto.map((x: any, i: number) => (
+            {(d.emAberto || []).map((x: any, i: number) => (
               <div key={i} style={linha}>
                 <span>{x.cliente}</span>
                 <span style={{ color: "#dc2626", fontWeight: 700 }}>{real(x.valor)}</span>
@@ -155,7 +155,7 @@ function Relatorio() {
           <div style={painel.card}>
             <strong style={{ color: cor.navy }}>Adiantados (crédito a usar)</strong>
             {d.adiantados.length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém adiantado.</p>}
-            {d.adiantados.map((x: any, i: number) => (
+            {(d.adiantados || []).map((x: any, i: number) => (
               <div key={i} style={linha}>
                 <span>{x.cliente}</span>
                 <span style={{ color: "#16a34a", fontWeight: 700 }}>{real(x.valor)}</span>
@@ -428,7 +428,7 @@ function PorJazigo() {
         <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 10px" }}>
           Margem = o que a família paga menos o tempo gasto e o material.
         </p>
-        {d.jazigos.map((j: any) => {
+        {(d.jazigos || []).map((j: any) => {
           const semTempo = !j.minutos;
           return (
             <div key={j.tumulo_id} style={{ display: "flex", justifyContent: "space-between", gap: 10,

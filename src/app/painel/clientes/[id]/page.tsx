@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
+import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
 
 export default function FichaCliente() {
   const params = useParams();
@@ -130,7 +131,7 @@ export default function FichaCliente() {
         {d.pagamentos && d.pagamentos.length > 0 && (
           <div style={painel.card}>
             <strong style={{ color: cor.navy }}>Pagamentos recebidos</strong>
-            {d.pagamentos.map((p: any) => (
+            {(d.pagamentos || []).map((p: any) => (
               <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
                 <span>
                   {new Date(p.data + "T12:00:00").toLocaleDateString("pt-BR")} · <b style={{ color: "#16a34a" }}>R$ {Number(p.valor).toFixed(2)}</b>
@@ -197,7 +198,7 @@ export default function FichaCliente() {
             sugere um rascunho 7 dias antes, todo ano.
           </p>
           {d.tumulos.length === 0 && <p style={{ color: cor.cinza }}>Nenhum túmulo cadastrado.</p>}
-          {d.tumulos.map((t: any) => (
+          {(d.tumulos || []).map((t: any) => (
             <TumuloEdit key={t.id} t={t}
                         plano={(d.planos || []).find((p: any) => p.tumulo_id === t.id) || null}
                         onSalvo={carregar} />
@@ -209,7 +210,7 @@ export default function FichaCliente() {
           <strong style={{ color: cor.navy }}>Últimas mensagens</strong>
           <div style={{ marginTop: 10 }}>
             {d.mensagens.length === 0 && <p style={{ color: cor.cinza }}>Sem histórico ainda.</p>}
-            {d.mensagens.map((m: any, i: number) => (
+            {(d.mensagens || []).map((m: any, i: number) => (
               <div key={i} style={{ margin: "6px 0", textAlign: m.autor === "cliente" ? "left" : "right" }}>
                 <span style={{ display: "inline-block", maxWidth: "80%", padding: "8px 12px", borderRadius: 12, background: m.autor === "cliente" ? "#e2e8f0" : cor.teal, color: m.autor === "cliente" ? cor.navy : "#fff", fontSize: 14 }}>
                   {m.texto}
@@ -341,6 +342,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
   });
   const [p, setP] = useState({
     cadencia: plano?.cadencia || "mensal",
+    lavagens_por_ciclo: plano?.lavagens_por_ciclo ?? plano?.qtd_por_passagem ?? 1,
     valor_mensal: plano?.valor_mensal ?? plano?.valor_vigente ?? 0,
     ativo: plano?.ativo !== false,
     pago_ate: (plano?.pago_ate || "").slice(0, 10),
@@ -441,7 +443,12 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
         <span>
           <b>{t.identificacao}</b>
           <span style={{ color: cor.cinza }}> · {localAtual}</span>
-          {plano && <span style={{ color: cor.cinza }}> · {plano.cadencia} R$ {Number(plano.valor_vigente).toFixed(2)}</span>}
+          {plano && (
+            <span style={{ color: cor.cinza }}>
+              {" · "}{descreverFrequencia(plano.cadencia, plano.lavagens_por_ciclo ?? 1)}
+              {" · R$ "}{Number(plano.valor_vigente).toFixed(2)}
+            </span>
+          )}
           {plano?.ativo === false && <span style={{ color: "#dc2626" }}> · INATIVO</span>}
           {token ? " · 🔗" : ""}
           {migrado ? " · ✓ conferido" : ""}
@@ -557,15 +564,52 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
               <div style={blocoTitulo}>
                 Plano e início da operação {migrado ? "· ✓ conferido" : "· falta conferir"}
               </div>
+              <label style={painel.rotulo}>Com que frequência a Nina vai a este jazigo</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {ATALHOS_FREQUENCIA.map((a) => {
+                  const marcado = p.cadencia === a.cadencia && Number(p.lavagens_por_ciclo) === a.lavagens;
+                  return (
+                    <button key={a.rotulo}
+                      style={{ ...(marcado ? painel.botao : painel.botaoSec), padding: "10px 14px", fontSize: 14 }}
+                      onClick={() => setP({ ...p, cadencia: a.cadencia, lavagens_por_ciclo: a.lavagens })}>
+                      {a.rotulo}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ background: "#f0fdfa", border: `1px solid ${cor.teal}`, borderRadius: 10,
+                            padding: 12, marginBottom: 12 }}>
+                <b style={{ color: cor.navy }}>
+                  {descreverFrequencia(p.cadencia, Number(p.lavagens_por_ciclo))}
+                </b>
+                {p.cadencia !== "avulso" && (
+                  <div style={{ fontSize: 14, color: cor.cinza, marginTop: 4 }}>
+                    A Nina volta a cada ~{intervaloEmDias(p.cadencia, Number(p.lavagens_por_ciclo))} dias
+                    {" · "}{lavagensPorAno(p.cadencia, Number(p.lavagens_por_ciclo))} lavagens por ano
+                    {" · "}cobrança {p.cadencia}
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div>
-                  <label style={painel.rotulo}>Periodicidade</label>
+                  <label style={painel.rotulo}>Período de cobrança</label>
                   <select style={{ ...painel.input, width: 130 }} value={p.cadencia}
                           onChange={(e) => setP({ ...p, cadencia: e.target.value })}>
                     {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
                       <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+                {p.cadencia !== "avulso" && (
+                  <div>
+                    <label style={painel.rotulo}>Lavagens no período</label>
+                    <select style={{ ...painel.input, width: 110 }} value={p.lavagens_por_ciclo}
+                            onChange={(e) => setP({ ...p, lavagens_por_ciclo: Number(e.target.value) })}>
+                      {[1,2,3,4,6,8,12].map((n) => <option key={n} value={n}>{n}x</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label style={painel.rotulo}>Valor mensal (R$)</label>
                   <input type="number" style={{ ...painel.input, width: 110 }} value={p.valor_mensal}

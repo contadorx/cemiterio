@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { descreverFrequencia } from "@/lib/frequencia";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const [{ data: tums }, { data: plans }, { data: movs }] = await Promise.all([
     db.from("tumulos").select("cliente_id,identificacao,rua,quadra_id,quadras(codigo)").in("cliente_id", ids.length ? ids : ["-"]),
-    db.from("planos").select("cliente_id,cadencia,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate,migrado_em").in("cliente_id", ids.length ? ids : ["-"]),
+    db.from("planos").select("cliente_id,cadencia,lavagens_por_ciclo,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate,migrado_em").in("cliente_id", ids.length ? ids : ["-"]),
     db.from("movimentos").select("cliente_id,tipo,valor,status_conc").in("cliente_id", ids.length ? ids : ["-"]),
   ]);
 
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
   for (const p of (plans || []) as any[]) {
     const x = porCliente.get(p.cliente_id); if (!x) continue;
     if (p.ativo) {
-      x.cadencias.push(p.cadencia);
+      x.cadencias.push(descreverFrequencia(p.cadencia, p.lavagens_por_ciclo ?? 1));
       x.mensal += Number(p.valor_mensal) || 0;
       if (p.proximo_servico && (!x.proximaLavagem || p.proximo_servico < x.proximaLavagem)) x.proximaLavagem = p.proximo_servico;
       if (p.proxima_cobranca && (!x.proximaCobranca || p.proxima_cobranca < x.proximaCobranca)) x.proximaCobranca = p.proxima_cobranca;
