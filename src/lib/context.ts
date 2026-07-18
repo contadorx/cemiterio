@@ -47,6 +47,7 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
   const db = supabaseAdmin();
   const org = env.orgId();
 
+  const dadosCasa = await carregarDadosCasa();
   const [saldoTexto, proximo, ultimo, tumulos] = await Promise.all([
     calcularSaldoTexto(cliente.id),
     db
@@ -81,9 +82,11 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
     ultimoServico: formatarData((ultimo.data as any)?.data_executada),
     perfilIa: cliente.perfil_ia,
     instrucoesIa: cliente.instrucoes_ia,
+    chavePix: dadosCasa.chavePix,
     tratamento: (cliente as any).tratamento || null,
     reguaCobranca: (cliente as any).regua_cobranca || "padrao",
     orientacaoCobranca: (cliente as any).orientacao_cobranca || null,
+    varosJazigos: (tumulos.data || []).length > 1,
     tumulos: (tumulos.data || []).map((t: any) => ({
       identificacao: t.identificacao,
       falecido: t.falecido_nome,
@@ -93,6 +96,21 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
 }
 
 // Conhecimento-base global do agente (treino do dono).
+// Dados da casa que a IA precisa citar (Pix, marca). Sem o Pix, ela NÃO inventa.
+export async function carregarDadosCasa(): Promise<{ chavePix: string | null; marca: string; assinatura: string }> {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("orgs")
+    .select("nome,marca_nome,marca_assinatura,chave_pix")
+    .eq("id", env.orgId())
+    .maybeSingle();
+  return {
+    chavePix: (data as any)?.chave_pix || null,
+    marca: (data as any)?.marca_nome || (data as any)?.nome || "Zelo & Memória",
+    assinatura: (data as any)?.marca_assinatura || "Por Dona Nadir · Desde 1990",
+  };
+}
+
 export async function carregarConfigIa(): Promise<{ conhecimento: string | null; tom: string | null }> {
   const db = supabaseAdmin();
   const { data } = await db

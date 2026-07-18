@@ -17,9 +17,10 @@ export async function GET(req: NextRequest) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const [{ data: cab, error: e1 }, { data: hist, error: e2 }] = await Promise.all([
+  const [{ data: cab, error: e1 }, { data: hist, error: e2 }, { data: irmaos }] = await Promise.all([
     db.rpc("sureya_portal_cabecalho", { p_token: token }),
     db.rpc("sureya_portal_historico", { p_token: token }),
+    db.rpc("sureya_portal_irmaos", { p_token: token }),
   ]);
 
   if (e1 || e2 || !cab || (Array.isArray(cab) && cab.length === 0)) {
@@ -27,5 +28,5 @@ export async function GET(req: NextRequest) {
   }
 
   const cabecalho = Array.isArray(cab) ? cab[0] : cab;
-  return NextResponse.json({ ok: true, cabecalho, historico: hist || [] });
+  return NextResponse.json({ ok: true, cabecalho, historico: hist || [], irmaos: irmaos || [] });
 }

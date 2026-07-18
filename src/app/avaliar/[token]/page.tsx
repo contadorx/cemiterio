@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MARCA } from "@/lib/marca";
 import { useParams } from "next/navigation";
 
 export default function Avaliar() {
@@ -45,7 +46,7 @@ export default function Avaliar() {
   return (
     <div style={s.wrap}>
       <div style={s.card}>
-        <div style={s.marca}>🕊 Sureya</div>
+        <div style={s.marca}>{MARCA.nome}</div>
         <h1 style={s.h1}>Como foi o nosso cuidado?</h1>
         <p style={s.p}>Sua opinião ajuda a Sureya a cuidar cada vez melhor.</p>
 

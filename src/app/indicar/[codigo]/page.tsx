@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MARCA } from "@/lib/marca";
 import { useParams } from "next/navigation";
 
 export default function Indicar() {
@@ -36,7 +37,7 @@ export default function Indicar() {
   return (
     <div style={s.wrap}>
       <div style={s.card}>
-        <div style={s.marca}>🕊 Sureya</div>
+        <div style={s.marca}>{MARCA.nome}</div>
         <h1 style={s.h1}>Você foi indicado por quem confia na gente</h1>
         <p style={s.p}>
           Cuidamos da limpeza e manutenção de túmulos no Cemitério da Saudade, com foto de cada visita.

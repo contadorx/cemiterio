@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"equipe" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("equipe");
+  const [aba, setAba] = useState<"casa" | "equipe" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -12,6 +12,7 @@ export default function Config() {
         <h1 style={painel.h1}>Configurações</h1>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {([
+            ["casa", "A Casa"],
             ["equipe", "Equipe"],
             ["campo", "Campo"],
             ["campanhas", "Campanhas"],
@@ -26,9 +27,10 @@ export default function Config() {
             </button>
           ))}
         </div>
+        {aba === "casa" && <Casa />}
         {aba === "equipe" && <Equipe />}
         {aba === "campanhas" && <Campanhas />}
-        {aba !== "equipe" && aba !== "campanhas" && <Agregados aba={aba} />}
+        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && <Agregados aba={aba} />}
       </div>
     </div>
   );
@@ -426,6 +428,108 @@ function Campanhas() {
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+
+function Casa() {
+  const [f, setF] = useState<any>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [ok, setOk] = useState(false);
+
+  async function carregar() {
+    const r = await fetch("/api/config/casa").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setF(r.casa);
+  }
+  useEffect(() => { carregar(); }, []);
+
+  async function salvar() {
+    setSalvando(true);
+    const r = await fetch("/api/config/casa", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(f),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); }
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  if (!f) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+  const semPix = !f.chave_pix;
+
+  return (
+    <>
+      {semPix && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
+          <strong style={{ color: "#991b1b" }}>A chave Pix não está cadastrada</strong>
+          <p style={{ color: "#7f1d1d", fontSize: 14, margin: "6px 0 0" }}>
+            Sem ela, a IA não consegue mandar o Pix nas cobranças — e foi instruída a não inventar.
+            É o primeiro campo abaixo.
+          </p>
+        </div>
+      )}
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Cobrança</strong>
+        <div style={{ marginTop: 12 }}>
+          <label style={painel.rotulo}>Chave Pix (a que vai nas mensagens)</label>
+          <input style={painel.input} value={f.chave_pix || ""}
+                 onChange={(e) => setF({ ...f, chave_pix: e.target.value })}
+                 placeholder="CPF, CNPJ, telefone, e-mail ou chave aleatória" />
+        </div>
+      </div>
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Identidade</strong>
+        <div style={{ marginTop: 12 }}>
+          <label style={painel.rotulo}>Nome da marca</label>
+          <input style={painel.input} value={f.marca_nome || ""}
+                 onChange={(e) => setF({ ...f, marca_nome: e.target.value })} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={painel.rotulo}>Assinatura</label>
+          <input style={painel.input} value={f.marca_assinatura || ""}
+                 onChange={(e) => setF({ ...f, marca_assinatura: e.target.value })} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={painel.rotulo}>Site</label>
+          <input style={painel.input} value={f.site || ""}
+                 onChange={(e) => setF({ ...f, site: e.target.value })} />
+        </div>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0" }}>
+          Aparece no portal da família, nas plaquetas, no recibo e na assinatura das mensagens.
+        </p>
+      </div>
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Capacidade e custo</strong>
+        <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+          <div>
+            <label style={painel.rotulo}>Limpezas por dia</label>
+            <input type="number" style={{ ...painel.input, width: 120 }} value={f.limpezas_por_dia || 0}
+                   onChange={(e) => setF({ ...f, limpezas_por_dia: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Dias por semana</label>
+            <input type="number" style={{ ...painel.input, width: 120 }} value={f.dias_trabalhados_semana || 0}
+                   onChange={(e) => setF({ ...f, dias_trabalhados_semana: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Teto de IA por dia (0 = sem teto)</label>
+            <input type="number" style={{ ...painel.input, width: 150 }} value={f.teto_ia_dia || 0}
+                   onChange={(e) => setF({ ...f, teto_ia_dia: Number(e.target.value) })} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <button style={painel.botao} onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+        {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+      </div>
     </>
   );
 }

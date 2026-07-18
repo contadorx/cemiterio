@@ -19,6 +19,8 @@ export interface ContextoCliente {
     falecido?: string | null;
     quadra?: string | null;
   }[];
+  chavePix?: string | null;
+  varosJazigos?: boolean;          // a família cuida de mais de um jazigo
   reguaCobranca?: string | null;   // suave | padrao | firme | nao_cobrar
   orientacaoCobranca?: string | null;
   instrucoesIa?: string | null;   // treino manual DESTE contato (prioridade)
@@ -77,7 +79,16 @@ Pagamento: ${ctx.saldoTexto}
 Próxima limpeza prevista: ${ctx.proximoServico || "não agendada"}
 Última limpeza feita: ${ctx.ultimoServico || "sem registro"}
 Jazigos desta família:
-${tumulos}
+${tumulos}${
+    ctx.varosJazigos
+      ? "\nATENÇÃO: esta família cuida de MAIS DE UM jazigo. O valor de pagamento acima é o total dos jazigos juntos, não de um só. Ao falar de limpeza ou foto, diga SEMPRE de qual jazigo se trata. Ao falar de valores, deixe claro que se refere ao conjunto."
+      : ""
+  }
+
+PIX DA CASA
+${ctx.chavePix
+    ? `Chave: ${ctx.chavePix} — use exatamente esta, sem alterar nada.`
+    : "SEM CHAVE CADASTRADA. Não invente nem improvise: diga que vai enviar a chave em seguida e avise a Sureya."}
 
 COBRANÇA DESTA FAMÍLIA
 Régua: ${ctx.reguaCobranca || "padrao"}${

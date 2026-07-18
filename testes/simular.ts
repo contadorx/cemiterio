@@ -24,7 +24,9 @@ const emDias = (n: number) => new Date(Date.now() + n * 86400000).toISOString().
 // ---------------------------------------------------------------- massa de dados
 function montarBanco(): Tabelas {
   return {
-    orgs: [{ id: ORG, nome: "Sureya", limpezas_por_dia: 20, dias_trabalhados_semana: 6,
+    orgs: [{ id: ORG, nome: "Zelo & Memória", marca_nome: "Zelo & Memória",
+             marca_assinatura: "Por Dona Nadir · Desde 1990", chave_pix: "zeloememoria@pix.com",
+             limpezas_por_dia: 20, dias_trabalhados_semana: 6,
              valor_referencia_limpeza: 40, ipca_anual_estimado: 0.045, teto_ia_dia: 0 }],
     membros: [
       { org_id: ORG, user_id: "u-dono", papel: "admin", nome: "Leandro", ativo: true, limpezas_por_dia: null },
@@ -76,6 +78,12 @@ function montarBanco(): Tabelas {
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "suave", ativacao_ativa: false, ativacao_meses: 6,
         dias_entre_cobrancas: 7, max_lembretes: 3 },
+      // família com DOIS jazigos (caso real: LINEU e Dra. YONE)
+      { id: "c-lin", org_id: ORG, nome: "LINEU", telefone: "5511900007", ativo_ia: true,
+        modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
+        anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
+        tratamento: "o senhor", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
+        ativacao_ativa: false, ativacao_meses: 6 },
       // anonimizado (LGPD): NÃO pode entrar em campanha nem cobrança
       { id: "c-anon", org_id: ORG, nome: "Cliente removido", telefone: "anon:xyz", ativo_ia: false,
         modo: "copiloto", score: 0, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
@@ -92,6 +100,12 @@ function montarBanco(): Tabelas {
       { id: "t3", org_id: ORG, quadra_id: "q2", cliente_id: "c-mar", identificacao: "T-103",
         falecido_nome: "Benedita Souza", lat: null, lng: null, gps_precisao: null, gps_amostras: 0,
         datas_gatilho: [], qr_token: null, foto_referencia_url: null, foto_enquadramento_url: null },
+      { id: "t5", org_id: ORG, quadra_id: "q1", cliente_id: "c-lin", identificacao: "Família LINEU BAIXINHO",
+        falecido_nome: null, rua: "RUA 1", lat: null, lng: null, gps_precisao: null, gps_amostras: 0,
+        datas_gatilho: [], qr_token: "tokA", foto_referencia_url: null, foto_enquadramento_url: null },
+      { id: "t6", org_id: ORG, quadra_id: "q1", cliente_id: "c-lin", identificacao: "Família BOSCARIOL",
+        falecido_nome: null, rua: "RUA 1", lat: null, lng: null, gps_precisao: null, gps_amostras: 0,
+        datas_gatilho: [], qr_token: "tokB", foto_referencia_url: null, foto_enquadramento_url: null },
       { id: "t4", org_id: ORG, quadra_id: "q3", cliente_id: "c-neu", identificacao: "T-104",
         falecido_nome: "Antenor Ferreira", lat: -23.6690, lng: -46.4620, gps_precisao: 5, gps_amostras: 4,
         datas_gatilho: [], qr_token: null, foto_referencia_url: null, foto_enquadramento_url: null },
@@ -138,6 +152,8 @@ function montarBanco(): Tabelas {
       { id: "m6", org_id: ORG, cliente_id: "c-neu", tipo: "debito", valor: 55, status_conc: "confirmado", data: diasAtras(40) },
       { id: "m7", org_id: ORG, cliente_id: "c-avu", tipo: "debito", valor: 50, status_conc: "confirmado", data: diasAtras(40) },
       { id: "m8", org_id: ORG, cliente_id: "c-sua", tipo: "debito", valor: 80, status_conc: "confirmado", data: diasAtras(40) },
+      { id: "m9", org_id: ORG, cliente_id: "c-lin", tipo: "debito", valor: 360, status_conc: "confirmado", data: diasAtras(40) },
+      { id: "m10", org_id: ORG, cliente_id: "c-lin", tipo: "debito", valor: 360, status_conc: "confirmado", data: diasAtras(40) },
     ],
     materiais: [
       { id: "mat1", org_id: ORG, nome: "vassoura", unidade: "un", estoque: 0, alerta_minimo: 1 },
@@ -277,6 +293,29 @@ async function rodar() {
   checar("convite não é cobrança (não cita valor em aberto)",
          convites.every((c) => !c.rascunho.includes("em aberto")), "");
 
+  console.log("\n=== 4d. FAMÍLIA COM MAIS DE UM JAZIGO ===");
+  const cobLin = banco.interacoes_ia.filter((i) => i.cliente_id === "c-lin" && i.assunto === "cobranca");
+  checar("cobrança avisa que o valor é do conjunto",
+         cobLin.some((r) => r.rascunho.includes("2 jazigos")), cobLin[0]?.rascunho?.slice(0, 140) || "sem cobrança");
+  checar("saldo soma os dois jazigos numa conta só",
+         (await fin.calcularSaldo("c-lin")).saldo === -720, String((await fin.calcularSaldo("c-lin")).saldo));
+
+  const ctxMod = await import("../src/lib/context");
+  const persMod = await import("../src/lib/persona");
+  const cliLin = await ctxMod.acharCliente("5511900007");
+  const ctxLin = await ctxMod.montarContexto(cliLin!);
+  const promptLin = persMod.montarSystemPrompt(ctxLin, {});
+  checar("prompt lista os dois jazigos",
+         promptLin.includes("LINEU BAIXINHO") && promptLin.includes("BOSCARIOL"), "");
+  checar("prompt avisa a IA sobre múltiplos jazigos",
+         promptLin.includes("MAIS DE UM jazigo"), "");
+  checar("prompt manda dizer de qual jazigo se trata",
+         promptLin.includes("diga SEMPRE de qual jazigo"), "");
+  const cliUm = await ctxMod.acharCliente("5511900001");
+  const promptUm = persMod.montarSystemPrompt(await ctxMod.montarContexto(cliUm!), {});
+  checar("família com um jazigo só NÃO recebe esse aviso",
+         !promptUm.includes("MAIS DE UM jazigo"), "");
+
   console.log("\n=== 5. CAMPANHAS ===");
   const camp = await import("../src/lib/campanha");
   const rc = await camp.executarCampanha({ nome: "Finados", mensagem: "Olá, {nome}! Finados chegando.", publico: "ativos" });
@@ -289,7 +328,7 @@ async function rodar() {
   checar("nenhum rascunho de campanha foi enviado sozinho",
          rascCamp.every((r) => r.acao_humana == null), "todos devem ficar pendentes de aprovação");
   const rc2 = await camp.executarCampanha({ nome: "Cobrar", mensagem: "Teste de público em aberto aqui", publico: "em_aberto" });
-  const emAberto = ["c-ant", "c-neu", "c-avu", "c-sua"];
+  const emAberto = ["c-ant", "c-neu", "c-avu", "c-sua", "c-lin"];
   const rascAberto = banco.interacoes_ia.filter((i) => i.rascunho?.includes("Teste de público em aberto"));
   checar("público 'em aberto' pega só quem tem saldo negativo",
          rascAberto.every((r) => emAberto.includes(r.cliente_id)),
@@ -362,6 +401,16 @@ async function rodar() {
     checar("prompt final NÃO tem [object Object]", !prompt.includes("[object Object]"), "");
     checar("prompt injeta o conhecimento do negócio", prompt.includes("Preço R$ 40."), "");
     checar("prompt injeta o tom", prompt.includes("Carinhosa."), "");
+    checar("prompt traz a chave Pix cadastrada", prompt.includes("zeloememoria@pix.com"), "");
+
+    // sem chave cadastrada, a IA é instruída a NÃO inventar
+    banco.orgs[0].chave_pix = null;
+    const semPix = await ctxMod.montarContexto(cli!);
+    const promptSemPix = persMod.montarSystemPrompt(semPix, {});
+    checar("sem Pix cadastrado, manda não inventar",
+           promptSemPix.includes("SEM CHAVE CADASTRADA") && promptSemPix.includes("Não invente"),
+           "");
+    banco.orgs[0].chave_pix = "zeloememoria@pix.com";
   }
 
   console.log("\n" + "=".repeat(60));

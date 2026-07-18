@@ -127,20 +127,26 @@ export async function cobrancaGentil(): Promise<number> {
 
     const valor = Math.abs(s.saldo).toFixed(2);
     const nome = (c as any).nome;
+
+    // família com mais de um jazigo: o valor é do conjunto, precisa ficar claro
+    const { count: nJaz } = await db
+      .from("tumulos").select("id", { count: "exact", head: true })
+      .eq("org_id", org).eq("cliente_id", (c as any).id);
+    const doConjunto = (nJaz || 0) > 1 ? ` (referente aos ${nJaz} jazigos)` : "";
     const trat = ((c as any).tratamento || "").trim();
     const voce = trat.includes("senhora") || trat.includes("Dra") ? "a senhora" : trat.includes("senhor") ? "o senhor" : "você";
     const vc = voce === "você" ? "você" : voce;
 
     const suaves = [
-      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha: consta um valor de R$ ${valor} da manutenção. Quando for possível, é o Pix de sempre. Sem pressa nenhuma. Muito obrigada pela confiança!`,
+      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha: consta um valor de R$ ${valor} da manutenção${doConjunto}. Quando for possível, é o Pix de sempre. Sem pressa nenhuma. Muito obrigada pela confiança!`,
     ];
     const padrao = [
-      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha de controles: consta um valor de R$ ${valor} da manutenção. Quando ${vc} puder, é o Pix de sempre. Muito obrigada pela confiança!`,
-      `Oi, ${nome}, tudo bem? Ainda consta em aberto o valor de R$ ${valor}. Se ${vc} já tiver feito o Pix, pode me mandar o comprovante por aqui? Assim deixo tudo certinho na ficha da família.`,
+      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha de controles: consta um valor de R$ ${valor} da manutenção${doConjunto}. Quando ${vc} puder, é o Pix de sempre. Muito obrigada pela confiança!`,
+      `Oi, ${nome}, tudo bem? Ainda consta em aberto o valor de R$ ${valor}${doConjunto}. Se ${vc} já tiver feito o Pix, pode me mandar o comprovante por aqui? Assim deixo tudo certinho na ficha da família.`,
       `Olá, ${nome}. Sobre o valor de R$ ${valor} que segue em aberto: se ficar melhor combinar uma data, é só me dizer que eu anoto aqui. Seguimos cuidando de tudo com o mesmo carinho. 🙏`,
     ];
     const firmes = [
-      `Olá, ${nome}! Tudo bem? Consta em aberto o valor de R$ ${valor} da manutenção. Pode acertar pelo Pix de sempre? Fico no aguardo do comprovante para dar baixa na ficha.`,
+      `Olá, ${nome}! Tudo bem? Consta em aberto o valor de R$ ${valor} da manutenção${doConjunto}. Pode acertar pelo Pix de sempre? Fico no aguardo do comprovante para dar baixa na ficha.`,
       `Oi, ${nome}. Ainda não localizei o pagamento de R$ ${valor}. Pode me confirmar se já foi feito? Se preferir combinar uma data, me diga qual.`,
       `Olá, ${nome}. Preciso acertar com ${vc} o valor de R$ ${valor}, que segue pendente. Pode me dizer como prefere resolver? Obrigada.`,
     ];

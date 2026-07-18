@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { env } from "@/lib/env";
+import { MARCA } from "@/lib/marca";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "nao_e_pagamento" }, { status: 400 });
   }
 
-  const { data: org } = await db.from("orgs").select("nome").eq("id", env.orgId()).maybeSingle();
+  const { data: org } = await db.from("orgs").select("nome,marca_nome,marca_assinatura").eq("id", env.orgId()).maybeSingle();
 
   return NextResponse.json({
     ok: true,
@@ -34,7 +35,8 @@ export async function GET(req: NextRequest) {
       valor: Number((mov as any).valor),
       data: (mov as any).data,
       descricao: (mov as any).descricao || "Pagamento de serviço de limpeza",
-      emitente: (org as any)?.nome || "Sureya",
+      emitente: (org as any)?.marca_nome || (org as any)?.nome || MARCA.nome,
+      assinatura: (org as any)?.marca_assinatura || MARCA.assinatura,
     },
   });
 }

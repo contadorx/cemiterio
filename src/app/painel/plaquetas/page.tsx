@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
+import { MARCA } from "@/lib/marca";
 
 export default function Plaquetas() {
   const [itens, setItens] = useState<any[]>([]);
@@ -46,7 +47,7 @@ export default function Plaquetas() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16 }}>
           {itens.map((p) => (
             <div key={p.id} style={etiqueta}>
-              <div style={{ fontSize: 12, letterSpacing: 1, color: "#c6a15b", textTransform: "uppercase" }}>Sureya</div>
+              <div style={{ fontSize: 12, letterSpacing: 1, color: "#c6a15b", textTransform: "uppercase" }}>{MARCA.nome}</div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.qr} alt="QR" style={{ width: 150, height: 150, margin: "8px 0" }} />
               <div style={{ fontSize: 14, fontWeight: 700, color: "#12284b" }}>
