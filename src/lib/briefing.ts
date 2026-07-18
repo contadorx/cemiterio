@@ -42,6 +42,7 @@ export async function montarBriefing(executoraId: string | null, nome?: string):
 
   // atenções: datas de memória próximas, serviços já adiados, clientes que pedem capricho
   const atencoes: string[] = [];
+  const jaAvisado = new Set<string>();   // evita repetir o alerta do mesmo túmulo
   const alvo = new Date(Date.now() + 7 * 86400000);
   const mmddAlvo = `${String(alvo.getMonth() + 1).padStart(2, "0")}-${String(alvo.getDate()).padStart(2, "0")}`;
 
@@ -54,13 +55,17 @@ export async function montarBriefing(executoraId: string | null, nome?: string):
     for (const d of datas) {
       const mmdd = String(d?.data || "").slice(-5);
       if (mmdd && mmdd <= mmddAlvo && mmdd >= new Date().toISOString().slice(5, 10)) {
-        atencoes.push(
-          `${t.identificacao} (${t.quadras?.codigo || "?"}): data de memória chegando — capriche, a família pode visitar.`
-        );
+        if (!jaAvisado.has(`mem:${t.identificacao}`)) {
+          jaAvisado.add(`mem:${t.identificacao}`);
+          atencoes.push(
+            `${t.identificacao} (${t.quadras?.codigo || "?"}): data de memória chegando — capriche, a família pode visitar.`
+          );
+        }
         break;
       }
     }
-    if ((s.adiado_vezes || 0) >= 2) {
+    if ((s.adiado_vezes || 0) >= 2 && !jaAvisado.has(`adi:${t.identificacao}`)) {
+      jaAvisado.add(`adi:${t.identificacao}`);
       atencoes.push(`${t.identificacao}: já ficou pra depois ${s.adiado_vezes}x — prioridade hoje.`);
     }
   }

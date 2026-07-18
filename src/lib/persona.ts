@@ -10,6 +10,7 @@ export type Assunto =
 
 export interface ContextoCliente {
   nome: string;
+  tratamento?: string | null;      // "a senhora" | "o senhor" | "a Dra"
   saldoTexto: string;            // "adiantado R$ 80,00" | "em aberto R$ 40,00" | "em dia"
   proximoServico?: string | null; // data prevista, se houver
   ultimoServico?: string | null;  // data do último feito
@@ -18,6 +19,8 @@ export interface ContextoCliente {
     falecido?: string | null;
     quadra?: string | null;
   }[];
+  reguaCobranca?: string | null;   // suave | padrao | firme | nao_cobrar
+  orientacaoCobranca?: string | null;
   instrucoesIa?: string | null;   // treino manual DESTE contato (prioridade)
   perfilIa?: string | null;       // memória destilada do histórico
 }
@@ -69,11 +72,23 @@ ${extras?.conhecimento ? `\nCONHECIMENTO DO NEGÓCIO (preços, procedimentos, re
 
 CLIENTE
 Nome: ${ctx.nome}
+Como tratar: ${ctx.tratamento || "com respeito, sem formalidade excessiva"}
 Pagamento: ${ctx.saldoTexto}
 Próxima limpeza prevista: ${ctx.proximoServico || "não agendada"}
 Última limpeza feita: ${ctx.ultimoServico || "sem registro"}
-Túmulos deste cliente:
+Jazigos desta família:
 ${tumulos}
+
+COBRANÇA DESTA FAMÍLIA
+Régua: ${ctx.reguaCobranca || "padrao"}${
+    ctx.reguaCobranca === "nao_cobrar"
+      ? " — NÃO cobre esta família. Se falar de valores, encaminhe para a Sureya."
+      : ctx.reguaCobranca === "suave"
+      ? " — no máximo UM lembrete, bem gentil. Não insista."
+      : ctx.reguaCobranca === "firme"
+      ? " — pode ser mais objetiva, mas sempre respeitosa."
+      : " — até três lembretes espaçados e acolhedores."
+  }${ctx.orientacaoCobranca ? `\nOrientação específica (vale acima da régua): ${ctx.orientacaoCobranca}` : ""}
 ${ctx.perfilIa ? `\nO QUE SABEMOS DESTE CLIENTE (histórico):\n${ctx.perfilIa}` : ""}
 ${ctx.instrucoesIa ? `\nINSTRUÇÕES DESTE CONTATO (prioridade — treino manual):\n${ctx.instrucoesIa}` : ""}`;
 }

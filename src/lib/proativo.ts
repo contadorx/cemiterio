@@ -105,27 +105,49 @@ export async function cobrancaGentil(): Promise<number> {
 
   const { data: clientes } = await db
     .from("clientes")
-    .select("id,nome,cobranca_em,cobranca_nivel")
-    .eq("org_id", org);
+    .select("id,nome,tratamento,cobranca_em,cobranca_nivel,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,anonimizado_em")
+    .eq("org_id", org)
+    .is("anonimizado_em", null);
 
   let n = 0;
   for (const c of clientes || []) {
+    const regua = (c as any).regua_cobranca || "padrao";
+    if (regua === "nao_cobrar") continue;               // respeita a régua da família
+
     const nivel = Number((c as any).cobranca_nivel) || 0;
-    if (nivel >= 3) continue;
-    if (!diasAtras((c as any).cobranca_em, 7)) continue;
+    // 'suave' manda um único lembrete; as outras seguem o máximo configurado
+    const maxLembretes = regua === "suave" ? 1 : Number((c as any).max_lembretes) || 3;
+    if (nivel >= maxLembretes) continue;
+
+    const espera = Number((c as any).dias_entre_cobrancas) || (regua === "firme" ? 5 : 7);
+    if (!diasAtras((c as any).cobranca_em, espera)) continue;
 
     const s = await calcularSaldo((c as any).id);
     if (s.saldo >= -0.005) continue;
 
     const valor = Math.abs(s.saldo).toFixed(2);
     const nome = (c as any).nome;
-    const textos = [
-      `Olá, ${nome}! Tudo bem? Passando só pra lembrar com carinho: ficou um valor de R$ ${valor} da limpeza. Quando puder, pode acertar pelo Pix de sempre — sem pressa. Qualquer coisa, estou por aqui. 🌿`,
-      `Oi, ${nome}, tudo bem? Ainda consta em aberto o valor de R$ ${valor} referente à limpeza. Se já tiver pago, me manda o comprovante que eu confiro rapidinho. Se precisar combinar de outro jeito, é só me dizer.`,
-      `Olá, ${nome}. Preciso da sua ajuda pra acertarmos o valor de R$ ${valor} que segue em aberto. Sei que a correria é grande — se quiser, podemos combinar uma data que fique boa pra você. Conto com você. 🙏`,
-    ];
+    const trat = ((c as any).tratamento || "").trim();
+    const voce = trat.includes("senhora") || trat.includes("Dra") ? "a senhora" : trat.includes("senhor") ? "o senhor" : "você";
+    const vc = voce === "você" ? "você" : voce;
 
-    if (await criarRascunho((c as any).id, "cobranca", textos[nivel])) {
+    const suaves = [
+      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha: consta um valor de R$ ${valor} da manutenção. Quando for possível, é o Pix de sempre. Sem pressa nenhuma. Muito obrigada pela confiança!`,
+    ];
+    const padrao = [
+      `Olá, ${nome}! Tudo bem? 🌿 Passando só para atualizar a nossa ficha de controles: consta um valor de R$ ${valor} da manutenção. Quando ${vc} puder, é o Pix de sempre. Muito obrigada pela confiança!`,
+      `Oi, ${nome}, tudo bem? Ainda consta em aberto o valor de R$ ${valor}. Se ${vc} já tiver feito o Pix, pode me mandar o comprovante por aqui? Assim deixo tudo certinho na ficha da família.`,
+      `Olá, ${nome}. Sobre o valor de R$ ${valor} que segue em aberto: se ficar melhor combinar uma data, é só me dizer que eu anoto aqui. Seguimos cuidando de tudo com o mesmo carinho. 🙏`,
+    ];
+    const firmes = [
+      `Olá, ${nome}! Tudo bem? Consta em aberto o valor de R$ ${valor} da manutenção. Pode acertar pelo Pix de sempre? Fico no aguardo do comprovante para dar baixa na ficha.`,
+      `Oi, ${nome}. Ainda não localizei o pagamento de R$ ${valor}. Pode me confirmar se já foi feito? Se preferir combinar uma data, me diga qual.`,
+      `Olá, ${nome}. Preciso acertar com ${vc} o valor de R$ ${valor}, que segue pendente. Pode me dizer como prefere resolver? Obrigada.`,
+    ];
+    const textos = regua === "suave" ? suaves : regua === "firme" ? firmes : padrao;
+    const texto = textos[Math.min(nivel, textos.length - 1)];
+
+    if (await criarRascunho((c as any).id, "cobranca", texto)) {
       await db
         .from("clientes")
         .update({ cobranca_nivel: nivel + 1, cobranca_em: new Date().toISOString() })

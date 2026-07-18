@@ -20,7 +20,7 @@ export async function acharCliente(telefone: string): Promise<ClienteRow | null>
   const db = supabaseAdmin();
   const { data } = await db
     .from("clientes")
-    .select("id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia")
+    .select("id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia,tratamento,regua_cobranca,orientacao_cobranca")
     .eq("org_id", env.orgId())
     .eq("telefone", telefone)
     .maybeSingle();
@@ -69,7 +69,7 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
       .maybeSingle(),
     db
       .from("tumulos")
-      .select("identificacao,falecido_nome,quadras(codigo)")
+      .select("identificacao,falecido_nome,rua,quadras(codigo)")
       .eq("org_id", org)
       .eq("cliente_id", cliente.id),
   ]);
@@ -81,10 +81,13 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
     ultimoServico: formatarData((ultimo.data as any)?.data_executada),
     perfilIa: cliente.perfil_ia,
     instrucoesIa: cliente.instrucoes_ia,
+    tratamento: (cliente as any).tratamento || null,
+    reguaCobranca: (cliente as any).regua_cobranca || "padrao",
+    orientacaoCobranca: (cliente as any).orientacao_cobranca || null,
     tumulos: (tumulos.data || []).map((t: any) => ({
       identificacao: t.identificacao,
       falecido: t.falecido_nome,
-      quadra: t.quadras?.codigo || null,
+      quadra: [t.quadras?.codigo, t.rua].filter(Boolean).join(" · ") || null,
     })),
   };
 }

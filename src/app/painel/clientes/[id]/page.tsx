@@ -197,6 +197,8 @@ export default function FichaCliente() {
           </div>
         </div>
 
+        <ReguaCobranca cliente={c} onSalvo={carregar} />
+
         <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
       </div>
     </div>
@@ -398,6 +400,130 @@ function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+
+function ReguaCobranca({ cliente, onSalvo }: { cliente: any; onSalvo: () => void }) {
+  const [f, setF] = useState({
+    tratamento: cliente.tratamento || "",
+    regua_cobranca: cliente.regua_cobranca || "padrao",
+    dias_entre_cobrancas: cliente.dias_entre_cobrancas ?? 7,
+    max_lembretes: cliente.max_lembretes ?? 3,
+    orientacao_cobranca: cliente.orientacao_cobranca || "",
+    ativacao_ativa: !!cliente.ativacao_ativa,
+    ativacao_meses: cliente.ativacao_meses ?? 6,
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [ok, setOk] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    const r = await fetch(`/api/clientes/${cliente.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(f),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); onSalvo(); }
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  const explica: Record<string, string> = {
+    suave: "Um único lembrete, bem gentil. Se não responder, a IA para e avisa você.",
+    padrao: "Até três lembretes espaçados e acolhedores.",
+    firme: "Até três lembretes mais objetivos, ainda respeitosos.",
+    nao_cobrar: "A IA NUNCA cobra esta família. Se falarem de valores, encaminha para você.",
+  };
+
+  return (
+    <div style={painel.card}>
+      <strong style={{ color: cor.navy }}>Como a IA trata esta família</strong>
+
+      <div style={{ marginTop: 12 }}>
+        <label style={painel.rotulo}>Tratamento (como se dirigir à pessoa)</label>
+        <select style={{ ...painel.input, width: "auto" }} value={f.tratamento}
+                onChange={(e) => setF({ ...f, tratamento: e.target.value })}>
+          <option value="">— não definido —</option>
+          <option value="a senhora">a senhora</option>
+          <option value="o senhor">o senhor</option>
+          <option value="a Dra">a Dra</option>
+          <option value="você">você (informal)</option>
+        </select>
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
+        <label style={painel.rotulo}>Régua de cobrança</label>
+        <select style={{ ...painel.input, width: "auto" }} value={f.regua_cobranca}
+                onChange={(e) => setF({ ...f, regua_cobranca: e.target.value })}>
+          <option value="suave">Suave — um lembrete só</option>
+          <option value="padrao">Padrão — até três lembretes</option>
+          <option value="firme">Firme — mais objetiva</option>
+          <option value="nao_cobrar">Não cobrar — só você resolve</option>
+        </select>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 0" }}>{explica[f.regua_cobranca]}</p>
+
+        {f.regua_cobranca !== "nao_cobrar" && (
+          <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+            <div>
+              <label style={painel.rotulo}>Dias entre lembretes</label>
+              <input type="number" style={{ ...painel.input, width: 100 }} value={f.dias_entre_cobrancas}
+                     onChange={(e) => setF({ ...f, dias_entre_cobrancas: Number(e.target.value) })} />
+            </div>
+            {f.regua_cobranca !== "suave" && (
+              <div>
+                <label style={painel.rotulo}>Máx. de lembretes</label>
+                <input type="number" style={{ ...painel.input, width: 100 }} value={f.max_lembretes}
+                       onChange={(e) => setF({ ...f, max_lembretes: Number(e.target.value) })} />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ marginTop: 10 }}>
+          <label style={painel.rotulo}>
+            Orientação específica (vale acima da régua — a IA lê isto antes de tudo)
+          </label>
+          <textarea
+            style={{ ...painel.input, minHeight: 70, resize: "vertical", fontFamily: "inherit" }}
+            value={f.orientacao_cobranca}
+            onChange={(e) => setF({ ...f, orientacao_cobranca: e.target.value })}
+            placeholder="Ex.: acordo de pagar jan a março à vista · sempre atrasa, não insistir · falar com o filho"
+          />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: cor.navy }}>
+          <input type="checkbox" checked={f.ativacao_ativa}
+                 onChange={(e) => setF({ ...f, ativacao_ativa: e.target.checked })} />
+          Convidar periodicamente (para quem é avulso, em vez de cobrar)
+        </label>
+        {f.ativacao_ativa && (
+          <div style={{ marginTop: 8 }}>
+            <label style={painel.rotulo}>Convidar a cada quantos meses</label>
+            <input type="number" style={{ ...painel.input, width: 100 }} value={f.ativacao_meses}
+                   onChange={(e) => setF({ ...f, ativacao_meses: Number(e.target.value) })} />
+            {cliente.ultima_ativacao_em && (
+              <p style={{ color: cor.cinza, fontSize: 12, margin: "6px 0 0" }}>
+                Último convite: {new Date(cliente.ultima_ativacao_em).toLocaleDateString("pt-BR")}
+              </p>
+            )}
+          </div>
+        )}
+        <p style={{ color: cor.cinza, fontSize: 12, margin: "8px 0 0" }}>
+          Convites de Finados, Dia das Mães, Dia dos Pais e Natal vão para todas as famílias,
+          independente desta opção.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14 }}>
+        <button style={painel.botao} onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+        {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+      </div>
     </div>
   );
 }

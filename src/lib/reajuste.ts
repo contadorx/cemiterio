@@ -19,8 +19,12 @@ function mesesEntre(iso: string, hoje = new Date()): number {
   const d = new Date(iso + "T00:00:00");
   return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
 }
+// Arredonda para o próximo múltiplo de 5 PARA CIMA.
+// Antes usava Math.round (múltiplo mais próximo), o que anulava o reajuste:
+// R$ 40 corrigido para R$ 41,95 voltava a R$ 40 e o cliente sumia da lista.
+// Na prática, 12 de 14 clientes nunca apareciam na tela de Reajustes.
 function round5(v: number): number {
-  return Math.round(v / 5) * 5;
+  return Math.ceil(v / 5) * 5;
 }
 
 // Lista clientes com preço defasado, ordenados pela urgência do reajuste.

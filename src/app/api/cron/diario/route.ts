@@ -5,6 +5,7 @@ import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { processarPendentes } from "@/lib/atendimento";
 import { processarFilaEnvios } from "@/lib/envio";
 import { destilarPerfisPendentes } from "@/lib/destilacao";
+import { convitesDeData, convitesPeriodicos } from "@/lib/ativacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,11 +43,16 @@ export async function GET(req: NextRequest) {
   // B4: mantém os perfis da IA frescos sem trabalho manual
   const perfis = await destilarPerfisPendentes();
 
+  // régua de ativação: convida em vez de cobrar (avulsos e datas especiais)
+  const convDatas = await convitesDeData();
+  const convPeriodicos = await convitesPeriodicos();
+
   return NextResponse.json({
     ok: true,
     agenda: { gerados: agenda.criados, ...aloc },
     rascunhos: { saldo, cobranca, gatilhos },
     rede_seguranca: { pendentes, envios },
     perfis,
+    convites: { datas: convDatas, periodicos: convPeriodicos },
   });
 }

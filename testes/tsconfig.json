@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@supabase/supabase-js": ["./testes/supabase-falso.ts"],
+      "@supabase/ssr": ["./testes/supabase-falso.ts"]
+    }
+  }
+}
