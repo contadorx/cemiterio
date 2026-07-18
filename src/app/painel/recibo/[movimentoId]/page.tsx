@@ -74,7 +74,7 @@ const s: Record<string, React.CSSProperties> = {
   papel: { background: "#fff", maxWidth: 600, width: "100%", padding: 48, borderRadius: 8, boxShadow: "0 2px 12px rgba(0,0,0,.08)" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2px solid ${NAVY}`, paddingBottom: 16, marginBottom: 24 },
   marca: { fontSize: 20, fontWeight: 700 },
-  assinaturaMarca: { fontSize: 12, color: "#7A6234", marginTop: 2 },
+  assinaturaMarca: { fontSize: 14, color: "#7A6234", marginTop: 2 },
   numero: { color: "#6b7280", fontSize: 14 },
   titulo: { fontSize: 22, fontWeight: 400, margin: "0 0 20px" },
   texto: { fontSize: 16, lineHeight: 1.8, marginBottom: 24 },

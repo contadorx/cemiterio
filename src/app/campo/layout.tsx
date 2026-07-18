@@ -1,10 +1,10 @@
-import RegistrarSW from "./RegistrarSW";
+
 
 import { MARCA } from "@/lib/marca";
 
 export const metadata = {
   title: `Campo — ${MARCA.nome}`,
-  manifest: "/manifest.json",
+  manifest: "/manifest-campo.json",
 };
 
 export const viewport = {
@@ -14,7 +14,6 @@ export const viewport = {
 export default function CampoLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <RegistrarSW />
       {children}
     </>
   );

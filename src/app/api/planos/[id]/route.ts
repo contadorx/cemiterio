@@ -23,6 +23,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (b[c] !== undefined) patch[c] = b[c] || null;
   }
   if (b.ativo !== undefined) patch.ativo = !!b.ativo;
+  if (b.momento_cobranca && ["antes", "depois", "contra_foto"].includes(b.momento_cobranca)) {
+    patch.momento_cobranca = b.momento_cobranca;
+  }
   if (b.qtd_por_passagem !== undefined) patch.qtd_por_passagem = Math.max(1, Number(b.qtd_por_passagem) || 1);
 
   // cadência e/ou valor mensal mudaram? recalcula a cobrança do ciclo

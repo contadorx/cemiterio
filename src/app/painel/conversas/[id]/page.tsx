@@ -90,7 +90,13 @@ export default function Thread() {
           {d.mensagens.map((m: any, i: number) => (
             <div key={i} style={{ margin: "8px 0", textAlign: m.autor === "cliente" ? "left" : "right" }}>
               <span style={{ display: "inline-block", maxWidth: "80%", padding: "8px 12px", borderRadius: 12, background: m.autor === "cliente" ? "#e2e8f0" : m.autor === "ia" ? "#0f766e" : "#1e293b", color: m.autor === "cliente" ? cor.navy : "#fff", fontSize: 14 }}>
-                {m.texto}
+                {m.transcrita && (
+                <span style={{ display: "block", fontSize: 15, color: cor.cinza,
+                               marginBottom: 4, fontStyle: "italic" }}>
+                  🎤 áudio transcrito
+                </span>
+              )}
+              {m.texto}
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{m.autor}</div>
               </span>
             </div>
@@ -101,8 +107,13 @@ export default function Thread() {
         {d.rascunho && (
           <div style={{ ...painel.card, borderColor: "#fbbf24", background: "#fffbeb" }}>
             <div style={painel.rotulo}>Rascunho da IA — revise antes de enviar</div>
+            {d.rascunho.motivo_retencao && (
+              <p style={{ fontSize: 15, color: "#92400e", margin: "0 0 8px" }}>
+                Não foi automático porque: {d.rascunho.motivo_retencao}
+              </p>
+            )}
             <textarea
-              style={{ ...painel.input, minHeight: 80, resize: "vertical", fontFamily: "inherit" }}
+              style={{ ...painel.input, minHeight: 160, resize: "vertical", fontFamily: "inherit" }}
               value={rascText}
               onChange={(e) => setRascText(e.target.value)}
             />
@@ -114,15 +125,28 @@ export default function Thread() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            style={{ ...painel.input, flex: 1 }}
+        <div>
+          <textarea
+            rows={5}
+            style={{ ...painel.input, width: "100%", minHeight: 130, resize: "vertical",
+                     fontFamily: "inherit", lineHeight: 1.5 }}
             placeholder="Escreva uma mensagem…"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && enviar()}
+            onKeyDown={(e) => {
+              // Enter quebra linha (mensagem longa é normal aqui).
+              // Ctrl+Enter ou Cmd+Enter envia.
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviar();
+            }}
           />
-          <button style={painel.botao} onClick={enviar} disabled={ocupado}>Enviar</button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+            <button style={painel.botao} onClick={enviar} disabled={ocupado || !texto.trim()}>
+              Enviar
+            </button>
+            <span style={{ fontSize: 14, color: cor.cinza }}>
+              Enter quebra linha · Ctrl+Enter envia
+            </span>
+          </div>
         </div>
         <MeAjuda conversaId={id} onEscolher={(t) => setTexto(t)} />
       </div>
@@ -175,7 +199,7 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
           O que você quer dizer? (quanto mais contexto, melhor a sugestão)
         </label>
         <textarea
-          style={{ ...painel.input, minHeight: 90, fontFamily: "inherit" }}
+          style={{ ...painel.input, minHeight: 160, fontFamily: "inherit" }}
           value={contexto}
           onChange={(e) => setContexto(e.target.value)}
           placeholder="Ex.: ela perguntou se dá para adiar a limpeza de novembro. Dá sim, mas quero aproveitar para combinar o Finados. Ela é antiga de casa e sempre paga certinho."
@@ -199,7 +223,7 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
       {opcoes.map((o, i) => (
         <div key={i} style={{ background: "#fff", border: `1px solid ${cor.linha}`,
                               borderRadius: 10, padding: 12, marginTop: 10 }}>
-          <div style={{ fontSize: 12, color: cor.teal, textTransform: "uppercase",
+          <div style={{ fontSize: 14, color: cor.teal, textTransform: "uppercase",
                         letterSpacing: 0.5, fontWeight: 700 }}>
             {o.titulo || `Opção ${i + 1}`}
           </div>

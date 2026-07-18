@@ -72,7 +72,7 @@ async function gravarMensagem(
   direcao: "entrada" | "saida",
   autor: "cliente" | "ia" | "humano" | "sistema",
   texto: string,
-  opts?: { midiaUrl?: string | null; processada?: boolean }
+  opts?: { midiaUrl?: string | null; processada?: boolean; transcrita?: boolean }
 ) {
   const db = supabaseAdmin();
   await db.from("mensagens").insert({
@@ -84,6 +84,7 @@ async function gravarMensagem(
     texto,
     midia_url: opts?.midiaUrl || null,
     processada: opts?.processada ?? true,
+    transcrita: opts?.transcrita || false,
   });
 }
 
@@ -148,17 +149,18 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
 export type ResultadoRegistro =
   | { tipo: "lead" }
   | { tipo: "ignorado"; motivo: string }
-  | { tipo: "escalado"; conversaId: string }
-  | { tipo: "ok"; conversaId: string; processarAgora: boolean };
+  | { tipo: "escalado"; conversaId: string; nomeCliente?: string }
+  | { tipo: "ok"; conversaId: string; processarAgora: boolean; nomeCliente?: string };
 
 export async function registrarEntrada(params: {
   telefone: string;
   texto: string;
   temMidia?: boolean;
   temAudio?: boolean;
+  transcrito?: boolean;   // o texto veio de um áudio que foi transcrito
   mensagemRaw?: any;
 }): Promise<ResultadoRegistro> {
-  const { telefone, texto, temMidia, temAudio, mensagemRaw } = params;
+  const { telefone, texto, temMidia, temAudio, transcrito, mensagemRaw } = params;
 
   const cliente = await acharCliente(telefone);
   if (!cliente) return { tipo: "lead" };
@@ -199,7 +201,7 @@ export async function registrarEntrada(params: {
   }
 
   const entrada = [texto, nota].filter(Boolean).join("\n");
-  await gravarMensagem(conv.id, cliente.id, "entrada", "cliente", entrada, { processada: false });
+  await gravarMensagem(conv.id, cliente.id, "entrada", "cliente", entrada, { processada: false, transcrita: !!transcrito });
   await db
     .from("conversas")
     .update({ ultima_entrada_at: new Date().toISOString() })
@@ -212,14 +214,14 @@ export async function registrarEntrada(params: {
       .update({ escalada_humano: true })
       .eq("org_id", env.orgId())
       .eq("id", conv.id);
-    return { tipo: "escalado", conversaId: conv.id };
+    return { tipo: "escalado", conversaId: conv.id, nomeCliente: cliente.nome };
   }
-  if (conv.escalada) return { tipo: "escalado", conversaId: conv.id };
+  if (conv.escalada) return { tipo: "escalado", conversaId: conv.id, nomeCliente: cliente.nome };
 
   // Estratégia sem agendador: SEMPRE devolvemos "ok" e deixamos o chamador (webhook)
   // agendar um processamento diferido via waitUntil. Se outra mensagem chegar dentro
   // da janela, ela reagenda e a anterior é absorvida (aguardarEProcessar confere o carimbo).
-  return { tipo: "ok", conversaId: conv.id, processarAgora: false };
+  return { tipo: "ok", conversaId: conv.id, processarAgora: false, nomeCliente: cliente.nome };
 }
 
 // Espera a janela de debounce e processa a conversa UMA vez, se ela "amadureceu"

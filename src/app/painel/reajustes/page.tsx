@@ -94,12 +94,12 @@ export default function Reajustes() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <div>
                 <strong style={{ color: cor.navy }}>{c.cliente}</strong>
-                <div style={{ fontSize: 13, color: cor.cinza }}>
+                <div style={{ fontSize: 15, color: cor.cinza }}>
                   {c.mesesSemReajuste} meses sem reajuste · IPCA estimado +{c.ipcaAcumuladoPct}% ·{" "}
                   {c.bomPagador ? "bom pagador" : "⚠ com pendência"}
                 </div>
               </div>
-              <span style={{ background: CORES[c.faixa], color: "#fff", padding: "4px 12px", borderRadius: 999, fontWeight: 700, fontSize: 13 }}>
+              <span style={{ background: CORES[c.faixa], color: "#fff", padding: "4px 12px", borderRadius: 999, fontWeight: 700, fontSize: 15 }}>
                 {c.faixa} · {c.temperatura}
               </span>
             </div>

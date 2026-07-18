@@ -86,7 +86,7 @@ export default function Plaquetas() {
               <input style={{ ...painel.input, flex: 1, minWidth: 160 }} value={f.busca}
                      onChange={(e) => setF({ ...f, busca: e.target.value })}
                      placeholder="Buscar família ou jazigo…" />
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: cor.cinza }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: cor.cinza }}>
                 <input type="checkbox" checked={f.incluirTeste}
                        onChange={(e) => setF({ ...f, incluirTeste: e.target.checked })} />
                 mostrar dados de teste
@@ -96,7 +96,7 @@ export default function Plaquetas() {
               <button style={painel.botao} onClick={() => window.print()}>
                 Imprimir {itens.length} plaqueta(s)
               </button>
-              <span style={{ color: cor.cinza, fontSize: 13 }}>
+              <span style={{ color: cor.cinza, fontSize: 15 }}>
                 Imprima em papel adesivo e proteja, ou leve a uma gráfica para fazer em alumínio.
               </span>
             </div>
@@ -113,7 +113,7 @@ export default function Plaquetas() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 16 }}>
           {itens.map((p) => (
             <div key={p.id} style={etiqueta}>
-              <div style={{ fontSize: 11, letterSpacing: 1, color: "#c6a15b", textTransform: "uppercase" }}>
+              <div style={{ fontSize: 15, letterSpacing: 1, color: "#c6a15b", textTransform: "uppercase" }}>
                 {MARCA.nome}
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,10 +121,10 @@ export default function Plaquetas() {
               <div style={{ fontSize: 14, fontWeight: 700, color: "#12284b" }}>
                 {p.falecido || p.identificacao}
               </div>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>
+              <div style={{ fontSize: 14, color: "#6b7280" }}>
                 {p.quadra}{p.rua ? ` · ${p.rua}` : ""}
               </div>
-              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+              <div style={{ fontSize: 15, color: "#6b7280", marginTop: 6 }}>
                 Aponte a câmera para ver os cuidados
               </div>
             </div>

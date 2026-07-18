@@ -127,7 +127,7 @@ function Equipe() {
         <div key={m.user_id} style={{ ...painel.card, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <div>
             <strong style={{ color: cor.navy }}>{m.nome || "(sem nome)"}</strong>
-            <div style={{ fontSize: 13, color: cor.cinza }}>
+            <div style={{ fontSize: 15, color: cor.cinza }}>
               {m.papel === "campo" ? "Campo" : "Administrador"}
               {m.papel === "campo" && ` · ${m.limpezas_por_dia || "padrão"} limpezas/dia`}
             </div>
@@ -186,7 +186,7 @@ function Agregados({ aba }: { aba: string }) {
       <>
         {d.mediaAvaliacoes != null && (
           <div style={painel.card}>
-            <div style={{ fontSize: 13, color: cor.cinza }}>Média das avaliações</div>
+            <div style={{ fontSize: 15, color: cor.cinza }}>Média das avaliações</div>
             <div style={{ fontSize: 30, fontWeight: 800, color: cor.teal }}>
               {Number(d.mediaAvaliacoes).toFixed(1)} ⭐
             </div>
@@ -197,7 +197,7 @@ function Agregados({ aba }: { aba: string }) {
           <div key={i} style={painel.card}>
             <div style={{ fontSize: 18 }}>{"⭐".repeat(a.nota)}</div>
             {a.comentario && <p style={{ color: cor.navy, margin: "6px 0 0" }}>&ldquo;{a.comentario}&rdquo;</p>}
-            <div style={{ fontSize: 12, color: cor.cinza, marginTop: 4 }}>
+            <div style={{ fontSize: 14, color: cor.cinza, marginTop: 4 }}>
               {new Date(a.respondida_em).toLocaleDateString("pt-BR")}
             </div>
           </div>
@@ -213,7 +213,7 @@ function Agregados({ aba }: { aba: string }) {
         {d.indicacoes.map((x: any) => (
           <div key={x.id} style={painel.card}>
             <strong style={{ color: cor.navy }}>{x.indicado_nome || "Sem nome"} · {x.indicado_tel || "sem telefone"}</strong>
-            <div style={{ fontSize: 13, color: cor.cinza, marginTop: 4 }}>
+            <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
               Indicado por {x.clientes?.nome || "—"} · {x.status} · {new Date(x.created_at).toLocaleDateString("pt-BR")}
             </div>
           </div>
@@ -252,7 +252,7 @@ function Agregados({ aba }: { aba: string }) {
     return (
       <>
         <div style={painel.card}>
-          <div style={{ fontSize: 13, color: cor.cinza }}>Túmulos perdidos por imprevistos (registrados)</div>
+          <div style={{ fontSize: 15, color: cor.cinza }}>Túmulos perdidos por imprevistos (registrados)</div>
           <div style={{ fontSize: 30, fontWeight: 800, color: totalImpacto > 0 ? "#dc2626" : cor.teal }}>{totalImpacto}</div>
         </div>
 
@@ -278,7 +278,7 @@ function Agregados({ aba }: { aba: string }) {
               <b>{rotulos[o.tipo] || o.tipo}</b>
               {o.impacto > 0 && <span style={{ color: "#dc2626" }}> · −{o.impacto} túmulo(s)</span>}
               {o.descricao && <div style={{ color: cor.cinza, marginTop: 2 }}>{o.descricao}</div>}
-              <div style={{ fontSize: 12, color: cor.cinza }}>{new Date(o.created_at).toLocaleString("pt-BR")}</div>
+              <div style={{ fontSize: 14, color: cor.cinza }}>{new Date(o.created_at).toLocaleString("pt-BR")}</div>
             </div>
           ))}
         </div>
@@ -294,8 +294,8 @@ function Agregados({ aba }: { aba: string }) {
         {d.auditoria.map((a: any, i: number) => (
           <div key={i} style={{ ...painel.card, padding: 12 }}>
             <strong style={{ color: cor.navy }}>{String(a.acao).replace(/_/g, " ")}</strong>
-            {a.alvo_tipo && <span style={{ color: cor.cinza, fontSize: 13 }}> · {a.alvo_tipo}</span>}
-            <div style={{ fontSize: 12, color: cor.cinza, marginTop: 4 }}>
+            {a.alvo_tipo && <span style={{ color: cor.cinza, fontSize: 15 }}> · {a.alvo_tipo}</span>}
+            <div style={{ fontSize: 14, color: cor.cinza, marginTop: 4 }}>
               {new Date(a.created_at).toLocaleString("pt-BR")}
             </div>
           </div>
@@ -312,8 +312,8 @@ function Agregados({ aba }: { aba: string }) {
       {d.erros.map((e: any, i: number) => (
         <div key={i} style={{ ...painel.card, borderLeft: "4px solid #dc2626" }}>
           <strong style={{ color: cor.navy }}>{e.contexto}</strong>
-          <p style={{ color: cor.cinza, fontSize: 13, margin: "4px 0" }}>{e.mensagem}</p>
-          <div style={{ fontSize: 12, color: cor.cinza }}>{new Date(e.created_at).toLocaleString("pt-BR")}</div>
+          <p style={{ color: cor.cinza, fontSize: 15, margin: "4px 0" }}>{e.mensagem}</p>
+          <div style={{ fontSize: 14, color: cor.cinza }}>{new Date(e.created_at).toLocaleString("pt-BR")}</div>
         </div>
       ))}
     </>
@@ -364,7 +364,7 @@ function Campanhas() {
     <>
       <div style={painel.card}>
         <strong style={{ color: cor.navy }}>Nova campanha</strong>
-        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
           Gera um rascunho por cliente — <b>nada sai sem a sua aprovação</b>. Use {"{nome}"} para inserir o
           primeiro nome de cada pessoa.
         </p>
@@ -486,14 +486,14 @@ function Casa() {
           <input style={painel.input} value={f.site || ""}
                  onChange={(e) => setF({ ...f, site: e.target.value })} />
         </div>
-        <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0" }}>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "8px 0 0" }}>
           Aparece no portal da família, nas plaquetas, no recibo e na assinatura das mensagens.
         </p>
       </div>
 
       <div style={painel.card}>
         <strong style={{ color: cor.navy }}>Custo da operação</strong>
-        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
           É com isto que o sistema calcula o resultado de cada jazigo. Se você paga
           um valor fixo por mês, preencha o salário — o custo por hora sai da jornada.
         </p>
@@ -517,7 +517,7 @@ function Casa() {
                    onChange={(e) => setF({ ...f, minutos_padrao_limpeza: Number(e.target.value) })} />
           </div>
         </div>
-        <p style={{ color: cor.cinza, fontSize: 12, margin: "8px 0 0" }}>
+        <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
           O tempo padrão só é usado enquanto não houver medição. Assim que a Nina começar a
           usar &ldquo;Começar/Finalizar&rdquo;, o sistema passa a usar a média real dela.
         </p>
@@ -623,7 +623,7 @@ function Materiais() {
           {criando ? "Fechar" : "+ Cadastrar material"}
         </button>
       </div>
-      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 0" }}>
+      <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0" }}>
         A Nina vê esta lista no app e marca o que está faltando. O que ela marcar zera aqui e vira ocorrência.
       </p>
 
@@ -711,7 +711,7 @@ function Materiais() {
                      style={{ ...painel.input, width: 110, padding: 8 }}
                      onBlur={(e) => atualizar(m.id, { consumoPorLimpeza: Number(e.target.value) })} />
             </div>
-            <span style={{ color: cor.cinza, fontSize: 13 }}>
+            <span style={{ color: cor.cinza, fontSize: 15 }}>
               {m.unidade}
               {Number(m.consumo_por_limpeza) > 0 &&
                 ` · dura ~${Math.round(1 / Number(m.consumo_por_limpeza))} limpezas`}
@@ -782,7 +782,7 @@ function Jornada() {
     <>
       <div style={painel.card}>
         <strong style={{ color: cor.navy }}>Dias de trabalho no cemitério</strong>
-        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
           A agenda nunca coloca serviço num dia que não estiver marcado aqui.
         </p>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -824,7 +824,7 @@ function Jornada() {
                    onChange={(e) => setJ({ ...j, limpezas_por_dia: Number(e.target.value) })} />
           </div>
         </div>
-        <p style={{ color: cor.cinza, fontSize: 12, margin: "10px 0 0" }}>
+        <p style={{ color: cor.cinza, fontSize: 14, margin: "10px 0 0" }}>
           O cemitério abre das 7h às 18h. O horário aqui é o da equipe, e serve de referência
           no briefing da manhã.
         </p>
@@ -901,7 +901,7 @@ function CompraMaterial({ m, onFechar, onConfirmar }:
         </button>
         <button style={painel.botaoSec} onClick={onFechar}>Cancelar</button>
       </div>
-      <p style={{ color: cor.cinza, fontSize: 12, margin: "10px 0 0" }}>
+      <p style={{ color: cor.cinza, fontSize: 14, margin: "10px 0 0" }}>
         O estoque sobe, o custo por unidade é recalculado e eu comparo com as limpezas do período
         para sugerir o gasto real por limpeza.
       </p>

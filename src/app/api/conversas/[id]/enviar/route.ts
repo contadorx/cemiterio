@@ -37,8 +37,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     texto,
   });
 
-  // assume a conversa
-  await db.from("conversas").update({ escalada_humano: true }).eq("id", params.id);
+  // Responder NÃO tira a IA da conversa. Antes, cada resposta manual escalava a
+  // conversa para sempre — e a IA parava de acompanhar aquela família, voltando
+  // a tratar tudo como novo depois. Agora ela continua junto, aprendendo do que
+  // você escreveu. Para assumir de vez, use "Assumir" na tela da conversa.
+  await db.from("conversas").update({
+    resolvida: false,
+    ultimo_autor: "humano",
+  }).eq("id", params.id);
+
+  // o que você escreveu é a melhor lição sobre esta família: marca para redestilar
+  if ((conv as any).cliente_id) {
+    await db.from("clientes")
+      .update({ perfil_ia_msgs: 999 })   // força a próxima destilação
+      .eq("id", (conv as any).cliente_id)
+      .then(() => null, () => null);
+  }
 
   return NextResponse.json({ ok: true });
 }

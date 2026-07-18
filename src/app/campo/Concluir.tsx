@@ -5,18 +5,17 @@ import { capturarGps, qualidade } from "@/lib/gps";
 import { concluirOuEnfileirar } from "@/lib/offline-fila";
 
 /**
- * FINALIZAR — a foto do depois fecha o serviço.
- * A foto do "antes" agora é tirada no Começar, então aqui ela é opcional
- * (fica para quem esqueceu de iniciar pelo app).
+ * FINALIZAR a lavagem: foto do depois, confirmação de local e envio.
+ * A foto do "antes" agora é tirada no Começar, então aqui é opcional.
  */
 export default function Concluir({
-  it: item,
+  item,
   onFechar,
   onPronto,
 }: {
-  it: any;
+  item: any;
   onFechar: () => void;
-  onPronto: (offline?: boolean) => void;
+  onPronto: (offline: boolean) => void;
 }) {
   const [antes, setAntes] = useState<{ b64: string; mt: string } | null>(null);
   const [depois, setDepois] = useState<{ b64: string; mt: string } | null>(null);
@@ -120,36 +119,36 @@ export default function Concluir({
   }
 
   return (
-    <div style={st.overlay}>
-      <div style={st.caixa}>
-        <div style={st.topo}>
+    <div style={s.overlay}>
+      <div style={s.modal}>
+        <div style={s.modalTopo}>
           <strong style={{ fontSize: 20 }}>{item.tumulo}</strong>
-          <button style={st.fechar} onClick={onFechar}>
+          <button style={s.fechar} onClick={onFechar}>
             ✕
           </button>
         </div>
-        <div style={st.caixaSub}>
+        <div style={s.modalSub}>
           Quadra {item.quadra}
           {item.falecido ? ` · ${item.falecido}` : ""}
         </div>
 
         {item.fotoEnquadramento && (
           <div>
-            <div style={st.rotulo}>Onde fica (foto de longe):</div>
+            <div style={s.rotulo}>Onde fica (foto de longe):</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.fotoEnquadramento} alt="enquadramento" style={st.fotoRef} />
+            <img src={item.fotoEnquadramento} alt="enquadramento" style={s.fotoRef} />
           </div>
         )}
         {item.fotoReferencia && (
           <div>
-            <div style={st.rotulo}>Confira se é este túmulo:</div>
+            <div style={s.rotulo}>Confira se é este túmulo:</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.fotoReferencia} alt="referência" style={st.fotoRef} />
+            <img src={item.fotoReferencia} alt="referência" style={s.fotoRef} />
           </div>
         )}
         {(item.lat != null && item.lng != null) && (
           <a
-            style={st.mapa}
+            style={s.mapa}
             href={`https://www.google.com/maps?q=${item.lat},${item.lng}`}
             target="_blank"
             rel="noreferrer"
@@ -187,37 +186,37 @@ export default function Concluir({
           onChange={async (e) => e.target.files?.[0] && setEnquadramento(await lerArquivo(e.target.files[0]))}
         />
 
-        <button style={{ ...st.botaoFoto, ...(antes ? st.botaoFotoOk : {}) }} onClick={() => refAntes.current?.click()}>
+        <button style={{ ...s.fotoBtn, ...(antes ? s.fotoOk : {}) }} onClick={() => refAntes.current?.click()}>
           {antes ? "✓ Foto do antes" : "📷 Foto do antes (opcional)"}
         </button>
-        <button style={{ ...st.botaoFoto, ...(depois ? st.botaoFotoOk : {}) }} onClick={() => refDepois.current?.click()}>
+        <button style={{ ...s.fotoBtn, ...(depois ? s.fotoOk : {}) }} onClick={() => refDepois.current?.click()}>
           {depois ? "✓ Foto do depois" : "📷 Foto do depois"}
         </button>
 
         {/* Localização: cada confirmação melhora a média do ponto */}
-        <div style={st.blocoGps}>
+        <div style={s.blocoGps}>
           <button
-            style={{ ...st.botaoFoto, ...(gpsEstado === "ok" ? st.botaoFotoOk : {}), marginBottom: 6 }}
+            style={{ ...s.fotoBtn, ...(gpsEstado === "ok" ? s.fotoOk : {}), marginBottom: 6 }}
             onClick={confirmarLocal}
             disabled={gpsEstado === "buscando"}
           >
             {gpsEstado === "buscando" ? "📍 Procurando sinal…" : gpsEstado === "ok" ? "✓ Localização confirmada" : "📍 Confirmar que estou neste túmulo"}
           </button>
           {gpsMsg && (
-            <p style={{ ...st.gpsMsg, color: gpsEstado === "erro" ? "#dc2626" : "#0f766e" }}>{gpsMsg}</p>
+            <p style={{ ...s.gpsMsg, color: gpsEstado === "erro" ? "#dc2626" : "#0f766e" }}>{gpsMsg}</p>
           )}
-          <button style={{ ...st.botaoFoto, ...(enquadramento ? st.botaoFotoOk : {}) }} onClick={() => refEnq.current?.click()}>
+          <button style={{ ...s.fotoBtn, ...(enquadramento ? s.fotoOk : {}) }} onClick={() => refEnq.current?.click()}>
             {enquadramento ? "✓ Foto de longe salva" : "🖼 Atualizar foto de longe (ajuda a achar)"}
           </button>
-          <p style={st.gpsDica}>
+          <p style={s.gpsDica}>
             A foto de longe é tirada do corredor, mostrando o túmulo junto com os vizinhos. É ela que ajuda a
             encontrar da próxima vez.
           </p>
         </div>
 
-        {erro && <p style={st.erro}>{erro}</p>}
+        {erro && <p style={s.erro}>{erro}</p>}
 
-        <button style={st.concluir} onClick={concluir} disabled={enviando}>
+        <button style={s.concluir} onClick={concluir} disabled={enviando}>
           {enviando ? "Enviando…" : "Concluir e enviar à família"}
         </button>
       </div>
@@ -225,30 +224,21 @@ export default function Concluir({
   );
 }
 
-const NAVY = "#12284b";
-const TEAL = "#0f766e";
-const st: Record<string, React.CSSProperties> = {
-  modal: { background: "#fff", width: "100%", maxWidth: 520, borderRadius: "16px 16px 0 0", padding: 18, maxHeight: "92vh", overflowY: "auto" },
-  modalTopo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  modalSub: { fontSize: 19, fontWeight: 700, color: "#12284b", margin: "2px 0 14px" },
-  fotoBtn: { width: "100%", minHeight: 60, padding: 17, background: "#fff", color: "#12284b", border: "2px dashed #cbd5e1", borderRadius: 12, fontSize: 17, cursor: "pointer" },
-  fotoRef: { width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 10, marginTop: 8 },
-  blocoGps: { background: "#f8fafc", borderRadius: 10, padding: 12, marginBottom: 14 },
-  gpsDica: { color: "#475569", fontSize: 17, margin: "4px 0 0" },
-  gpsMsg: { color: "#0f766e", fontSize: 18, fontWeight: 600, margin: "6px 0 0" },
-  mapa: { color: "#12284b", fontSize: 17, textDecoration: "underline" },
-  concluir: { width: "100%", minHeight: 60, padding: 18, background: "#0f766e", color: "#fff", border: "none", borderRadius: 12, fontSize: 17, fontWeight: 700, cursor: "pointer", marginTop: 6 },
-  overlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 60 },
-  caixa: { background: "#fff", width: "100%", maxWidth: 520, borderRadius: "16px 16px 0 0", padding: 18, maxHeight: "92vh", overflowY: "auto" },
-  topo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  fechar: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#475569" },
-  nome: { fontSize: 19, fontWeight: 700, color: NAVY, margin: "2px 0 14px" },
-  bloco: { marginBottom: 14 },
-  rotulo: { fontSize: 17, fontWeight: 600, color: NAVY, display: "block", marginBottom: 6 },
-  dica: { color: "#475569", fontSize: 17, margin: "4px 0 0" },
-  erro: { color: "#dc2626", fontSize: 18, fontWeight: 600, margin: "8px 0" },
-  botaoFoto: { width: "100%", minHeight: 60, padding: 17, background: "#fff", color: NAVY, border: "2px dashed #cbd5e1", borderRadius: 12, fontSize: 17, cursor: "pointer" },
-  botaoFotoOk: { borderColor: TEAL, color: TEAL, background: "#f0fdfa", borderStyle: "solid" },
-  botao: { width: "100%", minHeight: 60, padding: 18, background: TEAL, color: "#fff", border: "none", borderRadius: 12, fontSize: 17, fontWeight: 700, cursor: "pointer", marginTop: 6 },
-  previa: { width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 10, marginTop: 8 },
+
+const s: Record<string, React.CSSProperties> = {
+  blocoGps: { background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, margin: "10px 0" },
+  gpsMsg: { fontSize: 17, margin: "0 0 8px", textAlign: "center" },
+  gpsDica: { fontSize: 18, color: "#475569", margin: "8px 0 0", lineHeight: 1.4 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "grid", placeItems: "end center", zIndex: 50 },
+  modal: { width: "100%", maxWidth: 520, background: "#fff", borderRadius: "20px 20px 0 0", padding: 20, display: "flex", flexDirection: "column", gap: 12, maxHeight: "92vh", overflowY: "auto" },
+  modalTopo: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  modalSub: { color: "#475569", fontSize: 17, marginTop: -6 },
+  fechar: { background: "none", border: "none", fontSize: 22, color: "#475569" },
+  rotulo: { fontSize: 18, color: "#475569", marginBottom: 6 },
+  fotoRef: { width: "100%", borderRadius: 12, maxHeight: 220, objectFit: "cover" },
+  mapa: { display: "block", textAlign: "center", padding: 12, background: "#eff6ff", color: "#1d4ed8", borderRadius: 12, fontWeight: 600, textDecoration: "none" },
+  fotoBtn: { padding: 18, fontSize: 17, fontWeight: 600, borderRadius: 12, border: "2px dashed #cbd5e1", background: "#f8fafc", color: "#334155" },
+  fotoOk: { borderStyle: "solid", borderColor: "#6ee7b7", background: "#ecfdf5", color: "#059669" },
+  concluir: { padding: 20, fontSize: 20, fontWeight: 800, borderRadius: 14, border: "none", background: "#0f766e", color: "#fff", marginTop: 4 },
+  erro: { color: "#dc2626", margin: 0 },
 };

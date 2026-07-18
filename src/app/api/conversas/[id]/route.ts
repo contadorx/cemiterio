@@ -19,9 +19,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!conv) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
 
   const [{ data: msgs }, { data: rasc }] = await Promise.all([
-    db.from("mensagens").select("autor,direcao,texto,created_at").eq("conversa_id", id).order("created_at", { ascending: true }),
-    db.from("interacoes_ia").select("id,rascunho,assunto").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    db.from("mensagens").select("autor,direcao,texto,transcrita,created_at").eq("conversa_id", id).order("created_at", { ascending: true }),
+    db.from("interacoes_ia").select("id,rascunho,assunto,motivo_retencao").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+
+  // abriu = leu (mas ainda não respondeu)
+  await db.rpc("sureya_marcar_conversa", { p_conversa: id, p_acao: "lida" }).then(() => null, () => null);
 
   return NextResponse.json({
     ok: true,

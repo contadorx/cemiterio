@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
+import ConcluirAdmin from "./ConcluirAdmin";
 
 interface Item {
   id: string;
@@ -18,6 +19,7 @@ export default function AgendaPage() {
   const [carregando, setCarregando] = useState(true);
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
+  const [concluindo, setConcluindo] = useState<any>(null);
 
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
@@ -90,8 +92,8 @@ export default function AgendaPage() {
         </h1>
 
         <div style={{ ...painel.card, padding: 12 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: cor.cinza, marginRight: 4 }}>Mostrar:</span>
+          <div data-filtros style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 15, color: cor.cinza, marginRight: 4 }}>Mostrar:</span>
             {[[1, "Amanhã"], [3, "3 dias"], [7, "7 dias"], [14, "14 dias"], [30, "30 dias"], [90, "90 dias"]]
               .map(([v, rot]) => (
                 <button key={String(v)}
@@ -100,7 +102,7 @@ export default function AgendaPage() {
                   {rot}
                 </button>
               ))}
-            <span style={{ fontSize: 13, color: cor.cinza, marginLeft: 8 }}>ou período:</span>
+            <span style={{ fontSize: 15, color: cor.cinza, marginLeft: 8 }}>ou período:</span>
             <input type="date" style={{ ...painel.input, width: 150 }} value={periodo.inicio}
                    onChange={(e) => setPeriodo({ ...periodo, inicio: e.target.value })} />
             <input type="date" style={{ ...painel.input, width: 150 }} value={periodo.fim}
@@ -110,7 +112,7 @@ export default function AgendaPage() {
 
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
-          <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+          <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
             Cria o que os planos devem e distribui pelos dias de trabalho. Pode clicar à
             vontade: nunca duplica.
           </p>
@@ -142,7 +144,7 @@ export default function AgendaPage() {
               <label style={painel.rotulo}>Data da lavagem dos avulsos</label>
               <input type="date" style={{ ...painel.input, width: 160 }} value={dataAvulsos}
                      onChange={(e) => setDataAvulsos(e.target.value)} />
-              <p style={{ color: cor.cinza, fontSize: 12, margin: "6px 0 0" }}>
+              <p style={{ color: cor.cinza, fontSize: 14, margin: "6px 0 0" }}>
                 Para o Finados, ponha 30/10 — assim tudo fica pronto antes do dia 2.
               </p>
             </div>
@@ -155,7 +157,7 @@ export default function AgendaPage() {
               <strong style={{ color: cor.navy }}>
                 {diag.criados > 0 ? `${diag.criados} limpeza(s) criada(s)` : "Nada novo a criar"}
               </strong>
-              <div style={{ fontSize: 13, color: cor.cinza, marginTop: 4 }}>
+              <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
                 {diag.planosAtivos != null && `${diag.planosAtivos} planos ativos · `}
                 {diag.avulsosIncluidos > 0 && `${diag.avulsosIncluidos} avulso(s) · `}
                 {diag.jaExistiam > 0 && `${diag.jaExistiam} já existiam · `}
@@ -163,7 +165,7 @@ export default function AgendaPage() {
                 {diag.agendados} distribuída(s) em {diag.dias} dia(s)
               </div>
               {diag.proximaData && diag.criados === 0 && (
-                <div style={{ fontSize: 13, color: cor.navy, marginTop: 6 }}>
+                <div style={{ fontSize: 15, color: cor.navy, marginTop: 6 }}>
                   A próxima ida é em {new Date(diag.proximaData + "T12:00:00").toLocaleDateString("pt-BR")} —
                   aumente o período para alcançá-la.
                 </div>
@@ -208,8 +210,8 @@ export default function AgendaPage() {
                   <span style={{ color: cor.navy, fontWeight: 600 }}>
                     Q{s.quadra} · {s.tumulo}
                   </span>{" "}
-                  <span style={{ color: statusCor[s.status] || cor.cinza, fontSize: 13 }}>({s.status})</span>
-                  <p style={{ color: cor.cinza, fontSize: 13, margin: "2px 0 0" }}>
+                  <span style={{ color: statusCor[s.status] || cor.cinza, fontSize: 15 }}>({s.status})</span>
+                  <p style={{ color: cor.cinza, fontSize: 15, margin: "2px 0 0" }}>
                     {s.falecido ? `${s.falecido} · ` : ""}
                     {s.cliente || "sem cliente"}
                     {s.valor ? ` · R$ ${Number(s.valor).toFixed(2)}` : ""}

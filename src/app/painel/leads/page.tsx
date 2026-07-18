@@ -43,7 +43,7 @@ export default function Leads() {
         </div>
 
         <div style={{ ...painel.card, padding: 12 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select style={{ ...painel.input, width: "auto" }} value={f.origem}
                     onChange={(e) => setF({ ...f, origem: e.target.value })}>
               <option value="">Todas as origens</option>
@@ -161,18 +161,18 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
           <strong style={{ color: cor.navy, fontSize: 16 }}>
             {l.nome || l.nome_wa || "Sem nome"}
           </strong>
-          <div style={{ fontSize: 13, color: cor.cinza, marginTop: 2 }}>
+          <div style={{ fontSize: 15, color: cor.cinza, marginTop: 2 }}>
             {l.telefone} · {doWhats ? "escreveu no WhatsApp" : l.origem === "manual" ? "prospecção" : l.origem}
             {" · "}{l.status}
           </div>
-          {l.jazigo_ref && <div style={{ fontSize: 13, color: cor.cinza }}>Jazigo: {l.jazigo_ref}</div>}
+          {l.jazigo_ref && <div style={{ fontSize: 15, color: cor.cinza }}>Jazigo: {l.jazigo_ref}</div>}
           {l.contexto && (
             <p style={{ fontSize: 14, color: "#334155", margin: "8px 0 0", background: "#f8fafc",
                         padding: 10, borderRadius: 8 }}>{l.contexto}</p>
           )}
           {msgs.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 12, color: cor.cinza, textTransform: "uppercase" }}>O que escreveu:</div>
+              <div style={{ fontSize: 14, color: cor.cinza, textTransform: "uppercase" }}>O que escreveu:</div>
               {msgs.slice(-3).map((m: any, i: number) => (
                 <p key={i} style={{ fontSize: 14, margin: "4px 0", color: "#334155" }}>“{m.texto}”</p>
               ))}
@@ -184,7 +184,7 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
       {sugestao && (
         <div style={{ marginTop: 12, padding: 12, background: "#f0fdfa", borderRadius: 10,
                       border: `1px solid ${cor.teal}` }}>
-          <div style={{ fontSize: 12, color: cor.teal, textTransform: "uppercase", marginBottom: 6 }}>
+          <div style={{ fontSize: 14, color: cor.teal, textTransform: "uppercase", marginBottom: 6 }}>
             Sugestão — leia e ajuste antes de mandar
           </div>
           <textarea style={{ ...painel.input, minHeight: 90, fontFamily: "inherit" }}

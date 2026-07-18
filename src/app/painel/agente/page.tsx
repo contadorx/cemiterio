@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
+import Modelos from "./Modelos";
 
 export default function Agente() {
+  const [aba, setAba] = useState<"ensinar" | "modelos">("ensinar");
   const [conhecimento, setConhecimento] = useState("");
   const [tom, setTom] = useState("");
   const [msgLead, setMsgLead] = useState("");
@@ -40,6 +42,16 @@ export default function Agente() {
       <PainelNav atual="/painel/agente" />
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Treino do agente</h1>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {([["ensinar", "Ensinar a IA"], ["modelos", "Modelos e custo"]] as const).map(([v, rot]) => (
+            <button key={v} style={aba === v ? painel.botao : painel.botaoSec}
+                    onClick={() => setAba(v)}>{rot}</button>
+          ))}
+        </div>
+
+        {aba === "modelos" && <Modelos />}
+        {aba === "ensinar" && (<>
         <p style={{ color: cor.cinza, marginTop: -10 }}>
           Isto vale para <b>todos</b> os atendimentos. Para instruções de um contato específico,
           use a ficha do cliente.
@@ -88,6 +100,7 @@ export default function Agente() {
         <div style={{ marginTop: 20 }}>
           <Simulador />
         </div>
+        </>)}
       </div>
     </div>
   );
@@ -131,14 +144,14 @@ function Simulador() {
   return (
     <div style={painel.card}>
       <strong style={{ color: cor.navy }}>Simulador de treino</strong>
-      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+      <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
         Converse com a IA como se fosse um cliente. <b>Nada é enviado no WhatsApp nem gravado</b> — serve
         para você testar o conhecimento e o tom acima. Se a resposta não ficar boa, ajuste o texto e teste de novo.
       </p>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {exemplos.map((e) => (
-          <button key={e} style={{ ...painel.botaoSec, padding: "8px 12px", fontSize: 13, minHeight: 0 }} onClick={() => enviar(e)}>
+          <button key={e} style={{ ...painel.botaoSec, padding: "8px 12px", fontSize: 15, minHeight: 0 }} onClick={() => enviar(e)}>
             {e}
           </button>
         ))}
@@ -164,7 +177,7 @@ function Simulador() {
               {m.texto}
             </div>
             {m.meta && (
-              <div style={{ fontSize: 12, color: cor.cinza, marginTop: 4 }}>
+              <div style={{ fontSize: 14, color: cor.cinza, marginTop: 4 }}>
                 assunto: {m.meta.assunto} · confiança: {m.meta.confianca}
                 {m.meta.precisaHumano ? " · ⚠️ iria pra você aprovar" : " · ✓ sairia automático"}
                 {m.meta.motivo ? ` · ${m.meta.motivo}` : ""}

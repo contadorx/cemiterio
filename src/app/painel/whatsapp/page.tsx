@@ -113,10 +113,10 @@ export default function WhatsappPage() {
             <strong style={{ color: cor.navy }}>{b.rotulo}</strong>
           </div>
           {instancia && (
-            <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0" }}>Instância: {instancia}</p>
+            <p style={{ color: cor.cinza, fontSize: 15, margin: "8px 0 0" }}>Instância: {instancia}</p>
           )}
           {detalhe && (
-            <p style={{ color: "#b45309", fontSize: 13, margin: "8px 0 0" }}>{detalhe}</p>
+            <p style={{ color: "#b45309", fontSize: 15, margin: "8px 0 0" }}>{detalhe}</p>
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
@@ -138,7 +138,7 @@ export default function WhatsappPage() {
             </button>
           </div>
           {msgWebhook && (
-            <p style={{ fontSize: 13, color: cor.cinza, marginTop: 10, wordBreak: "break-all" }}>{msgWebhook}</p>
+            <p style={{ fontSize: 15, color: cor.cinza, marginTop: 10, wordBreak: "break-all" }}>{msgWebhook}</p>
           )}
         </section>
 
@@ -149,7 +149,7 @@ export default function WhatsappPage() {
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qr} alt="QR do WhatsApp" style={{ width: 260, height: 260, imageRendering: "pixelated" }} />
-            <p style={{ color: cor.cinza, fontSize: 13 }}>
+            <p style={{ color: cor.cinza, fontSize: 15 }}>
               O QR expira rápido. Se der tempo limite, clique em “Conectar” de novo.
             </p>
           </section>

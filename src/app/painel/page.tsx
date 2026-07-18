@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "./ui";
+import InstalarApp from "../InstalarApp";
 
 export default function Painel() {
   const [cap, setCap] = useState<any>(null);
@@ -48,6 +49,7 @@ export default function Painel() {
     <div style={painel.wrap}>
       <PainelNav atual="/painel" />
       <div style={painel.conteudo}>
+        <InstalarApp />
         <h1 style={painel.h1}>Início</h1>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
@@ -145,7 +147,7 @@ export default function Painel() {
                 <li><b>{diag.alocacao.agendados}</b> limpeza(s) distribuída(s) em <b>{diag.alocacao.dias}</b> dia(s) de trabalho</li>
               </ul>
               {diag.geracao.criados === 0 && diag.geracao.foraDoHorizonte > 0 && (
-                <p style={{ color: cor.navy, fontSize: 13, margin: "10px 0 0" }}>
+                <p style={{ color: cor.navy, fontSize: 15, margin: "10px 0 0" }}>
                   Quer enxergar mais longe? Aumente o período acima para {diag.geracao.horizonteDias < 90 ? "90 dias" : "1 ano"} e gere de novo.
                 </p>
               )}
@@ -163,7 +165,7 @@ function Metrica({ titulo, valor, cor: c }: { titulo: string; valor: string; cor
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 800, color: c }}>{valor}</div>
-      <div style={{ fontSize: 13, color: "#64748b" }}>{titulo}</div>
+      <div style={{ fontSize: 15, color: "#64748b" }}>{titulo}</div>
     </div>
   );
 }

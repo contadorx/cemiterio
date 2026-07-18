@@ -171,7 +171,7 @@ function Relatorio() {
 function Cartao({ titulo, valor, cor: c }: { titulo: string; valor: string; cor: string }) {
   return (
     <div style={{ ...painel.card, marginBottom: 0 }}>
-      <div style={{ fontSize: 13, color: cor.cinza }}>{titulo}</div>
+      <div style={{ fontSize: 15, color: cor.cinza }}>{titulo}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: c, marginTop: 4 }}>{valor}</div>
     </div>
   );
@@ -251,7 +251,7 @@ function Gestao() {
       {r.naoLancado > 0 && (
         <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
           <strong style={{ color: "#92400e" }}>{money(r.naoLancado)} recebido das famílias sem lançamento aqui</strong>
-          <p style={{ color: "#78350f", fontSize: 13, margin: "6px 0 0" }}>
+          <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 0" }}>
             As famílias pagaram {money(r.recebidoFamilias)} este mês, mas só {money(r.entradas)} está
             classificado no fluxo de caixa. Lance a diferença como entrada para o resultado ficar certo.
           </p>
@@ -334,7 +334,7 @@ function Gestao() {
                 {l.categorias_financeiras?.nome || "Sem categoria"}
                 {l.descricao ? <span style={{ color: cor.cinza }}> · {l.descricao}</span> : null}
               </div>
-              <div style={{ fontSize: 12, color: cor.cinza }}>
+              <div style={{ fontSize: 14, color: cor.cinza }}>
                 {new Date(l.data + "T12:00:00").toLocaleDateString("pt-BR")}
                 {l.automatico ? " · automático" : ""}
               </div>
@@ -344,7 +344,7 @@ function Gestao() {
                 {l.tipo === "entrada" ? "+" : "−"} {money(l.valor)}
               </b>
               {!l.automatico && (
-                <button style={{ ...painel.botaoSec, padding: "4px 10px", fontSize: 12 }}
+                <button style={{ ...painel.botaoSec, padding: "4px 10px", fontSize: 14 }}
                         onClick={() => excluir(l.id)}>excluir</button>
               )}
             </div>
@@ -359,9 +359,9 @@ function CartaoGestao({ titulo, valor, cor: c, rodape, destaque }:
   { titulo: string; valor: string; cor: string; rodape?: string; destaque?: boolean }) {
   return (
     <div style={{ ...painel.card, marginBottom: 0, borderTop: `3px solid ${c}` }}>
-      <div style={{ fontSize: 12, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{titulo}</div>
+      <div style={{ fontSize: 14, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{titulo}</div>
       <div style={{ fontSize: destaque ? 26 : 22, fontWeight: 700, color: c, marginTop: 4 }}>{valor}</div>
-      {rodape && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{rodape}</div>}
+      {rodape && <div style={{ fontSize: 14, color: "#6b7280", marginTop: 4 }}>{rodape}</div>}
     </div>
   );
 }
@@ -370,8 +370,8 @@ function LinhaGestao({ nome, qtd, valor, sub }: { nome: string; qtd: number; val
   return (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0",
                   borderTop: "1px solid #e2e8f0", marginTop: 8 }}>
-      <span>{nome} {sub && <span style={{ fontSize: 11, color: "#6b7280" }}>({sub})</span>}
-        <span style={{ color: "#6b7280", fontSize: 12 }}> · {qtd}x</span></span>
+      <span>{nome} {sub && <span style={{ fontSize: 15, color: "#6b7280" }}>({sub})</span>}
+        <span style={{ color: "#6b7280", fontSize: 14 }}> · {qtd}x</span></span>
       <b>{valor}</b>
     </div>
   );
@@ -416,7 +416,7 @@ function PorJazigo() {
       {d.semMedicao > 0 && (
         <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
           <strong style={{ color: "#92400e" }}>{d.semMedicao} jazigo(s) sem tempo medido</strong>
-          <p style={{ color: "#78350f", fontSize: 13, margin: "6px 0 0" }}>
+          <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 0" }}>
             O custo de mão de obra só aparece quando a Nina usa &ldquo;Começar&rdquo; e
             &ldquo;Finalizar&rdquo; no app. Até lá, esses jazigos mostram margem cheia — que não é real.
           </p>
@@ -425,7 +425,7 @@ function PorJazigo() {
 
       <div style={painel.card}>
         <strong style={{ color: cor.navy }}>Do pior para o melhor</strong>
-        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 10px" }}>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 10px" }}>
           Margem = o que a família paga menos o tempo gasto e o material.
         </p>
         {d.jazigos.map((j: any) => {
@@ -436,13 +436,13 @@ function PorJazigo() {
               <div style={{ flex: 1, minWidth: 200 }}>
                 <b style={{ color: cor.navy }}>{j.jazigo}</b>
                 <span style={{ color: cor.cinza }}> · {j.cliente || "—"}</span>
-                <div style={{ fontSize: 13, color: cor.cinza }}>
+                <div style={{ fontSize: 15, color: cor.cinza }}>
                   {j.quadra}{j.rua ? ` · ${j.rua}` : ""} · {j.limpezas} limpeza(s)
                   {semTempo ? " · tempo não medido" : ` · ${j.minutos} min`}
                 </div>
               </div>
               <div style={{ textAlign: "right", minWidth: 150 }}>
-                <div style={{ fontSize: 13, color: cor.cinza }}>
+                <div style={{ fontSize: 15, color: cor.cinza }}>
                   {money(j.receita)} − {money(j.custo_total)}
                 </div>
                 <b style={{ color: Number(j.margem) < 0 ? "#dc2626" : cor.teal, fontSize: 16 }}>

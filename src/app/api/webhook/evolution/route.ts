@@ -4,6 +4,9 @@ import { env } from "@/lib/env";
 import { normalizarTelefone } from "@/lib/evolution";
 import { registrarEntrada, aguardarEProcessar } from "@/lib/atendimento";
 import { tratarLead } from "@/lib/leads";
+import { transcreverAudio } from "@/lib/transcricao";
+import { avisarMensagemNova } from "@/lib/push";
+import { baixarMidiaBase64 } from "@/lib/evolution";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { registrarErro } from "@/lib/monitor";
 
@@ -101,16 +104,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ignorado: "duplicado" });
     }
 
+    // ÁUDIO: transcreve antes de registrar, para a conversa já nascer com o texto.
+    // A família manda áudio porque é mais fácil que digitar — o sistema não pode
+    // devolver "[áudio]" e obrigar alguém a ouvir para saber do que se trata.
+    let textoFinal = p.texto;
+    let transcrito = false;
+    if (p.temAudio && !p.texto) {
+      try {
+        const midia = await baixarMidiaBase64(body?.data);
+        if (midia?.base64) {
+          const t = await transcreverAudio(midia.base64, midia.mimetype || "audio/ogg");
+          if (t && t.trim()) {
+            textoFinal = t.trim();
+            transcrito = true;
+          }
+        }
+      } catch (e: any) {
+        console.error("[webhook] falha ao transcrever áudio:", e?.message || e);
+      }
+    }
+
     const reg = await registrarEntrada({
       telefone: p.telefone,
-      texto: p.texto,
+      texto: textoFinal,
+      transcrito,
       temMidia: p.temMidia,
       temAudio: p.temAudio,
       mensagemRaw: body?.data,
     });
 
     if (reg.tipo === "lead") {
-      await tratarLead(p.telefone, p.texto || (p.temAudio ? "[áudio]" : "[mídia]"), p.pushName);
+      await tratarLead(
+        p.telefone,
+        textoFinal || (p.temAudio ? "[áudio que não consegui transcrever]" : "[mídia]"),
+        p.pushName
+      );
       return NextResponse.json({ ok: true, resultado: "lead" });
     }
     if (reg.tipo === "ignorado" || reg.tipo === "escalado") {
@@ -119,8 +147,14 @@ export async function POST(req: NextRequest) {
 
     // Sem agendador: responde ao Evolution já e processa a rajada em background,
     // esperando a janela de debounce. Funciona no plano Hobby (sem cron/minuto).
+    // avisa no celular de quem cuida do painel — só de família, só o que
+    // ainda não foi respondido. Não trava o webhook se falhar.
+    waitUntil(
+      avisarMensagemNova(reg.nomeCliente || "Uma família", textoFinal || "[mídia]", reg.conversaId)
+        .catch(() => 0)
+    );
     waitUntil(aguardarEProcessar(reg.conversaId));
-    return NextResponse.json({ ok: true, resultado: "agendado" });
+    return NextResponse.json({ ok: true, resultado: "agendado", transcrito });
   } catch (e: any) {
     console.error("[webhook] erro ao processar:", e?.message || e);
     await registrarErro("webhook", e, { telefone: p?.telefone });

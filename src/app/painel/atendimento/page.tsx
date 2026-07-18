@@ -47,7 +47,7 @@ export default function Atendimento() {
           <div key={it.id} style={painel.card}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <strong style={{ color: cor.navy }}>{it.cliente}</strong>
-              <span style={{ fontSize: 12, color: cor.cinza, textTransform: "uppercase" }}>{it.assunto}</span>
+              <span style={{ fontSize: 14, color: cor.cinza, textTransform: "uppercase" }}>{it.assunto}</span>
             </div>
             <textarea
               style={{ ...painel.input, minHeight: 90, resize: "vertical", fontFamily: "inherit" }}

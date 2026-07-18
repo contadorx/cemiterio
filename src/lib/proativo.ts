@@ -114,6 +114,18 @@ export async function cobrancaGentil(): Promise<number> {
     const regua = (c as any).regua_cobranca || "padrao";
     if (regua === "nao_cobrar") continue;               // respeita a régua da família
 
+    // "contra_foto": só cobra o que já foi entregue. Cobrar antes da foto é
+    // quebrar o combinado — a foto é a prova do serviço.
+    const { data: pendenteEntrega } = await db
+      .from("servicos")
+      .select("id,planos!inner(momento_cobranca)")
+      .eq("org_id", org)
+      .eq("cliente_id", (c as any).id)
+      .eq("planos.momento_cobranca", "contra_foto")
+      .neq("status", "executado")
+      .limit(1);
+    const temEntregaPendente = (pendenteEntrega || []).length > 0;
+
     const nivel = Number((c as any).cobranca_nivel) || 0;
     // 'suave' manda um único lembrete; as outras seguem o máximo configurado
     const maxLembretes = regua === "suave" ? 1 : Number((c as any).max_lembretes) || 3;
@@ -123,6 +135,10 @@ export async function cobrancaGentil(): Promise<number> {
     if (!diasAtras((c as any).cobranca_em, espera)) continue;
 
     const s = await calcularSaldo((c as any).id);
+
+    // "contra_foto": se ainda há lavagem por entregar, não é hora de cobrar —
+    // a foto é a prova do serviço, e cobrar antes quebra o combinado.
+    if (temEntregaPendente && s.saldo >= -0.005) continue;
     if (s.saldo >= -0.005) continue;
 
     const valor = Math.abs(s.saldo).toFixed(2);

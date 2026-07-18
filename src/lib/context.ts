@@ -125,22 +125,57 @@ export async function carregarConfigIa(): Promise<{ conhecimento: string | null;
 }
 
 // Últimas N mensagens da conversa aberta, no formato do Anthropic.
+/**
+ * Histórico da conversa COM NOÇÃO DE TEMPO.
+ *
+ * Sem isso a IA lê "vou pagar semana que vem" e não sabe se foi ontem ou em
+ * março — e responde como se a conversa tivesse acabado de acontecer. Marcar a
+ * passagem do tempo é o que transforma mensagens soltas em conversa contínua.
+ */
+function quandoFoi(iso: string): string | null {
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (dias >= 365) return `há mais de um ano`;
+  if (dias >= 60) return `há ${Math.floor(dias / 30)} meses`;
+  if (dias >= 30) return `há um mês`;
+  if (dias >= 7) return `há ${Math.floor(dias / 7)} semanas`;
+  if (dias >= 2) return `há ${dias} dias`;
+  if (dias === 1) return `ontem`;
+  return null;   // hoje: não precisa marcar
+}
+
 export async function historicoConversa(
   conversaId: string,
-  limite = 12
+  limite = 30
 ): Promise<{ role: "user" | "assistant"; content: string }[]> {
   const db = supabaseAdmin();
   const { data } = await db
     .from("mensagens")
-    .select("autor,texto")
+    .select("autor,texto,created_at,transcrita")
     .eq("org_id", env.orgId())
     .eq("conversa_id", conversaId)
     .order("created_at", { ascending: false })
     .limit(limite);
 
   const rows = (data || []).reverse();
-  return rows.map((m: any) => ({
-    role: m.autor === "cliente" ? "user" : "assistant",
-    content: m.texto || "",
-  }));
+  const saida: { role: "user" | "assistant"; content: string }[] = [];
+  let ultimoDia = "";
+
+  for (const m of rows as any[]) {
+    const dia = String(m.created_at || "").slice(0, 10);
+    let texto = m.texto || "";
+
+    // marca a passagem de tempo quando muda o dia
+    if (dia && dia !== ultimoDia) {
+      const marca = quandoFoi(m.created_at);
+      if (marca) texto = `[${marca}] ${texto}`;
+      ultimoDia = dia;
+    }
+    if (m.transcrita) texto = `${texto}  (isto veio por áudio)`;
+
+    saida.push({
+      role: m.autor === "cliente" ? "user" : "assistant",
+      content: texto,
+    });
+  }
+  return saida;
 }

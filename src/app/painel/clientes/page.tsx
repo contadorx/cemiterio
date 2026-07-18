@@ -45,7 +45,7 @@ export default function Clientes() {
         <h1 style={painel.h1}>Famílias</h1>
 
         <div style={{ ...painel.card, padding: 12 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input style={{ ...painel.input, flex: 1, minWidth: 180 }} value={f.busca}
                    onChange={(e) => setF({ ...f, busca: e.target.value })}
                    placeholder="Buscar por nome, telefone ou jazigo…" />
@@ -92,7 +92,7 @@ export default function Clientes() {
               <option value="lavagem">Próxima lavagem</option>
               <option value="cobranca">Próxima cobrança</option>
             </select>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: cor.cinza }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: cor.cinza }}>
               <input type="checkbox" checked={f.teste}
                      onChange={(e) => setF({ ...f, teste: e.target.checked })} /> teste
             </label>
@@ -134,16 +134,16 @@ export default function Clientes() {
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <strong style={{ color: cor.navy, fontSize: 16 }}>{c.nome}</strong>
-                  <div style={{ fontSize: 13, color: cor.cinza, marginTop: 3 }}>
+                  <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
                     {c.jazigos.map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
                   </div>
-                  <div style={{ fontSize: 13, color: cor.cinza, marginTop: 3 }}>
+                  <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
                     {c.cadencias.join(", ") || "sem plano"}
                     {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}
                   </div>
-                  <div style={{ fontSize: 13, marginTop: 3,
+                  <div style={{ fontSize: 15, marginTop: 3,
                                 color: c.faltaData ? "#d97706" : cor.cinza }}>
                     {c.proximaLavagem
                       ? `Lava em ${new Date(c.proximaLavagem + "T12:00:00").toLocaleDateString("pt-BR")}`
@@ -159,7 +159,7 @@ export default function Clientes() {
                   <b style={{ color: c.atrasado ? "#dc2626" : c.saldo > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
                     {c.saldo === 0 ? "em dia" : money(Math.abs(c.saldo))}
                   </b>
-                  <div style={{ fontSize: 12, color: cor.cinza }}>
+                  <div style={{ fontSize: 14, color: cor.cinza }}>
                     {c.atrasado ? "em aberto" : c.saldo > 0 ? "de crédito" : ""}
                   </div>
                 </div>
@@ -291,7 +291,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
           <label style={painel.rotulo}>
             Cole as linhas (nome; telefone; jazigo; quadra; rua; periodicidade; valor mensal)
           </label>
-          <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 13 }}
+          <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 15 }}
                     value={csv} onChange={(e) => setCsv(e.target.value)}
                     placeholder={"MARIA SILVA;11999998888;Família SILVA;QD 1;RUA 2;mensal;40"} />
           <button style={{ ...painel.botao, marginTop: 10 }} onClick={importar} disabled={ocupado}>

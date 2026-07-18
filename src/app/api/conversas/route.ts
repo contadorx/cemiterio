@@ -11,6 +11,37 @@ export const dynamic = "force-dynamic";
  * ?busca    = nome ou telefone
  * ?de / ?ate = período (data da última movimentação)
  */
+/**
+ * Em que pé está a conversa:
+ *  sem_resposta       — a família falou e ninguém respondeu ainda
+ *  lida_sem_resposta  — alguém abriu, mas não respondeu
+ *  respondida         — respondemos depois da última fala dela
+ *  sem_movimento      — a família não falou nada desde a última resposta
+ */
+function estadoDa(c: any): string {
+  const familia = c.ultima_msg_cliente_em ? new Date(c.ultima_msg_cliente_em).getTime() : 0;
+  if (!familia) return "sem_movimento";
+  const resposta = c.respondida_em ? new Date(c.respondida_em).getTime() : 0;
+  if (resposta > familia) return "respondida";
+  const lida = c.lida_em ? new Date(c.lida_em).getTime() : 0;
+  return lida > familia ? "lida_sem_resposta" : "sem_resposta";
+}
+
+/** Há quanto tempo a família espera. */
+function esperaDe(c: any): string | null {
+  if (!c.ultima_msg_cliente_em) return null;
+  const resposta = c.respondida_em ? new Date(c.respondida_em).getTime() : 0;
+  const familia = new Date(c.ultima_msg_cliente_em).getTime();
+  if (resposta > familia) return null;
+
+  const min = Math.floor((Date.now() - familia) / 60000);
+  if (min < 60) return `${Math.max(1, min)} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "1 dia" : `${d} dias`;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
@@ -25,7 +56,7 @@ export async function GET(req: NextRequest) {
 
   let sel = db
     .from("conversas")
-    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,tipo,fixada,membro_id,clientes(nome,telefone)")
+    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,tipo,fixada,membro_id,ultimo_autor,ultima_msg_em,aguardando_desde,respondida_em,clientes(nome,telefone,foto_url)")
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -35,6 +66,7 @@ export async function GET(req: NextRequest) {
   if (situacao === "escaladas") sel = sel.eq("escalada_humano", true);
   if (situacao === "resolvidas") sel = sel.eq("resolvida", true);
   if (situacao === "pendentes") sel = sel.eq("resolvida", false);
+  if (situacao === "aguardando") sel = sel.not("aguardando_desde", "is", null);
 
   if (assunto) sel = sel.eq("ultimo_assunto", assunto);
   if (de) sel = sel.gte("updated_at", de);
@@ -77,10 +109,19 @@ export async function GET(req: NextRequest) {
     for (const r of rasc || []) comRascunho.add((r as any).conversa_id);
   }
 
+  // quem espera há mais tempo aparece antes
+  lista.sort((a: any, b: any) => {
+    const ea = a.aguardando_desde ? new Date(a.aguardando_desde).getTime() : Infinity;
+    const eb = b.aguardando_desde ? new Date(b.aguardando_desde).getTime() : Infinity;
+    return ea - eb;
+  });
+
   // "pendentes" de verdade: com rascunho a aprovar OU escalada.
   // A caixa da equipe nunca é filtrada — ela fica sempre visível.
   if (situacao === "pendentes") {
-    lista = lista.filter((c: any) => c.tipo === "equipe" || comRascunho.has(c.id) || c.escalada_humano);
+    lista = lista.filter((c: any) =>
+      c.tipo === "equipe" || comRascunho.has(c.id) || c.escalada_humano ||
+      estadoDa(c) === "sem_resposta" || estadoDa(c) === "lida_sem_resposta");
   }
 
   // nome dos membros, para rotular a caixa da equipe
@@ -104,8 +145,18 @@ export async function GET(req: NextRequest) {
     resolvida: c.resolvida,
     arquivada: !!c.arquivada_em,
     atualizada: c.updated_at,
+    estado: estadoDa(c),
+    esperandoHa: esperaDe(c),
     rascunhoPendente: comRascunho.has(c.id),
     ultima: ultima.get(c.id) || null,
+    foto: c.clientes?.foto_url || null,
+    // estado: de quem é a bola?
+    ultimoAutor: c.ultimo_autor || null,
+    aguardandoDesde: c.aguardando_desde || null,
+    respondidaEm: c.respondida_em || null,
+    horasEsperando: c.aguardando_desde
+      ? Math.floor((Date.now() - new Date(c.aguardando_desde).getTime()) / 3600000)
+      : null,
   }));
 
   // contadores para os botões de filtro
@@ -113,6 +164,13 @@ export async function GET(req: NextRequest) {
     .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("resolvida", false);
   const { count: nEsc } = await db.from("conversas")
     .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("escalada_humano", true);
+  const { count: nAguard } = await db.from("conversas")
+    .select("id", { count: "exact", head: true }).is("arquivada_em", null)
+    .not("aguardando_desde", "is", null);
+  const { data: todasAbertas } = await db.from("conversas")
+    .select("ultima_msg_cliente_em,lida_em,respondida_em").is("arquivada_em", null);
+  const semResposta = (todasAbertas || []).filter((c: any) => estadoDa(c) === "sem_resposta").length;
+
   const { count: nArq } = await db.from("conversas")
     .select("id", { count: "exact", head: true }).not("arquivada_em", "is", null);
 
@@ -125,6 +183,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     conversas,
-    contadores: { pendentes: nPend || 0, escaladas: nEsc || 0, arquivadas: nArq || 0 },
+    contadores: { pendentes: nPend || 0, escaladas: nEsc || 0,
+                  aguardando: nAguard || 0, arquivadas: nArq || 0 },
   });
 }
