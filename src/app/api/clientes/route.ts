@@ -6,20 +6,109 @@ import { normalizarTelefone } from "@/lib/evolution";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
   const db = auth.db;
+  const q = req.nextUrl.searchParams;
 
-  const { data } = await db
+  const { data: clientes } = await db
     .from("clientes")
-    .select("id,nome,telefone,modo,score,ativo_ia")
-    .order("nome", { ascending: true });
+    .select("id,nome,telefone,modo,score,ativo_ia,regua_cobranca,cobranca_nivel,anonimizado_em,observacoes")
+    .order("nome")
+    .limit(400);
 
-  return NextResponse.json({ ok: true, clientes: data || [] });
+  const ids = (clientes || []).map((c: any) => c.id);
+
+  const [{ data: tums }, { data: plans }, { data: movs }] = await Promise.all([
+    db.from("tumulos").select("cliente_id,identificacao,rua,quadra_id,quadras(codigo)").in("cliente_id", ids.length ? ids : ["-"]),
+    db.from("planos").select("cliente_id,cadencia,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate").in("cliente_id", ids.length ? ids : ["-"]),
+    db.from("movimentos").select("cliente_id,tipo,valor,status_conc").in("cliente_id", ids.length ? ids : ["-"]),
+  ]);
+
+  const porCliente = new Map<string, any>();
+  for (const c of (clientes || []) as any[]) {
+    porCliente.set(c.id, { ...c, jazigos: [], cadencias: [], saldo: 0, mensal: 0, proximaLavagem: null, proximaCobranca: null });
+  }
+  for (const t of (tums || []) as any[]) {
+    const x = porCliente.get(t.cliente_id); if (!x) continue;
+    x.jazigos.push({ id: t.identificacao, quadra: t.quadras?.codigo || "", rua: t.rua || "" });
+  }
+  for (const p of (plans || []) as any[]) {
+    const x = porCliente.get(p.cliente_id); if (!x) continue;
+    if (p.ativo) {
+      x.cadencias.push(p.cadencia);
+      x.mensal += Number(p.valor_mensal) || 0;
+      if (p.proximo_servico && (!x.proximaLavagem || p.proximo_servico < x.proximaLavagem)) x.proximaLavagem = p.proximo_servico;
+      if (p.proxima_cobranca && (!x.proximaCobranca || p.proxima_cobranca < x.proximaCobranca)) x.proximaCobranca = p.proxima_cobranca;
+    }
+  }
+  for (const m of (movs || []) as any[]) {
+    const x = porCliente.get(m.cliente_id); if (!x) continue;
+    if (m.status_conc !== "confirmado") continue;
+    x.saldo += m.tipo === "credito" ? Number(m.valor) : -Number(m.valor);
+  }
+
+  let lista = [...porCliente.values()].map((c) => ({
+    ...c,
+    saldo: Math.round(c.saldo * 100) / 100,
+    mensal: Math.round(c.mensal * 100) / 100,
+    cadencias: [...new Set(c.cadencias)],
+    quadras: [...new Set(c.jazigos.map((j: any) => j.quadra).filter(Boolean))],
+    ruas: [...new Set(c.jazigos.map((j: any) => j.rua).filter(Boolean))],
+    atrasado: c.saldo < -0.005,
+  }));
+
+  // ------------------------------- filtros
+  const busca = (q.get("busca") || "").trim().toLowerCase();
+  if (busca) {
+    lista = lista.filter((c) =>
+      String(c.nome).toLowerCase().includes(busca) ||
+      String(c.telefone).includes(busca) ||
+      c.jazigos.some((j: any) => String(j.id).toLowerCase().includes(busca)));
+  }
+  const quadra = q.get("quadra") || "";
+  if (quadra) lista = lista.filter((c) => c.quadras.includes(quadra));
+  const rua = q.get("rua") || "";
+  if (rua) lista = lista.filter((c) => c.ruas.includes(rua));
+  const cadencia = q.get("cadencia") || "";
+  if (cadencia) lista = lista.filter((c) => c.cadencias.includes(cadencia));
+  const regua = q.get("regua") || "";
+  if (regua) lista = lista.filter((c) => c.regua_cobranca === regua);
+
+  const situacao = q.get("situacao") || "";
+  if (situacao === "atrasados") lista = lista.filter((c) => c.atrasado);
+  if (situacao === "em_dia") lista = lista.filter((c) => !c.atrasado);
+  if (situacao === "adiantados") lista = lista.filter((c) => c.saldo > 0.005);
+  if (situacao === "sem_telefone") lista = lista.filter((c) => String(c.telefone).startsWith("sem-tel"));
+  if (situacao === "ia_desligada") lista = lista.filter((c) => !c.ativo_ia);
+  if (situacao === "automatico") lista = lista.filter((c) => c.modo === "automatico");
+
+  const venceEm = Number(q.get("venceEm") || 0);
+  if (venceEm > 0) {
+    const limite = new Date(Date.now() + venceEm * 86400000).toISOString().slice(0, 10);
+    const hoje = new Date().toISOString().slice(0, 10);
+    lista = lista.filter((c) =>
+      (c.proximaCobranca && c.proximaCobranca <= limite) ||
+      (c.proximaLavagem && c.proximaLavagem >= hoje && c.proximaLavagem <= limite));
+  }
+  if (q.get("teste") !== "1") lista = lista.filter((c) => !String(c.nome).startsWith("[TESTE]"));
+
+  const ordem = q.get("ordem") || "nome";
+  if (ordem === "saldo") lista.sort((a, b) => a.saldo - b.saldo);
+  if (ordem === "valor") lista.sort((a, b) => b.mensal - a.mensal);
+  if (ordem === "lavagem") lista.sort((a, b) => String(a.proximaLavagem || "9").localeCompare(String(b.proximaLavagem || "9")));
+
+  const totais = {
+    quantidade: lista.length,
+    mensal: Math.round(lista.reduce((s, c) => s + c.mensal, 0) * 100) / 100,
+    emAberto: Math.round(lista.filter((c) => c.atrasado).reduce((s, c) => s + Math.abs(c.saldo), 0) * 100) / 100,
+    atrasados: lista.filter((c) => c.atrasado).length,
+  };
+
+  return NextResponse.json({ ok: true, clientes: lista, totais });
 }
 
-// POST { nome, telefone, modo?, tumulo?:{identificacao,quadraCodigo,falecidoNome?}, plano?:{cadencia,qtdPorPassagem,valorVigente} }
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase-admin";
+import { redigir } from "./redator";
 import { env } from "./env";
 import { calcularSaldo } from "./financeiro";
 

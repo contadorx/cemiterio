@@ -301,3 +301,103 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   return { agendados, dias };
 }
+
+// ============================================================================
+// CALENDÁRIO DE UM MÊS ESPECÍFICO
+// Gera o que os planos devem NAQUELE mês, sem tocar no que já existe.
+// Também permite incluir os AVULSOS que só contratam para uma data — o caso do
+// Finados, em que a família paga apenas por aquela ida.
+// ============================================================================
+export interface CalendarioMes {
+  mes: string;
+  criados: number;
+  jaExistiam: number;
+  avulsosIncluidos: number;
+  planosNoMes: number;
+  agendados: number;
+  dias: number;
+}
+
+export async function gerarCalendarioMes(
+  mes: string,                       // "2026-11"
+  opcoes?: { incluirAvulsos?: boolean; dataAvulsos?: string; distribuir?: boolean }
+): Promise<CalendarioMes> {
+  const db = supabaseAdmin();
+  const org = env.orgId();
+
+  const ini = `${mes}-01`;
+  const d = new Date(ini + "T00:00:00Z");
+  const fim = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+
+  const { data: planos } = await db
+    .from("planos")
+    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,valor_vigente,proximo_servico")
+    .eq("org_id", org)
+    .eq("ativo", true);
+
+  let criados = 0;
+  let jaExistiam = 0;
+  let planosNoMes = 0;
+  let avulsosIncluidos = 0;
+
+  for (const p of (planos || []) as any[]) {
+    const ehAvulso = !DIAS_CICLO[p.cadencia];
+
+    // avulso só entra se pedirem explicitamente (ex.: campanha de Finados)
+    if (ehAvulso) {
+      if (!opcoes?.incluirAvulsos) continue;
+      const data = opcoes?.dataAvulsos || fim;
+      if (data < ini || data > fim) continue;
+
+      const { data: existe } = await db
+        .from("servicos").select("id")
+        .eq("org_id", org).eq("plano_id", p.id).eq("data_prevista", data)
+        .in("status", ["pendente", "agendado"]).maybeSingle();
+      if (existe) { jaExistiam++; continue; }
+
+      const { error } = await db.from("servicos").insert({
+        org_id: org, tumulo_id: p.tumulo_id, plano_id: p.id, cliente_id: p.cliente_id,
+        data_prevista: data, status: "pendente", valor: p.valor_vigente, prioridade: 5,
+      });
+      if (!error) { criados++; avulsosIncluidos++; }
+      continue;
+    }
+
+    // recorrentes: percorre o ciclo até cobrir o mês pedido
+    const cicloDias = DIAS_CICLO[p.cadencia];
+    const qtd = Math.max(1, Number(p.qtd_por_passagem) || 1);
+    const passo = Math.max(1, Math.round(cicloDias / qtd));
+
+    let prox: string = p.proximo_servico || isoHoje();
+    let guarda = 0;
+    while (prox < ini && guarda < 400) { prox = addDias(prox, passo); guarda++; }
+
+    let entrouNoMes = false;
+    while (prox >= ini && prox <= fim && guarda < 400) {
+      guarda++;
+      entrouNoMes = true;
+
+      const { data: existe } = await db
+        .from("servicos").select("id")
+        .eq("org_id", org).eq("plano_id", p.id).eq("data_prevista", prox)
+        .in("status", ["pendente", "agendado", "executado"]).maybeSingle();
+
+      if (existe) jaExistiam++;
+      else {
+        const { error } = await db.from("servicos").insert({
+          org_id: org, tumulo_id: p.tumulo_id, plano_id: p.id, cliente_id: p.cliente_id,
+          data_prevista: prox, status: "pendente", valor: p.valor_vigente,
+        });
+        if (!error) criados++;
+      }
+      prox = addDias(prox, passo);
+    }
+    if (entrouNoMes) planosNoMes++;
+  }
+
+  const aloc = opcoes?.distribuir === false
+    ? { agendados: 0, dias: 0 }
+    : await alocarAgenda();
+
+  return { mes, criados, jaExistiam, avulsosIncluidos, planosNoMes, ...aloc };
+}

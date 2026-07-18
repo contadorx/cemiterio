@@ -1,16 +1,24 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
-import { enviarTextoComRetry } from "./envio";
 
-// Número desconhecido escreveu: registrar como lead (em vez de silêncio total).
-// Na primeira mensagem, se houver saudação configurada, responde UMA vez.
+/**
+ * NÚMERO DESCONHECIDO — apenas REGISTRA, nunca responde.
+ *
+ * O WhatsApp é o número pessoal da Sureya. Uma mensagem de número desconhecido
+ * pode ser uma amiga, um parente, alguém do outro trabalho ou um engano.
+ * Responder automaticamente seria invasivo e constrangedor.
+ *
+ * Então: registramos o contato para ela ver no painel e decidir. Se for cliente
+ * em potencial, ela converte em lead e aí sim a IA ajuda na prospecção — com o
+ * contexto que ela mesma escreveu.
+ */
 export async function tratarLead(telefone: string, texto: string, nomeWa?: string | null) {
   const db = supabaseAdmin();
   const org = env.orgId();
 
   const { data: lead } = await db
     .from("leads")
-    .select("id,mensagens,respondido_inicial,status")
+    .select("id,mensagens,status")
     .eq("org_id", org)
     .eq("telefone", telefone)
     .maybeSingle();
@@ -24,32 +32,15 @@ export async function tratarLead(telefone: string, texto: string, nomeWa?: strin
       nome_wa: nomeWa || null,
       mensagens: [novaMsg],
       status: "novo",
+      respondido_inicial: false,   // continua false: NUNCA respondemos sozinhos
     });
-  } else {
-    const msgs = Array.isArray((lead as any).mensagens) ? (lead as any).mensagens : [];
-    msgs.push(novaMsg);
-    await db
-      .from("leads")
-      .update({ mensagens: msgs.slice(-20), nome_wa: nomeWa || undefined })
-      .eq("id", (lead as any).id);
+    return;
   }
 
-  // saudação inicial (uma vez só)
-  const jaRespondeu = !!(lead as any)?.respondido_inicial;
-  if (!jaRespondeu) {
-    const { data: cfg } = await db
-      .from("config_ia")
-      .select("msg_lead_inicial")
-      .eq("org_id", org)
-      .maybeSingle();
-    const saudacao = ((cfg as any)?.msg_lead_inicial || "").trim();
-    if (saudacao) {
-      await enviarTextoComRetry(telefone, saudacao);
-      await db
-        .from("leads")
-        .update({ respondido_inicial: true, status: "em_conversa" })
-        .eq("org_id", org)
-        .eq("telefone", telefone);
-    }
-  }
+  const msgs = Array.isArray((lead as any).mensagens) ? (lead as any).mensagens : [];
+  msgs.push(novaMsg);
+  await db
+    .from("leads")
+    .update({ mensagens: msgs.slice(-20), nome_wa: nomeWa || undefined })
+    .eq("id", (lead as any).id);
 }

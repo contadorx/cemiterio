@@ -19,6 +19,37 @@ const SYSTEM =
   "combinados. Não invente nada que não esteja no histórico. Máximo ~8 linhas. Retorne só o perfil.";
 
 // B4: mantém o perfil_ia fresco sem o dono precisar colar histórico na mão.
+/**
+ * Aprende com as correções: quando você EDITA um rascunho antes de enviar, a
+ * diferença entre o que a IA escreveu e o que você mandou é a lição mais valiosa
+ * que existe. Isso vira instrução permanente para aquele contato.
+ */
+async function licoesDeEdicao(clienteId: string): Promise<string> {
+  const db = supabaseAdmin();
+  const org = env.orgId();
+  const { data } = await db
+    .from("interacoes_ia")
+    .select("assunto,rascunho,texto_final,acao_humana,created_at")
+    .eq("org_id", org)
+    .eq("cliente_id", clienteId)
+    .in("acao_humana", ["editou", "descartou"])
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const linhas: string[] = [];
+  for (const i of (data || []) as any[]) {
+    if (i.acao_humana === "descartou") {
+      linhas.push(`[${i.assunto}] A Sureya DESCARTOU este texto: "${String(i.rascunho || "").slice(0, 200)}"`);
+    } else if (i.texto_final && i.texto_final !== i.rascunho) {
+      linhas.push(
+        `[${i.assunto}] A IA escreveu: "${String(i.rascunho || "").slice(0, 200)}"\n` +
+        `A Sureya corrigiu para: "${String(i.texto_final).slice(0, 200)}"`
+      );
+    }
+  }
+  return linhas.join("\n\n");
+}
+
 export async function destilarPerfisPendentes(): Promise<{ atualizados: number }> {
   const db = supabaseAdmin();
   const org = env.orgId();

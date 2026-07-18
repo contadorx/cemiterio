@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 interface Comp {
@@ -13,7 +13,7 @@ interface Comp {
 }
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<"conferir" | "relatorio">("conferir");
+  const [aba, setAba] = useState<"conferir" | "relatorio" | "gestao">("conferir");
 
   return (
     <div style={painel.wrap}>
@@ -127,10 +127,10 @@ function Relatorio() {
       {d?.ok && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
-            <Cartao titulo="Recebido no mês" valor={real(d.recebido)} cor="#16a34a" />
-            <Cartao titulo="Serviço prestado" valor={real(d.executado)} cor={cor.navy} />
-            <Cartao titulo="A conferir" valor={real(d.aConferir)} cor="#d97706" />
-            <Cartao titulo="Total a receber" valor={real(d.totalReceber)} cor="#dc2626" />
+            <CartaoGestao titulo="Recebido no mês" valor={real(d.recebido)} cor="#16a34a" />
+            <CartaoGestao titulo="Serviço prestado" valor={real(d.executado)} cor={cor.navy} />
+            <CartaoGestao titulo="A conferir" valor={real(d.aConferir)} cor="#d97706" />
+            <CartaoGestao titulo="Total a receber" valor={real(d.totalReceber)} cor="#dc2626" />
           </div>
 
           <div style={painel.card}>
@@ -178,3 +178,190 @@ const linha: React.CSSProperties = {
   fontSize: 15,
   color: cor.navy,
 };
+
+
+function Gestao() {
+  const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
+  const [d, setD] = useState<any>(null);
+  const [novo, setNovo] = useState({ tipo: "saida", valor: "", data: new Date().toISOString().slice(0, 10), categoriaId: "", descricao: "" });
+  const [lancando, setLancando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    const r = await fetch(`/api/financeiro/gestao?mes=${mes}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setD(r);
+  }, [mes]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function lancar() {
+    const v = Number(String(novo.valor).replace(",", "."));
+    if (!v || v <= 0) return alert("Informe o valor.");
+    setLancando(true);
+    const r = await fetch("/api/financeiro/gestao", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...novo, valor: v }),
+    }).then((x) => x.json()).catch(() => null);
+    setLancando(false);
+    if (r?.ok) { setNovo({ ...novo, valor: "", descricao: "" }); carregar(); }
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  async function excluir(id: string) {
+    if (!confirm("Excluir este lançamento?")) return;
+    await fetch(`/api/financeiro/lancamentos/${id}`, { method: "DELETE" });
+    carregar();
+  }
+
+  if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+  const r = d.resumo;
+  const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
+  const cats = d.categorias || [];
+  const entradas = (d.fluxo || []).filter((x: any) => x.tipo === "entrada");
+  const saidas = (d.fluxo || []).filter((x: any) => x.tipo === "saida");
+
+  return (
+    <>
+      <div style={{ ...painel.card, padding: 12 }}>
+        <label style={painel.rotulo}>Mês</label>
+        <input type="month" style={{ ...painel.input, width: 180 }} value={mes}
+               onChange={(e) => setMes(e.target.value)} />
+      </div>
+
+      {/* resultado do mês */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
+        <CartaoGestao titulo="Entradas" valor={money(r.entradas)} cor={cor.teal} />
+        <CartaoGestao titulo="Saídas" valor={money(r.saidas)} cor="#dc2626" />
+        <CartaoGestao titulo="Resultado do mês"
+                valor={money(r.resultado)}
+                cor={r.resultado >= 0 ? cor.teal : "#dc2626"} destaque />
+        <CartaoGestao titulo="Custo estimado de IA" valor={money(d.ia.custoMes)} cor="#7c3aed"
+                rodape={`${d.ia.chamadas} chamadas · ${money(d.ia.custoPorDia)}/dia`} />
+      </div>
+
+      {r.naoLancado > 0 && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
+          <strong style={{ color: "#92400e" }}>{money(r.naoLancado)} recebido das famílias sem lançamento aqui</strong>
+          <p style={{ color: "#78350f", fontSize: 13, margin: "6px 0 0" }}>
+            As famílias pagaram {money(r.recebidoFamilias)} este mês, mas só {money(r.entradas)} está
+            classificado no fluxo de caixa. Lance a diferença como entrada para o resultado ficar certo.
+          </p>
+        </div>
+      )}
+
+      {/* novo lançamento */}
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Novo lançamento</strong>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
+          <div>
+            <label style={painel.rotulo}>Tipo</label>
+            <select style={{ ...painel.input, width: 120 }} value={novo.tipo}
+                    onChange={(e) => setNovo({ ...novo, tipo: e.target.value, categoriaId: "" })}>
+              <option value="saida">Saída</option>
+              <option value="entrada">Entrada</option>
+            </select>
+          </div>
+          <div>
+            <label style={painel.rotulo}>Categoria</label>
+            <select style={{ ...painel.input, width: 190 }} value={novo.categoriaId}
+                    onChange={(e) => setNovo({ ...novo, categoriaId: e.target.value })}>
+              <option value="">— escolher —</option>
+              {cats.filter((c: any) => c.tipo === novo.tipo).map((c: any) =>
+                <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={painel.rotulo}>Valor</label>
+            <input style={{ ...painel.input, width: 110 }} value={novo.valor}
+                   onChange={(e) => setNovo({ ...novo, valor: e.target.value })} placeholder="0,00" />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Data</label>
+            <input type="date" style={{ ...painel.input, width: 160 }} value={novo.data}
+                   onChange={(e) => setNovo({ ...novo, data: e.target.value })} />
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={painel.rotulo}>Descrição</label>
+            <input style={painel.input} value={novo.descricao}
+                   onChange={(e) => setNovo({ ...novo, descricao: e.target.value })}
+                   placeholder="ex.: 2 vassouras + água sanitária" />
+          </div>
+          <button style={painel.botao} onClick={lancar} disabled={lancando}>
+            {lancando ? "…" : "Lançar"}
+          </button>
+        </div>
+      </div>
+
+      {/* fluxo por categoria */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
+        <div style={painel.card}>
+          <strong style={{ color: cor.teal }}>Entradas por categoria</strong>
+          {entradas.length === 0 && <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>Nada lançado.</p>}
+          {entradas.map((x: any, i: number) => (
+            <LinhaGestao key={i} nome={x.categoria} qtd={x.qtd} valor={money(x.total)} />
+          ))}
+        </div>
+        <div style={painel.card}>
+          <strong style={{ color: "#dc2626" }}>Saídas por categoria</strong>
+          {saidas.length === 0 && <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>Nada lançado.</p>}
+          {saidas.map((x: any, i: number) => (
+            <LinhaGestao key={i} nome={x.categoria} qtd={x.qtd} valor={money(x.total)}
+                   sub={x.grupo === "retirada" ? "retirada" : x.grupo === "pessoal" ? "pessoal" : undefined} />
+          ))}
+        </div>
+      </div>
+
+      {/* lançamentos do mês */}
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Lançamentos de {mes}</strong>
+        {(d.lancamentos || []).length === 0 && (
+          <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>Nenhum lançamento neste mês.</p>
+        )}
+        {(d.lancamentos || []).map((l: any) => (
+          <div key={l.id} style={{ display: "flex", justifyContent: "space-between", gap: 10,
+                 alignItems: "center", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
+            <div>
+              <div style={{ fontSize: 14 }}>
+                {l.categorias_financeiras?.nome || "Sem categoria"}
+                {l.descricao ? <span style={{ color: cor.cinza }}> · {l.descricao}</span> : null}
+              </div>
+              <div style={{ fontSize: 12, color: cor.cinza }}>
+                {new Date(l.data + "T12:00:00").toLocaleDateString("pt-BR")}
+                {l.automatico ? " · automático" : ""}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <b style={{ color: l.tipo === "entrada" ? cor.teal : "#dc2626" }}>
+                {l.tipo === "entrada" ? "+" : "−"} {money(l.valor)}
+              </b>
+              {!l.automatico && (
+                <button style={{ ...painel.botaoSec, padding: "4px 10px", fontSize: 12 }}
+                        onClick={() => excluir(l.id)}>excluir</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function CartaoGestao({ titulo, valor, cor: c, rodape, destaque }:
+  { titulo: string; valor: string; cor: string; rodape?: string; destaque?: boolean }) {
+  return (
+    <div style={{ ...painel.card, marginBottom: 0, borderTop: `3px solid ${c}` }}>
+      <div style={{ fontSize: 12, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{titulo}</div>
+      <div style={{ fontSize: destaque ? 26 : 22, fontWeight: 700, color: c, marginTop: 4 }}>{valor}</div>
+      {rodape && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{rodape}</div>}
+    </div>
+  );
+}
+
+function LinhaGestao({ nome, qtd, valor, sub }: { nome: string; qtd: number; valor: string; sub?: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0",
+                  borderTop: "1px solid #e2e8f0", marginTop: 8 }}>
+      <span>{nome} {sub && <span style={{ fontSize: 11, color: "#6b7280" }}>({sub})</span>}
+        <span style={{ color: "#6b7280", fontSize: 12 }}> · {qtd}x</span></span>
+      <b>{valor}</b>
+    </div>
+  );
+}

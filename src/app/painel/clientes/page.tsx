@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 
@@ -14,48 +14,138 @@ interface Cli {
 }
 
 export default function Clientes() {
-  const [itens, setItens] = useState<Cli[]>([]);
-  const [novo, setNovo] = useState(false);
-  const [importar, setImportar] = useState(false);
+  const [d, setD] = useState<any>(null);
+  const [f, setF] = useState({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
+                               regua: "", venceEm: "", ordem: "nome", teste: false });
+  const [quadras, setQuadras] = useState<any[]>([]);
+  const [abrindo, setAbrindo] = useState(false);
 
-  async function carregar() {
-    const r = await fetch("/api/clientes").then((x) => x.json());
-    if (r.ok) setItens(r.clientes);
-  }
+  const carregar = useCallback(async () => {
+    const p = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => {
+      if (k === "teste") { if (v) p.set("teste", "1"); }
+      else if (v) p.set(k, String(v));
+    });
+    const r = await fetch(`/api/clientes?${p}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setD(r);
+  }, [f]);
+
+  useEffect(() => { carregar(); }, [carregar]);
   useEffect(() => {
-    carregar();
+    fetch("/api/quadras").then((x) => x.json()).then((r) => r.ok && setQuadras(r.quadras)).catch(() => {});
   }, []);
+
+  const ruas = d ? [...new Set(d.clientes.flatMap((c: any) => c.ruas))].sort() : [];
+  const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
 
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/clientes" />
       <div style={painel.conteudo}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h1 style={painel.h1}>Clientes</h1>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button style={painel.botaoSec} onClick={() => setImportar(true)}>
-              Importar planilha
-            </button>
-            <button style={painel.botao} onClick={() => setNovo(true)}>
-              + Novo cliente
+        <h1 style={painel.h1}>Famílias</h1>
+
+        <div style={{ ...painel.card, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input style={{ ...painel.input, flex: 1, minWidth: 180 }} value={f.busca}
+                   onChange={(e) => setF({ ...f, busca: e.target.value })}
+                   placeholder="Buscar por nome, telefone ou jazigo…" />
+            <select style={{ ...painel.input, width: "auto" }} value={f.situacao}
+                    onChange={(e) => setF({ ...f, situacao: e.target.value })}>
+              <option value="">Todas as situações</option>
+              <option value="atrasados">Em aberto (devendo)</option>
+              <option value="em_dia">Em dia</option>
+              <option value="adiantados">Adiantados</option>
+              <option value="automatico">IA no automático</option>
+              <option value="ia_desligada">IA desligada</option>
+              <option value="sem_telefone">Sem telefone</option>
+            </select>
+            <select style={{ ...painel.input, width: "auto" }} value={f.quadra}
+                    onChange={(e) => setF({ ...f, quadra: e.target.value, rua: "" })}>
+              <option value="">Todas as quadras</option>
+              {quadras.map((q) => <option key={q.id} value={q.codigo}>{q.codigo}</option>)}
+            </select>
+            <select style={{ ...painel.input, width: "auto" }} value={f.rua}
+                    onChange={(e) => setF({ ...f, rua: e.target.value })}>
+              <option value="">Todas as ruas</option>
+              {ruas.map((r: any) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select style={{ ...painel.input, width: "auto" }} value={f.cadencia}
+                    onChange={(e) => setF({ ...f, cadencia: e.target.value })}>
+              <option value="">Toda periodicidade</option>
+              {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
+                <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select style={{ ...painel.input, width: "auto" }} value={f.venceEm}
+                    onChange={(e) => setF({ ...f, venceEm: e.target.value })}>
+              <option value="">Qualquer vencimento</option>
+              <option value="7">Vence em 7 dias</option>
+              <option value="15">Vence em 15 dias</option>
+              <option value="30">Vence em 30 dias</option>
+            </select>
+            <select style={{ ...painel.input, width: "auto" }} value={f.ordem}
+                    onChange={(e) => setF({ ...f, ordem: e.target.value })}>
+              <option value="nome">Ordenar por nome</option>
+              <option value="saldo">Quem deve mais</option>
+              <option value="valor">Maior valor mensal</option>
+              <option value="lavagem">Próxima lavagem</option>
+            </select>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: cor.cinza }}>
+              <input type="checkbox" checked={f.teste}
+                     onChange={(e) => setF({ ...f, teste: e.target.checked })} /> teste
+            </label>
+            <button style={painel.botaoSec}
+                    onClick={() => setF({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
+                                          regua: "", venceEm: "", ordem: "nome", teste: false })}>
+              Limpar
             </button>
           </div>
         </div>
 
-        {novo && <NovoCliente onFechar={() => setNovo(false)} onCriado={() => { setNovo(false); carregar(); }} />}
-        {importar && <ImportarCsv onFechar={() => { setImportar(false); carregar(); }} />}
+        {d && (
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 14, color: cor.cinza, fontSize: 14 }}>
+            <span><b style={{ color: cor.navy }}>{d.totais.quantidade}</b> famílias</span>
+            <span><b style={{ color: cor.navy }}>{money(d.totais.mensal)}</b> por mês</span>
+            <span><b style={{ color: d.totais.atrasados ? "#dc2626" : cor.teal }}>
+              {d.totais.atrasados}</b> em aberto ({money(d.totais.emAberto)})</span>
+            <button style={{ ...painel.botaoSec, marginLeft: "auto" }} onClick={() => setAbrindo(!abrindo)}>
+              {abrindo ? "Fechar" : "+ Nova família / importar"}
+            </button>
+          </div>
+        )}
 
-        {itens.map((c) => (
-          <Link key={c.id} href={`/painel/clientes/${c.id}`} style={{ ...painel.card, display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none" }}>
-            <div>
-              <div style={{ fontWeight: 700, color: cor.navy }}>{c.nome}</div>
-              <div style={{ fontSize: 14, color: cor.cinza }}>{c.telefone}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <span style={{ fontSize: 12, padding: "3px 8px", borderRadius: 999, background: c.modo === "automatico" ? "#dcfce7" : "#e2e8f0", color: c.modo === "automatico" ? "#166534" : cor.cinza }}>
-                {c.modo}
-              </span>
-              <div style={{ fontSize: 13, color: cor.cinza, marginTop: 4 }}>score {Math.round(c.score)}</div>
+        {abrindo && <Importar onPronto={() => { setAbrindo(false); carregar(); }} />}
+
+        {!d && <p style={{ color: cor.cinza }}>Carregando…</p>}
+        {d && d.clientes.length === 0 && (
+          <div style={painel.card}><p style={{ color: cor.cinza, margin: 0 }}>Nenhuma família com esses filtros.</p></div>
+        )}
+
+        {d && d.clientes.map((c: any) => (
+          <Link key={c.id} href={`/painel/clientes/${c.id}`} style={{ textDecoration: "none" }}>
+            <div style={{ ...painel.card, borderLeft: c.atrasado ? "4px solid #dc2626" : `1px solid ${cor.linha}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <strong style={{ color: cor.navy, fontSize: 16 }}>{c.nome}</strong>
+                  <div style={{ fontSize: 13, color: cor.cinza, marginTop: 3 }}>
+                    {c.jazigos.map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
+                  </div>
+                  <div style={{ fontSize: 13, color: cor.cinza, marginTop: 3 }}>
+                    {c.cadencias.join(", ") || "sem plano"}
+                    {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
+                    {c.modo === "automatico" && " · IA automática"}
+                    {!c.ativo_ia && " · IA desligada"}
+                    {c.proximaLavagem && ` · lava em ${new Date(c.proximaLavagem + "T12:00:00").toLocaleDateString("pt-BR")}`}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <b style={{ color: c.atrasado ? "#dc2626" : c.saldo > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
+                    {c.saldo === 0 ? "em dia" : money(Math.abs(c.saldo))}
+                  </b>
+                  <div style={{ fontSize: 12, color: cor.cinza }}>
+                    {c.atrasado ? "em aberto" : c.saldo > 0 ? "de crédito" : ""}
+                  </div>
+                </div>
+              </div>
             </div>
           </Link>
         ))}
@@ -64,137 +154,132 @@ export default function Clientes() {
   );
 }
 
-function NovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: () => void }) {
-  const [f, setF] = useState<any>({ nome: "", telefone: "", quadra: "", tumulo: "", falecido: "", cadencia: "mensal", qtd: 1, valor: 40, consentimento: false });
-  const [erro, setErro] = useState("");
-  const [salvando, setSalvando] = useState(false);
 
-  async function salvar() {
-    if (!f.nome || !f.telefone) { setErro("Nome e telefone são obrigatórios."); return; }
-    setSalvando(true);
-    setErro("");
-    const body: any = { nome: f.nome, telefone: f.telefone, consentimento: f.consentimento };
-    if (f.tumulo) body.tumulo = { identificacao: f.tumulo, quadraCodigo: f.quadra, falecidoNome: f.falecido };
-    if (f.tumulo && f.cadencia) body.plano = { cadencia: f.cadencia, qtdPorPassagem: Number(f.qtd), valorVigente: Number(f.valor) };
-    const r = await fetch("/api/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json());
-    setSalvando(false);
-    if (!r.ok) { setErro("Falha ao salvar."); return; }
-    onCriado();
+function Importar({ onPronto }: { onPronto: () => void }) {
+  const [modo, setModo] = useState<"nova" | "csv">("nova");
+  const [f, setF] = useState({
+    nome: "", telefone: "", tratamento: "a senhora", jazigo: "", quadraId: "", rua: "",
+    cadencia: "mensal", valorMensal: 40, consentimento: false,
+  });
+  const [quadras, setQuadras] = useState<any[]>([]);
+  const [csv, setCsv] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/quadras").then((x) => x.json()).then((r) => r.ok && setQuadras(r.quadras)).catch(() => {});
+  }, []);
+
+  async function criar() {
+    if (!f.nome.trim() || !f.telefone.trim()) return alert("Nome e telefone são obrigatórios.");
+    setOcupado(true);
+    const r = await fetch("/api/clientes", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) onPronto();
+    else alert("Falhou: " + (r?.erro || "erro"));
   }
 
-  const campo = (k: string, label: string, tipo = "text") => (
-    <div style={{ marginBottom: 10 }}>
-      <label style={painel.rotulo}>{label}</label>
-      <input style={painel.input} type={tipo} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
-    </div>
-  );
+  async function importar() {
+    if (!csv.trim()) return;
+    setOcupado(true);
+    const r = await fetch("/api/tumulos/importar", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) { alert(`${r.criados || 0} linha(s) importada(s).`); onPronto(); }
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
 
   return (
     <div style={painel.card}>
-      <strong style={{ color: cor.navy }}>Novo cliente</strong>
-      <div style={{ marginTop: 12 }}>
-        {campo("nome", "Nome")}
-        {campo("telefone", "WhatsApp (com DDD)")}
-        <div style={{ borderTop: `1px solid ${cor.linha}`, margin: "12px 0", paddingTop: 12 }}>
-          <div style={{ color: cor.cinza, fontSize: 13, marginBottom: 8 }}>Primeiro túmulo (opcional)</div>
-          {campo("quadra", "Quadra")}
-          {campo("tumulo", "Identificação do túmulo")}
-          {campo("falecido", "Nome do falecido")}
-        </div>
-        {f.tumulo && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              <label style={painel.rotulo}>Cadência</label>
-              <select style={painel.input} value={f.cadencia} onChange={(e) => setF({ ...f, cadencia: e.target.value })}>
-                <option value="mensal">mensal</option>
-                <option value="bimestral">bimestral</option>
-                <option value="trimestral">trimestral</option>
-                <option value="semestral">semestral</option>
-                <option value="anual">anual</option>
-                <option value="avulso">avulso</option>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button style={modo === "nova" ? painel.botao : painel.botaoSec} onClick={() => setModo("nova")}>
+          Nova família
+        </button>
+        <button style={modo === "csv" ? painel.botao : painel.botaoSec} onClick={() => setModo("csv")}>
+          Importar planilha
+        </button>
+      </div>
+
+      {modo === "nova" && (
+        <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <label style={painel.rotulo}>Nome da família</label>
+              <input style={painel.input} value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} />
+            </div>
+            <div>
+              <label style={painel.rotulo}>WhatsApp</label>
+              <input style={{ ...painel.input, width: 170 }} value={f.telefone}
+                     onChange={(e) => setF({ ...f, telefone: e.target.value })} placeholder="11 99999-9999" />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Tratamento</label>
+              <select style={{ ...painel.input, width: 130 }} value={f.tratamento}
+                      onChange={(e) => setF({ ...f, tratamento: e.target.value })}>
+                <option value="a senhora">a senhora</option>
+                <option value="o senhor">o senhor</option>
+                <option value="a Dra">a Dra</option>
               </select>
             </div>
-            <div style={{ width: 90 }}>
-              <label style={painel.rotulo}>Qtd/vez</label>
-              <input style={painel.input} type="number" value={f.qtd} onChange={(e) => setF({ ...f, qtd: e.target.value })} />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <label style={painel.rotulo}>Jazigo</label>
+              <input style={painel.input} value={f.jazigo} onChange={(e) => setF({ ...f, jazigo: e.target.value })}
+                     placeholder="Família SILVA" />
             </div>
-            <div style={{ width: 110 }}>
-              <label style={painel.rotulo}>Valor R$</label>
-              <input style={painel.input} type="number" value={f.valor} onChange={(e) => setF({ ...f, valor: e.target.value })} />
+            <div>
+              <label style={painel.rotulo}>Quadra</label>
+              <select style={{ ...painel.input, width: 120 }} value={f.quadraId}
+                      onChange={(e) => setF({ ...f, quadraId: e.target.value })}>
+                <option value="">—</option>
+                {quadras.map((q) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={painel.rotulo}>Rua</label>
+              <input style={{ ...painel.input, width: 100 }} value={f.rua}
+                     onChange={(e) => setF({ ...f, rua: e.target.value })} placeholder="RUA 1" />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Periodicidade</label>
+              <select style={{ ...painel.input, width: 130 }} value={f.cadencia}
+                      onChange={(e) => setF({ ...f, cadencia: e.target.value })}>
+                {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
+                  <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={painel.rotulo}>Valor mensal</label>
+              <input type="number" style={{ ...painel.input, width: 110 }} value={f.valorMensal}
+                     onChange={(e) => setF({ ...f, valorMensal: Number(e.target.value) })} />
             </div>
           </div>
-        )}
-        {erro && <p style={{ color: "#dc2626" }}>{erro}</p>}
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 14, color: cor.cinza }}>
-          <input type="checkbox" checked={f.consentimento} onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
-          O cliente autorizou guardarmos seus dados para o atendimento (LGPD)
-        </label>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button style={painel.botao} onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
-          <button style={painel.botaoSec} onClick={onFechar}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, margin: "12px 0" }}>
+            <input type="checkbox" checked={f.consentimento}
+                   onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
+            A família autorizou o contato por WhatsApp (LGPD)
+          </label>
+          <button style={painel.botao} onClick={criar} disabled={ocupado}>
+            {ocupado ? "…" : "Cadastrar família"}
+          </button>
+        </>
+      )}
 
-
-function ImportarCsv({ onFechar }: { onFechar: () => void }) {
-  const [csv, setCsv] = useState("");
-  const [rodando, setRodando] = useState(false);
-  const [resultado, setResultado] = useState<any>(null);
-
-  async function enviar() {
-    if (!csv.trim()) return;
-    setRodando(true);
-    setResultado(null);
-    const r = await fetch("/api/tumulos/importar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ csv }),
-    }).then((x) => x.json()).catch(() => null);
-    setRodando(false);
-    setResultado(r || { ok: false, erro: "falha de rede" });
-  }
-
-  return (
-    <div style={painel.card}>
-      <strong style={{ color: cor.navy }}>Importar túmulos e clientes (planilha)</strong>
-      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 10px" }}>
-        Cole aqui o conteúdo da planilha (CSV). Primeira linha é o cabeçalho:
-        <code style={{ display: "block", marginTop: 4 }}>
-          quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor
-        </code>
-        cadencia/qtd/valor são opcionais (mensal, bimestral, trimestral, semestral, anual). Máx. 500 linhas.
-      </p>
-      <textarea
-        style={{ ...painel.input, minHeight: 140, resize: "vertical", fontFamily: "monospace", fontSize: 13 }}
-        value={csv}
-        onChange={(e) => setCsv(e.target.value)}
-        placeholder={"quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor\n12;T-045;José da Silva;Maria da Silva;11987654321;mensal;2;40"}
-      />
-      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        <button style={painel.botao} onClick={enviar} disabled={rodando}>
-          {rodando ? "Importando..." : "Importar"}
-        </button>
-        <button style={painel.botaoSec} onClick={onFechar}>Fechar</button>
-      </div>
-      {resultado && (
-        <div style={{ marginTop: 10, fontSize: 14 }}>
-          {resultado.ok ? (
-            <p style={{ color: cor.teal, margin: 0 }}>
-              ✓ {resultado.criados.clientes} cliente(s), {resultado.criados.tumulos} túmulo(s), {resultado.criados.planos} plano(s) criados.
-              {resultado.erros?.length ? ` ${resultado.erros.length} linha(s) com erro.` : ""}
-            </p>
-          ) : (
-            <p style={{ color: "#dc2626", margin: 0 }}>Falhou: {resultado.erro}</p>
-          )}
-          {(resultado.erros || []).slice(0, 10).map((e: any, i: number) => (
-            <p key={i} style={{ color: "#b45309", fontSize: 13, margin: "4px 0 0" }}>
-              linha {e.linha}: {e.motivo}
-            </p>
-          ))}
-        </div>
+      {modo === "csv" && (
+        <>
+          <label style={painel.rotulo}>
+            Cole as linhas (nome; telefone; jazigo; quadra; rua; periodicidade; valor mensal)
+          </label>
+          <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 13 }}
+                    value={csv} onChange={(e) => setCsv(e.target.value)}
+                    placeholder={"MARIA SILVA;11999998888;Família SILVA;QD 1;RUA 2;mensal;40"} />
+          <button style={{ ...painel.botao, marginTop: 10 }} onClick={importar} disabled={ocupado}>
+            {ocupado ? "Importando…" : "Importar"}
+          </button>
+        </>
       )}
     </div>
   );
