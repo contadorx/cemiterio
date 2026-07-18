@@ -34,3 +34,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
+
+
+// DELETE — remove o jazigo. Bloqueia se já houver limpeza executada,
+// para não apagar o histórico que a família vê no portal.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
+
+  const { count } = await db
+    .from("servicos").select("id", { count: "exact", head: true })
+    .eq("tumulo_id", params.id).eq("status", "executado");
+  if ((count || 0) > 0) {
+    return NextResponse.json(
+      { ok: false, erro: "tem_historico",
+        mensagem: `Este jazigo já tem ${count} limpeza(s) registrada(s). Em vez de excluir, desative o plano — o histórico e as fotos da família são preservados.` },
+      { status: 400 }
+    );
+  }
+
+  await db.from("servicos").delete().eq("tumulo_id", params.id);
+  await db.from("planos").delete().eq("tumulo_id", params.id);
+  await db.from("gps_leituras").delete().eq("tumulo_id", params.id);
+  const { error } = await db.from("tumulos").delete().eq("id", params.id);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

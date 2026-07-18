@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "jornada" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -15,6 +15,7 @@ export default function Config() {
             ["casa", "A Casa"],
             ["equipe", "Equipe"],
             ["campo", "Campo"],
+            ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
             ["indicacoes", "Indicações"],
@@ -28,9 +29,10 @@ export default function Config() {
           ))}
         </div>
         {aba === "casa" && <Casa />}
+        {aba === "jornada" && <Jornada />}
         {aba === "equipe" && <Equipe />}
         {aba === "campanhas" && <Campanhas />}
-        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && <Agregados aba={aba} />}
+        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && <Agregados aba={aba} />}
       </div>
     </div>
   );
@@ -633,5 +635,146 @@ function Materiais() {
         );
       })}
     </div>
+  );
+}
+
+
+function Jornada() {
+  const [j, setJ] = useState<any>(null);
+  const [bloq, setBloq] = useState<any[]>([]);
+  const [novo, setNovo] = useState({ data: "", motivo: "" });
+  const [salvando, setSalvando] = useState(false);
+  const [ok, setOk] = useState(false);
+
+  const NOMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+  async function carregar() {
+    const r = await fetch("/api/config/jornada").then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setJ(r.jornada); setBloq(r.bloqueados); }
+  }
+  useEffect(() => { carregar(); }, []);
+
+  async function salvar() {
+    setSalvando(true);
+    const r = await fetch("/api/config/jornada", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(j),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); carregar(); }
+    else alert("Falhou: " + (r?.erro === "escolha_ao_menos_um_dia" ? "Escolha pelo menos um dia." : r?.erro));
+  }
+
+  async function bloquear() {
+    if (!novo.data) return;
+    await fetch("/api/config/jornada", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(novo),
+    });
+    setNovo({ data: "", motivo: "" });
+    carregar();
+  }
+
+  async function desbloquear(id: string) {
+    await fetch(`/api/config/jornada?id=${id}`, { method: "DELETE" });
+    carregar();
+  }
+
+  if (!j) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+  const dias: number[] = Array.isArray(j.dias_semana) ? j.dias_semana : [1, 2, 3, 4, 5, 6];
+
+  function alternarDia(d: number) {
+    const novos = dias.includes(d) ? dias.filter((x) => x !== d) : [...dias, d].sort();
+    setJ({ ...j, dias_semana: novos });
+  }
+
+  return (
+    <>
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Dias de trabalho no cemitério</strong>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+          A agenda nunca coloca serviço num dia que não estiver marcado aqui.
+        </p>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {NOMES.map((nome, d) => (
+            <button key={d}
+              style={dias.includes(d) ? painel.botao : painel.botaoSec}
+              onClick={() => alternarDia(d)}>
+              {nome}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Horário</strong>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12, alignItems: "flex-end" }}>
+          <div>
+            <label style={painel.rotulo}>Começa</label>
+            <input type="time" style={{ ...painel.input, width: 130 }}
+                   value={(j.hora_inicio || "08:00").slice(0, 5)}
+                   onChange={(e) => setJ({ ...j, hora_inicio: e.target.value })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Termina</label>
+            <input type="time" style={{ ...painel.input, width: 130 }}
+                   value={(j.hora_fim || "16:00").slice(0, 5)}
+                   onChange={(e) => setJ({ ...j, hora_fim: e.target.value })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Almoço (min)</label>
+            <input type="number" style={{ ...painel.input, width: 110 }}
+                   value={j.intervalo_almoco_min ?? 60}
+                   onChange={(e) => setJ({ ...j, intervalo_almoco_min: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Limpezas por dia</label>
+            <input type="number" style={{ ...painel.input, width: 120 }}
+                   value={j.limpezas_por_dia ?? 20}
+                   onChange={(e) => setJ({ ...j, limpezas_por_dia: Number(e.target.value) })} />
+          </div>
+        </div>
+        <p style={{ color: cor.cinza, fontSize: 12, margin: "10px 0 0" }}>
+          O cemitério abre das 7h às 18h. O horário aqui é o da equipe, e serve de referência
+          no briefing da manhã.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
+        <button style={painel.botao} onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar jornada"}
+        </button>
+        {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+      </div>
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Dias sem campo (feriados, cemitério fechado)</strong>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+          <div>
+            <label style={painel.rotulo}>Data</label>
+            <input type="date" style={{ ...painel.input, width: 160 }} value={novo.data}
+                   onChange={(e) => setNovo({ ...novo, data: e.target.value })} />
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <label style={painel.rotulo}>Motivo</label>
+            <input style={painel.input} value={novo.motivo}
+                   onChange={(e) => setNovo({ ...novo, motivo: e.target.value })}
+                   placeholder="ex.: feriado, chuva prevista" />
+          </div>
+          <button style={painel.botaoSec} onClick={bloquear}>Bloquear dia</button>
+        </div>
+        {bloq.length === 0 && (
+          <p style={{ color: cor.cinza, fontSize: 14, margin: "12px 0 0" }}>Nenhum dia bloqueado.</p>
+        )}
+        {bloq.map((b) => (
+          <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                   padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
+            <span>{new Date(b.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+              {b.motivo ? ` · ${b.motivo}` : ""}</span>
+            <button style={{ ...painel.botaoSec, padding: "6px 12px" }} onClick={() => desbloquear(b.id)}>
+              Liberar
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

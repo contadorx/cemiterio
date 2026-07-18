@@ -199,6 +199,8 @@ export default function FichaCliente() {
 
         <ReguaCobranca cliente={c} onSalvo={carregar} />
 
+        <ExcluirCliente clienteId={id} nome={c.nome} />
+
         <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
       </div>
     </div>
@@ -381,6 +383,13 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
     }).then((x) => x.json()).catch(() => null);
     setGpsMsg(r?.ok ? `✓ Salvo (${r.amostras} leituras, ±${r.precisao} m)` : r?.mensagem || "Não consegui salvar.");
     if (r?.ok) onSalvo();
+  }
+
+  async function excluirJazigo() {
+    if (!confirm(`Excluir o jazigo "${t.identificacao}"? Isso apaga o plano e os agendamentos dele.`)) return;
+    const r = await fetch(`/api/tumulos/${t.id}`, { method: "DELETE" }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) onSalvo();
+    else alert(r?.mensagem || r?.erro || "Não consegui excluir.");
   }
 
   async function portalAcao(acao: "emitir" | "revogar") {
@@ -579,11 +588,14 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
             )}
           </div>
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
             <button style={painel.botao} onClick={salvar} disabled={salvando}>
               {salvando ? "Salvando…" : "Salvar jazigo"}
             </button>
             {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+            <button style={{ ...painel.botaoPerigo, marginLeft: "auto" }} onClick={excluirJazigo}>
+              Excluir jazigo
+            </button>
           </div>
         </div>
       )}
@@ -791,6 +803,34 @@ function SaldoAbertura({ clienteId, saldoAtual, onSalvo }:
       <p style={{ color: cor.cinza, fontSize: 12, margin: "8px 0 0" }}>
         Entra no histórico como &ldquo;Saldo de abertura (migração)&rdquo;. Registrar de novo substitui o anterior.
       </p>
+    </div>
+  );
+}
+
+
+function ExcluirCliente({ clienteId, nome }: { clienteId: string; nome: string }) {
+  const [ocupado, setOcupado] = useState(false);
+
+  async function excluir() {
+    if (!confirm(`Excluir "${nome}" e todos os jazigos dela? Esta ação não pode ser desfeita.`)) return;
+    setOcupado(true);
+    const r = await fetch(`/api/clientes/${clienteId}`, { method: "DELETE" })
+      .then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) { alert("Família excluída."); location.href = "/painel/clientes"; }
+    else alert(r?.mensagem || r?.erro || "Não consegui excluir.");
+  }
+
+  return (
+    <div style={{ ...painel.card, borderLeft: "4px solid #dc2626" }}>
+      <strong style={{ color: cor.navy }}>Excluir esta família</strong>
+      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+        Só é permitido enquanto não houver lançamento no financeiro. Se já houver, use
+        &ldquo;Remover dados&rdquo; acima (LGPD): apaga o que é pessoal e preserva a contabilidade.
+      </p>
+      <button style={painel.botaoPerigo} onClick={excluir} disabled={ocupado}>
+        {ocupado ? "…" : "Excluir família"}
+      </button>
     </div>
   );
 }

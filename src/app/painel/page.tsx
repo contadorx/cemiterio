@@ -10,7 +10,8 @@ export default function Painel() {
   const [comp, setComp] = useState(0);
   const [ind, setInd] = useState<any>(null);
   const [gerando, setGerando] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [horizonte, setHorizonte] = useState(90);
+  const [diag, setDiag] = useState<any>(null);
 
   async function carregar() {
     const [c, r, cp, i] = await Promise.all([
@@ -30,10 +31,14 @@ export default function Painel() {
 
   async function gerarAgenda() {
     setGerando(true);
-    setMsg("");
-    const r = await fetch("/api/agenda/gerar", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((x) => x.json());
+    setDiag(null);
+    const r = await fetch("/api/agenda/gerar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ horizonteDias: horizonte }),
+    }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    setMsg(r.ok ? `${r.gerados} serviços gerados, ${r.agendados} agendados em ${r.dias} dia(s).` : "Falha ao gerar agenda.");
+    if (r?.ok) { setDiag(r); carregar(); }
+    else alert("Falha ao gerar a agenda.");
   }
 
   const util = cap ? Math.round(cap.utilizacao * 100) : 0;
@@ -88,14 +93,66 @@ export default function Painel() {
         )}
 
         <div style={painel.card}>
-          <strong style={{ fontSize: 18, color: cor.navy }}>Agenda</strong>
-          <p style={{ color: cor.cinza, fontSize: 15 }}>
-            Gera os serviços dos planos vencidos e distribui nos dias da Nina, por quadra.
+          <strong style={{ fontSize: 18, color: cor.navy }}>Agenda da equipe</strong>
+          <p style={{ color: cor.cinza, fontSize: 14, margin: "6px 0 0", lineHeight: 1.6 }}>
+            Este botão faz duas coisas: <b>1)</b> cria as limpezas que os planos devem no período
+            escolhido — cada plano tem sua periodicidade e a data da próxima ida; <b>2)</b> distribui
+            essas limpezas pelos dias de trabalho, agrupando por quadra e rua para a rota render.
+            <br />
+            Pode clicar quantas vezes quiser: ele nunca duplica. Se não houver nada novo no período,
+            o resultado será zero — e isso é o esperado.
           </p>
-          <button style={painel.botao} onClick={gerarAgenda} disabled={gerando}>
-            {gerando ? "Gerando…" : "Gerar e distribuir agenda"}
-          </button>
-          {msg && <p style={{ marginTop: 10, color: cor.navy }}>{msg}</p>}
+
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
+            <div>
+              <label style={painel.rotulo}>Olhar quantos dias à frente</label>
+              <select style={{ ...painel.input, width: 150 }} value={horizonte}
+                      onChange={(e) => setHorizonte(Number(e.target.value))}>
+                <option value={30}>30 dias</option>
+                <option value={60}>60 dias</option>
+                <option value={90}>90 dias</option>
+                <option value={180}>6 meses</option>
+                <option value={365}>1 ano</option>
+              </select>
+            </div>
+            <button style={painel.botao} onClick={gerarAgenda} disabled={gerando}>
+              {gerando ? "Processando…" : "Gerar e distribuir"}
+            </button>
+          </div>
+
+          {diag && (
+            <div style={{ marginTop: 14, padding: 14, borderRadius: 10,
+                          background: diag.geracao.criados > 0 ? "#f0fdf4" : "#f8fafc",
+                          border: `1px solid ${diag.geracao.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
+              <strong style={{ color: cor.navy }}>
+                {diag.geracao.criados > 0
+                  ? `${diag.geracao.criados} limpeza(s) criada(s)`
+                  : "Nada novo a criar neste período"}
+              </strong>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: cor.cinza, fontSize: 14, lineHeight: 1.8 }}>
+                <li><b>{diag.geracao.planosAtivos}</b> planos recorrentes ativos</li>
+                <li><b>{diag.geracao.planosNoHorizonte}</b> com ida prevista nos próximos {diag.geracao.horizonteDias} dias</li>
+                {diag.geracao.foraDoHorizonte > 0 && (
+                  <li><b>{diag.geracao.foraDoHorizonte}</b> só voltam depois deste período
+                    {diag.geracao.proximaData && (
+                      <> — o próximo é em <b>{new Date(diag.geracao.proximaData + "T12:00:00").toLocaleDateString("pt-BR")}</b></>
+                    )}
+                  </li>
+                )}
+                {diag.geracao.jaExistiam > 0 && (
+                  <li><b>{diag.geracao.jaExistiam}</b> já tinham limpeza criada (não duplicou)</li>
+                )}
+                <li><b>{diag.alocacao.agendados}</b> limpeza(s) distribuída(s) em <b>{diag.alocacao.dias}</b> dia(s) de trabalho</li>
+              </ul>
+              {diag.geracao.criados === 0 && diag.geracao.foraDoHorizonte > 0 && (
+                <p style={{ color: cor.navy, fontSize: 13, margin: "10px 0 0" }}>
+                  Quer enxergar mais longe? Aumente o período acima para {diag.geracao.horizonteDias < 90 ? "90 dias" : "1 ano"} e gere de novo.
+                </p>
+              )}
+              <a href="/painel/agenda" style={{ ...painel.botaoSec, display: "inline-block",
+                 textDecoration: "none", marginTop: 12 }}>Ver a agenda</a>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,9 @@
 import RegistrarSW from "./RegistrarSW";
 
+import { MARCA } from "@/lib/marca";
+
 export const metadata = {
-  title: "Sureya Campo",
+  title: `Campo — ${MARCA.nome}`,
   manifest: "/manifest.json",
 };
 

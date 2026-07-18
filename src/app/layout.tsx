@@ -1,6 +1,8 @@
+import { MARCA } from "@/lib/marca";
+
 export const metadata = {
-  title: "Sureya",
-  description: "Atendimento e gestão do serviço de limpeza de túmulos",
+  title: `${MARCA.nome} — ${MARCA.assinatura}`,
+  description: "Cuidado e conservação de jazigos no Cemitério da Saudade, em Mauá, desde 1990.",
 };
 
 // Essencial para o sistema funcionar bem no celular

@@ -4,18 +4,20 @@ import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
-// POST { horizonteDias? } — gera serviços dos planos vencidos e distribui nos dias.
+// POST { horizonteDias?, apenasGerar? }
+// Devolve um diagnóstico completo, para a tela poder EXPLICAR o resultado
+// (inclusive quando o resultado é "nada a fazer", que é o caso normal).
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
-  const db = auth.db;
 
-  const body = await req.json().catch(() => ({}));
-  const horizonte = Number(body?.horizonteDias) || 30;
+  const b = await req.json().catch(() => ({}));
+  const horizonte = Math.max(1, Math.min(365, Number(b?.horizonteDias) || 30));
 
-  const ger = await gerarServicosDevidos(horizonte);
-  const alo = await alocarAgenda();
+  const g = await gerarServicosDevidos(horizonte);
+  const a = b?.apenasGerar ? { agendados: 0, dias: 0 } : await alocarAgenda();
 
-  return NextResponse.json({ ok: true, gerados: ger.criados, ...alo });
+  return NextResponse.json({ ok: true, geracao: g, alocacao: a });
 }

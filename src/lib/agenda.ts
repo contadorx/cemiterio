@@ -22,9 +22,38 @@ function addDias(iso: string, dias: number): string {
 function ehDomingo(iso: string): boolean {
   return new Date(iso + "T00:00:00").getDay() === 0;
 }
-function proximoDiaUtil(iso: string): string {
+// Jornada configurada: quais dias a equipe trabalha e quais datas estão bloqueadas.
+interface Jornada {
+  dias: number[];          // 0=dom ... 6=sáb
+  bloqueadas: Set<string>; // feriados / dias sem campo
+}
+
+async function carregarJornada(): Promise<Jornada> {
+  const db = supabaseAdmin();
+  const org = env.orgId();
+  const { data: o } = await db.from("orgs").select("dias_semana").eq("id", org).maybeSingle();
+  const { data: bl } = await db
+    .from("dias_sem_campo").select("data").eq("org_id", org).gte("data", isoHoje());
+  const dias = Array.isArray((o as any)?.dias_semana) && (o as any).dias_semana.length
+    ? ((o as any).dias_semana as number[])
+    : [1, 2, 3, 4, 5, 6];
+  return { dias, bloqueadas: new Set((bl || []).map((x: any) => x.data)) };
+}
+
+function diaDaSemana(iso: string): number {
+  return new Date(iso + "T12:00:00Z").getUTCDay();
+}
+
+// Avança até cair num dia em que a equipe trabalha e que não esteja bloqueado.
+function proximoDiaUtil(iso: string, j?: Jornada): string {
+  const dias = j?.dias ?? [1, 2, 3, 4, 5, 6];
+  const bloq = j?.bloqueadas ?? new Set<string>();
   let d = iso;
-  while (ehDomingo(d)) d = addDias(d, 1);
+  let guarda = 0;
+  while ((!dias.includes(diaDaSemana(d)) || bloq.has(d)) && guarda < 40) {
+    d = addDias(d, 1);
+    guarda++;
+  }
   return d;
 }
 
@@ -32,7 +61,21 @@ function proximoDiaUtil(iso: string): string {
 // GERADOR: transforma planos recorrentes vencidos em serviços "pendente".
 // Avança o proximo_servico de cada plano. Avulso/por_data não entram.
 // ----------------------------------------------------------------------------
-export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criados: number }> {
+export interface DiagnosticoGeracao {
+  criados: number;
+  planosAtivos: number;      // planos recorrentes ativos
+  planosNoHorizonte: number; // com data dentro da janela
+  foraDoHorizonte: number;   // a próxima ida é depois da janela
+  jaExistiam: number;        // a data já tinha serviço aberto
+  proximaData: string | null;// quando volta a ter algo para gerar
+  horizonteDias: number;
+}
+
+/**
+ * Cria os serviços que os planos devem no período. NÃO define o dia da rota —
+ * isso é do alocador. Idempotente: rodar de novo não duplica.
+ */
+export async function gerarServicosDevidos(horizonteDias = 30): Promise<DiagnosticoGeracao> {
   const db = supabaseAdmin();
   const org = env.orgId();
   const limite = addDias(isoHoje(), horizonteDias);
@@ -45,6 +88,10 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criado
     .in("cadencia", Object.keys(DIAS_CICLO));
 
   let criados = 0;
+  let jaExistiam = 0;
+  let noHorizonte = 0;
+  let foraDoHorizonte = 0;
+  let proximaData: string | null = null;
 
   for (const p of planos || []) {
     const cicloDias = DIAS_CICLO[(p as any).cadencia];
@@ -53,6 +100,13 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criado
 
     let prox: string = (p as any).proximo_servico || isoHoje();
     let guarda = 0; // trava anti-loop
+
+    if (prox > limite) {
+      foraDoHorizonte++;
+      if (!proximaData || prox < proximaData) proximaData = prox;
+      continue;
+    }
+    noHorizonte++;
 
     while (prox <= limite && guarda < 60) {
       guarda++;
@@ -67,6 +121,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criado
         .in("status", ["pendente", "agendado"])
         .maybeSingle();
 
+      if (existe) jaExistiam++;
       if (!existe) {
         const { error } = await db.from("servicos").insert({
           org_id: org,
@@ -85,7 +140,15 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criado
     await db.from("planos").update({ proximo_servico: prox }).eq("id", (p as any).id);
   }
 
-  return { criados };
+  return {
+    criados,
+    planosAtivos: (planos || []).length,
+    planosNoHorizonte: noHorizonte,
+    foraDoHorizonte,
+    jaExistiam,
+    proximaData,
+    horizonteDias,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -189,7 +252,8 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   });
 
   // empacota em dias, começando hoje (pula domingo)
-  let dia = proximoDiaUtil(isoHoje());
+  const jornada = await carregarJornada();
+  let dia = proximoDiaUtil(isoHoje(), jornada);
   let dias = 0;
   let agendados = 0;
 
@@ -232,7 +296,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
         agendados++;
       }
     }
-    dia = proximoDiaUtil(addDias(dia, 1));
+    dia = proximoDiaUtil(addDias(dia, 1), jornada);
   }
 
   return { agendados, dias };

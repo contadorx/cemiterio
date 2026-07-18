@@ -73,3 +73,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   return NextResponse.json({ ok: true });
 }
+
+
+// DELETE — remove o cliente e tudo que depende dele.
+// Só permite se NÃO houver movimento financeiro; nesse caso, oriente a anonimizar
+// (LGPD), que preserva o histórico contábil.
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
+
+  const { count } = await db
+    .from("movimentos").select("id", { count: "exact", head: true }).eq("cliente_id", params.id);
+  if ((count || 0) > 0) {
+    return NextResponse.json(
+      { ok: false, erro: "tem_movimento_financeiro",
+        mensagem: "Esta família já tem lançamentos no financeiro. Excluir apagaria o histórico. Use 'Remover dados' (LGPD), que preserva a contabilidade." },
+      { status: 400 }
+    );
+  }
+
+  await db.from("mensagens").delete().eq("cliente_id", params.id);
+  await db.from("interacoes_ia").delete().eq("cliente_id", params.id);
+  await db.from("conversas").delete().eq("cliente_id", params.id);
+  await db.from("servicos").delete().eq("cliente_id", params.id);
+  await db.from("planos").delete().eq("cliente_id", params.id);
+  await db.from("tumulos").delete().eq("cliente_id", params.id);
+  const { error } = await db.from("clientes").delete().eq("id", params.id);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

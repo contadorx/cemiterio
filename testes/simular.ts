@@ -27,7 +27,8 @@ function montarBanco(): Tabelas {
     orgs: [{ id: ORG, nome: "Zelo & Memória", marca_nome: "Zelo & Memória",
              marca_assinatura: "Por Dona Nadir · Desde 1990", chave_pix: "zeloememoria@pix.com",
              limpezas_por_dia: 20, dias_trabalhados_semana: 6,
-             valor_referencia_limpeza: 40, ipca_anual_estimado: 0.045, teto_ia_dia: 0 }],
+             valor_referencia_limpeza: 40, ipca_anual_estimado: 0.045, teto_ia_dia: 0,
+             dias_semana: [1,2,3,4,5], hora_inicio: "08:00", hora_fim: "16:00" }],
     membros: [
       { org_id: ORG, user_id: "u-dono", papel: "admin", nome: "Leandro", ativo: true, limpezas_por_dia: null },
       { org_id: ORG, user_id: "u-nina", papel: "campo", nome: "Nina", ativo: true, limpezas_por_dia: 10 },
@@ -160,6 +161,7 @@ function montarBanco(): Tabelas {
       { id: "mat2", org_id: ORG, nome: "balde", unidade: "un", estoque: 5, alerta_minimo: 2 },
     ],
     conversas: [], mensagens: [], interacoes_ia: [], campanhas: [],
+    dias_sem_campo: [],
     datas_comemorativas: [
       { id: "d1", org_id: ORG, nome: "Finados", regra: "fixa", mes: new Date().getUTCMonth()+1,
         dia: new Date().getUTCDate()+3, ordinal_domingo: null, antecedencia_dias: 15, ativa: true,
@@ -210,6 +212,11 @@ async function rodar() {
   const ag = await import("../src/lib/agenda");
   const ger = await ag.gerarServicosDevidos(30);
   checar("gerou serviços dos planos vencidos", ger.criados >= 2, `criou ${ger.criados}`);
+  checar("geração explica quantos planos olhou", ger.planosAtivos > 0, JSON.stringify(ger));
+  const ger2 = await ag.gerarServicosDevidos(30);
+  checar("rodar de novo não duplica", ger2.criados === 0, `criou ${ger2.criados} na segunda vez`);
+  checar("e explica por que não criou nada", ger2.jaExistiam > 0 || ger2.foraDoHorizonte > 0,
+         JSON.stringify(ger2));
   checar("plano avulso NÃO gera serviço",
          !banco.servicos.some((s) => s.plano_id === "p4" && s.status === "pendente" && s.id !== "s3"),
          "avulso não pode entrar na esteira automática");
@@ -220,6 +227,14 @@ async function rodar() {
       valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null });
   }
   const alo = await ag.alocarAgenda();
+  // jornada de seg a sex: nada pode cair em sábado ou domingo
+  const foraDaJornada = banco.servicos.filter((x: any) => {
+    if (!x.data_prevista) return false;
+    const d = new Date(x.data_prevista + "T12:00:00Z").getUTCDay();
+    return d === 0 || d === 6;
+  });
+  checar("alocador respeita os dias de trabalho configurados", foraDaJornada.length === 0,
+         `${foraDaJornada.length} caíram em fim de semana`);
   checar("alocou serviços", alo.agendados > 0, JSON.stringify(alo));
   const agendados = banco.servicos.filter((s) => s.status === "agendado");
   const porExec = new Set(agendados.map((s) => s.executora_id));
