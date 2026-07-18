@@ -114,7 +114,12 @@ function Relatorio() {
     <>
       <div style={painel.card}>
         <label style={painel.rotulo}>Mês de referência</label>
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ ...painel.input, width: 200 }} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ ...painel.input, width: 200 }} />
+          <a href={`/api/financeiro/export?mes=${mes}`} style={{ ...painel.botaoSec, textDecoration: "none", display: "inline-block" }}>
+            Exportar CSV
+          </a>
+        </div>
       </div>
 
       {carregando && <p style={{ color: cor.cinza }}>Carregando...</p>}

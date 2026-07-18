@@ -8,18 +8,21 @@ export default function Painel() {
   const [cap, setCap] = useState<any>(null);
   const [rasc, setRasc] = useState(0);
   const [comp, setComp] = useState(0);
+  const [ind, setInd] = useState<any>(null);
   const [gerando, setGerando] = useState(false);
   const [msg, setMsg] = useState("");
 
   async function carregar() {
-    const [c, r, cp] = await Promise.all([
+    const [c, r, cp, i] = await Promise.all([
       fetch("/api/capacidade").then((x) => x.json()),
       fetch("/api/rascunhos").then((x) => x.json()),
       fetch("/api/comprovantes").then((x) => x.json()),
+      fetch("/api/indicadores").then((x) => x.json()),
     ]);
     if (c.ok) setCap(c);
     if (r.ok) setRasc(r.rascunhos.length);
     if (cp.ok) setComp(cp.comprovantes.length);
+    if (i.ok) setInd(i);
   }
   useEffect(() => {
     carregar();
@@ -53,6 +56,20 @@ export default function Painel() {
           </Link>
         </div>
 
+        {ind && (
+          <div style={painel.card}>
+            <strong style={{ fontSize: 18, color: cor.navy }}>Este mês</strong>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginTop: 12 }}>
+              <Metrica titulo="Recebido" valor={`R$ ${ind.recebidoMes.toFixed(0)}`} cor="#16a34a" />
+              <Metrica titulo="A receber" valor={`R$ ${ind.aReceber.toFixed(0)}`} cor={ind.aReceber > 0 ? "#dc2626" : cor.navy} />
+              <Metrica titulo="Limpezas feitas" valor={String(ind.servExecutadosMes)} cor={cor.navy} />
+              <Metrica titulo="Clientes ativos" valor={String(ind.clientesAtivos)} cor={cor.navy} />
+              <Metrica titulo="Nota média" valor={ind.mediaAvaliacoes != null ? `${ind.mediaAvaliacoes.toFixed(1)}⭐` : "—"} cor="#d97706" />
+              <Metrica titulo="IA automática" valor={ind.pctAutomatico != null ? `${ind.pctAutomatico}%` : "—"} cor={cor.teal} />
+            </div>
+          </div>
+        )}
+
         {cap && (
           <div style={painel.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -81,6 +98,15 @@ export default function Painel() {
           {msg && <p style={{ marginTop: 10, color: cor.navy }}>{msg}</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Metrica({ titulo, valor, cor: c }: { titulo: string; valor: string; cor: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: c }}>{valor}</div>
+      <div style={{ fontSize: 13, color: "#64748b" }}>{titulo}</div>
     </div>
   );
 }

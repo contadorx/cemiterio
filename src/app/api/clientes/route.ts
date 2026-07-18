@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
       telefone,
       modo: body?.modo === "automatico" ? "automatico" : "copiloto",
       ativo_ia: true,
+      consentimento_em: body?.consentimento ? new Date().toISOString() : null,
+      consentimento_via: body?.consentimento ? "cadastro" : null,
     })
     .select("id")
     .single();

@@ -65,7 +65,7 @@ export default function Clientes() {
 }
 
 function NovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: () => void }) {
-  const [f, setF] = useState<any>({ nome: "", telefone: "", quadra: "", tumulo: "", falecido: "", cadencia: "mensal", qtd: 1, valor: 40 });
+  const [f, setF] = useState<any>({ nome: "", telefone: "", quadra: "", tumulo: "", falecido: "", cadencia: "mensal", qtd: 1, valor: 40, consentimento: false });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -73,7 +73,7 @@ function NovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: (
     if (!f.nome || !f.telefone) { setErro("Nome e telefone são obrigatórios."); return; }
     setSalvando(true);
     setErro("");
-    const body: any = { nome: f.nome, telefone: f.telefone };
+    const body: any = { nome: f.nome, telefone: f.telefone, consentimento: f.consentimento };
     if (f.tumulo) body.tumulo = { identificacao: f.tumulo, quadraCodigo: f.quadra, falecidoNome: f.falecido };
     if (f.tumulo && f.cadencia) body.plano = { cadencia: f.cadencia, qtdPorPassagem: Number(f.qtd), valorVigente: Number(f.valor) };
     const r = await fetch("/api/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json());
@@ -125,6 +125,10 @@ function NovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: (
           </div>
         )}
         {erro && <p style={{ color: "#dc2626" }}>{erro}</p>}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 14, color: cor.cinza }}>
+          <input type="checkbox" checked={f.consentimento} onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
+          O cliente autorizou guardarmos seus dados para o atendimento (LGPD)
+        </label>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <button style={painel.botao} onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
           <button style={painel.botaoSec} onClick={onFechar}>Cancelar</button>

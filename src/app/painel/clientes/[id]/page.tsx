@@ -103,6 +103,22 @@ export default function FichaCliente() {
           </div>
         </div>
 
+        {d.pagamentos && d.pagamentos.length > 0 && (
+          <div style={painel.card}>
+            <strong style={{ color: cor.navy }}>Pagamentos recebidos</strong>
+            {d.pagamentos.map((p: any) => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
+                <span>
+                  {new Date(p.data + "T12:00:00").toLocaleDateString("pt-BR")} · <b style={{ color: "#16a34a" }}>R$ {Number(p.valor).toFixed(2)}</b>
+                </span>
+                <a href={`/painel/recibo/${p.id}`} target="_blank" rel="noreferrer" style={{ ...painel.botaoSec, padding: "6px 12px", textDecoration: "none" }}>
+                  Recibo
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Atendimento da IA</strong>
           <div style={{ display: "flex", gap: 16, margin: "12px 0", flexWrap: "wrap" }}>

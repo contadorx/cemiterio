@@ -21,18 +21,20 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
     db.from("tumulos").select("id,identificacao,falecido_nome,datas_gatilho,qr_token,quadras(codigo)").eq("cliente_id", id),
     db.from("planos").select("id,cadencia,qtd_por_passagem,valor_vigente,data_valor_vigente,ativo").eq("cliente_id", id),
-    db.from("movimentos").select("tipo,valor,status_conc").eq("cliente_id", id),
+    db.from("movimentos").select("id,tipo,valor,status_conc,data,descricao").eq("cliente_id", id).order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
   ]);
 
   let saldo = 0;
   let aConferir = 0;
+  const pagamentos: any[] = [];
   for (const m of mov || []) {
     const st = (m as any).status_conc;
     const v = Number((m as any).valor) || 0;
     if (st === "rejeitado") continue;
     if (st === "a_conferir") { if ((m as any).tipo === "credito") aConferir += v; continue; }
     saldo += (m as any).tipo === "credito" ? v : -v;
+    if ((m as any).tipo === "credito") pagamentos.push({ id: (m as any).id, valor: v, data: (m as any).data });
   }
 
   return NextResponse.json({
@@ -42,6 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     planos: planos || [],
     saldo,
     aConferir,
+    pagamentos,
     mensagens: (msgs || []).reverse(),
   });
 }

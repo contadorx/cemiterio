@@ -130,11 +130,48 @@ export default function AgendaPage() {
                     )}
                   </div>
                 )}
+                {s.status === "executado" && <Avaliar servicoId={s.id} />}
               </div>
             ))}
           </section>
         ))}
       </main>
     </div>
+  );
+}
+
+function Avaliar({ servicoId }: { servicoId: string }) {
+  const [link, setLink] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  async function gerar() {
+    setBusy(true);
+    const r = await fetch(`/api/servico/${servicoId}/avaliacao`, { method: "POST" })
+      .then((x) => x.json())
+      .catch(() => null);
+    setBusy(false);
+    if (r?.ok) setLink(`${window.location.origin}/avaliar/${r.token}`);
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  function copiar() {
+    if (!link) return;
+    navigator.clipboard?.writeText(link);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1500);
+  }
+
+  if (link) {
+    return (
+      <button style={{ ...painel.botaoSec, padding: "6px 10px" }} onClick={copiar}>
+        {copiado ? "✓ copiado" : "Copiar link de avaliação"}
+      </button>
+    );
+  }
+  return (
+    <button style={{ ...painel.botaoSec, padding: "6px 10px" }} onClick={gerar} disabled={busy}>
+      {busy ? "..." : "Pedir avaliação"}
+    </button>
   );
 }
