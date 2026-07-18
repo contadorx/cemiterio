@@ -18,8 +18,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
   }
 
   const body = await req.json().catch(() => ({}));
-  const papel = body?.papel === "campo" ? "campo" : "admin";
-  const { error } = await auth.db.from("membros").update({ papel }).eq("org_id", org).eq("user_id", params.userId);
+  const patch: Record<string, any> = {};
+  if (body?.papel !== undefined) patch.papel = body.papel === "campo" ? "campo" : "admin";
+  if (body?.limpezasPorDia !== undefined) {
+    const n = Number(body.limpezasPorDia);
+    patch.limpezas_por_dia = n > 0 ? Math.round(n) : null;
+  }
+  if (body?.ativo !== undefined) patch.ativo = !!body.ativo;
+  if (!Object.keys(patch).length) {
+    return NextResponse.json({ ok: false, erro: "nada_para_atualizar" }, { status: 400 });
+  }
+  const { error } = await auth.db.from("membros").update(patch).eq("org_id", org).eq("user_id", params.userId);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

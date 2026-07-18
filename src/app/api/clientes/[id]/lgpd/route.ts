@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { auditar } from "@/lib/auditoria";
+import { orgAtual } from "@/lib/org";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +18,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (acao === "anonimizar") {
     const { error } = await db.rpc("sureya_anonimizar_cliente", { p_cliente: params.id });
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    const org = await orgAtual(db);
+    if (org) await auditar(db, org, auth.userId, "anonimizou_cliente", { tipo: "cliente", id: params.id });
     return NextResponse.json({ ok: true });
   }
 

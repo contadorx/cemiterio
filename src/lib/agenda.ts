@@ -128,13 +128,32 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   const db = supabaseAdmin();
   const org = env.orgId();
 
-  // capacidade/dia
+  // capacidade/dia padrão da org
   const { data: orgRow } = await db
     .from("orgs")
     .select("limpezas_por_dia")
     .eq("id", org)
     .single();
-  const capacidade = Number((orgRow as any)?.limpezas_por_dia) || 20;
+  const capacidadePadrao = Number((orgRow as any)?.limpezas_por_dia) || 20;
+
+  // D5: ajudantes ativas (papel campo). Cada uma pode ter capacidade própria.
+  const { data: campo } = await db
+    .from("membros")
+    .select("user_id,nome,limpezas_por_dia,ativo")
+    .eq("org_id", org)
+    .eq("papel", "campo");
+
+  const equipe = (campo || [])
+    .filter((m: any) => m.ativo !== false)
+    .map((m: any) => ({
+      userId: m.user_id as string,
+      capacidade: Number(m.limpezas_por_dia) || capacidadePadrao,
+    }));
+
+  // sem ajudante cadastrada: opera como antes (um turno único, sem executora)
+  const turnos =
+    equipe.length > 0 ? equipe : [{ userId: null as string | null, capacidade: capacidadePadrao }];
+  const capacidadeDia = turnos.reduce((s, t) => s + t.capacidade, 0);
 
   // pendentes não alocados ou a realocar
   const { data: pend } = await db
@@ -164,13 +183,13 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     return a.tumulo.quadra_ordem - b.tumulo.quadra_ordem;
   });
 
-  // empacota em dias de capacidade fixa, começando hoje (pula domingo)
+  // empacota em dias, começando hoje (pula domingo)
   let dia = proximoDiaUtil(isoHoje());
   let dias = 0;
   let agendados = 0;
 
-  for (let i = 0; i < itens.length; i += capacidade) {
-    const doDia = itens.slice(i, i + capacidade);
+  for (let i = 0; i < itens.length; i += capacidadeDia) {
+    const doDia = itens.slice(i, i + capacidadeDia);
     dias++;
 
     // dentro do dia: agrupa por quadra e ordena por proximidade
@@ -182,13 +201,26 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     }
     const quadrasOrdenadas = [...porQuadra.keys()].sort((a, b) => a - b);
 
-    let ordem = 1;
-    for (const q of quadrasOrdenadas) {
-      const rota = ordenarPorProximidade(porQuadra.get(q)!);
-      for (const it of rota) {
+    // sequência do dia já otimizada por quadra/proximidade
+    const sequencia: ServicoPend[] = [];
+    for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorProximidade(porQuadra.get(q)!));
+
+    // reparte a sequência entre as ajudantes, em blocos contíguos
+    // (blocos contíguos preservam a proximidade: cada uma pega quadras vizinhas)
+    let pos = 0;
+    for (const turno of turnos) {
+      const bloco = sequencia.slice(pos, pos + turno.capacidade);
+      pos += turno.capacidade;
+      let ordem = 1;
+      for (const it of bloco) {
         await db
           .from("servicos")
-          .update({ data_prevista: dia, ordem_dia: ordem, status: "agendado" })
+          .update({
+            data_prevista: dia,
+            ordem_dia: ordem,
+            status: "agendado",
+            executora_id: turno.userId,
+          })
           .eq("id", it.id)
           .eq("org_id", org);
         ordem++;

@@ -4,6 +4,7 @@ import { avisosSaldoBaixo, cobrancaGentil, gatilhosDeData } from "@/lib/proativo
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { processarPendentes } from "@/lib/atendimento";
 import { processarFilaEnvios } from "@/lib/envio";
+import { destilarPerfisPendentes } from "@/lib/destilacao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,10 +39,14 @@ export async function GET(req: NextRequest) {
   const pendentes = await processarPendentes();
   const envios = await processarFilaEnvios();
 
+  // B4: mantém os perfis da IA frescos sem trabalho manual
+  const perfis = await destilarPerfisPendentes();
+
   return NextResponse.json({
     ok: true,
     agenda: { gerados: agenda.criados, ...aloc },
     rascunhos: { saldo, cobranca, gatilhos },
     rede_seguranca: { pendentes, envios },
+    perfis,
   });
 }

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
-  const { data } = await auth.db.from("membros").select("user_id,papel,nome,created_at").order("created_at");
+  const { data } = await auth.db.from("membros").select("user_id,papel,nome,limpezas_por_dia,ativo,created_at").order("created_at");
   return NextResponse.json({ ok: true, membros: data || [] });
 }
 

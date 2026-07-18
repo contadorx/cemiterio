@@ -12,14 +12,23 @@ export async function GET(req: NextRequest) {
 
   const data = req.nextUrl.searchParams.get("data") || new Date().toISOString().slice(0, 10);
 
-  const { data: servs, error } = await db
+  let q = db
     .from("servicos")
     .select(
       "id,status,ordem_dia,tumulos(identificacao,lat,lng,falecido_nome,foto_referencia_url,quadras(codigo,ordem)),clientes(nome)"
     )
     .eq("data_prevista", data)
-    .in("status", ["pendente", "agendado", "executado"])
-    .order("ordem_dia", { ascending: true });
+    .in("status", ["pendente", "agendado", "executado"]);
+
+  // D5: a ajudante vê só a própria rota; o dono vê tudo (ou filtra por ?executora=)
+  if (auth.papel === "campo") {
+    q = q.or(`executora_id.eq.${auth.userId},executora_id.is.null`);
+  } else {
+    const exec = req.nextUrl.searchParams.get("executora");
+    if (exec) q = q.eq("executora_id", exec);
+  }
+
+  const { data: servs, error } = await q.order("ordem_dia", { ascending: true });
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 

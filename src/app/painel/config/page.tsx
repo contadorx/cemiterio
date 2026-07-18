@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"equipe" | "avaliacoes" | "indicacoes" | "privacidade" | "erros">("equipe");
+  const [aba, setAba] = useState<"equipe" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("equipe");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -13,9 +13,11 @@ export default function Config() {
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {([
             ["equipe", "Equipe"],
+            ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
             ["indicacoes", "Indicações"],
             ["privacidade", "Privacidade (LGPD)"],
+            ["auditoria", "Auditoria"],
             ["erros", "Diagnóstico"],
           ] as const).map(([k, label]) => (
             <button key={k} style={aba === k ? painel.botao : painel.botaoSec} onClick={() => setAba(k)}>
@@ -24,7 +26,8 @@ export default function Config() {
           ))}
         </div>
         {aba === "equipe" && <Equipe />}
-        {aba !== "equipe" && <Agregados aba={aba} />}
+        {aba === "campanhas" && <Campanhas />}
+        {aba !== "equipe" && aba !== "campanhas" && <Agregados aba={aba} />}
       </div>
     </div>
   );
@@ -71,11 +74,11 @@ function Equipe() {
     else alert("Falhou: " + (r?.erro || "erro"));
   }
 
-  async function trocarPapel(userId: string, papel: string) {
+  async function atualizar(userId: string, patch: Record<string, any>) {
     await fetch(`/api/membros/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ papel }),
+      body: JSON.stringify(patch),
     });
     carregar();
   }
@@ -119,10 +122,23 @@ function Equipe() {
         <div key={m.user_id} style={{ ...painel.card, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <div>
             <strong style={{ color: cor.navy }}>{m.nome || "(sem nome)"}</strong>
-            <div style={{ fontSize: 13, color: cor.cinza }}>{m.papel === "campo" ? "Campo" : "Administrador"}</div>
+            <div style={{ fontSize: 13, color: cor.cinza }}>
+              {m.papel === "campo" ? "Campo" : "Administrador"}
+              {m.papel === "campo" && ` · ${m.limpezas_por_dia || "padrão"} limpezas/dia`}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <select style={{ ...painel.input, width: "auto", padding: 8 }} value={m.papel} onChange={(e) => trocarPapel(m.user_id, e.target.value)}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {m.papel === "campo" && (
+              <input
+                type="number"
+                defaultValue={m.limpezas_por_dia || ""}
+                placeholder="p/ dia"
+                title="Limpezas por dia desta pessoa (vazio = padrão da org)"
+                style={{ ...painel.input, width: 90, padding: 8 }}
+                onBlur={(e) => atualizar(m.user_id, { limpezasPorDia: e.target.value || null })}
+              />
+            )}
+            <select style={{ ...painel.input, width: "auto", padding: 8 }} value={m.papel} onChange={(e) => atualizar(m.user_id, { papel: e.target.value })}>
               <option value="campo">Campo</option>
               <option value="admin">Admin</option>
             </select>
@@ -222,6 +238,24 @@ function Agregados({ aba }: { aba: string }) {
     );
   }
 
+  if (aba === "auditoria") {
+    return (
+      <>
+        <p style={{ color: cor.cinza, fontSize: 14 }}>Registro das ações sensíveis feitas no sistema.</p>
+        {d.auditoria.length === 0 && <p style={{ color: cor.cinza }}>Nada registrado ainda.</p>}
+        {d.auditoria.map((a: any, i: number) => (
+          <div key={i} style={{ ...painel.card, padding: 12 }}>
+            <strong style={{ color: cor.navy }}>{String(a.acao).replace(/_/g, " ")}</strong>
+            {a.alvo_tipo && <span style={{ color: cor.cinza, fontSize: 13 }}> · {a.alvo_tipo}</span>}
+            <div style={{ fontSize: 12, color: cor.cinza, marginTop: 4 }}>
+              {new Date(a.created_at).toLocaleString("pt-BR")}
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  }
+
   // erros / diagnóstico
   return (
     <>
@@ -234,6 +268,106 @@ function Agregados({ aba }: { aba: string }) {
           <div style={{ fontSize: 12, color: cor.cinza }}>{new Date(e.created_at).toLocaleString("pt-BR")}</div>
         </div>
       ))}
+    </>
+  );
+}
+
+function Campanhas() {
+  const [hist, setHist] = useState<any[]>([]);
+  const [nome, setNome] = useState("");
+  const [mensagem, setMensagem] = useState("");
+  const [publico, setPublico] = useState("ativos");
+  const [rodando, setRodando] = useState(false);
+  const [res, setRes] = useState<string>("");
+
+  async function carregar() {
+    const r = await fetch("/api/campanhas").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setHist(r.campanhas);
+  }
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function executar() {
+    if (!nome || mensagem.length < 10) return;
+    if (!confirm("Isso cria um rascunho de mensagem para cada cliente do público escolhido. Nada é enviado automaticamente — você aprova um a um em Conversas. Continuar?")) return;
+    setRodando(true);
+    setRes("");
+    const r = await fetch("/api/campanhas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome, mensagem, publico }),
+    }).then((x) => x.json()).catch(() => null);
+    setRodando(false);
+    if (r?.ok) {
+      setRes(`${r.criados} rascunho(s) criado(s). Vá em Conversas para revisar e enviar.`);
+      setNome("");
+      setMensagem("");
+      carregar();
+    } else setRes("Falhou: " + (r?.erro || "erro"));
+  }
+
+  const modelos = [
+    { n: "Finados", m: "Olá, {nome}! O Dia de Finados está chegando. Se quiser, deixamos o túmulo especialmente cuidado antes do dia 2, para a sua visita. É só me avisar. 🌿" },
+    { n: "Retorno", m: "Olá, {nome}, tudo bem? Faz um tempo que não cuidamos do túmulo por aí. Se quiser retomar as limpezas, é só me dizer que organizo tudo. 🌿" },
+  ];
+
+  return (
+    <>
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Nova campanha</strong>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+          Gera um rascunho por cliente — <b>nada sai sem a sua aprovação</b>. Use {"{nome}"} para inserir o
+          primeiro nome de cada pessoa.
+        </p>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {modelos.map((mo) => (
+            <button key={mo.n} style={painel.botaoSec} onClick={() => { setNome(mo.n); setMensagem(mo.m); }}>
+              Usar modelo: {mo.n}
+            </button>
+          ))}
+        </div>
+
+        <label style={painel.rotulo}>Nome da campanha (interno)</label>
+        <input style={painel.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Finados 2026" />
+
+        <div style={{ marginTop: 10 }}>
+          <label style={painel.rotulo}>Público</label>
+          <select style={{ ...painel.input, width: "auto" }} value={publico} onChange={(e) => setPublico(e.target.value)}>
+            <option value="ativos">Clientes com plano ativo</option>
+            <option value="todos">Todos os clientes</option>
+            <option value="sem_servico_90d">Sem limpeza há 90 dias</option>
+            <option value="em_aberto">Com valor em aberto</option>
+          </select>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <label style={painel.rotulo}>Mensagem</label>
+          <textarea
+            style={{ ...painel.input, minHeight: 110, resize: "vertical", fontFamily: "inherit" }}
+            value={mensagem}
+            onChange={(e) => setMensagem(e.target.value)}
+          />
+        </div>
+
+        <button style={{ ...painel.botao, marginTop: 12 }} onClick={executar} disabled={rodando}>
+          {rodando ? "Gerando rascunhos..." : "Gerar rascunhos"}
+        </button>
+        {res && <p style={{ color: cor.navy, marginTop: 10 }}>{res}</p>}
+      </div>
+
+      {hist.length > 0 && (
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Campanhas anteriores</strong>
+          {hist.map((c) => (
+            <div key={c.id} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8, fontSize: 14 }}>
+              <b>{c.nome}</b> · {c.publico} · {c.criados} rascunho(s) ·{" "}
+              {c.executada_em ? new Date(c.executada_em).toLocaleDateString("pt-BR") : "—"}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

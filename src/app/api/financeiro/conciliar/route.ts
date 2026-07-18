@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { calcularSaldo } from "@/lib/financeiro";
+import { auditar } from "@/lib/auditoria";
+import { orgAtual } from "@/lib/org";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +39,11 @@ export async function POST(req: NextRequest) {
         .update({ cobranca_nivel: 0, cobranca_em: null })
         .eq("id", (comp as any).cliente_id);
     }
+  }
+
+  const org = await orgAtual(db);
+  if (org) {
+    await auditar(db, org, auth.userId, aprovar ? "confirmou_pagamento" : "rejeitou_comprovante", { tipo: "comprovante", id: comprovanteId });
   }
 
   return NextResponse.json({ ok: true, status: aprovar ? "confirmado" : "rejeitado" });
