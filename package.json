@@ -21,3 +21,11 @@
     "typescript": "^5"
   }
 }
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
