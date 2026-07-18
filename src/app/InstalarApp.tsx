@@ -109,18 +109,44 @@ export default function InstalarApp({ contexto = "painel" }: { contexto?: "paine
 }
 
 /** Dispara uma notificação local (usada quando o sistema detecta novidade). */
+/**
+ * Mostra um aviso no aparelho.
+ *
+ * No Chrome do Android, `new Notification()` lança "Illegal constructor" — lá o
+ * caminho certo é pedir ao service worker. Tentamos primeiro por ele e só caímos
+ * no construtor direto no computador, onde ele funciona.
+ *
+ * Nunca lança: um aviso que falha não pode derrubar a tela.
+ */
 export function avisar(titulo: string, corpo: string, url?: string) {
   if (typeof window === "undefined") return;
   if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const opcoes: NotificationOptions = {
+    body: corpo,
+    icon: "/icon-192.png",
+    badge: "/icon-notificacao.png",
+    tag: "zm-novidade",
+    data: { url },
+  };
+
   try {
-    const n = new Notification(titulo, {
-      body: corpo,
-      icon: "/icon-192.png",
-      badge: "/icon-notificacao.png",
-      tag: "zm-novidade",
-    });
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => reg.showNotification(titulo, opcoes))
+        .catch(() => notificacaoDireta(titulo, opcoes, url));
+      return;
+    }
+  } catch { /* segue para o caminho direto */ }
+
+  notificacaoDireta(titulo, opcoes, url);
+}
+
+function notificacaoDireta(titulo: string, opcoes: NotificationOptions, url?: string) {
+  try {
+    const n = new Notification(titulo, opcoes);
     if (url) n.onclick = () => { window.focus(); location.href = url; };
-  } catch { /* alguns navegadores exigem o service worker; silencioso */ }
+  } catch { /* Android sem service worker pronto: sem aviso, e tudo bem */ }
 }
 
 const NAVY = "#12284b";

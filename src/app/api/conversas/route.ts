@@ -23,6 +23,20 @@ function estadoDa(c: any): string {
   return c.estado || "sem_movimento";
 }
 
+/**
+ * Quem "precisa de você". Esta regra tem que ser a MESMA usada pelo contador —
+ * senão a aba diz (1) e a lista vem vazia, que foi o que aconteceu.
+ * A versão em SQL está em sureya_contadores_conversas().
+ */
+function precisaDeVoce(c: any, temRascunho: boolean): boolean {
+  return (
+    c.tipo === "equipe" ||
+    temRascunho ||
+    !!c.escalada_humano ||
+    ["sem_resposta", "lida_sem_resposta"].includes(estadoDa(c))
+  );
+}
+
 /** Há quanto tempo a família espera. */
 function esperaDe(c: any): string | null {
   if (!c.ultima_msg_cliente_em) return null;
@@ -116,9 +130,7 @@ export async function GET(req: NextRequest) {
   // "pendentes" de verdade: com rascunho a aprovar OU escalada.
   // A caixa da equipe nunca é filtrada — ela fica sempre visível.
   if (situacao === "pendentes") {
-    lista = lista.filter((c: any) =>
-      c.tipo === "equipe" || comRascunho.has(c.id) || c.escalada_humano ||
-      estadoDa(c) === "sem_resposta" || estadoDa(c) === "lida_sem_resposta");
+    lista = lista.filter((c: any) => precisaDeVoce(c, comRascunho.has(c.id)));
   }
 
   // nome dos membros, para rotular a caixa da equipe
@@ -156,21 +168,14 @@ export async function GET(req: NextRequest) {
       : null,
   }));
 
-  // contadores para os botões de filtro
-  const { count: nPend } = await db.from("conversas")
-    .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("resolvida", false);
-  const { count: nEsc } = await db.from("conversas")
-    .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("escalada_humano", true);
-  const { count: nAguard } = await db.from("conversas")
-    .select("id", { count: "exact", head: true }).is("arquivada_em", null)
-    .in("estado", ["sem_resposta", "lida_sem_resposta"]);
+  // contadores: uma função só no banco, com a MESMA regra da lista
+  const { data: cont } = await db.rpc("sureya_contadores_conversas");
+  const c0 = (Array.isArray(cont) ? cont[0] : cont) || {};
   const { count: semResposta } = await db.from("conversas")
     .select("id", { count: "exact", head: true })
     .is("arquivada_em", null)
     .in("estado", ["sem_resposta", "lida_sem_resposta"]);
 
-  const { count: nArq } = await db.from("conversas")
-    .select("id", { count: "exact", head: true }).not("arquivada_em", "is", null);
 
   // a caixa da equipe sempre no topo
   conversas.sort((a: any, b: any) => {
@@ -181,7 +186,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     conversas,
-    contadores: { pendentes: nPend || 0, escaladas: nEsc || 0,
-                  aguardando: nAguard || 0, arquivadas: nArq || 0 },
+    contadores: {
+      pendentes: c0.pendentes || 0,
+      aguardando: c0.aguardando || 0,
+      escaladas: c0.escaladas || 0,
+      arquivadas: c0.arquivadas || 0,
+      resolvidas: c0.resolvidas || 0,
+    },
   });
 }

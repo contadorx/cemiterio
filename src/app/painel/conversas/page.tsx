@@ -42,32 +42,44 @@ export default function Conversas() {
   const [cont, setCont] = useState({ pendentes: 0, escaladas: 0, aguardando: 0, arquivadas: 0 });
   const [ultimoAviso, setUltimoAviso] = useState<string>("");
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState("");
   const [f, setF] = useState({ situacao: "pendentes", assunto: "", busca: "", de: "", ate: "" });
   const [maisFiltros, setMaisFiltros] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    const p = new URLSearchParams();
-    Object.entries(f).forEach(([k, v]) => v && p.set(k, String(v)));
-    const r = await fetch(`/api/conversas?${p}`).then((x) => x.json()).catch(() => null);
-    if (r?.ok) {
+    setErro("");
+    try {
+      const p = new URLSearchParams();
+      Object.entries(f).forEach(([k, v]) => v && p.set(k, String(v)));
+      const r = await fetch(`/api/conversas?${p}`).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) {
+        setErro(r?.erro || "não consegui carregar as conversas");
+        return;
+      }
       // alguém respondeu? avisa pelo navegador (só a primeira vez de cada)
       const novas = (r.conversas || []).filter((c: any) => c.ultimoAutor === "cliente");
       const marca = novas.map((c: any) => `${c.id}:${c.atualizada}`).join("|");
       if (ultimoAviso && marca && marca !== ultimoAviso && novas.length) {
         const c = novas[0];
-        avisar(
-          `${c.cliente} respondeu`,
-          String(c.ultima?.texto || "").slice(0, 120),
-          `/painel/conversas/${c.id}`
-        );
+        try {
+          avisar(
+            `${c.cliente} respondeu`,
+            String(c.ultima?.texto || "").slice(0, 120),
+            `/painel/conversas/${c.id}`
+          );
+        } catch { /* avisar nunca pode travar a tela */ }
       }
       setUltimoAviso(marca);
-      setLista(r.conversas);
-      setCont(r.contadores);
+      setLista(r.conversas || []);
+      if (r.contadores) setCont(r.contadores);
+    } finally {
+      // sempre sai do "carregando", mesmo se algo acima falhar.
+      // Sem isto, um erro no meio deixava a tela presa em "Carregando…".
+      setCarregando(false);
     }
-    setCarregando(false);
-  }, [f]);
+  }, [f, ultimoAviso]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -173,6 +185,14 @@ export default function Conversas() {
         </div>
 
         {carregando && <p style={{ color: cor.cinza }}>Carregando…</p>}
+
+        {!carregando && erro && (
+          <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
+            <strong style={{ color: "#991b1b" }}>Não consegui carregar as conversas</strong>
+            <p style={{ color: "#7f1d1d", fontSize: 15, margin: "6px 0 12px" }}>{erro}</p>
+            <button style={painel.botao} onClick={carregar}>Tentar de novo</button>
+          </div>
+        )}
         {!carregando && lista.length === 0 && (
           <div style={painel.card}>
             <p style={{ color: cor.cinza, margin: 0 }}>

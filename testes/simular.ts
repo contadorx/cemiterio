@@ -418,6 +418,28 @@ async function rodar() {
          String(fq.lavagensPorAno("semestral", 1)));
   checar("avulso não tem intervalo", fq.intervaloEmDias("avulso", 1) === null, "");
 
+  console.log("\n=== 4i. CONTADOR BATE COM A LISTA ===");
+  // A aba dizia "Precisam de você (1)" e a lista vinha vazia: contador e lista
+  // usavam regras diferentes. Agora é a mesma regra dos dois lados.
+  function precisaDeVoce(c: any, temRascunho: boolean): boolean {
+    return c.tipo === "equipe" || temRascunho || !!c.escalada_humano ||
+           ["sem_resposta", "lida_sem_resposta"].includes(c.estado || "sem_movimento");
+  }
+
+  const casos = [
+    { nome: "respondida e não resolvida", c: { estado: "respondida", resolvida: false }, r: false, esperado: false },
+    { nome: "sem resposta", c: { estado: "sem_resposta" }, r: false, esperado: true },
+    { nome: "lida mas sem responder", c: { estado: "lida_sem_resposta" }, r: false, esperado: true },
+    { nome: "com rascunho pendente", c: { estado: "respondida" }, r: true, esperado: true },
+    { nome: "escalada", c: { estado: "respondida", escalada_humano: true }, r: false, esperado: true },
+    { nome: "recado da equipe", c: { tipo: "equipe", estado: "sem_movimento" }, r: false, esperado: true },
+    { nome: "sem movimento nenhum", c: { estado: "sem_movimento" }, r: false, esperado: false },
+  ];
+  for (const t of casos) {
+    checar(`${t.nome} → ${t.esperado ? "conta" : "não conta"}`,
+           precisaDeVoce(t.c, t.r) === t.esperado, JSON.stringify(t.c));
+  }
+
   console.log("\n=== 5. CAMPANHAS ===");
   const camp = await import("../src/lib/campanha");
   const rc = await camp.executarCampanha({ nome: "Finados", mensagem: "Olá, {nome}! Finados chegando.", publico: "ativos" });
