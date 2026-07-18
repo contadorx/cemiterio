@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { env } from "@/lib/env";
 import { normalizarTelefone } from "@/lib/evolution";
-import { registrarEntrada, processarConversa } from "@/lib/atendimento";
+import { registrarEntrada, aguardarEProcessar } from "@/lib/atendimento";
 import { tratarLead } from "@/lib/leads";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -115,11 +116,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, resultado: reg.tipo });
     }
 
-    if (reg.processarAgora) {
-      const r = await processarConversa(reg.conversaId);
-      return NextResponse.json({ ok: true, resultado: r });
-    }
-    return NextResponse.json({ ok: true, resultado: "aguardando_rajada" });
+    // Sem agendador: responde ao Evolution já e processa a rajada em background,
+    // esperando a janela de debounce. Funciona no plano Hobby (sem cron/minuto).
+    waitUntil(aguardarEProcessar(reg.conversaId));
+    return NextResponse.json({ ok: true, resultado: "agendado" });
   } catch (e: any) {
     console.error("[webhook] erro ao processar:", e?.message || e);
     return NextResponse.json({ ok: false, erro: "processamento" });

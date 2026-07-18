@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { avisosSaldoBaixo, cobrancaGentil, gatilhosDeData } from "@/lib/proativo";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
+import { processarPendentes } from "@/lib/atendimento";
+import { processarFilaEnvios } from "@/lib/envio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,9 +34,14 @@ export async function GET(req: NextRequest) {
     await gatilhosDeData(),
   ];
 
+  // rede de segurança (o cron/minuto não roda no Hobby): drena o que ficou preso
+  const pendentes = await processarPendentes();
+  const envios = await processarFilaEnvios();
+
   return NextResponse.json({
     ok: true,
     agenda: { gerados: agenda.criados, ...aloc },
     rascunhos: { saldo, cobranca, gatilhos },
+    rede_seguranca: { pendentes, envios },
   });
 }

@@ -186,12 +186,48 @@ export async function registrarEntrada(params: {
   }
   if (conv.escalada) return { tipo: "escalado", conversaId: conv.id };
 
-  // Debounce: mensagem isolada responde já; rajada espera o cron consolidar.
-  const agora = Date.now();
-  const prev = conv.ultimaEntrada ? new Date(conv.ultimaEntrada).getTime() : 0;
-  const processarAgora = !prev || agora - prev > env.DEBOUNCE_SEGUNDOS * 1000;
+  // Estratégia sem agendador: SEMPRE devolvemos "ok" e deixamos o chamador (webhook)
+  // agendar um processamento diferido via waitUntil. Se outra mensagem chegar dentro
+  // da janela, ela reagenda e a anterior é absorvida (aguardarEProcessar confere o carimbo).
+  return { tipo: "ok", conversaId: conv.id, processarAgora: false };
+}
 
-  return { tipo: "ok", conversaId: conv.id, processarAgora };
+// Espera a janela de debounce e processa a conversa UMA vez, se ela "amadureceu"
+// (ou seja, se nenhuma mensagem mais nova chegou depois). Feito pra rodar em waitUntil,
+// sem bloquear a resposta ao Evolution nem depender de cron externo.
+export async function aguardarEProcessar(conversaId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const org = env.orgId();
+
+  // marca de tempo desta rajada no momento do agendamento
+  const { data: c0 } = await db
+    .from("conversas")
+    .select("ultima_entrada_at")
+    .eq("org_id", org)
+    .eq("id", conversaId)
+    .maybeSingle();
+  const carimbo = (c0 as any)?.ultima_entrada_at || null;
+
+  // dorme a janela de debounce
+  await new Promise((r) => setTimeout(r, env.DEBOUNCE_SEGUNDOS * 1000));
+
+  // se chegou mensagem mais nova depois do carimbo, outra execução cuidará: sai
+  const { data: c1 } = await db
+    .from("conversas")
+    .select("ultima_entrada_at")
+    .eq("org_id", org)
+    .eq("id", conversaId)
+    .maybeSingle();
+  const agora = (c1 as any)?.ultima_entrada_at || null;
+  if (carimbo && agora && new Date(agora).getTime() > new Date(carimbo).getTime()) {
+    return; // rajada ainda crescendo; a execução da mensagem mais nova processa
+  }
+
+  try {
+    await processarConversa(conversaId);
+  } catch (e) {
+    console.error("[debounce] processarConversa falhou:", (e as any)?.message || e);
+  }
 }
 
 // ----------------------------------------------------------------------------

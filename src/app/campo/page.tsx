@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { concluirOuEnfileirar, sincronizar, lerFila } from "@/lib/offline-fila";
 
 interface Item {
   id: string;
@@ -21,19 +22,48 @@ export default function Campo() {
   const [feitos, setFeitos] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [ativo, setAtivo] = useState<Item | null>(null);
+  const [pendentes, setPendentes] = useState(0);
+  const [online, setOnline] = useState(true);
 
   async function carregar() {
     setCarregando(true);
-    const r = await fetch("/api/agenda/dia").then((x) => x.json());
-    if (r.ok) {
+    const r = await fetch("/api/agenda/dia").then((x) => x.json()).catch(() => null);
+    if (r?.ok) {
       setLista(r.lista);
       setTotal(r.total);
       setFeitos(r.feitos);
     }
     setCarregando(false);
   }
+
+  async function sincronizarFila() {
+    const res = await sincronizar();
+    setPendentes(res.restantes);
+    if (res.enviadas > 0) carregar(); // atualiza contadores após subir
+  }
+
   useEffect(() => {
     carregar();
+    setPendentes(lerFila().length);
+    setOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+    const aoVoltar = () => {
+      setOnline(true);
+      sincronizarFila();
+    };
+    const aoCair = () => setOnline(false);
+    window.addEventListener("online", aoVoltar);
+    window.addEventListener("offline", aoCair);
+
+    // tenta sincronizar ao abrir e a cada 30s (rede pode oscilar no cemitério)
+    sincronizarFila();
+    const timer = setInterval(sincronizarFila, 30000);
+    return () => {
+      window.removeEventListener("online", aoVoltar);
+      window.removeEventListener("offline", aoCair);
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restantes = total - feitos;
@@ -56,6 +86,13 @@ export default function Campo() {
       <div style={s.barraFundo}>
         <div style={{ ...s.barraCheia, width: total ? `${(feitos / total) * 100}%` : "0%" }} />
       </div>
+
+      {(pendentes > 0 || !online) && (
+        <div style={s.faixaOffline}>
+          {!online ? "📴 Sem sinal — as conclusões ficam salvas no aparelho." : ""}
+          {pendentes > 0 ? ` ⏳ ${pendentes} para enviar quando voltar o sinal.` : ""}
+        </div>
+      )}
 
       {agrupar(lista).map((grupo) => (
         <section key={grupo.quadra}>
@@ -84,8 +121,9 @@ export default function Campo() {
         <Concluir
           item={ativo}
           onFechar={() => setAtivo(null)}
-          onPronto={() => {
+          onPronto={(offline: boolean) => {
             setAtivo(null);
+            if (offline) setPendentes(lerFila().length);
             carregar();
           }}
         />
@@ -112,7 +150,7 @@ function Concluir({
 }: {
   item: Item;
   onFechar: () => void;
-  onPronto: () => void;
+  onPronto: (offline: boolean) => void;
 }) {
   const [antes, setAntes] = useState<{ b64: string; mt: string } | null>(null);
   const [depois, setDepois] = useState<{ b64: string; mt: string } | null>(null);
@@ -148,24 +186,18 @@ function Concluir({
     setEnviando(true);
     setErro("");
     const gps = await pegarGps();
-    const r = await fetch("/api/servico/concluir", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        servicoId: item.id,
-        fotoDepoisBase64: depois.b64,
-        fotoAntesBase64: antes?.b64,
-        mimetype: depois.mt,
-        lat: gps?.lat,
-        lng: gps?.lng,
-      }),
-    }).then((x) => x.json());
+    const modo = await concluirOuEnfileirar({
+      servicoId: item.id,
+      fotoDepoisBase64: depois.b64,
+      fotoAntesBase64: antes?.b64,
+      mimetype: depois.mt,
+      lat: gps?.lat,
+      lng: gps?.lng,
+    });
     setEnviando(false);
-    if (!r.ok) {
-      setErro("Não consegui salvar. Tente de novo.");
-      return;
-    }
-    onPronto();
+    // online = subiu; offline = guardado no aparelho e sobe sozinho quando voltar o sinal.
+    // Em ambos, a Nina segue em frente (o cemitério tem sinal ruim; travar não ajuda).
+    onPronto(modo === "offline");
   }
 
   return (
@@ -235,6 +267,7 @@ function Concluir({
 
 const s: Record<string, React.CSSProperties> = {
   wrap: { maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui", background: "#f8fafc", minHeight: "100vh" },
+  faixaOffline: { background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", borderRadius: 10, padding: "10px 12px", fontSize: 14, marginBottom: 12, textAlign: "center" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   data: { fontSize: 14, color: "#64748b" },
   progresso: { fontSize: 22, fontWeight: 800, color: "#0f172a" },

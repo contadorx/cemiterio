@@ -195,6 +195,11 @@ function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
   const [falec, setFalec] = useState(dFal);
   const [nasc, setNasc] = useState(dNas);
   const [salvando, setSalvando] = useState(false);
+  const [token, setToken] = useState<string | null>(t.qr_token || null);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  const linkPortal = token ? `${typeof window !== "undefined" ? window.location.origin : ""}/familia/${token}` : "";
 
   async function salvar() {
     setSalvando(true);
@@ -214,6 +219,25 @@ function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
     } else alert("Falhou: " + (r?.erro || "erro"));
   }
 
+  async function portalAcao(acao: "emitir" | "revogar") {
+    setPortalBusy(true);
+    const r = await fetch(`/api/tumulos/${t.id}/portal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao }),
+    }).then((x) => x.json()).catch(() => null);
+    setPortalBusy(false);
+    if (r?.ok) setToken(r.token);
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  function copiar() {
+    if (!linkPortal) return;
+    navigator.clipboard?.writeText(linkPortal);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1500);
+  }
+
   return (
     <div style={{ padding: "8px 0", borderBottom: `1px solid ${cor.linha}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -221,29 +245,52 @@ function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
           <b>{t.identificacao}</b> {t.quadras?.codigo ? `· quadra ${t.quadras.codigo}` : ""}{" "}
           {t.falecido_nome ? `· ${t.falecido_nome}` : ""}
           {dFal ? ` · 🕊 ${dFal}` : ""}
+          {token ? " · 🔗 portal ativo" : ""}
         </span>
         <button style={{ ...painel.botaoSec, padding: "6px 12px" }} onClick={() => setEditando(!editando)}>
           {editando ? "Fechar" : "Editar"}
         </button>
       </div>
       {editando && (
-        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
-            <label style={painel.rotulo}>Nome do falecido</label>
-            <input style={{ ...painel.input, width: 200 }} value={falecido} onChange={(e) => setFalecido(e.target.value)} />
+        <>
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <label style={painel.rotulo}>Nome do falecido</label>
+              <input style={{ ...painel.input, width: 200 }} value={falecido} onChange={(e) => setFalecido(e.target.value)} />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Falecimento (MM-DD)</label>
+              <input style={{ ...painel.input, width: 110 }} value={falec} onChange={(e) => setFalec(e.target.value)} placeholder="07-23" />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Nascimento (MM-DD)</label>
+              <input style={{ ...painel.input, width: 110 }} value={nasc} onChange={(e) => setNasc(e.target.value)} placeholder="01-15" />
+            </div>
+            <button style={painel.botao} onClick={salvar} disabled={salvando}>
+              {salvando ? "..." : "Salvar"}
+            </button>
           </div>
-          <div>
-            <label style={painel.rotulo}>Falecimento (MM-DD)</label>
-            <input style={{ ...painel.input, width: 110 }} value={falec} onChange={(e) => setFalec(e.target.value)} placeholder="07-23" />
+
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px dashed ${cor.linha}` }}>
+            <label style={painel.rotulo}>Portal da família (link com as fotos das limpezas)</label>
+            {token ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input readOnly value={linkPortal} style={{ ...painel.input, flex: 1, minWidth: 220, fontSize: 13 }} onFocus={(e) => e.target.select()} />
+                <button style={painel.botaoSec} onClick={copiar}>{copiado ? "✓ copiado" : "Copiar"}</button>
+                <button style={painel.botaoPerigo} onClick={() => portalAcao("revogar")} disabled={portalBusy}>
+                  Desativar
+                </button>
+              </div>
+            ) : (
+              <button style={painel.botaoSec} onClick={() => portalAcao("emitir")} disabled={portalBusy}>
+                {portalBusy ? "..." : "Gerar link do portal"}
+              </button>
+            )}
+            <p style={{ color: cor.cinza, fontSize: 12, margin: "6px 0 0" }}>
+              Qualquer pessoa com o link vê as fotos e datas das limpezas (sem dados de pagamento). Desative a qualquer momento.
+            </p>
           </div>
-          <div>
-            <label style={painel.rotulo}>Nascimento (MM-DD)</label>
-            <input style={{ ...painel.input, width: 110 }} value={nasc} onChange={(e) => setNasc(e.target.value)} placeholder="01-15" />
-          </div>
-          <button style={painel.botao} onClick={salvar} disabled={salvando}>
-            {salvando ? "..." : "Salvar"}
-          </button>
-        </div>
+        </>
       )}
     </div>
   );
