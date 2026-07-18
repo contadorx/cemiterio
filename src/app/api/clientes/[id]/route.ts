@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: cliente } = await db
     .from("clientes")
-    .select("id,nome,telefone,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes")
+    .select("id,nome,telefone,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes,consentimento_em,codigo_indicacao")
     .eq("id", id)
     .maybeSingle();
   if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });

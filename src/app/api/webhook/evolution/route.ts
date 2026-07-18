@@ -5,6 +5,7 @@ import { normalizarTelefone } from "@/lib/evolution";
 import { registrarEntrada, aguardarEProcessar } from "@/lib/atendimento";
 import { tratarLead } from "@/lib/leads";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { registrarErro } from "@/lib/monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, resultado: "agendado" });
   } catch (e: any) {
     console.error("[webhook] erro ao processar:", e?.message || e);
+    await registrarErro("webhook", e, { telefone: p?.telefone });
     return NextResponse.json({ ok: false, erro: "processamento" });
   }
 }
