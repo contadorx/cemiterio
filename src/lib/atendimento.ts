@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
 import { supabaseAdmin } from "./supabase-admin";
-import { enviarWhatsapp } from "./evolution";
+import { enviarWhatsapp, baixarMidiaBase64 } from "./evolution";
+import { extrairComprovante } from "./comprovante";
+import { registrarComprovante } from "./conciliacao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
 import {
   acharCliente,
@@ -123,8 +125,9 @@ export async function processarMensagem(params: {
   telefone: string;
   texto: string;
   temMidia?: boolean;
+  mensagemRaw?: any; // objeto data.* do Evolution, p/ baixar a mídia
 }): Promise<ResultadoAtendimento> {
-  const { telefone, texto, temMidia } = params;
+  const { telefone, texto, temMidia, mensagemRaw } = params;
 
   // 1) Allowlist: só cliente cadastrado e com IA ativa.
   const cliente = await acharCliente(telefone);
@@ -133,10 +136,30 @@ export async function processarMensagem(params: {
 
   const conversaId = await garantirConversa(cliente.id);
 
-  // Texto que representa a entrada (mídia entra como marcador — leitura vem na fatia 3).
-  const entrada = temMidia
-    ? `${texto ? texto + "\n" : ""}[cliente enviou uma imagem — possível comprovante de Pix]`
-    : texto;
+  // Tratamento de mídia: tenta ler comprovante de Pix.
+  let notaEntrada = "";
+  let forcarHumano = false;
+  if (temMidia) {
+    const midia = await baixarMidiaBase64(mensagemRaw);
+    if (!midia) {
+      notaEntrada = "[cliente enviou uma mídia que não consegui baixar]";
+      forcarHumano = true;
+    } else {
+      const dados = await extrairComprovante(midia);
+      if (dados.eh_comprovante && dados.confianca !== "baixa") {
+        await registrarComprovante(cliente.id, midia, dados);
+        const v = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : "valor não identificado";
+        const d = dados.data || "data não identificada";
+        notaEntrada = `[comprovante de Pix recebido: ${v}, ${d} — registrado, aguardando conferência de uma pessoa]`;
+        // NÃO força humano: a IA pode agradecer o recebimento; a conferência do dinheiro é à parte.
+      } else {
+        notaEntrada = "[cliente enviou uma imagem que não parece um comprovante]";
+        forcarHumano = true;
+      }
+    }
+  }
+
+  const entrada = [texto, notaEntrada].filter(Boolean).join("\n");
   await gravarMensagem(conversaId, cliente.id, "entrada", "cliente", entrada);
 
   // 2) Se já está com uma pessoa, a IA cala.
@@ -147,12 +170,13 @@ export async function processarMensagem(params: {
   // 3) A IA pensa.
   const out = await chamarIa(cliente, conversaId);
 
-  // 4) É sensível? luto/reclamação/preço/cancelamento OU a própria IA pediu humano.
+  // 4) É sensível? luto/reclamação/preço/cancelamento OU a própria IA pediu humano
+  //    OU mídia que não é comprovante claro.
   const sensivel =
     out.sensivel ||
     out.precisa_humano ||
     ASSUNTOS_SENSIVEIS.includes(out.assunto) ||
-    !!temMidia; // comprovante: registro é humano até a fatia 3
+    forcarHumano;
 
   const db = supabaseAdmin();
   await db

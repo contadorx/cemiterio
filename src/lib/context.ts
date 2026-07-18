@@ -37,7 +37,8 @@ function formatarReal(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Saldo = Σ créditos confirmados − Σ débitos. >0 adiantado, <0 em aberto.
+// Saldo definitivo = Σ créditos CONFIRMADOS − Σ débitos. Créditos "a conferir"
+// aparecem à parte (ainda não entraram no saldo).
 async function calcularSaldoTexto(clienteId: string): Promise<string> {
   const db = supabaseAdmin();
   const { data } = await db
@@ -47,15 +48,25 @@ async function calcularSaldoTexto(clienteId: string): Promise<string> {
     .eq("cliente_id", clienteId);
 
   let saldo = 0;
+  let aConferir = 0;
   for (const m of data || []) {
-    if ((m as any).status_conc === "rejeitado") continue;
+    const st = (m as any).status_conc;
     const v = Number((m as any).valor) || 0;
+    if (st === "rejeitado") continue;
+    if (st === "a_conferir") {
+      if ((m as any).tipo === "credito") aConferir += v;
+      continue;
+    }
+    // confirmado
     saldo += (m as any).tipo === "credito" ? v : -v;
   }
-  if (Math.abs(saldo) < 0.005) return "em dia";
-  return saldo > 0
-    ? `adiantado ${formatarReal(saldo)}`
-    : `em aberto ${formatarReal(Math.abs(saldo))}`;
+
+  let base: string;
+  if (Math.abs(saldo) < 0.005) base = "em dia";
+  else if (saldo > 0) base = `adiantado ${formatarReal(saldo)}`;
+  else base = `em aberto ${formatarReal(Math.abs(saldo))}`;
+
+  return aConferir > 0.005 ? `${base} (${formatarReal(aConferir)} a conferir)` : base;
 }
 
 export async function montarContexto(cliente: ClienteRow): Promise<ContextoCliente> {

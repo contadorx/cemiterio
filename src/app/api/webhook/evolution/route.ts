@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       telefone: p.telefone,
       texto: p.texto,
       temMidia: p.temMidia,
+      mensagemRaw: body?.data,
     });
     return NextResponse.json({ ok: true, resultado: r });
   } catch (e: any) {
