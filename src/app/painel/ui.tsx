@@ -22,6 +22,7 @@ export function PainelNav({ atual }: { atual: string }) {
     { href: "/painel/reajustes", label: "Reajustes" },
     { href: "/painel/agente", label: "Agente" },
     { href: "/painel/whatsapp", label: "WhatsApp" },
+    { href: "/painel/config", label: "Config" },
   ];
   return (
     <nav style={nav.barra}>

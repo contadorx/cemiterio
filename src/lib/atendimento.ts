@@ -7,6 +7,7 @@ import { extrairComprovante } from "./comprovante";
 import { registrarComprovante } from "./conciliacao";
 import { transcreverAudio } from "./transcricao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
+import { registrarErro } from "./monitor";
 import {
   acharCliente,
   montarContexto,
@@ -227,6 +228,7 @@ export async function aguardarEProcessar(conversaId: string): Promise<void> {
     await processarConversa(conversaId);
   } catch (e) {
     console.error("[debounce] processarConversa falhou:", (e as any)?.message || e);
+    await registrarErro("debounce", e, { conversaId });
   }
 }
 

@@ -180,6 +180,96 @@ export default function FichaCliente() {
             ))}
           </div>
         </div>
+
+        <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
+      </div>
+    </div>
+  );
+}
+
+function PrivacidadeIndicacao({ clienteId, consentimentoEm, codigo: codigoInicial }: { clienteId: string; consentimentoEm: string | null; codigo: string | null }) {
+  const [codigo, setCodigo] = useState<string | null>(codigoInicial || null);
+  const [busy, setBusy] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const [consentido, setConsentido] = useState(!!consentimentoEm);
+
+  const linkIndicacao = codigo ? `${typeof window !== "undefined" ? window.location.origin : ""}/indicar/${codigo}` : "";
+
+  async function acao(acao: string, extra?: any) {
+    setBusy(true);
+    const r = await fetch(`/api/clientes/${clienteId}/lgpd`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao, ...extra }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusy(false);
+    return r;
+  }
+
+  async function gerarIndicacao() {
+    const r = await acao("indicacao");
+    if (r?.ok) setCodigo(r.codigo);
+  }
+
+  async function marcarConsentimento() {
+    const r = await acao("consentimento", { via: "cadastro" });
+    if (r?.ok) setConsentido(true);
+  }
+
+  async function anonimizar() {
+    if (!confirm("Remover os dados pessoais deste cliente (LGPD)? Nome, telefone e mensagens serão apagados. O histórico financeiro é mantido sem identificação. Isso não pode ser desfeito.")) return;
+    const r = await acao("anonimizar");
+    if (r?.ok) {
+      alert("Dados removidos.");
+      location.reload();
+    } else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  async function exportar() {
+    const r = await fetch(`/api/clientes/${clienteId}/lgpd`).then((x) => x.json());
+    if (!r?.ok) return alert("Falhou ao exportar.");
+    const blob = new Blob([JSON.stringify(r.export, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dados-cliente-${clienteId.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copiar() {
+    navigator.clipboard?.writeText(linkIndicacao);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1500);
+  }
+
+  return (
+    <div style={painel.card}>
+      <strong style={{ color: cor.navy }}>Privacidade e indicação</strong>
+
+      <div style={{ marginTop: 12 }}>
+        <label style={painel.rotulo}>Indicação (o cliente indica outras famílias)</label>
+        {codigo ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input readOnly value={linkIndicacao} style={{ ...painel.input, flex: 1, minWidth: 200, fontSize: 13 }} onFocus={(e) => e.target.select()} />
+            <button style={painel.botaoSec} onClick={copiar}>{copiado ? "✓ copiado" : "Copiar"}</button>
+          </div>
+        ) : (
+          <button style={painel.botaoSec} onClick={gerarIndicacao} disabled={busy}>Gerar link de indicação</button>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
+        <label style={painel.rotulo}>LGPD</label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {consentido ? (
+            <span style={{ color: cor.teal, fontSize: 14 }}>✓ consentimento registrado</span>
+          ) : (
+            <button style={painel.botaoSec} onClick={marcarConsentimento} disabled={busy}>Registrar consentimento</button>
+          )}
+          <button style={painel.botaoSec} onClick={exportar}>Exportar dados</button>
+          <button style={painel.botaoPerigo} onClick={anonimizar} disabled={busy}>Remover dados</button>
+        </div>
       </div>
     </div>
   );
