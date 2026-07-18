@@ -58,6 +58,8 @@ export default function Clientes() {
               <option value="automatico">IA no automático</option>
               <option value="ia_desligada">IA desligada</option>
               <option value="sem_telefone">Sem telefone</option>
+              <option value="falta_data">Falta data de lavagem ou cobrança</option>
+              <option value="nao_conferido">Ainda não conferidos</option>
             </select>
             <select style={{ ...painel.input, width: "auto" }} value={f.quadra}
                     onChange={(e) => setF({ ...f, quadra: e.target.value, rua: "" })}>
@@ -88,6 +90,7 @@ export default function Clientes() {
               <option value="saldo">Quem deve mais</option>
               <option value="valor">Maior valor mensal</option>
               <option value="lavagem">Próxima lavagem</option>
+              <option value="cobranca">Próxima cobrança</option>
             </select>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: cor.cinza }}>
               <input type="checkbox" checked={f.teste}
@@ -107,6 +110,11 @@ export default function Clientes() {
             <span><b style={{ color: cor.navy }}>{money(d.totais.mensal)}</b> por mês</span>
             <span><b style={{ color: d.totais.atrasados ? "#dc2626" : cor.teal }}>
               {d.totais.atrasados}</b> em aberto ({money(d.totais.emAberto)})</span>
+            {d.totais.faltaData > 0 && (
+              <span style={{ color: "#d97706" }}>
+                <b>{d.totais.faltaData}</b> sem data de lavagem ou cobrança
+              </span>
+            )}
             <button style={{ ...painel.botaoSec, marginLeft: "auto" }} onClick={() => setAbrindo(!abrindo)}>
               {abrindo ? "Fechar" : "+ Nova família / importar"}
             </button>
@@ -134,7 +142,17 @@ export default function Clientes() {
                     {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}
-                    {c.proximaLavagem && ` · lava em ${new Date(c.proximaLavagem + "T12:00:00").toLocaleDateString("pt-BR")}`}
+                  </div>
+                  <div style={{ fontSize: 13, marginTop: 3,
+                                color: c.faltaData ? "#d97706" : cor.cinza }}>
+                    {c.proximaLavagem
+                      ? `Lava em ${new Date(c.proximaLavagem + "T12:00:00").toLocaleDateString("pt-BR")}`
+                      : "Sem data de lavagem"}
+                    {" · "}
+                    {c.proximaCobranca
+                      ? `Cobra em ${new Date(c.proximaCobranca + "T12:00:00").toLocaleDateString("pt-BR")}`
+                      : "Sem data de cobrança"}
+                    {c.faltaData && " ← falta preencher"}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>

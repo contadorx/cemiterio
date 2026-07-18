@@ -492,7 +492,39 @@ function Casa() {
       </div>
 
       <div style={painel.card}>
-        <strong style={{ color: cor.navy }}>Capacidade e custo</strong>
+        <strong style={{ color: cor.navy }}>Custo da operação</strong>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+          É com isto que o sistema calcula o resultado de cada jazigo. Se você paga
+          um valor fixo por mês, preencha o salário — o custo por hora sai da jornada.
+        </p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <label style={painel.rotulo}>Salário mensal da ajudante (R$)</label>
+            <input type="number" style={{ ...painel.input, width: 150 }}
+                   value={f.custo_mensal_ajudante ?? 0}
+                   onChange={(e) => setF({ ...f, custo_mensal_ajudante: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>ou custo por hora (R$)</label>
+            <input type="number" style={{ ...painel.input, width: 130 }}
+                   value={f.custo_hora_campo ?? 15}
+                   onChange={(e) => setF({ ...f, custo_hora_campo: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Tempo padrão por limpeza (min)</label>
+            <input type="number" style={{ ...painel.input, width: 150 }}
+                   value={f.minutos_padrao_limpeza ?? 25}
+                   onChange={(e) => setF({ ...f, minutos_padrao_limpeza: Number(e.target.value) })} />
+          </div>
+        </div>
+        <p style={{ color: cor.cinza, fontSize: 12, margin: "8px 0 0" }}>
+          O tempo padrão só é usado enquanto não houver medição. Assim que a Nina começar a
+          usar &ldquo;Começar/Finalizar&rdquo;, o sistema passa a usar a média real dela.
+        </p>
+      </div>
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Capacidade</strong>
         <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <div>
             <label style={painel.rotulo}>Limpezas por dia</label>
@@ -556,6 +588,30 @@ function Materiais() {
     carregar();
   }
 
+  const [comprando, setComprando] = useState<any>(null);
+  const [sugestao, setSugestao] = useState<any>(null);
+
+  async function registrarCompra(m: any, quantidade: number, valor: number) {
+    const r = await fetch("/api/config/materiais/compra", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ materialId: m.id, quantidade, valorTotal: valor }),
+    }).then((x) => x.json()).catch(() => null);
+    setComprando(null);
+    if (r?.ok) {
+      carregar();
+      if (r.consumoSugerido != null && r.limpezas > 0) setSugestao({ ...r, material: m });
+    } else alert("Falhou ao registrar a compra.");
+  }
+
+  async function aprovarSugestao() {
+    await fetch("/api/config/materiais/compra", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ compraId: sugestao.compraId }),
+    });
+    setSugestao(null);
+    carregar();
+  }
+
   const sugestoes = ["vassoura de piaçava", "água sanitária", "pano de chão", "balde",
                      "luvas", "saco de lixo", "esponja", "rodo", "escova de aço", "flores"];
 
@@ -608,6 +664,28 @@ function Materiais() {
           Nenhum material cadastrado ainda.
         </p>
       )}
+      {comprando && (
+        <CompraMaterial m={comprando} onFechar={() => setComprando(null)}
+                        onConfirmar={(q, v) => registrarCompra(comprando, q, v)} />
+      )}
+
+      {sugestao && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #0f766e", background: "#f0fdfa", marginTop: 12 }}>
+          <strong style={{ color: cor.navy }}>Revisar o gasto de {sugestao.material.nome}?</strong>
+          <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0" }}>
+            Desde a compra anterior foram <b>{sugestao.limpezas}</b> limpezas. Pelo que você comprou,
+            o gasto real é de <b>{sugestao.consumoSugerido}</b> por limpeza — hoje está{" "}
+            <b>{sugestao.consumoAtual}</b>.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button style={painel.botao} onClick={aprovarSugestao}>
+              Usar {sugestao.consumoSugerido} por limpeza
+            </button>
+            <button style={painel.botaoSec} onClick={() => setSugestao(null)}>Deixar como está</button>
+          </div>
+        </div>
+      )}
+
       {itens.map((m) => {
         const baixo = Number(m.estoque) <= Number(m.alerta_minimo);
         return (
@@ -627,7 +705,21 @@ function Materiais() {
               <input type="number" defaultValue={m.alerta_minimo} style={{ ...painel.input, width: 100, padding: 8 }}
                      onBlur={(e) => atualizar(m.id, { alertaMinimo: Number(e.target.value) })} />
             </div>
-            <span style={{ color: cor.cinza, fontSize: 13 }}>{m.unidade}</span>
+            <div>
+              <label style={{ ...painel.rotulo, marginBottom: 2 }}>Gasto por limpeza</label>
+              <input type="number" step="0.001" defaultValue={m.consumo_por_limpeza}
+                     style={{ ...painel.input, width: 110, padding: 8 }}
+                     onBlur={(e) => atualizar(m.id, { consumoPorLimpeza: Number(e.target.value) })} />
+            </div>
+            <span style={{ color: cor.cinza, fontSize: 13 }}>
+              {m.unidade}
+              {Number(m.consumo_por_limpeza) > 0 &&
+                ` · dura ~${Math.round(1 / Number(m.consumo_por_limpeza))} limpezas`}
+              {Number(m.custo_unitario) > 0 && ` · R$ ${Number(m.custo_unitario).toFixed(2)}/${m.unidade}`}
+            </span>
+            <button style={{ ...painel.botaoSec, padding: "8px 12px" }} onClick={() => setComprando(m)}>
+              Comprei
+            </button>
             <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }} onClick={() => remover(m.id, m.nome)}>
               Remover
             </button>
@@ -776,5 +868,43 @@ function Jornada() {
         ))}
       </div>
     </>
+  );
+}
+
+
+function CompraMaterial({ m, onFechar, onConfirmar }:
+  { m: any; onFechar: () => void; onConfirmar: (q: number, v: number) => void }) {
+  const [qtd, setQtd] = useState("");
+  const [valor, setValor] = useState("");
+
+  return (
+    <div style={{ ...painel.card, borderLeft: `4px solid ${cor.navy}`, marginTop: 12 }}>
+      <strong style={{ color: cor.navy }}>Comprei {m.nome}</strong>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
+        <div>
+          <label style={painel.rotulo}>Quantidade ({m.unidade})</label>
+          <input type="number" step="0.01" style={{ ...painel.input, width: 130 }} value={qtd}
+                 onChange={(e) => setQtd(e.target.value)} />
+        </div>
+        <div>
+          <label style={painel.rotulo}>Valor total (R$)</label>
+          <input type="number" step="0.01" style={{ ...painel.input, width: 130 }} value={valor}
+                 onChange={(e) => setValor(e.target.value)} />
+        </div>
+        <button style={painel.botao}
+                onClick={() => {
+                  const q = Number(qtd), v = Number(valor);
+                  if (!q) return alert("Informe a quantidade.");
+                  onConfirmar(q, v);
+                }}>
+          Registrar
+        </button>
+        <button style={painel.botaoSec} onClick={onFechar}>Cancelar</button>
+      </div>
+      <p style={{ color: cor.cinza, fontSize: 12, margin: "10px 0 0" }}>
+        O estoque sobe, o custo por unidade é recalculado e eu comparo com as limpezas do período
+        para sugerir o gasto real por limpeza.
+      </p>
+    </div>
   );
 }

@@ -22,13 +22,15 @@ export async function GET(req: NextRequest) {
 
   const [{ data: tums }, { data: plans }, { data: movs }] = await Promise.all([
     db.from("tumulos").select("cliente_id,identificacao,rua,quadra_id,quadras(codigo)").in("cliente_id", ids.length ? ids : ["-"]),
-    db.from("planos").select("cliente_id,cadencia,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate").in("cliente_id", ids.length ? ids : ["-"]),
+    db.from("planos").select("cliente_id,cadencia,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate,migrado_em").in("cliente_id", ids.length ? ids : ["-"]),
     db.from("movimentos").select("cliente_id,tipo,valor,status_conc").in("cliente_id", ids.length ? ids : ["-"]),
   ]);
 
   const porCliente = new Map<string, any>();
   for (const c of (clientes || []) as any[]) {
-    porCliente.set(c.id, { ...c, jazigos: [], cadencias: [], saldo: 0, mensal: 0, proximaLavagem: null, proximaCobranca: null });
+    porCliente.set(c.id, { ...c, jazigos: [], cadencias: [], saldo: 0, mensal: 0,
+                           proximaLavagem: null, proximaCobranca: null,
+                           temPlanoAtivo: false, conferido: true });
   }
   for (const t of (tums || []) as any[]) {
     const x = porCliente.get(t.cliente_id); if (!x) continue;
@@ -41,6 +43,8 @@ export async function GET(req: NextRequest) {
       x.mensal += Number(p.valor_mensal) || 0;
       if (p.proximo_servico && (!x.proximaLavagem || p.proximo_servico < x.proximaLavagem)) x.proximaLavagem = p.proximo_servico;
       if (p.proxima_cobranca && (!x.proximaCobranca || p.proxima_cobranca < x.proximaCobranca)) x.proximaCobranca = p.proxima_cobranca;
+      x.temPlanoAtivo = true;
+      if (!p.migrado_em) x.conferido = false;
     }
   }
   for (const m of (movs || []) as any[]) {
@@ -57,6 +61,8 @@ export async function GET(req: NextRequest) {
     quadras: [...new Set(c.jazigos.map((j: any) => j.quadra).filter(Boolean))],
     ruas: [...new Set(c.jazigos.map((j: any) => j.rua).filter(Boolean))],
     atrasado: c.saldo < -0.005,
+    faltaData: c.temPlanoAtivo && (!c.proximaLavagem || !c.proximaCobranca),
+    conferido: c.conferido,
   }));
 
   // ------------------------------- filtros
@@ -83,6 +89,8 @@ export async function GET(req: NextRequest) {
   if (situacao === "sem_telefone") lista = lista.filter((c) => String(c.telefone).startsWith("sem-tel"));
   if (situacao === "ia_desligada") lista = lista.filter((c) => !c.ativo_ia);
   if (situacao === "automatico") lista = lista.filter((c) => c.modo === "automatico");
+  if (situacao === "falta_data") lista = lista.filter((c) => c.faltaData);
+  if (situacao === "nao_conferido") lista = lista.filter((c) => !c.conferido);
 
   const venceEm = Number(q.get("venceEm") || 0);
   if (venceEm > 0) {
@@ -98,12 +106,14 @@ export async function GET(req: NextRequest) {
   if (ordem === "saldo") lista.sort((a, b) => a.saldo - b.saldo);
   if (ordem === "valor") lista.sort((a, b) => b.mensal - a.mensal);
   if (ordem === "lavagem") lista.sort((a, b) => String(a.proximaLavagem || "9").localeCompare(String(b.proximaLavagem || "9")));
+  if (ordem === "cobranca") lista.sort((a, b) => String(a.proximaCobranca || "9").localeCompare(String(b.proximaCobranca || "9")));
 
   const totais = {
     quantidade: lista.length,
     mensal: Math.round(lista.reduce((s, c) => s + c.mensal, 0) * 100) / 100,
     emAberto: Math.round(lista.filter((c) => c.atrasado).reduce((s, c) => s + Math.abs(c.saldo), 0) * 100) / 100,
     atrasados: lista.filter((c) => c.atrasado).length,
+    faltaData: lista.filter((c) => c.faltaData).length,
   };
 
   return NextResponse.json({ ok: true, clientes: lista, totais });

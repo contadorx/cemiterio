@@ -13,23 +13,31 @@ interface Comp {
 }
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<"conferir" | "relatorio" | "gestao">("conferir");
+  const [aba, setAba] = useState<"conferir" | "relatorio" | "gestao" | "jazigos">("conferir");
 
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/financeiro" />
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Financeiro</h1>
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button style={aba === "conferir" ? painel.botao : painel.botaoSec} onClick={() => setAba("conferir")}>
-            Comprovantes a conferir
-          </button>
-          <button style={aba === "relatorio" ? painel.botao : painel.botaoSec} onClick={() => setAba("relatorio")}>
-            Relatório do mês
-          </button>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {([
+            ["gestao", "Gestão do negócio"],
+            ["conferir", "Comprovantes a conferir"],
+            ["relatorio", "Recebido no mês"],
+            ["jazigos", "Resultado por jazigo"],
+          ] as const).map(([v, rot]) => (
+            <button key={v} style={aba === v ? painel.botao : painel.botaoSec}
+                    onClick={() => setAba(v)}>
+              {rot}
+            </button>
+          ))}
         </div>
 
-        {aba === "conferir" ? <Conferir /> : <Relatorio />}
+        {aba === "gestao" && <Gestao />}
+        {aba === "conferir" && <Conferir />}
+        {aba === "relatorio" && <Relatorio />}
+        {aba === "jazigos" && <PorJazigo />}
       </div>
     </div>
   );
@@ -233,8 +241,11 @@ function Gestao() {
         <CartaoGestao titulo="Resultado do mês"
                 valor={money(r.resultado)}
                 cor={r.resultado >= 0 ? cor.teal : "#dc2626"} destaque />
-        <CartaoGestao titulo="Custo estimado de IA" valor={money(d.ia.custoMes)} cor="#7c3aed"
-                rodape={`${d.ia.chamadas} chamadas · ${money(d.ia.custoPorDia)}/dia`} />
+        <CartaoGestao titulo={d.ia.medido ? "Custo de IA (medido)" : "Custo de IA (estimado)"}
+                valor={money(d.ia.custoMes)} cor="#7c3aed"
+                rodape={d.ia.medido
+                  ? `${d.ia.chamadas} chamadas · ${money(d.ia.custoPorDia)}/dia · ${((d.ia.tokensEntrada + d.ia.tokensSaida) / 1000).toFixed(0)}k tokens`
+                  : `${d.ia.chamadas} chamadas · ainda sem medição por tokens`} />
       </div>
 
       {r.naoLancado > 0 && (
@@ -363,5 +374,88 @@ function LinhaGestao({ nome, qtd, valor, sub }: { nome: string; qtd: number; val
         <span style={{ color: "#6b7280", fontSize: 12 }}> · {qtd}x</span></span>
       <b>{valor}</b>
     </div>
+  );
+}
+
+
+function PorJazigo() {
+  const [meses, setMeses] = useState(12);
+  const [d, setD] = useState<any>(null);
+
+  const carregar = useCallback(async () => {
+    const r = await fetch(`/api/financeiro/jazigos?meses=${meses}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setD(r);
+  }, [meses]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+  const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
+
+  return (
+    <>
+      <div style={{ ...painel.card, padding: 12 }}>
+        <label style={painel.rotulo}>Período</label>
+        <select style={{ ...painel.input, width: 180 }} value={meses}
+                onChange={(e) => setMeses(Number(e.target.value))}>
+          <option value={3}>Últimos 3 meses</option>
+          <option value={6}>Últimos 6 meses</option>
+          <option value={12}>Últimos 12 meses</option>
+          <option value={24}>Últimos 2 anos</option>
+        </select>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
+        <CartaoGestao titulo="Receita" valor={money(d.totais.receita)} cor={cor.teal} />
+        <CartaoGestao titulo="Custo (mão de obra + material)" valor={money(d.totais.custo)} cor="#dc2626" />
+        <CartaoGestao titulo="Margem" valor={money(d.totais.margem)} destaque
+                cor={d.totais.margem >= 0 ? cor.teal : "#dc2626"} />
+        <CartaoGestao titulo="No prejuízo" valor={String(d.totais.noPrejuizo)} cor="#d97706"
+                rodape="jazigos que custam mais do que rendem" />
+      </div>
+
+      {d.semMedicao > 0 && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
+          <strong style={{ color: "#92400e" }}>{d.semMedicao} jazigo(s) sem tempo medido</strong>
+          <p style={{ color: "#78350f", fontSize: 13, margin: "6px 0 0" }}>
+            O custo de mão de obra só aparece quando a Nina usa &ldquo;Começar&rdquo; e
+            &ldquo;Finalizar&rdquo; no app. Até lá, esses jazigos mostram margem cheia — que não é real.
+          </p>
+        </div>
+      )}
+
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Do pior para o melhor</strong>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 10px" }}>
+          Margem = o que a família paga menos o tempo gasto e o material.
+        </p>
+        {d.jazigos.map((j: any) => {
+          const semTempo = !j.minutos;
+          return (
+            <div key={j.tumulo_id} style={{ display: "flex", justifyContent: "space-between", gap: 10,
+                   flexWrap: "wrap", padding: "10px 0", borderTop: `1px solid ${cor.linha}` }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <b style={{ color: cor.navy }}>{j.jazigo}</b>
+                <span style={{ color: cor.cinza }}> · {j.cliente || "—"}</span>
+                <div style={{ fontSize: 13, color: cor.cinza }}>
+                  {j.quadra}{j.rua ? ` · ${j.rua}` : ""} · {j.limpezas} limpeza(s)
+                  {semTempo ? " · tempo não medido" : ` · ${j.minutos} min`}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", minWidth: 150 }}>
+                <div style={{ fontSize: 13, color: cor.cinza }}>
+                  {money(j.receita)} − {money(j.custo_total)}
+                </div>
+                <b style={{ color: Number(j.margem) < 0 ? "#dc2626" : cor.teal, fontSize: 16 }}>
+                  {money(j.margem)}{j.margem_pct != null && ` (${j.margem_pct}%)`}
+                </b>
+              </div>
+            </div>
+          );
+        })}
+        {d.jazigos.length === 0 && (
+          <p style={{ color: cor.cinza, fontSize: 14 }}>Nenhuma limpeza executada no período.</p>
+        )}
+      </div>
+    </>
   );
 }

@@ -19,13 +19,13 @@ const ITENS = [
   { href: "/painel/agenda", label: "Agenda" },
   { href: "/painel/financeiro", label: "Financeiro" },
   { href: "/painel/clientes", label: "Clientes" },
-  { href: "/painel/planos", label: "Planos" },
   { href: "/painel/leads", label: "Leads" },
   { href: "/painel/reajustes", label: "Reajustes" },
   { href: "/painel/agente", label: "Agente" },
   { href: "/painel/whatsapp", label: "WhatsApp" },
   { href: "/painel/plaquetas", label: "Plaquetas" },
   { href: "/painel/config", label: "Config" },
+  { href: "/campo", label: "📍 Campo" },
 ];
 
 export function PainelNav({ atual }: { atual: string }) {
@@ -35,6 +35,17 @@ export function PainelNav({ atual }: { atual: string }) {
   return (
     <nav style={nav.barra}>
       <div style={nav.topo}>
+        <button
+          onClick={async () => {
+            if (!confirm("Sair do sistema?")) return;
+            await fetch("/api/sair", { method: "POST" });
+            location.href = "/login";
+          }}
+          style={nav.sair}
+          title="Sair"
+        >
+          Sair
+        </button>
         <span style={nav.marca}>
           {MARCA.nome}
           <span style={nav.assinatura}>{MARCA.assinatura}</span>
@@ -77,6 +88,7 @@ const nav: Record<string, React.CSSProperties> = {
   barra: { display: "flex", flexDirection: "column", padding: "12px 16px", background: cor.navy, color: "#fff" },
   topo: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%" },
   assinatura: { display: "block", fontSize: 10, fontWeight: 400, opacity: 0.75, letterSpacing: 0.2, marginTop: 1 },
+  sair: { float: "right", background: "rgba(255,255,255,.12)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer" },
   marca: { fontWeight: 800, fontSize: 20 },
   botao: { background: "rgba(255,255,255,.12)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 18, cursor: "pointer" },
   links: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 },

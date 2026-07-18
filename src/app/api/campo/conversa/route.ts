@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     `Faltam ${b.totalHoje} túmulos hoje.`,
     b.quadras.length ? `Quadras: ${b.quadras.join(", ")}.` : "",
     b.materiais.length ? `Materiais acabando: ${b.materiais.join(", ")}.` : "",
-    b.pendencias ? `Há ${b.pendencias} túmulos represados de outros dias.` : "",
+    b.precisamAtencao ? `${b.precisamAtencao} jazigo(s) pedem atenção especial hoje.` : "",
   ]
     .filter(Boolean)
     .join(" ");

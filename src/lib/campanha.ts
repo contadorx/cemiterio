@@ -75,6 +75,7 @@ export async function executarCampanha(params: {
   nome: string;
   mensagem: string;
   publico: Publico;
+  comIa?: boolean;      // reescreve a mensagem para CADA família, olhando o histórico
 }): Promise<{ criados: number; campanhaId: string | null }> {
   const db = supabaseAdmin();
   const org = env.orgId();
@@ -86,7 +87,18 @@ export async function executarCampanha(params: {
     const conversaId = await conversaDe(c.id);
     if (!conversaId) continue;
     const primeiroNome = (c.nome || "").split(" ")[0] || "";
-    const texto = params.mensagem.replace(/\{nome\}/g, primeiroNome);
+    let texto = params.mensagem.replace(/\{nome\}/g, primeiroNome);
+
+    // com contexto: a IA adapta a mensagem à situação daquela família
+    // (cliente antiga, quem está devendo, quem acabou de contratar…)
+    if (params.comIa) {
+      const personalizada = await redigir({
+        clienteId: c.id,
+        proposito: "campanha",
+        dados: { modelo: params.mensagem, campanha: params.nome },
+      });
+      if (personalizada) texto = personalizada;
+    }
 
     const { error } = await db.from("interacoes_ia").insert({
       org_id: org,

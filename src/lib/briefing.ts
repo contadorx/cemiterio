@@ -1,109 +1,104 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 
+/**
+ * BRIEFING DO DIA — curto e direto.
+ *
+ * A pessoa que abre isso está de pé, no portão do cemitério, com o celular numa
+ * mão e o balde na outra. Então: uma saudação, quantos jazigos, e quantos pedem
+ * atenção. O QUE pede atenção fica no card de cada jazigo, na hora de fazer —
+ * que é quando a informação serve.
+ */
 export interface Briefing {
   saudacao: string;
   totalHoje: number;
+  feitos: number;
   quadras: string[];
-  atencoes: string[];   // avisos que mudam o cuidado do dia
-  materiais: string[];  // o que está acabando
-  pendencias: number;   // backlog acumulado
-  meta: string;
+  precisamAtencao: number;      // só o NÚMERO; o detalhe vai no card
+  materiaisAcabando: number;
+  materiais: string[];
+}
+
+/** Avisos de UM jazigo — vão no card dele, não no resumo. */
+export interface AvisoJazigo {
+  tipo: "memoria" | "adiado" | "primeira" | "atrasado";
+  texto: string;
 }
 
 function saudacaoDaHora(): string {
-  const h = new Date().getUTCHours() - 3; // BRT
-  const hora = (h + 24) % 24;
-  if (hora < 12) return "Bom dia";
-  if (hora < 18) return "Boa tarde";
+  const h = Number(
+    new Date().toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" })
+  );
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
   return "Boa noite";
 }
 
-// Monta a orientação do dia para a ajudante: o que tem, onde, e o que exige atenção.
-export async function montarBriefing(executoraId: string | null, nome?: string): Promise<Briefing> {
+/** Datas de memória chegando nos próximos 10 dias. */
+function memoriaChegando(datas: any): string | null {
+  const lista = Array.isArray(datas) ? datas : [];
+  const hoje = new Date();
+  for (const d of lista) {
+    const mmdd = String(d?.data || "").slice(-5);
+    if (!/^\d{2}-\d{2}$/.test(mmdd)) continue;
+    const [m, dia] = mmdd.split("-").map(Number);
+    const alvo = new Date(hoje.getFullYear(), m - 1, dia);
+    const faltam = Math.floor((alvo.getTime() - hoje.getTime()) / 86400000);
+    if (faltam >= 0 && faltam <= 10) {
+      return d?.tipo === "nascimento" ? "aniversário chegando" : "data de memória chegando";
+    }
+  }
+  return null;
+}
+
+export function avisosDoJazigo(s: any): AvisoJazigo[] {
+  const avisos: AvisoJazigo[] = [];
+  const mem = memoriaChegando(s?.tumulos?.datas_gatilho);
+  if (mem) avisos.push({ tipo: "memoria", texto: `${mem} — capriche, a família pode visitar` });
+  if ((s?.adiado_vezes || 0) >= 2) {
+    avisos.push({ tipo: "adiado", texto: `ficou pra depois ${s.adiado_vezes}x — hoje é prioridade` });
+  }
+  if (!s?.tumulos?.foto_referencia_url && !s?.tumulos?.lat) {
+    avisos.push({ tipo: "primeira", texto: "primeira visita — tire a foto de longe pra achar depois" });
+  }
+  return avisos;
+}
+
+export async function montarBriefing(executoraId: string | null, nome: string): Promise<Briefing> {
   const db = supabaseAdmin();
   const org = env.orgId();
   const hoje = new Date().toISOString().slice(0, 10);
 
   let q = db
     .from("servicos")
-    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,quadras(codigo)),clientes(nome)")
+    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,rua,foto_referencia_url,lat,quadras(codigo))")
     .eq("org_id", org)
-    .eq("data_prevista", hoje)
-    .in("status", ["pendente", "agendado", "executado"]);
+    .eq("data_prevista", hoje);
   if (executoraId) q = q.or(`executora_id.eq.${executoraId},executora_id.is.null`);
-  const { data: servs } = await q;
 
-  const lista = servs || [];
-  const pendentesHoje = lista.filter((s: any) => s.status !== "executado");
+  const { data: lista } = await q;
+  const todos = (lista || []) as any[];
+  const feitos = todos.filter((s) => s.status === "executado").length;
+  const pendentes = todos.filter((s) => s.status !== "executado");
 
-  // quadras do dia
-  const quadras = [...new Set(lista.map((s: any) => s.tumulos?.quadras?.codigo).filter(Boolean))].sort();
+  const quadras = [...new Set(todos.map((s) => s.tumulos?.quadras?.codigo).filter(Boolean))].sort();
+  const precisamAtencao = pendentes.filter((s) => avisosDoJazigo(s).length > 0).length;
 
-  // atenções: datas de memória próximas, serviços já adiados, clientes que pedem capricho
-  const atencoes: string[] = [];
-  const jaAvisado = new Set<string>();   // evita repetir o alerta do mesmo túmulo
-  const alvo = new Date(Date.now() + 7 * 86400000);
-  const mmddAlvo = `${String(alvo.getMonth() + 1).padStart(2, "0")}-${String(alvo.getDate()).padStart(2, "0")}`;
-
-  for (const s of lista as any[]) {
-    if (s.status === "executado") continue;
-    const t = s.tumulos;
-    if (!t) continue;
-
-    const datas = Array.isArray(t.datas_gatilho) ? t.datas_gatilho : [];
-    for (const d of datas) {
-      const mmdd = String(d?.data || "").slice(-5);
-      if (mmdd && mmdd <= mmddAlvo && mmdd >= new Date().toISOString().slice(5, 10)) {
-        if (!jaAvisado.has(`mem:${t.identificacao}`)) {
-          jaAvisado.add(`mem:${t.identificacao}`);
-          atencoes.push(
-            `${t.identificacao} (${t.quadras?.codigo || "?"}): data de memória chegando — capriche, a família pode visitar.`
-          );
-        }
-        break;
-      }
-    }
-    if ((s.adiado_vezes || 0) >= 2 && !jaAvisado.has(`adi:${t.identificacao}`)) {
-      jaAvisado.add(`adi:${t.identificacao}`);
-      atencoes.push(`${t.identificacao}: já ficou pra depois ${s.adiado_vezes}x — prioridade hoje.`);
-    }
-  }
-
-  // materiais acabando
   const { data: mats } = await db
-    .from("materiais")
-    .select("nome,estoque,alerta_minimo,unidade")
-    .eq("org_id", org);
+    .from("materiais").select("nome,estoque,alerta_minimo").eq("org_id", org);
   const materiais = (mats || [])
     .filter((m: any) => Number(m.estoque) <= Number(m.alerta_minimo))
-    .map((m: any) => `${m.nome} (${m.estoque} ${m.unidade})`);
+    .map((m: any) => m.nome);
 
-  // backlog acumulado (sem data)
-  const { count: backlog } = await db
-    .from("servicos")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", org)
-    .eq("status", "pendente")
-    .is("data_prevista", null);
-
-  const total = pendentesHoje.length;
-  const meta =
-    total === 0
-      ? "Hoje não há túmulos na sua rota."
-      : total <= 5
-      ? `São ${total} — dia tranquilo.`
-      : total <= 15
-      ? `São ${total} túmulos hoje.`
-      : `São ${total} túmulos — dia cheio, vá com calma e com água.`;
+  const primeiro = (nome || "").trim().split(/\s+/)[0] || "";
 
   return {
-    saudacao: `${saudacaoDaHora()}${nome ? `, ${nome}` : ""}!`,
-    totalHoje: total,
-    quadras: quadras as string[],
-    atencoes: atencoes.slice(0, 5),
+    saudacao: `${saudacaoDaHora()}${primeiro ? `, ${primeiro}` : ""}!`,
+    totalHoje: pendentes.length,
+    feitos,
+    quadras,
+    precisamAtencao,
+    materiaisAcabando: materiais.length,
     materiais,
-    pendencias: backlog || 0,
-    meta,
   };
 }

@@ -18,6 +18,7 @@ export default function AgendaPage() {
   const [carregando, setCarregando] = useState(true);
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
+
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
   const [diag, setDiag] = useState<any>(null);
@@ -37,6 +38,28 @@ export default function AgendaPage() {
   }, [periodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  async function gerarDias(n: number) {
+    setGerando(true); setDiag(null);
+    const r = await fetch("/api/agenda/gerar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ horizonteDias: n }),
+    }).then((x) => x.json()).catch(() => null);
+    setGerando(false);
+    if (r?.ok) { setDiag({ ...r.geracao, ...r.alocacao }); carregar(); }
+    else alert("Falhou ao gerar.");
+  }
+
+  async function gerarMes() {
+    setGerando(true); setDiag(null);
+    const r = await fetch("/api/agenda/mes", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mes: mesAlvo, incluirAvulsos, dataAvulsos: dataAvulsos || undefined }),
+    }).then((x) => x.json()).catch(() => null);
+    setGerando(false);
+    if (r?.ok) { setDiag(r); carregar(); }
+    else alert("Falhou ao gerar o mês.");
+  }
 
   async function acao(id: string, corpo: any) {
     const r = await fetch(`/api/servico/${id}`, {
@@ -62,7 +85,92 @@ export default function AgendaPage() {
     <div style={painel.wrap}>
       <PainelNav atual="/painel/agenda" />
       <main style={painel.conteudo}>
-        <h1 style={painel.h1}>Agenda — próximos 14 dias</h1>
+        <h1 style={painel.h1}>
+          Agenda{periodo.fim ? "" : ` — próximo${periodo.dias > 1 ? `s ${periodo.dias} dias` : " dia"}`}
+        </h1>
+
+        <div style={{ ...painel.card, padding: 12 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: cor.cinza, marginRight: 4 }}>Mostrar:</span>
+            {[[1, "Amanhã"], [3, "3 dias"], [7, "7 dias"], [14, "14 dias"], [30, "30 dias"], [90, "90 dias"]]
+              .map(([v, rot]) => (
+                <button key={String(v)}
+                  style={periodo.dias === v && !periodo.fim ? painel.botao : painel.botaoSec}
+                  onClick={() => setPeriodo({ dias: Number(v), inicio: "", fim: "" })}>
+                  {rot}
+                </button>
+              ))}
+            <span style={{ fontSize: 13, color: cor.cinza, marginLeft: 8 }}>ou período:</span>
+            <input type="date" style={{ ...painel.input, width: 150 }} value={periodo.inicio}
+                   onChange={(e) => setPeriodo({ ...periodo, inicio: e.target.value })} />
+            <input type="date" style={{ ...painel.input, width: 150 }} value={periodo.fim}
+                   onChange={(e) => setPeriodo({ ...periodo, fim: e.target.value })} />
+          </div>
+        </div>
+
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
+          <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+            Cria o que os planos devem e distribui pelos dias de trabalho. Pode clicar à
+            vontade: nunca duplica.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            {[30, 60, 90].map((n) => (
+              <button key={n} style={painel.botaoSec} disabled={gerando} onClick={() => gerarDias(n)}>
+                Próximos {n} dias
+              </button>
+            ))}
+            <div style={{ width: 1, height: 34, background: cor.linha, margin: "0 4px" }} />
+            <div>
+              <label style={painel.rotulo}>Mês inteiro</label>
+              <input type="month" style={{ ...painel.input, width: 150 }} value={mesAlvo}
+                     onChange={(e) => setMesAlvo(e.target.value)} />
+            </div>
+            <button style={painel.botao} disabled={gerando} onClick={gerarMes}>
+              {gerando ? "…" : "Gerar o mês"}
+            </button>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14,
+                          marginTop: 12, color: cor.navy }}>
+            <input type="checkbox" checked={incluirAvulsos}
+                   onChange={(e) => setIncluirAvulsos(e.target.checked)} />
+            Incluir os avulsos neste mês (Finados, Dia das Mães…)
+          </label>
+          {incluirAvulsos && (
+            <div style={{ marginTop: 8 }}>
+              <label style={painel.rotulo}>Data da lavagem dos avulsos</label>
+              <input type="date" style={{ ...painel.input, width: 160 }} value={dataAvulsos}
+                     onChange={(e) => setDataAvulsos(e.target.value)} />
+              <p style={{ color: cor.cinza, fontSize: 12, margin: "6px 0 0" }}>
+                Para o Finados, ponha 30/10 — assim tudo fica pronto antes do dia 2.
+              </p>
+            </div>
+          )}
+
+          {diag && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
+                          background: diag.criados > 0 ? "#f0fdf4" : "#f8fafc",
+                          border: `1px solid ${diag.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
+              <strong style={{ color: cor.navy }}>
+                {diag.criados > 0 ? `${diag.criados} limpeza(s) criada(s)` : "Nada novo a criar"}
+              </strong>
+              <div style={{ fontSize: 13, color: cor.cinza, marginTop: 4 }}>
+                {diag.planosAtivos != null && `${diag.planosAtivos} planos ativos · `}
+                {diag.avulsosIncluidos > 0 && `${diag.avulsosIncluidos} avulso(s) · `}
+                {diag.jaExistiam > 0 && `${diag.jaExistiam} já existiam · `}
+                {diag.foraDoHorizonte > 0 && `${diag.foraDoHorizonte} fora do período · `}
+                {diag.agendados} distribuída(s) em {diag.dias} dia(s)
+              </div>
+              {diag.proximaData && diag.criados === 0 && (
+                <div style={{ fontSize: 13, color: cor.navy, marginTop: 6 }}>
+                  A próxima ida é em {new Date(diag.proximaData + "T12:00:00").toLocaleDateString("pt-BR")} —
+                  aumente o período para alcançá-la.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {carregando && <p style={{ color: cor.cinza }}>Carregando...</p>}
         {!carregando && chaves.length === 0 && (

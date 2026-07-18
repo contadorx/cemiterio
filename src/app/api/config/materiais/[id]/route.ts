@@ -13,6 +13,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (b.estoque !== undefined) patch.estoque = Number(b.estoque) || 0;
   if (b.alertaMinimo !== undefined) patch.alerta_minimo = Number(b.alertaMinimo) || 0;
   if (b.unidade !== undefined) patch.unidade = String(b.unidade || "un");
+  if (b.consumoPorLimpeza !== undefined) patch.consumo_por_limpeza = Number(b.consumoPorLimpeza) || 0;
+  if (b.custoUnitario !== undefined) patch.custo_unitario = Number(b.custoUnitario) || 0;
   const { error } = await auth.db.from("materiais").update(patch).eq("id", params.id);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

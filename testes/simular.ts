@@ -357,8 +357,25 @@ async function rodar() {
   checar("briefing traz saudação com nome", b.saudacao.includes("Nina"), b.saudacao);
   checar("briefing conta os túmulos do dia", b.totalHoje >= 0, String(b.totalHoje));
   checar("briefing alerta material acabando", b.materiais.some((m) => m.includes("vassoura")), JSON.stringify(b.materiais));
-  checar("briefing não repete o mesmo alerta",
-         new Set(b.atencoes).size === b.atencoes.length, JSON.stringify(b.atencoes));
+  // o briefing agora só CONTA quantos pedem atenção; o detalhe vai no card
+  checar("briefing só conta quantos pedem atenção", typeof b.precisamAtencao === "number",
+         JSON.stringify(b));
+  checar("briefing não traz lista de avisos no resumo", !(b as any).atencoes, "resumo tem que ser curto");
+  const avisos = bri.avisosDoJazigo({
+    adiado_vezes: 3,
+    tumulos: { datas_gatilho: [], foto_referencia_url: "x", lat: -23 },
+  });
+  checar("aviso de adiado vai para o card do jazigo",
+         avisos.some((a) => a.tipo === "adiado"), JSON.stringify(avisos));
+  const semAviso = bri.avisosDoJazigo({
+    adiado_vezes: 0, tumulos: { datas_gatilho: [], foto_referencia_url: "x", lat: -23 },
+  });
+  checar("jazigo tranquilo não gera aviso", semAviso.length === 0, JSON.stringify(semAviso));
+  const primeira = bri.avisosDoJazigo({
+    adiado_vezes: 0, tumulos: { datas_gatilho: [], foto_referencia_url: null, lat: null },
+  });
+  checar("primeira visita avisa para tirar a foto",
+         primeira.some((a) => a.tipo === "primeira"), JSON.stringify(primeira));
   const bAna = await bri.montarBriefing("u-ana", "Ana");
   checar("cada ajudante recebe o próprio briefing",
          bAna.saudacao.includes("Ana"), bAna.saudacao);

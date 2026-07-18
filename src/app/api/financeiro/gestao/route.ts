@@ -28,14 +28,23 @@ export async function GET(req: NextRequest) {
         .gte("data", ini).lte("data", fim).order("data", { ascending: false }).limit(200),
       db.from("categorias_financeiras").select("id,nome,tipo,grupo").eq("ativa", true).order("tipo").order("nome"),
       db.from("orgs").select("custo_ia_por_chamada").eq("id", org).maybeSingle(),
-      db.from("uso_ia").select("dia,chamadas").gte("dia", ini).lte("dia", fim).order("dia"),
+      db.from("uso_ia").select("dia,chamadas,tokens_entrada,tokens_saida,custo_real")
+        .gte("dia", ini).lte("dia", fim).order("dia"),
     ]);
 
   // custo de IA estimado no mês
   const custoUnit = Number((orgRow as any)?.custo_ia_por_chamada) || 0.05;
   const chamadas = (usoIa || []).reduce((s: number, u: any) => s + (Number(u.chamadas) || 0), 0);
   const diasComUso = (usoIa || []).length;
-  const custoIa = Math.round(chamadas * custoUnit * 100) / 100;
+  // custo REAL medido por tokens; se ainda não houver medição, cai na estimativa
+  const custoMedido = (usoIa || []).reduce((s: number, u: any) => s + (Number(u.custo_real) || 0), 0);
+  const tokens = (usoIa || []).reduce(
+    (a: any, u: any) => ({
+      entrada: a.entrada + (Number(u.tokens_entrada) || 0),
+      saida: a.saida + (Number(u.tokens_saida) || 0),
+    }), { entrada: 0, saida: 0 });
+  const medido = custoMedido > 0;
+  const custoIa = Math.round((medido ? custoMedido : chamadas * custoUnit) * 100) / 100;
 
   // recebido das famílias no mês (entra como entrada operacional, mesmo sem lançamento manual)
   const { data: movs } = await db
@@ -66,6 +75,9 @@ export async function GET(req: NextRequest) {
       naoLancado: r2(Math.max(0, recebidoFamilias - entradas)),
     },
     ia: {
+      medido,
+      tokensEntrada: tokens.entrada,
+      tokensSaida: tokens.saida,
       chamadas,
       diasComUso,
       custoUnitario: custoUnit,

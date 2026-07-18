@@ -11,7 +11,7 @@ export async function GET() {
   const org = await orgAtual(auth.db);
   const { data } = await auth.db
     .from("orgs")
-    .select("nome,marca_nome,marca_assinatura,chave_pix,site,limpezas_por_dia,dias_trabalhados_semana,teto_ia_dia")
+    .select("nome,marca_nome,marca_assinatura,chave_pix,site,limpezas_por_dia,dias_trabalhados_semana,teto_ia_dia,custo_hora_campo,custo_mensal_ajudante,minutos_padrao_limpeza")
     .eq("id", org)
     .maybeSingle();
   return NextResponse.json({ ok: true, casa: data || {} });
@@ -28,7 +28,8 @@ export async function PUT(req: NextRequest) {
   for (const c of ["marca_nome", "marca_assinatura", "chave_pix", "site"]) {
     if (b[c] !== undefined) patch[c] = String(b[c] || "").trim() || null;
   }
-  for (const c of ["limpezas_por_dia", "dias_trabalhados_semana", "teto_ia_dia"]) {
+  for (const c of ["limpezas_por_dia", "dias_trabalhados_semana", "teto_ia_dia",
+                   "custo_hora_campo", "custo_mensal_ajudante", "minutos_padrao_limpeza"]) {
     if (b[c] !== undefined) patch[c] = Number(b[c]) || 0;
   }
   if (patch.marca_nome) patch.nome = patch.marca_nome;

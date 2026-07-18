@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "nome_e_mensagem_obrigatorios" }, { status: 400 });
   }
 
-  const r = await executarCampanha({ nome, mensagem, publico });
+  const r = await executarCampanha({ nome, mensagem, publico, comIa: !!body?.comIa });
 
   const org = await orgAtual(auth.db);
   if (org) await auditar(auth.db, org, auth.userId, "executou_campanha", { tipo: "campanha", id: r.campanhaId || undefined }, { nome, publico, criados: r.criados });

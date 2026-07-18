@@ -402,6 +402,7 @@ const s: Record<string, React.CSSProperties> = {
   blocoGps: { background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, margin: "10px 0" },
   gpsMsg: { fontSize: 13, margin: "0 0 8px", textAlign: "center" },
   gpsDica: { fontSize: 12, color: "#64748b", margin: "8px 0 0", lineHeight: 1.4 },
+  sair: { background: "none", border: "1px solid #e2e8f0", color: "#64748b", borderRadius: 8, padding: "6px 12px", fontSize: 13, cursor: "pointer" },
   botaoMaterial: { width: "100%", padding: 14, background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", marginBottom: 16 },
   faixaOffline: { background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", borderRadius: 10, padding: "10px 12px", fontSize: 14, marginBottom: 12, textAlign: "center" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
