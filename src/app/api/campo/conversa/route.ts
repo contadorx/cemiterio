@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { env } from "@/lib/env";
 import { conversarCampo } from "@/lib/assistente-campo";
 import { montarBriefing } from "@/lib/briefing";
 import { registrarErro } from "@/lib/monitor";
@@ -79,7 +80,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    // o recado da equipe vai para a MESMA caixa de entrada das famílias,
+  // fixado no topo — quem está no campo agora pode estar precisando de resposta
+  try {
+    const adm = supabaseAdmin();
+    const { data: conversaId } = await auth.db.rpc("sureya_conversa_equipe", {
+      p_membro: auth.userId,
+    });
+    if (conversaId) {
+      await adm.from("mensagens").insert([
+        { org_id: env.orgId(), conversa_id: conversaId, cliente_id: null,
+          direcao: "entrada", autor: "campo",
+          texto: `${nome || "Campo"}: ${String(historico[historico.length - 1]?.texto || "")}`, processada: true },
+        { org_id: env.orgId(), conversa_id: conversaId, cliente_id: null,
+          direcao: "saida", autor: "ia", texto: out.resposta, processada: true },
+      ]);
+      await adm.from("conversas")
+        .update({ updated_at: new Date().toISOString(), aberta: true, resolvida: false })
+        .eq("id", conversaId);
+    }
+  } catch { /* o recado não pode derrubar o assistente */ }
+
+  return NextResponse.json({
       ok: true,
       resposta: out.resposta,
       registrou: !!out.tipo_ocorrencia,

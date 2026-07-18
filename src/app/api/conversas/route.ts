@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   let sel = db
     .from("conversas")
-    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,clientes(nome,telefone)")
+    .select("id,cliente_id,aberta,escalada_humano,ultimo_assunto,updated_at,resolvida,arquivada_em,tipo,fixada,membro_id,clientes(nome,telefone)")
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -77,14 +77,27 @@ export async function GET(req: NextRequest) {
     for (const r of rasc || []) comRascunho.add((r as any).conversa_id);
   }
 
-  // "pendentes" de verdade: com rascunho a aprovar OU escalada
+  // "pendentes" de verdade: com rascunho a aprovar OU escalada.
+  // A caixa da equipe nunca é filtrada — ela fica sempre visível.
   if (situacao === "pendentes") {
-    lista = lista.filter((c: any) => comRascunho.has(c.id) || c.escalada_humano);
+    lista = lista.filter((c: any) => c.tipo === "equipe" || comRascunho.has(c.id) || c.escalada_humano);
+  }
+
+  // nome dos membros, para rotular a caixa da equipe
+  const membroIds = lista.filter((c: any) => c.tipo === "equipe").map((c: any) => c.membro_id).filter(Boolean);
+  const nomeMembro = new Map<string, string>();
+  if (membroIds.length) {
+    const { data: ms } = await db.from("membros").select("user_id,nome").in("user_id", membroIds);
+    for (const m of ms || []) nomeMembro.set((m as any).user_id, (m as any).nome || "Equipe");
   }
 
   const conversas = lista.map((c: any) => ({
     id: c.id,
-    cliente: c.clientes?.nome || "—",
+    tipo: c.tipo || "familia",
+    fixada: !!c.fixada,
+    cliente: c.tipo === "equipe"
+      ? `${nomeMembro.get(c.membro_id) || "Equipe"} · campo`
+      : c.clientes?.nome || "—",
     telefone: c.clientes?.telefone || "",
     assunto: c.ultimo_assunto,
     escalada: c.escalada_humano,
@@ -102,6 +115,12 @@ export async function GET(req: NextRequest) {
     .select("id", { count: "exact", head: true }).is("arquivada_em", null).eq("escalada_humano", true);
   const { count: nArq } = await db.from("conversas")
     .select("id", { count: "exact", head: true }).not("arquivada_em", "is", null);
+
+  // a caixa da equipe sempre no topo
+  conversas.sort((a: any, b: any) => {
+    if (a.fixada !== b.fixada) return a.fixada ? -1 : 1;
+    return String(b.atualizada).localeCompare(String(a.atualizada));
+  });
 
   return NextResponse.json({
     ok: true,

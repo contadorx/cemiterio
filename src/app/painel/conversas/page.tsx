@@ -6,6 +6,8 @@ import { PainelNav, painel, cor } from "../ui";
 
 interface Conversa {
   id: string;
+  tipo?: string;
+  fixada?: boolean;
   cliente: string;
   telefone: string;
   assunto: string | null;
@@ -131,15 +133,20 @@ export default function Conversas() {
 
         {lista.map((c) => (
           <div key={c.id} style={{ ...painel.card,
-            borderLeft: c.rascunhoPendente ? "4px solid #d97706"
+            background: c.tipo === "equipe" ? "#f0fdfa" : "#fff",
+            borderLeft: c.tipo === "equipe" ? `4px solid ${cor.teal}`
+              : c.rascunhoPendente ? "4px solid #d97706"
               : c.escalada ? "4px solid #dc2626" : `1px solid ${cor.linha}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <Link href={`/painel/conversas/${c.id}`} style={{ textDecoration: "none" }}>
-                  <strong style={{ color: cor.navy, fontSize: 16 }}>{c.cliente}</strong>
+                  <strong style={{ color: cor.navy, fontSize: 16 }}>
+                    {c.tipo === "equipe" && "📌 "}{c.cliente}
+                  </strong>
                 </Link>
                 <div style={{ fontSize: 13, color: cor.cinza, marginTop: 2 }}>
-                  {c.assunto ? ASSUNTOS[c.assunto] || c.assunto : "sem assunto"}
+                  {c.tipo === "equipe" ? "Recados de quem está no campo"
+                    : c.assunto ? ASSUNTOS[c.assunto] || c.assunto : "sem assunto"}
                   {" · "}
                   {new Date(c.atualizada).toLocaleDateString("pt-BR")}
                   {c.rascunhoPendente && <span style={{ color: "#d97706" }}> · rascunho a aprovar</span>}
@@ -159,11 +166,11 @@ export default function Conversas() {
                       style={{ ...painel.botaoSec, textDecoration: "none", padding: "8px 12px" }}>
                   Abrir
                 </Link>
-                {!c.arquivada && !c.resolvida && (
+                {c.tipo !== "equipe" && !c.arquivada && !c.resolvida && (
                   <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
                           onClick={() => acao(c.id, "resolver")}>Resolver</button>
                 )}
-                {!c.arquivada && (
+                {c.tipo !== "equipe" && !c.arquivada && (
                   <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
                           onClick={() => acao(c.id, "arquivar")}>Arquivar</button>
                 )}
@@ -171,11 +178,11 @@ export default function Conversas() {
                   <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
                           onClick={() => acao(c.id, "desarquivar")}>Reabrir</button>
                 )}
-                <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }}
+                {c.tipo !== "equipe" && <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }}
                         onClick={() => acao(c.id, "excluir",
                           `Excluir a conversa com ${c.cliente}? As mensagens serão apagadas. O histórico financeiro não é afetado.`)}>
                   Excluir
-                </button>
+                </button>}
               </div>
             </div>
           </div>

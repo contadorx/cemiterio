@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { escolherModelo, registrarChamada } from "./modelo-ia";
 import { registrarErro } from "./monitor";
 
 let _cli: Anthropic | null = null;
@@ -91,8 +92,10 @@ export async function destilarPerfisPendentes(): Promise<{ atualizados: number }
     if (historico.length < 200) continue;
 
     try {
+      // perfil é tarefa interna: sempre no modelo econômico
+      const escolha = await escolherModelo({ proposito: "destilacao" });
       const resp = await anthropic().messages.create({
-        model: env.ANTHROPIC_MODEL,
+        model: escolha.modelo,
         max_tokens: 500,
         system: SYSTEM,
         messages: [{ role: "user", content: historico }],

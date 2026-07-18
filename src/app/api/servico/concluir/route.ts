@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
+import { consumirMaterial } from "@/lib/consumo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,12 +31,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "falha_upload_foto" }, { status: 500 });
   }
 
+  // tempo gasto: do "iniciar" até agora. Sem início registrado fica nulo,
+  // e o painel mostra "não medido" em vez de inventar um número.
+  const { data: antes } = await db
+    .from("servicos").select("iniciado_em").eq("id", servicoId).maybeSingle();
+  const inicio = (antes as any)?.iniciado_em ? new Date((antes as any).iniciado_em).getTime() : null;
+  const duracao = inicio ? Math.max(1, Math.round((Date.now() - inicio) / 60000)) : null;
+
   // marca executado (idempotente: só transiciona se ainda não executado)
   const { data: serv, error } = await db
     .from("servicos")
     .update({
       status: "executado",
       data_executada: new Date().toISOString(),
+      duracao_minutos: duracao,
       foto_depois_url: urlDepois,
       foto_antes_url: urlAntes,
       executora_id: auth.userId,
@@ -48,7 +57,8 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   if (!serv) {
     // já estava executado antes — não duplica débito nem notificação
-    return NextResponse.json({ ok: true, jaExecutado: true });
+
+  return NextResponse.json({ ok: true, jaExecutado: true });
   }
 
   const orgId = (serv as any).org_id as string;
@@ -99,9 +109,20 @@ export async function POST(req: NextRequest) {
 
   // GPS do túmulo na primeira conclusão
   if (lat != null && lng != null && (serv as any)?.tumulo_id) {
-    await db.from("tumulos").update({ lat, lng }).eq("id", (serv as any).tumulo_id).is("lat", null);
+    // a leitura da Nina ENTRA NA MÉDIA; a posição oficial vem do cadastro.
+    // Se o jazigo ainda não tem posição, a primeira leitura dela vira o ponto inicial.
+    await db.rpc("sureya_registrar_gps", {
+      p_tumulo: (serv as any).tumulo_id,
+      p_lat: lat, p_lng: lng,
+      p_precisao: body?.precisao != null ? Number(body.precisao) : 15,
+      p_origem: "conclusao",
+    }).then(() => null, () => null);
   }
 
   const notificado = await notificarFamilia(servicoId, urlDepois);
-  return NextResponse.json({ ok: true, notificado });
+
+  // baixa o estoque pelo consumo estimado e guarda o custo desta limpeza
+  const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));
+
+  return NextResponse.json({ ok: true, duracao, material, notificado });
 }

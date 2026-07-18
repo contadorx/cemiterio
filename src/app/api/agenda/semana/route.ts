@@ -10,8 +10,11 @@ export async function GET(req: NextRequest) {
   if (auth.erro) return auth.erro;
   const db = auth.db;
 
-  const inicio = req.nextUrl.searchParams.get("inicio") || new Date().toISOString().slice(0, 10);
-  const fim = new Date(new Date(inicio + "T00:00:00").getTime() + 13 * 86_400_000)
+  const q = req.nextUrl.searchParams;
+  const inicio = q.get("inicio") || new Date().toISOString().slice(0, 10);
+  // quantos dias mostrar: 1, 3, 7, 14, 30… ou um período com data final própria
+  const dias = Math.max(1, Math.min(180, Number(q.get("dias")) || 14));
+  const fim = q.get("fim") || new Date(new Date(inicio + "T00:00:00").getTime() + (dias - 1) * 86_400_000)
     .toISOString()
     .slice(0, 10);
 

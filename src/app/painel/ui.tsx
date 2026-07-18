@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { MARCA } from "@/lib/marca";
 import { useState } from "react";
 
 export const cor = {
@@ -18,6 +19,7 @@ const ITENS = [
   { href: "/painel/agenda", label: "Agenda" },
   { href: "/painel/financeiro", label: "Financeiro" },
   { href: "/painel/clientes", label: "Clientes" },
+  { href: "/painel/planos", label: "Planos" },
   { href: "/painel/leads", label: "Leads" },
   { href: "/painel/reajustes", label: "Reajustes" },
   { href: "/painel/agente", label: "Agente" },
@@ -33,7 +35,10 @@ export function PainelNav({ atual }: { atual: string }) {
   return (
     <nav style={nav.barra}>
       <div style={nav.topo}>
-        <span style={nav.marca}>Sureya</span>
+        <span style={nav.marca}>
+          {MARCA.nome}
+          <span style={nav.assinatura}>{MARCA.assinatura}</span>
+        </span>
 
         {/* botão só aparece no celular (via CSS) */}
         <button className="menuBotao" style={nav.botao} onClick={() => setAberto(!aberto)} aria-label="Menu">
@@ -71,6 +76,7 @@ export function PainelNav({ atual }: { atual: string }) {
 const nav: Record<string, React.CSSProperties> = {
   barra: { display: "flex", flexDirection: "column", padding: "12px 16px", background: cor.navy, color: "#fff" },
   topo: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%" },
+  assinatura: { display: "block", fontSize: 10, fontWeight: 400, opacity: 0.75, letterSpacing: 0.2, marginTop: 1 },
   marca: { fontWeight: 800, fontSize: 20 },
   botao: { background: "rgba(255,255,255,.12)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 18, cursor: "pointer" },
   links: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 interface Item {
@@ -18,16 +18,25 @@ export default function AgendaPage() {
   const [carregando, setCarregando] = useState(true);
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
+  const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
+  const [gerando, setGerando] = useState(false);
+  const [diag, setDiag] = useState<any>(null);
+  const [mesAlvo, setMesAlvo] = useState(new Date().toISOString().slice(0, 7));
+  const [incluirAvulsos, setIncluirAvulsos] = useState(false);
+  const [dataAvulsos, setDataAvulsos] = useState("");
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setCarregando(true);
-    const r = await fetch("/api/agenda/semana").then((x) => x.json()).catch(() => null);
+    const qs = new URLSearchParams();
+    if (periodo.inicio) qs.set("inicio", periodo.inicio);
+    if (periodo.fim) qs.set("fim", periodo.fim);
+    qs.set("dias", String(periodo.dias));
+    const r = await fetch(`/api/agenda/semana?${qs}`).then((x) => x.json()).catch(() => null);
     setDias(r?.dias || {});
     setCarregando(false);
-  }
-  useEffect(() => {
-    carregar();
-  }, []);
+  }, [periodo]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   async function acao(id: string, corpo: any) {
     const r = await fetch(`/api/servico/${id}`, {

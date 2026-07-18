@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { montarContexto, carregarConfigIa, historicoConversa } from "./context";
 import { podeChamarIa } from "./custo-ia";
+import { escolherModelo, registrarChamada } from "./modelo-ia";
 
 /**
  * REDATOR — escreve mensagens olhando o contexto real da família.
@@ -84,8 +85,14 @@ export async function redigir(p: PedidoRedacao): Promise<string | null> {
     `sem assinatura de sistema. Português do Brasil. Até 90 palavras.`;
 
   try {
+    const escolha = await escolherModelo({
+      proposito: "redator",
+      assunto: p.proposito === "reajuste" ? "cobranca" : "outro",
+      score: Number((cliente as any).score) || 0,
+    });
+
     const r = await anthropic.messages.create({
-      model: env.ANTHROPIC_MODEL,
+      model: escolha.modelo,
       max_tokens: 600,
       system: sistema,
       messages: [{
@@ -93,6 +100,10 @@ export async function redigir(p: PedidoRedacao): Promise<string | null> {
         content: `${INSTRUCAO[p.proposito]}\n\nCONTEXTO DESTA FAMÍLIA:\n${contexto}${conversa}`,
       }],
     });
+    await registrarChamada({
+      proposito: "redator", escolha, usage: (r as any).usage, clienteId: p.clienteId,
+    });
+
     const bloco = r.content.find((b: any) => b.type === "text") as any;
     const texto = String(bloco?.text || "").trim();
     return texto || null;

@@ -9,6 +9,7 @@ import { transcreverAudio } from "./transcricao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
 import { registrarErro } from "./monitor";
 import { podeChamarIa } from "./custo-ia";
+import { escolherModelo, registrarChamada } from "./modelo-ia";
 import { quebrarEmBolhas, pausaMs } from "./bolhas";
 import {
   acharCliente,
@@ -103,8 +104,15 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
   const historico = await historicoConversa(conversaId);
   const config = await carregarConfigIa();
 
+  // escolhe o modelo pelo assunto e pelo histórico deste contato
+  const escolha = await escolherModelo({
+    proposito: "atendimento",
+    assunto: (cliente as any).ultimo_assunto || null,
+    score: Number((cliente as any).score) || 0,
+  });
+
   const resp = await anthropic().messages.create({
-    model: env.ANTHROPIC_MODEL,
+    model: escolha.modelo,
     max_tokens: 1024,
     system: montarSystemPrompt(ctx, { conhecimento: config.conhecimento, tom: config.tom }),
     messages: historico.length
@@ -112,6 +120,11 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
       : [{ role: "user", content: "(cliente iniciou conversa)" }],
     tools: [responderTool],
     tool_choice: { type: "tool", name: "responder" },
+  });
+
+  await registrarChamada({
+    proposito: "atendimento", escolha, usage: (resp as any).usage,
+    assunto: (cliente as any).ultimo_assunto || null, clienteId: (cliente as any).id,
   });
 
   const bloco = resp.content.find((b) => b.type === "tool_use");
