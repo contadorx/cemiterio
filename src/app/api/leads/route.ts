@@ -9,14 +9,22 @@ export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
   const status = req.nextUrl.searchParams.get("status") || "";
+  const mostrarOcultos = req.nextUrl.searchParams.get("ocultos") === "1";
   const origem = req.nextUrl.searchParams.get("origem") || "";
 
   let q = auth.db
     .from("leads")
-    .select("id,telefone,nome,nome_wa,contexto,jazigo_ref,mensagens,status,origem,proximo_passo,created_at,updated_at")
+    .select("id,telefone,nome,nome_wa,contexto,jazigo_ref,mensagens,status,origem,proximo_passo,ignorado,motivo_ignorado,created_at,updated_at")
     .order("updated_at", { ascending: false })
     .limit(200);
   if (status) q = q.eq("status", status);
+  // por padrão a lista mostra só quem ainda pode virar cliente
+  if (!mostrarOcultos && !status) {
+    q = q.eq("ignorado", false).neq("status", "descartado");
+  }
+  if (!mostrarOcultos && status && status !== "descartado") {
+    q = q.eq("ignorado", false);
+  }
   if (origem) q = q.eq("origem", origem);
 
   const { data } = await q;

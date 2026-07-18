@@ -16,6 +16,12 @@ export async function tratarLead(telefone: string, texto: string, nomeWa?: strin
   const db = supabaseAdmin();
   const org = env.orgId();
 
+  // número marcado como "não é lead" nem chega a ser registrado
+  const { data: bloqueado } = await db
+    .from("telefones_ignorados")
+    .select("id").eq("org_id", org).eq("telefone", telefone).maybeSingle();
+  if (bloqueado) return;
+
   const { data: lead } = await db
     .from("leads")
     .select("id,mensagens,status")

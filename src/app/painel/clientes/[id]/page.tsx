@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
+import Extras from "./Extras";
 import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
 
 export default function FichaCliente() {
@@ -221,6 +222,8 @@ export default function FichaCliente() {
         </div>
 
         <BarraSalvar />
+
+        <Extras clienteId={id} tumulos={d.tumulos || []} onMudou={carregar} />
 
         <RegistrarPagamento clienteId={id} nome={c.nome} onSalvo={carregar} />
 

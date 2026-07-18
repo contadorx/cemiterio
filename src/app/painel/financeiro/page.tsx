@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
+import Entradas from "./Entradas";
 
 interface Comp {
   id: string;
@@ -13,7 +15,7 @@ interface Comp {
 }
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<"conferir" | "relatorio" | "gestao" | "jazigos">("conferir");
+  const [aba, setAba] = useState<"gestao" | "entradas" | "conferir" | "relatorio" | "jazigos">("gestao");
 
   return (
     <div style={painel.wrap}>
@@ -24,6 +26,7 @@ export default function Financeiro() {
           {([
             ["gestao", "Gestão do negócio"],
             ["conferir", "Comprovantes a conferir"],
+            ["entradas", "Entradas do banco"],
             ["relatorio", "Recebido no mês"],
             ["jazigos", "Resultado por jazigo"],
           ] as const).map(([v, rot]) => (
@@ -36,6 +39,7 @@ export default function Financeiro() {
 
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}
+        {aba === "entradas" && <Entradas />}
         {aba === "relatorio" && <Relatorio />}
         {aba === "jazigos" && <PorJazigo />}
       </div>
@@ -456,6 +460,146 @@ function PorJazigo() {
           <p style={{ color: cor.cinza, fontSize: 14 }}>Nenhuma limpeza executada no período.</p>
         )}
       </div>
+    </>
+  );
+}
+
+
+/**
+ * BATER COM O BANCO
+ *
+ * Lista os pagamentos que entraram sem comprovante — aqueles em que a família
+ * disse que pagou e você registrou para não continuar cobrando.
+ * Aqui você abre o extrato ao lado e vai dando o visto.
+ */
+function BaterComBanco() {
+  const [d, setD] = useState<any>(null);
+  const [meses, setMeses] = useState(6);
+  const [soPendentes, setSoPendentes] = useState(true);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    const r = await fetch(`/api/financeiro/conferir-banco?meses=${meses}`)
+      .then((x) => x.json()).catch(() => null);
+    if (r?.ok) setD(r);
+  }, [meses]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function marcar(id: string, conferido: boolean, nota?: string) {
+    setOcupado(id);
+    await fetch("/api/financeiro/conferir-banco", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movimentoId: id, conferido, nota }),
+    });
+    setOcupado(null);
+    carregar();
+  }
+
+  if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+  const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
+  const lista = (d.lancamentos || []).filter((x: any) => (soPendentes ? !x.conferido : true));
+
+  return (
+    <>
+      <div style={{ ...painel.card, background: "#f8fafc" }}>
+        <p style={{ margin: 0, fontSize: 15, color: cor.cinza, lineHeight: 1.6 }}>
+          Estes valores entraram porque a família <b>disse</b> que pagou — sem comprovante.
+          Foram lançados na conta dela para a cobrança parar. Abra o extrato do banco ao lado
+          e vá dando o visto no que encontrar.
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+                    gap: 12, marginBottom: 14 }}>
+        <CartaoGestao titulo="Falta conferir" valor={String(d.totais.pendentes)}
+                cor={d.totais.pendentes ? "#d97706" : cor.teal} destaque />
+        <CartaoGestao titulo="Valor em jogo" valor={money(d.totais.valorPendente)} cor={cor.navy} />
+        <CartaoGestao titulo="Já conferidos" valor={String(d.totais.conferidos)} cor={cor.teal} />
+        {d.totais.maisAntigo > 30 && (
+          <CartaoGestao titulo="Mais antigo" valor={`${d.totais.maisAntigo} dias`} cor="#b91c1c"
+                  rodape="esperando conferência" />
+        )}
+      </div>
+
+      <div style={{ ...painel.card, padding: 12 }}>
+        <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select style={{ ...painel.input, width: "auto" }} value={meses}
+                  onChange={(e) => setMeses(Number(e.target.value))}>
+            <option value={3}>Últimos 3 meses</option>
+            <option value={6}>Últimos 6 meses</option>
+            <option value={12}>Último ano</option>
+          </select>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: cor.cinza }}>
+            <input type="checkbox" checked={soPendentes}
+                   onChange={(e) => setSoPendentes(e.target.checked)} />
+            só o que falta conferir
+          </label>
+        </div>
+      </div>
+
+      {lista.length === 0 && (
+        <div style={painel.card}>
+          <p style={{ margin: 0, color: cor.cinza }}>
+            {soPendentes
+              ? "Tudo conferido. 🌿"
+              : "Nenhum pagamento sem comprovante no período."}
+          </p>
+        </div>
+      )}
+
+      {lista.map((x: any) => (
+        <div key={x.id} style={{ ...painel.card,
+          borderLeft: x.conferido ? `4px solid ${cor.teal}`
+            : x.dias_esperando > 30 ? "4px solid #b91c1c" : "4px solid #d97706" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <Link href={`/painel/clientes/${x.cliente_id}`} style={{ textDecoration: "none" }}>
+                <strong style={{ color: cor.navy, fontSize: 16 }}>{x.cliente}</strong>
+              </Link>
+              <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
+                {new Date(x.data + "T12:00:00").toLocaleDateString("pt-BR")}
+                {" · "}{x.descricao || "pagamento informado"}
+                {!x.conferido && x.dias_esperando > 0 && (
+                  <span style={{ color: x.dias_esperando > 30 ? "#b91c1c" : "#92400e" }}>
+                    {" · "}há {x.dias_esperando} dia{x.dias_esperando > 1 ? "s" : ""} esperando
+                  </span>
+                )}
+              </div>
+              {x.nota && (
+                <div style={{ fontSize: 14, color: cor.cinza, marginTop: 4, fontStyle: "italic" }}>
+                  {x.nota}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <b style={{ color: cor.navy, fontSize: 17 }}>{money(x.valor)}</b>
+              {x.conferido ? (
+                <button style={painel.botaoSec} disabled={ocupado === x.id}
+                        onClick={() => marcar(x.id, false)}>
+                  ✓ conferido · desfazer
+                </button>
+              ) : (
+                <>
+                  <button style={painel.botao} disabled={ocupado === x.id}
+                          onClick={() => marcar(x.id, true)}>
+                    Achei no extrato
+                  </button>
+                  <button style={painel.botaoSec} disabled={ocupado === x.id}
+                          onClick={() => {
+                            const nota = prompt(
+                              "Não achou no extrato? Anote o que fazer:\n" +
+                              "(ex.: perguntar a data certa, conferir outra conta)", "");
+                            if (nota !== null) marcar(x.id, false, nota || "não localizado no extrato");
+                          }}>
+                    Não achei
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </>
   );
 }

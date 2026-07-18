@@ -11,7 +11,7 @@ import { PainelNav, painel, cor } from "../ui";
  */
 export default function Leads() {
   const [lista, setLista] = useState<any[]>([]);
-  const [f, setF] = useState({ status: "", origem: "" });
+  const [f, setF] = useState({ status: "", origem: "", ocultos: false });
   const [novo, setNovo] = useState(false);
   const [carregando, setCarregando] = useState(true);
 
@@ -20,6 +20,7 @@ export default function Leads() {
     const p = new URLSearchParams();
     if (f.status) p.set("status", f.status);
     if (f.origem) p.set("origem", f.origem);
+    if (f.ocultos) p.set("ocultos", "1");
     const r = await fetch(`/api/leads?${p}`).then((x) => x.json()).catch(() => null);
     setLista(r?.leads || []);
     setCarregando(false);
@@ -53,12 +54,17 @@ export default function Leads() {
             </select>
             <select style={{ ...painel.input, width: "auto" }} value={f.status}
                     onChange={(e) => setF({ ...f, status: e.target.value })}>
-              <option value="">Todos os status</option>
+              <option value="">Ativos (esconde descartados)</option>
               <option value="novo">Novos</option>
               <option value="em_conversa">Em conversa</option>
               <option value="convertido">Viraram cliente</option>
               <option value="descartado">Descartados</option>
             </select>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, color: cor.cinza }}>
+              <input type="checkbox" checked={f.ocultos}
+                     onChange={(e) => setF({ ...f, ocultos: e.target.checked })} />
+              mostrar ignorados
+            </label>
             <button style={{ ...painel.botao, marginLeft: "auto" }} onClick={() => setNovo(!novo)}>
               {novo ? "Fechar" : "+ Nova prospecção"}
             </button>
@@ -144,11 +150,35 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
   }
 
   async function mudarStatus(status: string) {
-    await fetch(`/api/leads/${l.id}`, {
+    const r = await fetch(`/api/leads/${l.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
-    });
-    onMudou();
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) onMudou(); else alert("Não consegui atualizar.");
+  }
+
+  /** Não é cliente e não vai ser: some da lista e não volta nem escrevendo de novo. */
+  async function naoEhLead() {
+    const motivo = prompt(
+      `Marcar ${l.nome || l.nome_wa || l.telefone} como "não é lead"?\n\n` +
+      `Some da lista e o número não volta a aparecer nem se escrever de novo.\n` +
+      `Se quiser, anote o motivo (opcional):`,
+      ""
+    );
+    if (motivo === null) return;   // cancelou
+    const r = await fetch(`/api/leads/${l.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ignorado: true, motivoIgnorado: motivo || null }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) onMudou(); else alert("Não consegui marcar.");
+  }
+
+  async function voltarASerLead() {
+    const r = await fetch(`/api/leads/${l.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ignorado: false, status: "novo" }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) onMudou();
   }
 
   const tel = String(l.telefone || "").replace(/\D/g, "");
@@ -164,6 +194,11 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
           <div style={{ fontSize: 15, color: cor.cinza, marginTop: 2 }}>
             {l.telefone} · {doWhats ? "escreveu no WhatsApp" : l.origem === "manual" ? "prospecção" : l.origem}
             {" · "}{l.status}
+            {l.ignorado && (
+              <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                {" · "}🚫 não é lead{l.motivo_ignorado ? ` (${l.motivo_ignorado})` : ""}
+              </span>
+            )}
           </div>
           {l.jazigo_ref && <div style={{ fontSize: 15, color: cor.cinza }}>Jazigo: {l.jazigo_ref}</div>}
           {l.contexto && (
@@ -210,7 +245,21 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
         {l.status !== "convertido" && (
           <button style={painel.botaoSec} onClick={() => mudarStatus("em_conversa")}>Em conversa</button>
         )}
-        <button style={painel.botaoSec} onClick={() => mudarStatus("descartado")}>Descartar</button>
+        {!l.ignorado && (
+          <>
+            <button style={painel.botaoSec} onClick={() => mudarStatus("descartado")}>
+              Descartar
+            </button>
+            <button style={painel.botaoSec} onClick={naoEhLead}>
+              🚫 Não é lead
+            </button>
+          </>
+        )}
+        {l.ignorado && (
+          <button style={painel.botaoSec} onClick={voltarASerLead}>
+            Voltar a mostrar
+          </button>
+        )}
       </div>
     </div>
   );
