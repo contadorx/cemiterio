@@ -10,7 +10,12 @@ import {
   type ClienteRow,
 } from "./context";
 
-const anthropic = new Anthropic({ apiKey: env.anthropicKey() });
+// lazy: só cria (e exige a chave) quando de fato vai chamar a IA — nunca no build
+let _anthropic: Anthropic | null = null;
+function anthropic(): Anthropic {
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: env.anthropicKey() });
+  return _anthropic;
+}
 
 // Assuntos que uma pessoa SEMPRE trata — não graduam pro automático por mais alto que o score esteja.
 const ASSUNTOS_SENSIVEIS: Assunto[] = ["luto", "reclamacao"];
@@ -82,7 +87,7 @@ async function chamarIa(
   const ctx = await montarContexto(cliente);
   const historico = await historicoConversa(conversaId);
 
-  const resp = await anthropic.messages.create({
+  const resp = await anthropic().messages.create({
     model: env.ANTHROPIC_MODEL,
     max_tokens: 1024,
     system: montarSystemPrompt(ctx),
