@@ -17,6 +17,7 @@ export function PainelNav({ atual }: { atual: string }) {
     { href: "/painel/atendimento", label: "Atendimento" },
     { href: "/painel/financeiro", label: "Financeiro" },
     { href: "/painel/clientes", label: "Clientes" },
+    { href: "/painel/reajustes", label: "Reajustes" },
   ];
   return (
     <nav style={nav.barra}>
