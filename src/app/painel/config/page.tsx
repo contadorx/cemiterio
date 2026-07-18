@@ -254,21 +254,7 @@ function Agregados({ aba }: { aba: string }) {
           <div style={{ fontSize: 30, fontWeight: 800, color: totalImpacto > 0 ? "#dc2626" : cor.teal }}>{totalImpacto}</div>
         </div>
 
-        <div style={painel.card}>
-          <strong style={{ color: cor.navy }}>Materiais</strong>
-          {(d.materiais || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0", fontSize: 14 }}>Nenhum material cadastrado. Quando a ajudante avisar que algo acabou, aparece aqui.</p>}
-          {(d.materiais || []).map((m: any) => {
-            const baixo = Number(m.estoque) <= Number(m.alerta_minimo);
-            return (
-              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
-                <span style={{ textTransform: "capitalize" }}>{m.nome}</span>
-                <b style={{ color: baixo ? "#dc2626" : cor.navy }}>
-                  {baixo ? "repor" : `${m.estoque} ${m.unidade}`}
-                </b>
-              </div>
-            );
-          })}
-        </div>
+        <Materiais />
 
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Dias de trabalho</strong>
@@ -531,5 +517,121 @@ function Casa() {
         {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
       </div>
     </>
+  );
+}
+
+
+function Materiais() {
+  const [itens, setItens] = useState<any[]>([]);
+  const [novo, setNovo] = useState({ nome: "", unidade: "un", estoque: 0, alertaMinimo: 1 });
+  const [criando, setCriando] = useState(false);
+
+  async function carregar() {
+    const r = await fetch("/api/config/materiais").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setItens(r.materiais);
+  }
+  useEffect(() => { carregar(); }, []);
+
+  async function criar() {
+    if (!novo.nome.trim()) return;
+    const r = await fetch("/api/config/materiais", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(novo),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setNovo({ nome: "", unidade: "un", estoque: 0, alertaMinimo: 1 }); setCriando(false); carregar(); }
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  async function atualizar(id: string, patch: any) {
+    await fetch(`/api/config/materiais/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+    });
+    carregar();
+  }
+
+  async function remover(id: string, nome: string) {
+    if (!confirm(`Remover "${nome}" da lista de materiais?`)) return;
+    await fetch(`/api/config/materiais/${id}`, { method: "DELETE" });
+    carregar();
+  }
+
+  const sugestoes = ["vassoura de piaçava", "água sanitária", "pano de chão", "balde",
+                     "luvas", "saco de lixo", "esponja", "rodo", "escova de aço", "flores"];
+
+  return (
+    <div style={painel.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <strong style={{ color: cor.navy }}>Materiais</strong>
+        <button style={painel.botaoSec} onClick={() => setCriando(!criando)}>
+          {criando ? "Fechar" : "+ Cadastrar material"}
+        </button>
+      </div>
+      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 0" }}>
+        A Nina vê esta lista no app e marca o que está faltando. O que ela marcar zera aqui e vira ocorrência.
+      </p>
+
+      {criando && (
+        <div style={{ border: `1px solid ${cor.linha}`, borderRadius: 10, padding: 12, marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <label style={painel.rotulo}>Nome</label>
+              <input style={painel.input} value={novo.nome} list="sugestoes-material"
+                     onChange={(e) => setNovo({ ...novo, nome: e.target.value })}
+                     placeholder="ex.: vassoura de piaçava" />
+              <datalist id="sugestoes-material">
+                {sugestoes.map((x) => <option key={x} value={x} />)}
+              </datalist>
+            </div>
+            <div>
+              <label style={painel.rotulo}>Unidade</label>
+              <input style={{ ...painel.input, width: 80 }} value={novo.unidade}
+                     onChange={(e) => setNovo({ ...novo, unidade: e.target.value })} />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Estoque</label>
+              <input type="number" style={{ ...painel.input, width: 90 }} value={novo.estoque}
+                     onChange={(e) => setNovo({ ...novo, estoque: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label style={painel.rotulo}>Avisar abaixo de</label>
+              <input type="number" style={{ ...painel.input, width: 110 }} value={novo.alertaMinimo}
+                     onChange={(e) => setNovo({ ...novo, alertaMinimo: Number(e.target.value) })} />
+            </div>
+            <button style={painel.botao} onClick={criar}>Salvar</button>
+          </div>
+        </div>
+      )}
+
+      {itens.length === 0 && (
+        <p style={{ color: cor.cinza, margin: "12px 0 0", fontSize: 14 }}>
+          Nenhum material cadastrado ainda.
+        </p>
+      )}
+      {itens.map((m) => {
+        const baixo = Number(m.estoque) <= Number(m.alerta_minimo);
+        return (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                                   padding: "10px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 10 }}>
+            <span style={{ flex: 1, minWidth: 140, textTransform: "capitalize",
+                           color: baixo ? "#dc2626" : cor.navy, fontWeight: baixo ? 700 : 400 }}>
+              {m.nome} {baixo && "· repor"}
+            </span>
+            <div>
+              <label style={{ ...painel.rotulo, marginBottom: 2 }}>Estoque</label>
+              <input type="number" defaultValue={m.estoque} style={{ ...painel.input, width: 90, padding: 8 }}
+                     onBlur={(e) => atualizar(m.id, { estoque: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label style={{ ...painel.rotulo, marginBottom: 2 }}>Avisar abaixo</label>
+              <input type="number" defaultValue={m.alerta_minimo} style={{ ...painel.input, width: 100, padding: 8 }}
+                     onBlur={(e) => atualizar(m.id, { alertaMinimo: Number(e.target.value) })} />
+            </div>
+            <span style={{ color: cor.cinza, fontSize: 13 }}>{m.unidade}</span>
+            <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }} onClick={() => remover(m.id, m.nome)}>
+              Remover
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }

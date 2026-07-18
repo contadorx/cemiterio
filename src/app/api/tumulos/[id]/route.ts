@@ -13,6 +13,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};
 
+  for (const c of ["identificacao", "rua", "quadra_id"]) {
+    if (body[c] !== undefined) patch[c] = body[c] || null;
+  }
   if (body.falecido_nome !== undefined) patch.falecido_nome = body.falecido_nome || null;
 
   if (body.data_falecimento !== undefined || body.data_nascimento !== undefined) {
