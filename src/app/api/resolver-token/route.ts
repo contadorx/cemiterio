@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,9 +32,11 @@ export async function GET(req: NextRequest) {
 
   // equipe: acha o túmulo e o serviço aberto mais próximo
   const adm = supabaseAdmin();
+  // service role ignora RLS: filtrar org_id explicitamente é obrigatório
   const { data: tumulo } = await adm
     .from("tumulos")
     .select("id,identificacao")
+    .eq("org_id", env.orgId())
     .eq("qr_token", token)
     .maybeSingle();
 
@@ -42,6 +45,7 @@ export async function GET(req: NextRequest) {
   const { data: servico } = await adm
     .from("servicos")
     .select("id,data_prevista,status")
+    .eq("org_id", env.orgId())
     .eq("tumulo_id", (tumulo as any).id)
     .in("status", ["pendente", "agendado"])
     .order("data_prevista", { ascending: true, nullsFirst: false })

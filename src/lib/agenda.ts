@@ -134,7 +134,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     .from("orgs")
     .select("limpezas_por_dia")
     .eq("id", org)
-    .single();
+    .maybeSingle();
   const capacidadePadrao = Number((orgRow as any)?.limpezas_por_dia) || 20;
 
   // D5: ajudantes ativas (papel campo). Cada uma pode ter capacidade própria.

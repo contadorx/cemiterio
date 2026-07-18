@@ -21,7 +21,7 @@ export async function calcularCapacidade(): Promise<Capacidade> {
     .from("orgs")
     .select("limpezas_por_dia,dias_trabalhados_semana")
     .eq("id", org)
-    .single();
+    .maybeSingle();
 
   const porDia = Number((orgRow as any)?.limpezas_por_dia) || 20;
   const diasSemana = Number((orgRow as any)?.dias_trabalhados_semana) || 6;
