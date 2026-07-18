@@ -4,3 +4,4 @@
     { "path": "/api/cron/diario", "schedule": "0 12 * * *" }
   ]
 }
+
