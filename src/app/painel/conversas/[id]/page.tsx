@@ -165,6 +165,14 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
   const [tom, setTom] = useState("acolhedor");
   const [opcoes, setOpcoes] = useState<any[]>([]);
   const [pensando, setPensando] = useState(false);
+  const [copiado, setCopiado] = useState<number | null>(null);
+
+  /** Edita uma sugestão no lugar, guardando o texto original para poder desfazer. */
+  function trocarTexto(i: number, texto: string) {
+    setOpcoes((atual) =>
+      atual.map((o, idx) => (idx === i ? { ...o, texto } : o))
+    );
+  }
 
   async function pedir() {
     setPensando(true);
@@ -174,7 +182,10 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
       body: JSON.stringify({ contexto, tom }),
     }).then((x) => x.json()).catch(() => null);
     setPensando(false);
-    if (r?.ok) setOpcoes(r.opcoes || []);
+    if (r?.ok) {
+      // guarda o texto como veio, para o "desfazer edição"
+      setOpcoes((r.opcoes || []).map((o: any) => ({ ...o, original: o.texto })));
+    }
     else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
   }
 
@@ -223,16 +234,45 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
       {opcoes.map((o, i) => (
         <div key={i} style={{ background: "#fff", border: `1px solid ${cor.linha}`,
                               borderRadius: 10, padding: 12, marginTop: 10 }}>
-          <div style={{ fontSize: 14, color: cor.teal, textTransform: "uppercase",
-                        letterSpacing: 0.5, fontWeight: 700 }}>
-            {o.titulo || `Opção ${i + 1}`}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                        gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 14, color: cor.teal, textTransform: "uppercase",
+                          letterSpacing: 0.5, fontWeight: 700 }}>
+              {o.titulo || `Opção ${i + 1}`}
+            </div>
+            {o.texto !== (o.original ?? o.texto) && (
+              <button
+                style={{ background: "none", border: "none", color: cor.cinza, fontSize: 13,
+                         cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => trocarTexto(i, o.original)}
+              >
+                desfazer edição
+              </button>
+            )}
           </div>
-          <p style={{ margin: "6px 0 10px", fontSize: 15, color: cor.navy, lineHeight: 1.5 }}>
-            {o.texto}
-          </p>
-          <button style={painel.botaoSec} onClick={() => { onEscolher(o.texto); setAberto(false); }}>
-            Usar esta
-          </button>
+
+          {/* editável aqui mesmo: dá para ajustar antes de escolher */}
+          <textarea
+            style={{ ...painel.input, minHeight: 130, marginTop: 8, fontFamily: "inherit",
+                     lineHeight: 1.5, resize: "vertical" }}
+            value={o.texto}
+            onChange={(e) => trocarTexto(i, e.target.value)}
+          />
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+            <button style={painel.botao}
+                    onClick={() => { onEscolher(o.texto); setAberto(false); }}>
+              Usar esta
+            </button>
+            <button style={painel.botaoSec}
+                    onClick={() => { navigator.clipboard?.writeText(o.texto); setCopiado(i);
+                                     setTimeout(() => setCopiado(null), 1500); }}>
+              {copiado === i ? "✓ copiado" : "Copiar"}
+            </button>
+            <span style={{ fontSize: 13, color: cor.cinza }}>
+              {o.texto.trim().split(/\s+/).filter(Boolean).length} palavras
+            </span>
+          </div>
         </div>
       ))}
     </div>

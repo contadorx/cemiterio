@@ -187,8 +187,12 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
           <div style={{ fontSize: 14, color: cor.teal, textTransform: "uppercase", marginBottom: 6 }}>
             Sugestão — leia e ajuste antes de mandar
           </div>
-          <textarea style={{ ...painel.input, minHeight: 90, fontFamily: "inherit" }}
+          <textarea style={{ ...painel.input, minHeight: 150, fontFamily: "inherit",
+                             lineHeight: 1.5, resize: "vertical" }}
                     value={sugestao} onChange={(e) => setSugestao(e.target.value)} />
+          <div style={{ fontSize: 13, color: cor.cinza, marginTop: 6 }}>
+            {sugestao.trim().split(/\s+/).filter(Boolean).length} palavras · edite à vontade antes de mandar
+          </div>
         </div>
       )}
 
