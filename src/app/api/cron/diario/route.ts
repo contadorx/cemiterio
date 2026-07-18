@@ -1,58 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/lib/env";
+import { cronAutorizado } from "@/lib/cron-auth";
 import { avisosSaldoBaixo, cobrancaGentil, gatilhosDeData } from "@/lib/proativo";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
-import { processarPendentes } from "@/lib/atendimento";
-import { processarFilaEnvios } from "@/lib/envio";
-import { destilarPerfisPendentes } from "@/lib/destilacao";
-import { convitesDeData, convitesPeriodicos } from "@/lib/ativacao";
+import { registrarErro } from "@/lib/monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// Roda 1x/dia: gera/aloca a agenda e cria os rascunhos proativos
-// (aviso de saldo, cobrança gentil, gatilhos de data). Tudo copiloto.
-function autorizado(req: NextRequest): boolean {
-  const secret = env.cronSecret();
-  if (!secret) return false;
-  const auth = req.headers.get("authorization") || "";
-  return auth === `Bearer ${secret}` || req.nextUrl.searchParams.get("secret") === secret;
-}
-
+// Rotina da manhã: monta a agenda do período e prepara os rascunhos proativos.
+// Convites (ativação) e destilação de perfis rodam em crons próprios, para que
+// uma falha em um não derrube os outros.
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) {
-    return NextResponse.json(
-      { ok: false, erro: "cron_nao_autorizado (defina CRON_SECRET)" },
-      { status: 401 }
-    );
+  if (!cronAutorizado(req)) {
+    return NextResponse.json({ ok: false, erro: "cron_nao_autorizado (defina CRON_SECRET)" }, { status: 401 });
   }
 
-  const agenda = await gerarServicosDevidos(30);
-  const aloc = await alocarAgenda();
-  const [saldo, cobranca, gatilhos] = [
-    await avisosSaldoBaixo(),
-    await cobrancaGentil(),
-    await gatilhosDeData(),
-  ];
+  const resultado: Record<string, any> = { ok: true };
 
-  // rede de segurança (o cron/minuto não roda no Hobby): drena o que ficou preso
-  const pendentes = await processarPendentes();
-  const envios = await processarFilaEnvios();
+  // cada etapa é independente: se uma falhar, as outras seguem
+  try {
+    const gerados = await gerarServicosDevidos(30);
+    const aloc = await alocarAgenda();
+    resultado.agenda = { gerados: gerados.criados, ...aloc };
+  } catch (e) {
+    await registrarErro("cron_diario_agenda", e);
+    resultado.agenda = { erro: true };
+  }
 
-  // B4: mantém os perfis da IA frescos sem trabalho manual
-  const perfis = await destilarPerfisPendentes();
+  try {
+    resultado.rascunhos = {
+      saldo: await avisosSaldoBaixo(),
+      cobranca: await cobrancaGentil(),
+      gatilhos: await gatilhosDeData(),
+    };
+  } catch (e) {
+    await registrarErro("cron_diario_proativos", e);
+    resultado.rascunhos = { erro: true };
+  }
 
-  // régua de ativação: convida em vez de cobrar (avulsos e datas especiais)
-  const convDatas = await convitesDeData();
-  const convPeriodicos = await convitesPeriodicos();
-
-  return NextResponse.json({
-    ok: true,
-    agenda: { gerados: agenda.criados, ...aloc },
-    rascunhos: { saldo, cobranca, gatilhos },
-    rede_seguranca: { pendentes, envios },
-    perfis,
-    convites: { datas: convDatas, periodicos: convPeriodicos },
-  });
+  return NextResponse.json(resultado);
 }

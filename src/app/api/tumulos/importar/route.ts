@@ -5,7 +5,7 @@ import { normalizarTelefone } from "@/lib/evolution";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // POST { csv } — colunas (cabeçalho obrigatório, ; ou ,):
 // quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor
