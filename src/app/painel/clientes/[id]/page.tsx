@@ -305,7 +305,7 @@ function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
   const [portalBusy, setPortalBusy] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
-  const linkPortal = token ? `${typeof window !== "undefined" ? window.location.origin : ""}/familia/${token}` : "";
+  const linkPortal = token ? `${typeof window !== "undefined" ? window.location.origin : ""}/t/${token}` : "";
 
   async function salvar() {
     setSalvando(true);

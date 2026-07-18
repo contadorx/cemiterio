@@ -12,12 +12,15 @@ export async function GET() {
   const db = auth.db;
   const org = await orgAtual(db);
 
-  const [{ data: aval }, { data: indic }, { data: erros }, { data: orgRow }, { data: audit }] = await Promise.all([
+  const [{ data: aval }, { data: indic }, { data: erros }, { data: orgRow }, { data: audit }, { data: ocor }, { data: diasCampo }, { data: materiais }] = await Promise.all([
     db.from("avaliacoes").select("nota,comentario,respondida_em,created_at").not("respondida_em", "is", null).order("respondida_em", { ascending: false }).limit(50),
     db.from("indicacoes").select("id,indicado_nome,indicado_tel,status,created_at,clientes!indicacoes_indicador_id_fkey(nome)").order("created_at", { ascending: false }).limit(50),
     db.from("erros_log").select("contexto,mensagem,created_at").order("created_at", { ascending: false }).limit(30),
     db.from("orgs").select("aviso_privacidade").eq("id", org).maybeSingle(),
     db.from("auditoria").select("acao,alvo_tipo,detalhe,created_at").order("created_at", { ascending: false }).limit(50),
+    db.from("ocorrencias").select("tipo,descricao,impacto,created_at").order("created_at", { ascending: false }).limit(40),
+    db.from("dias_campo").select("data,meta_tumulos,feitos,clima,observacoes").order("data", { ascending: false }).limit(20),
+    db.from("materiais").select("id,nome,unidade,estoque,alerta_minimo").order("nome"),
   ]);
 
   const notas = (aval || []).map((a: any) => a.nota).filter(Boolean);
@@ -31,6 +34,9 @@ export async function GET() {
     erros: erros || [],
     avisoPrivacidade: (orgRow as any)?.aviso_privacidade || "",
     auditoria: audit || [],
+    ocorrencias: ocor || [],
+    diasCampo: diasCampo || [],
+    materiais: materiais || [],
   });
 }
 

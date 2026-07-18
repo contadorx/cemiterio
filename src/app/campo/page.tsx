@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { concluirOuEnfileirar, sincronizar, lerFila } from "@/lib/offline-fila";
+import Assistente from "./Assistente";
+import { capturarGps, qualidade } from "@/lib/gps";
 
 interface Item {
   id: string;
+  tumuloId: string;
   status: string;
   ordem: number;
   tumulo: string;
@@ -13,7 +16,10 @@ interface Item {
   cliente: string | null;
   lat: number | null;
   lng: number | null;
+  gpsPrecisao: number | null;
+  gpsAmostras: number;
   fotoReferencia: string | null;
+  fotoEnquadramento: string | null;
 }
 
 export default function Campo() {
@@ -24,6 +30,7 @@ export default function Campo() {
   const [ativo, setAtivo] = useState<Item | null>(null);
   const [pendentes, setPendentes] = useState(0);
   const [online, setOnline] = useState(true);
+  const [avisoQr, setAvisoQr] = useState(false);
 
   async function carregar() {
     setCarregando(true);
@@ -32,6 +39,21 @@ export default function Campo() {
       setLista(r.lista);
       setTotal(r.total);
       setFeitos(r.feitos);
+
+      // veio de um QR? abre direto o túmulo escaneado
+      if (typeof window !== "undefined") {
+        const q = new URLSearchParams(window.location.search);
+        const alvoServico = q.get("servico");
+        const alvoTumulo = q.get("tumulo");
+        if (alvoServico || alvoTumulo) {
+          const achado = (r.lista as Item[]).find(
+            (x) => (alvoServico && x.id === alvoServico) || (alvoTumulo && x.tumuloId === alvoTumulo)
+          );
+          if (achado && achado.status !== "executado") setAtivo(achado);
+          else if (alvoServico || alvoTumulo) setAvisoQr(true);
+          window.history.replaceState({}, "", "/campo");
+        }
+      }
     }
     setCarregando(false);
   }
@@ -94,6 +116,14 @@ export default function Campo() {
         </div>
       )}
 
+      {avisoQr && (
+        <div style={s.faixaOffline}>
+          Este túmulo não está na sua rota de hoje (ou já foi feito). Se precisar fazer assim mesmo, fale com o apoio.
+        </div>
+      )}
+
+      <Assistente onMudou={carregar} />
+
       {agrupar(lista).map((grupo) => (
         <section key={grupo.quadra}>
           <h2 style={s.quadra}>Quadra {grupo.quadra}</h2>
@@ -154,10 +184,14 @@ function Concluir({
 }) {
   const [antes, setAntes] = useState<{ b64: string; mt: string } | null>(null);
   const [depois, setDepois] = useState<{ b64: string; mt: string } | null>(null);
+  const [enquadramento, setEnquadramento] = useState<{ b64: string; mt: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [gpsEstado, setGpsEstado] = useState<"idle" | "buscando" | "ok" | "erro">("idle");
+  const [gpsMsg, setGpsMsg] = useState("");
   const refAntes = useRef<HTMLInputElement>(null);
   const refDepois = useRef<HTMLInputElement>(null);
+  const refEnq = useRef<HTMLInputElement>(null);
 
   async function lerArquivo(f: File): Promise<{ b64: string; mt: string }> {
     const buf = await f.arrayBuffer();
@@ -167,15 +201,45 @@ function Concluir({
     return { b64: btoa(bin), mt: f.type || "image/jpeg" };
   }
 
-  function pegarGps(): Promise<{ lat: number; lng: number } | null> {
-    return new Promise((res) => {
-      if (!navigator.geolocation) return res(null);
-      navigator.geolocation.getCurrentPosition(
-        (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => res(null),
-        { timeout: 6000 }
-      );
+  // Confirmação de localização pela Nina: captura a melhor leitura possível e
+  // manda pro servidor, que recalcula a média. Cada visita melhora o ponto.
+  async function confirmarLocal() {
+    setGpsEstado("buscando");
+    setGpsMsg("Procurando sinal…");
+    const leitura = await capturarGps({
+      alvoMetros: 8,
+      timeoutMs: 15000,
+      aoProgredir: (p) => setGpsMsg(`Sinal: ${p} m — aguarde…`),
     });
+
+    if (!leitura) {
+      setGpsEstado("erro");
+      setGpsMsg("Não consegui o GPS. Verifique se a localização está ligada.");
+      return;
+    }
+
+    const q = qualidade(leitura.precisao);
+    if (!q.serve) {
+      setGpsEstado("erro");
+      setGpsMsg(`Sinal ${q.rotulo} (${leitura.precisao} m). Chegue mais perto e tente de novo.`);
+      return;
+    }
+
+    const r = await fetch(`/api/tumulos/${item.tumuloId}/gps`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...leitura, origem: "confirmacao" }),
+    }).then((x) => x.json()).catch(() => null);
+
+    if (r?.ok) {
+      setGpsEstado("ok");
+      setGpsMsg(
+        `✓ Localização confirmada (${r.amostras} leitura${r.amostras > 1 ? "s" : ""}, precisão ~${r.precisao} m)`
+      );
+    } else {
+      setGpsEstado("erro");
+      setGpsMsg(r?.mensagem || "Não consegui salvar. Tente de novo.");
+    }
   }
 
   async function concluir() {
@@ -185,14 +249,33 @@ function Concluir({
     }
     setEnviando(true);
     setErro("");
-    const gps = await pegarGps();
+
+    // aproveita a conclusão para registrar mais uma leitura (sem travar o fluxo)
+    const leitura = await capturarGps({ alvoMetros: 10, timeoutMs: 8000 });
+    if (leitura && leitura.precisao <= 30) {
+      fetch(`/api/tumulos/${item.tumuloId}/gps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...leitura, origem: "conclusao" }),
+      }).catch(() => {});
+    }
+
+    // foto de enquadramento (referência do túmulo), se ela tirou uma nova
+    if (enquadramento) {
+      fetch(`/api/tumulos/${item.tumuloId}/foto-referencia`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: enquadramento.b64, mimetype: enquadramento.mt, tipo: "enquadramento" }),
+      }).catch(() => {});
+    }
+
     const modo = await concluirOuEnfileirar({
       servicoId: item.id,
       fotoDepoisBase64: depois.b64,
       fotoAntesBase64: antes?.b64,
       mimetype: depois.mt,
-      lat: gps?.lat,
-      lng: gps?.lng,
+      lat: leitura?.lat,
+      lng: leitura?.lng,
     });
     setEnviando(false);
     // online = subiu; offline = guardado no aparelho e sobe sozinho quando voltar o sinal.
@@ -214,9 +297,17 @@ function Concluir({
           {item.falecido ? ` · ${item.falecido}` : ""}
         </div>
 
+        {item.fotoEnquadramento && (
+          <div>
+            <div style={s.rotulo}>Onde fica (foto de longe):</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.fotoEnquadramento} alt="enquadramento" style={s.fotoRef} />
+          </div>
+        )}
         {item.fotoReferencia && (
           <div>
             <div style={s.rotulo}>Confira se é este túmulo:</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.fotoReferencia} alt="referência" style={s.fotoRef} />
           </div>
         )}
@@ -228,6 +319,9 @@ function Concluir({
             rel="noreferrer"
           >
             📍 abrir no mapa
+            {item.gpsAmostras > 0 && item.gpsPrecisao != null
+              ? ` (±${item.gpsPrecisao} m · ${item.gpsAmostras} leitura${item.gpsAmostras > 1 ? "s" : ""})`
+              : ""}
           </a>
         )}
 
@@ -248,12 +342,42 @@ function Concluir({
           onChange={async (e) => e.target.files?.[0] && setDepois(await lerArquivo(e.target.files[0]))}
         />
 
+        <input
+          ref={refEnq}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={async (e) => e.target.files?.[0] && setEnquadramento(await lerArquivo(e.target.files[0]))}
+        />
+
         <button style={{ ...s.fotoBtn, ...(antes ? s.fotoOk : {}) }} onClick={() => refAntes.current?.click()}>
           {antes ? "✓ Foto do antes" : "📷 Foto do antes (opcional)"}
         </button>
         <button style={{ ...s.fotoBtn, ...(depois ? s.fotoOk : {}) }} onClick={() => refDepois.current?.click()}>
           {depois ? "✓ Foto do depois" : "📷 Foto do depois"}
         </button>
+
+        {/* Localização: cada confirmação melhora a média do ponto */}
+        <div style={s.blocoGps}>
+          <button
+            style={{ ...s.fotoBtn, ...(gpsEstado === "ok" ? s.fotoOk : {}), marginBottom: 6 }}
+            onClick={confirmarLocal}
+            disabled={gpsEstado === "buscando"}
+          >
+            {gpsEstado === "buscando" ? "📍 Procurando sinal…" : gpsEstado === "ok" ? "✓ Localização confirmada" : "📍 Confirmar que estou neste túmulo"}
+          </button>
+          {gpsMsg && (
+            <p style={{ ...s.gpsMsg, color: gpsEstado === "erro" ? "#dc2626" : "#0f766e" }}>{gpsMsg}</p>
+          )}
+          <button style={{ ...s.fotoBtn, ...(enquadramento ? s.fotoOk : {}) }} onClick={() => refEnq.current?.click()}>
+            {enquadramento ? "✓ Foto de longe salva" : "🖼 Atualizar foto de longe (ajuda a achar)"}
+          </button>
+          <p style={s.gpsDica}>
+            A foto de longe é tirada do corredor, mostrando o túmulo junto com os vizinhos. É ela que ajuda a
+            encontrar da próxima vez.
+          </p>
+        </div>
 
         {erro && <p style={s.erro}>{erro}</p>}
 
@@ -267,6 +391,9 @@ function Concluir({
 
 const s: Record<string, React.CSSProperties> = {
   wrap: { maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui", background: "#f8fafc", minHeight: "100vh" },
+  blocoGps: { background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, margin: "10px 0" },
+  gpsMsg: { fontSize: 13, margin: "0 0 8px", textAlign: "center" },
+  gpsDica: { fontSize: 12, color: "#64748b", margin: "8px 0 0", lineHeight: 1.4 },
   faixaOffline: { background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", borderRadius: 10, padding: "10px 12px", fontSize: 14, marginBottom: 12, textAlign: "center" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   data: { fontSize: 14, color: "#64748b" },

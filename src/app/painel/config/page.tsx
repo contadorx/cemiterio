@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"equipe" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("equipe");
+  const [aba, setAba] = useState<"equipe" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("equipe");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -13,6 +13,7 @@ export default function Config() {
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {([
             ["equipe", "Equipe"],
+            ["campo", "Campo"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
             ["indicacoes", "Indicações"],
@@ -235,6 +236,63 @@ function Agregados({ aba }: { aba: string }) {
           {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
         </div>
       </div>
+    );
+  }
+
+  if (aba === "campo") {
+    const totalImpacto = (d.ocorrencias || []).reduce((s: number, o: any) => s + (o.impacto || 0), 0);
+    const rotulos: Record<string, string> = {
+      chuva: "🌧 Chuva", falta_agua: "🚰 Falta de água", falta_material: "🧴 Falta de material",
+      acesso: "🚧 Acesso", saude: "🩺 Saúde", tumulo_nao_encontrado: "❓ Túmulo não encontrado", outro: "• Outro",
+    };
+    return (
+      <>
+        <div style={painel.card}>
+          <div style={{ fontSize: 13, color: cor.cinza }}>Túmulos perdidos por imprevistos (registrados)</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: totalImpacto > 0 ? "#dc2626" : cor.teal }}>{totalImpacto}</div>
+        </div>
+
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Materiais</strong>
+          {(d.materiais || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0", fontSize: 14 }}>Nenhum material cadastrado. Quando a ajudante avisar que algo acabou, aparece aqui.</p>}
+          {(d.materiais || []).map((m: any) => {
+            const baixo = Number(m.estoque) <= Number(m.alerta_minimo);
+            return (
+              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
+                <span style={{ textTransform: "capitalize" }}>{m.nome}</span>
+                <b style={{ color: baixo ? "#dc2626" : cor.navy }}>
+                  {baixo ? "repor" : `${m.estoque} ${m.unidade}`}
+                </b>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Dias de trabalho</strong>
+          {(d.diasCampo || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0", fontSize: 14 }}>Nenhum dia encerrado ainda.</p>}
+          {(d.diasCampo || []).map((x: any, i: number) => (
+            <div key={i} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8, fontSize: 14 }}>
+              <b>{new Date(x.data + "T12:00:00").toLocaleDateString("pt-BR")}</b> · {x.feitos} de {x.meta_tumulos} feitos
+              {x.clima ? ` · ${x.clima}` : ""}
+              {x.observacoes ? <div style={{ color: cor.cinza, marginTop: 2 }}>&ldquo;{x.observacoes}&rdquo;</div> : null}
+            </div>
+          ))}
+        </div>
+
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Ocorrências relatadas</strong>
+          {(d.ocorrencias || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0", fontSize: 14 }}>Nenhuma ocorrência.</p>}
+          {(d.ocorrencias || []).map((o: any, i: number) => (
+            <div key={i} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8, fontSize: 14 }}>
+              <b>{rotulos[o.tipo] || o.tipo}</b>
+              {o.impacto > 0 && <span style={{ color: "#dc2626" }}> · −{o.impacto} túmulo(s)</span>}
+              {o.descricao && <div style={{ color: cor.cinza, marginTop: 2 }}>{o.descricao}</div>}
+              <div style={{ fontSize: 12, color: cor.cinza }}>{new Date(o.created_at).toLocaleString("pt-BR")}</div>
+            </div>
+          ))}
+        </div>
+      </>
     );
   }
 

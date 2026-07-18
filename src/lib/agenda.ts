@@ -95,6 +95,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<{ criado
 interface ServicoPend {
   id: string;
   data_prevista: string | null;
+  prioridade?: number;
   tumulo: { identificacao: string; lat: number | null; lng: number | null; quadra_ordem: number };
 }
 
@@ -158,13 +159,14 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   // pendentes não alocados ou a realocar
   const { data: pend } = await db
     .from("servicos")
-    .select("id,data_prevista,tumulos(identificacao,lat,lng,quadras(ordem))")
+    .select("id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
     .eq("org_id", org)
     .eq("status", "pendente");
 
   const itens: ServicoPend[] = (pend || []).map((s: any) => ({
     id: s.id,
     data_prevista: s.data_prevista,
+    prioridade: s.prioridade || 0,
     tumulo: {
       identificacao: s.tumulos?.identificacao || "",
       lat: s.tumulos?.lat ?? null,
@@ -175,8 +177,11 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   if (!itens.length) return { agendados: 0, dias: 0 };
 
-  // prioridade: vencimento mais antigo primeiro, depois quadra
+  // prioridade: o que já foi adiado vem primeiro; depois vencimento; depois quadra
   itens.sort((a, b) => {
+    const pa = (a as any).prioridade || 0;
+    const pb = (b as any).prioridade || 0;
+    if (pa !== pb) return pb - pa;
     const da = a.data_prevista || "9999-99-99";
     const db_ = b.data_prevista || "9999-99-99";
     if (da !== db_) return da < db_ ? -1 : 1;

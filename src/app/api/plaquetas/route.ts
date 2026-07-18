@@ -24,8 +24,10 @@ export async function GET(req: NextRequest) {
 
   const plaquetas = [];
   for (const t of tumulos || []) {
-    const url = `${origem}/familia/${(t as any).qr_token}`;
-    const qr = await QRCode.toDataURL(url, { margin: 1, width: 300, errorCorrectionLevel: "M" });
+    // destino único: decide entre app de campo (equipe) e portal (família)
+    const url = `${origem}/t/${(t as any).qr_token}`;
+    // nível Q tolera ~25% de sujeira/desgaste — necessário em ambiente externo
+    const qr = await QRCode.toDataURL(url, { margin: 2, width: 400, errorCorrectionLevel: "Q" });
     plaquetas.push({
       id: (t as any).id,
       identificacao: (t as any).identificacao,

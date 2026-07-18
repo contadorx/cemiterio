@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   let q = db
     .from("servicos")
     .select(
-      "id,status,ordem_dia,tumulos(identificacao,lat,lng,falecido_nome,foto_referencia_url,quadras(codigo,ordem)),clientes(nome)"
+      "id,status,ordem_dia,tumulo_id,tumulos(identificacao,lat,lng,gps_precisao,gps_amostras,falecido_nome,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
     )
     .eq("data_prevista", data)
     .in("status", ["pendente", "agendado", "executado"]);
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
 
   const lista = (servs || []).map((s: any) => ({
     id: s.id,
+    tumuloId: s.tumulo_id,
     status: s.status,
     ordem: s.ordem_dia,
     tumulo: s.tumulos?.identificacao || "",
@@ -42,7 +43,10 @@ export async function GET(req: NextRequest) {
     cliente: s.clientes?.nome || null,
     lat: s.tumulos?.lat ?? null,
     lng: s.tumulos?.lng ?? null,
+    gpsPrecisao: s.tumulos?.gps_precisao ?? null,
+    gpsAmostras: s.tumulos?.gps_amostras ?? 0,
     fotoReferencia: s.tumulos?.foto_referencia_url || null,
+    fotoEnquadramento: s.tumulos?.foto_enquadramento_url || null,
   }));
 
   const total = lista.length;

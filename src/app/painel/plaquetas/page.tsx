@@ -29,7 +29,8 @@ export default function Plaquetas() {
           <h1 style={painel.h1}>Plaquetas QR</h1>
           <div style={painel.card}>
             <p style={{ color: cor.cinza, margin: "0 0 10px", fontSize: 14 }}>
-              Uma etiqueta por túmulo com portal ativo. A família escaneia e vê as fotos das limpezas.
+              Uma etiqueta por túmulo com portal ativo. O mesmo QR serve aos dois: a <b>família</b> escaneia e
+              vê as fotos das limpezas; a <b>equipe logada</b> cai direto no túmulo certo dentro do app de campo.
               Imprima em papel adesivo e proteja com plástico — ou leve a um gráfico para fazer em acrílico.
               Para incluir um túmulo aqui, gere o link do portal na ficha do cliente.
             </p>
