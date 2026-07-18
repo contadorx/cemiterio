@@ -124,7 +124,93 @@ export default function Thread() {
           />
           <button style={painel.botao} onClick={enviar} disabled={ocupado}>Enviar</button>
         </div>
+        <MeAjuda conversaId={id} onEscolher={(t) => setTexto(t)} />
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * "Me ajuda a escrever" — você dá o contexto e o tom; a IA devolve três
+ * caminhos diferentes. Escolhe um, ajusta e manda. Nada sai sozinho.
+ */
+function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (t: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [contexto, setContexto] = useState("");
+  const [tom, setTom] = useState("acolhedor");
+  const [opcoes, setOpcoes] = useState<any[]>([]);
+  const [pensando, setPensando] = useState(false);
+
+  async function pedir() {
+    setPensando(true);
+    setOpcoes([]);
+    const r = await fetch(`/api/conversas/${conversaId}/ajuda`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contexto, tom }),
+    }).then((x) => x.json()).catch(() => null);
+    setPensando(false);
+    if (r?.ok) setOpcoes(r.opcoes || []);
+    else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
+  }
+
+  if (!aberto) {
+    return (
+      <button style={{ ...painel.botaoSec, marginBottom: 12 }} onClick={() => setAberto(true)}>
+        ✍️ Me ajuda a escrever
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ ...painel.card, borderLeft: `4px solid ${cor.teal}`, background: "#f0fdfa" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong style={{ color: cor.navy }}>Me ajuda a escrever</strong>
+        <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer",
+                         color: cor.cinza }} onClick={() => setAberto(false)}>✕</button>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <label style={painel.rotulo}>
+          O que você quer dizer? (quanto mais contexto, melhor a sugestão)
+        </label>
+        <textarea
+          style={{ ...painel.input, minHeight: 90, fontFamily: "inherit" }}
+          value={contexto}
+          onChange={(e) => setContexto(e.target.value)}
+          placeholder="Ex.: ela perguntou se dá para adiar a limpeza de novembro. Dá sim, mas quero aproveitar para combinar o Finados. Ela é antiga de casa e sempre paga certinho."
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginTop: 10 }}>
+        <div>
+          <label style={painel.rotulo}>Tom</label>
+          <select style={{ ...painel.input, width: 150 }} value={tom} onChange={(e) => setTom(e.target.value)}>
+            <option value="acolhedor">Acolhedor</option>
+            <option value="objetivo">Objetivo</option>
+            <option value="firme">Firme</option>
+          </select>
+        </div>
+        <button style={painel.botao} onClick={pedir} disabled={pensando}>
+          {pensando ? "Pensando…" : opcoes.length ? "Sugerir de novo" : "Sugerir 3 caminhos"}
+        </button>
+      </div>
+
+      {opcoes.map((o, i) => (
+        <div key={i} style={{ background: "#fff", border: `1px solid ${cor.linha}`,
+                              borderRadius: 10, padding: 12, marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: cor.teal, textTransform: "uppercase",
+                        letterSpacing: 0.5, fontWeight: 700 }}>
+            {o.titulo || `Opção ${i + 1}`}
+          </div>
+          <p style={{ margin: "6px 0 10px", fontSize: 15, color: cor.navy, lineHeight: 1.5 }}>
+            {o.texto}
+          </p>
+          <button style={painel.botaoSec} onClick={() => { onEscolher(o.texto); setAberto(false); }}>
+            Usar esta
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

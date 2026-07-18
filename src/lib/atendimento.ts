@@ -9,6 +9,7 @@ import { transcreverAudio } from "./transcricao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
 import { registrarErro } from "./monitor";
 import { podeChamarIa } from "./custo-ia";
+import { avaliarRetencao } from "./retencao";
 import { escolherModelo, registrarChamada } from "./modelo-ia";
 import { quebrarEmBolhas, pausaMs } from "./bolhas";
 import {
@@ -332,9 +333,29 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     return { acao: "duplicado" };
   }
 
+  // Assuntos e palavras que NUNCA vão sozinhos, por mais alto que seja o score.
+  // A família não percebe: para ela, é a Sureya que respondeu.
+  // o que a família escreveu por último — é ali que aparecem as palavras que pedem cuidado
+  const { data: ultEntrada } = await db
+    .from("mensagens")
+    .select("texto")
+    .eq("conversa_id", conversaId)
+    .eq("direcao", "entrada")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const trava = await avaliarRetencao({
+    assunto: out.assunto,
+    textoDaFamilia: (ultEntrada as any)?.texto || null,
+    sensivel,
+    confianca: out.confianca,
+    score: cliente.score,
+  });
+
   const podeAutomatico =
     cliente.modo === "automatico" &&
-    !sensivel &&
+    !trava.reter &&
     cliente.score >= env.SCORE_LIMITE_AUTO &&
     out.confianca === "alta";
 
@@ -365,6 +386,10 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     assunto: out.assunto,
     rascunho: out.resposta,
     acao_humana: null,
+    motivo_retencao: trava.motivo
+      || (cliente.modo !== "automatico" ? "contato em modo copiloto"
+      : cliente.score < env.SCORE_LIMITE_AUTO ? `score ${Math.round(cliente.score)} abaixo de ${env.SCORE_LIMITE_AUTO}`
+      : out.confianca !== "alta" ? "a IA ficou em dúvida" : null),
   });
 
   if (sensivel) {

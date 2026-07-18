@@ -304,6 +304,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
   const [quadras, setQuadras] = useState<any[]>([]);
   const [f, setF] = useState({
     identificacao: t.identificacao || "",
+    numero: t.numero || "",
     quadra_id: t.quadra_id || "",
     rua: t.rua || "",
     falecido_nome: t.falecido_nome || "",
@@ -401,7 +402,8 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
     else alert("Falhou: " + (r?.erro || "erro"));
   }
 
-  const localAtual = [t.quadras?.codigo, t.rua].filter(Boolean).join(" · ") || "sem local";
+  const localAtual = [t.quadras?.codigo, t.rua, t.numero ? `nº ${t.numero}` : null]
+    .filter(Boolean).join(" · ") || "sem local";
   const migrado = !!plano?.migrado_em;
 
   return (
@@ -430,6 +432,12 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 <label style={painel.rotulo}>Identificação do jazigo</label>
                 <input style={{ ...painel.input, width: 220 }} value={f.identificacao}
                        onChange={(e) => setF({ ...f, identificacao: e.target.value })} />
+              </div>
+              <div>
+                <label style={painel.rotulo}>Número do jazigo</label>
+                <input style={{ ...painel.input, width: 120 }} value={f.numero}
+                       onChange={(e) => setF({ ...f, numero: e.target.value })}
+                       placeholder="se tiver" />
               </div>
               <div>
                 <label style={painel.rotulo}>Quadra</label>

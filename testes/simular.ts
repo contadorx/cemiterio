@@ -28,7 +28,9 @@ function montarBanco(): Tabelas {
              marca_assinatura: "Por Dona Nadir · Desde 1990", chave_pix: "zeloememoria@pix.com",
              limpezas_por_dia: 20, dias_trabalhados_semana: 6,
              valor_referencia_limpeza: 40, ipca_anual_estimado: 0.045, teto_ia_dia: 0,
-             dias_semana: [1,2,3,4,5], hora_inicio: "08:00", hora_fim: "16:00" }],
+             dias_semana: [1,2,3,4,5], hora_inicio: "08:00", hora_fim: "16:00",
+             assuntos_sempre_manual: ["luto","reclamacao","cancelamento"],
+             palavras_criticas: ["faleceu","advogado","processo","cancelar","roubaram"] }],
     membros: [
       { org_id: ORG, user_id: "u-dono", papel: "admin", nome: "Leandro", ativo: true, limpezas_por_dia: null },
       { org_id: ORG, user_id: "u-nina", papel: "campo", nome: "Nina", ativo: true, limpezas_por_dia: 10 },
@@ -330,6 +332,50 @@ async function rodar() {
   const promptUm = persMod.montarSystemPrompt(await ctxMod.montarContexto(cliUm!), {});
   checar("família com um jazigo só NÃO recebe esse aviso",
          !promptUm.includes("MAIS DE UM jazigo"), "");
+
+  console.log("\n=== 4e. O QUE NUNCA VAI SOZINHO ===");
+  const ret = await import("../src/lib/retencao");
+
+  const r1 = await ret.avaliarRetencao({ assunto: "luto", score: 100, confianca: "alta" });
+  checar("luto é retido mesmo com score 100", r1.reter, JSON.stringify(r1));
+
+  const r2 = await ret.avaliarRetencao({ assunto: "reclamacao", score: 100, confianca: "alta" });
+  checar("reclamação é retida mesmo com score 100", r2.reter, JSON.stringify(r2));
+
+  const r3 = await ret.avaliarRetencao({
+    assunto: "agendamento", score: 100, confianca: "alta",
+    textoDaFamilia: "Bom dia, minha mãe faleceu ontem e preciso falar sobre o jazigo",
+  });
+  checar("palavra crítica no texto retém, mesmo em assunto de rotina", r3.reter, JSON.stringify(r3));
+
+  const r4 = await ret.avaliarRetencao({
+    assunto: "agendamento", score: 100, confianca: "alta",
+    textoDaFamilia: "Vou ter que falar com meu ADVOGADO sobre isso",
+  });
+  checar("palavra crítica pega maiúscula e acento", r4.reter, JSON.stringify(r4));
+
+  const r5 = await ret.avaliarRetencao({
+    assunto: "agendamento", score: 95, confianca: "alta",
+    textoDaFamilia: "Bom dia! Vocês passam lá essa semana?",
+  });
+  checar("rotina com score alto passa no automático", !r5.reter, JSON.stringify(r5));
+
+  const r6 = await ret.avaliarRetencao({
+    assunto: "duvida", score: 95, confianca: "baixa",
+    textoDaFamilia: "Como funciona?",
+  });
+  checar("IA em dúvida retém, mesmo com score alto", r6.reter, JSON.stringify(r6));
+
+  console.log("\n=== 4f. A IA É A SUREYA ===");
+  const persona2 = await import("../src/lib/persona");
+  const promptVoz = persona2.montarSystemPrompt(
+    { nome: "Teste", saldoTexto: "em dia", tumulos: [], chavePix: null } as any, {});
+  checar("prompt proíbe dizer 'vou passar para a Sureya'",
+         promptVoz.includes("NUNCA diga") && promptVoz.includes("vou passar para a Sureya"), "");
+  checar("prompt ensina o que dizer no lugar",
+         promptVoz.includes("Deixa eu conferir isso direitinho"), "");
+  checar("prompt não manda encaminhar para a Sureya",
+         !promptVoz.includes("encaminhe para a Sureya"), "");
 
   console.log("\n=== 5. CAMPANHAS ===");
   const camp = await import("../src/lib/campanha");

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   let q = db
     .from("servicos")
     .select(
-      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,tumulos(identificacao,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
+      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
     )
     .eq("data_prevista", data)
     .in("status", ["pendente", "agendado", "executado"]);
@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
     fotoReferencia: s.tumulos?.foto_referencia_url || null,
     fotoEnquadramento: s.tumulos?.foto_enquadramento_url || null,
     rua: s.tumulos?.rua || "",
+    numero: s.tumulos?.numero || "",
     qrToken: s.tumulos?.qr_token || null,
     iniciadoEm: s.iniciado_em || null,
     adiadoVezes: s.adiado_vezes || 0,
