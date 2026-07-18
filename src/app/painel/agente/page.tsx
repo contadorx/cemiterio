@@ -6,6 +6,7 @@ import { PainelNav, painel, cor } from "../ui";
 export default function Agente() {
   const [conhecimento, setConhecimento] = useState("");
   const [tom, setTom] = useState("");
+  const [msgLead, setMsgLead] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
 
@@ -16,6 +17,7 @@ export default function Agente() {
         if (r.ok) {
           setConhecimento(r.conhecimento);
           setTom(r.tom);
+          setMsgLead(r.msgLead || "");
         }
       });
   }, []);
@@ -26,7 +28,7 @@ export default function Agente() {
     await fetch("/api/config-ia", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conhecimento, tom }),
+      body: JSON.stringify({ conhecimento, tom, msgLead }),
     });
     setSalvando(false);
     setOk(true);
@@ -60,6 +62,19 @@ export default function Agente() {
             value={tom}
             onChange={(e) => setTom(e.target.value)}
             placeholder="Ex.: mais formal, sempre chamar de senhor/senhora"
+          />
+        </div>
+
+        <div style={painel.card}>
+          <label style={painel.rotulo}>
+            Saudação para números desconhecidos (leads). Se preencher, quem não é cliente recebe esta
+            mensagem UMA vez e entra na aba Leads. Vazio = não responde (só registra o lead).
+          </label>
+          <textarea
+            style={{ ...painel.input, minHeight: 80, resize: "vertical", fontFamily: "inherit" }}
+            value={msgLead}
+            onChange={(e) => setMsgLead(e.target.value)}
+            placeholder={"Ex.: Olá! Aqui é a Sureya, do serviço de limpeza de túmulos do Cemitério da Saudade. Me conta como posso ajudar? 🌿"}
           />
         </div>
 

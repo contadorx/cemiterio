@@ -1,31 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
+import { calcularSaldo } from "@/lib/financeiro";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Corpo: { comprovanteId, aprovar: boolean }
-// aprovar=true  -> comprovante e crédito viram 'confirmado' (entra no saldo)
-// aprovar=false -> ambos 'rejeitado' (fora do saldo)
 export async function POST(req: NextRequest) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const body = await req.json().catch(() => null);
   const comprovanteId: string = body?.comprovanteId;
   const aprovar: boolean = !!body?.aprovar;
-  if (!comprovanteId) {
-    return NextResponse.json({ ok: false, erro: "parametros" }, { status: 400 });
-  }
+  if (!comprovanteId) return NextResponse.json({ ok: false, erro: "parametros" }, { status: 400 });
+
+  const { data: comp } = await db
+    .from("comprovantes")
+    .select("cliente_id")
+    .eq("id", comprovanteId)
+    .maybeSingle();
 
   const { error } = await db.rpc("sureya_conciliar_comprovante", {
     p_comprovante: comprovanteId,
     p_aprovar: aprovar,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  // pagamento entrou e quitou? zera a régua de cobrança gentil
+  if (aprovar && (comp as any)?.cliente_id) {
+    const s = await calcularSaldo((comp as any).cliente_id);
+    if (s.saldo >= -0.005) {
+      await db
+        .from("clientes")
+        .update({ cobranca_nivel: 0, cobranca_em: null })
+        .eq("id", (comp as any).cliente_id);
+    }
+  }
 
   return NextResponse.json({ ok: true, status: aprovar ? "confirmado" : "rejeitado" });
 }

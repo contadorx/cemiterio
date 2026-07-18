@@ -15,10 +15,13 @@ export function PainelNav({ atual }: { atual: string }) {
   const itens = [
     { href: "/painel", label: "Início" },
     { href: "/painel/conversas", label: "Conversas" },
+    { href: "/painel/agenda", label: "Agenda" },
     { href: "/painel/financeiro", label: "Financeiro" },
     { href: "/painel/clientes", label: "Clientes" },
+    { href: "/painel/leads", label: "Leads" },
     { href: "/painel/reajustes", label: "Reajustes" },
     { href: "/painel/agente", label: "Agente" },
+    { href: "/painel/whatsapp", label: "WhatsApp" },
   ];
   return (
     <nav style={nav.barra}>

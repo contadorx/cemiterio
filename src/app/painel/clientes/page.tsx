@@ -16,6 +16,7 @@ interface Cli {
 export default function Clientes() {
   const [itens, setItens] = useState<Cli[]>([]);
   const [novo, setNovo] = useState(false);
+  const [importar, setImportar] = useState(false);
 
   async function carregar() {
     const r = await fetch("/api/clientes").then((x) => x.json());
@@ -31,12 +32,18 @@ export default function Clientes() {
       <div style={painel.conteudo}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h1 style={painel.h1}>Clientes</h1>
-          <button style={painel.botao} onClick={() => setNovo(true)}>
-            + Novo cliente
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={painel.botaoSec} onClick={() => setImportar(true)}>
+              Importar planilha
+            </button>
+            <button style={painel.botao} onClick={() => setNovo(true)}>
+              + Novo cliente
+            </button>
+          </div>
         </div>
 
         {novo && <NovoCliente onFechar={() => setNovo(false)} onCriado={() => { setNovo(false); carregar(); }} />}
+        {importar && <ImportarCsv onFechar={() => { setImportar(false); carregar(); }} />}
 
         {itens.map((c) => (
           <Link key={c.id} href={`/painel/clientes/${c.id}`} style={{ ...painel.card, display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none" }}>
@@ -123,6 +130,68 @@ function NovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: (
           <button style={painel.botaoSec} onClick={onFechar}>Cancelar</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+function ImportarCsv({ onFechar }: { onFechar: () => void }) {
+  const [csv, setCsv] = useState("");
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState<any>(null);
+
+  async function enviar() {
+    if (!csv.trim()) return;
+    setRodando(true);
+    setResultado(null);
+    const r = await fetch("/api/tumulos/importar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv }),
+    }).then((x) => x.json()).catch(() => null);
+    setRodando(false);
+    setResultado(r || { ok: false, erro: "falha de rede" });
+  }
+
+  return (
+    <div style={painel.card}>
+      <strong style={{ color: cor.navy }}>Importar túmulos e clientes (planilha)</strong>
+      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 10px" }}>
+        Cole aqui o conteúdo da planilha (CSV). Primeira linha é o cabeçalho:
+        <code style={{ display: "block", marginTop: 4 }}>
+          quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor
+        </code>
+        cadencia/qtd/valor são opcionais (mensal, bimestral, trimestral, semestral, anual). Máx. 500 linhas.
+      </p>
+      <textarea
+        style={{ ...painel.input, minHeight: 140, resize: "vertical", fontFamily: "monospace", fontSize: 13 }}
+        value={csv}
+        onChange={(e) => setCsv(e.target.value)}
+        placeholder={"quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor\n12;T-045;José da Silva;Maria da Silva;11987654321;mensal;2;40"}
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        <button style={painel.botao} onClick={enviar} disabled={rodando}>
+          {rodando ? "Importando..." : "Importar"}
+        </button>
+        <button style={painel.botaoSec} onClick={onFechar}>Fechar</button>
+      </div>
+      {resultado && (
+        <div style={{ marginTop: 10, fontSize: 14 }}>
+          {resultado.ok ? (
+            <p style={{ color: cor.teal, margin: 0 }}>
+              ✓ {resultado.criados.clientes} cliente(s), {resultado.criados.tumulos} túmulo(s), {resultado.criados.planos} plano(s) criados.
+              {resultado.erros?.length ? ` ${resultado.erros.length} linha(s) com erro.` : ""}
+            </p>
+          ) : (
+            <p style={{ color: "#dc2626", margin: 0 }}>Falhou: {resultado.erro}</p>
+          )}
+          {(resultado.erros || []).slice(0, 10).map((e: any, i: number) => (
+            <p key={i} style={{ color: "#b45309", fontSize: 13, margin: "4px 0 0" }}>
+              linha {e.linha}: {e.motivo}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirLogado } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET ?data=yyyy-mm-dd  (default: hoje) — lista ordenada dos túmulos do dia.
 export async function GET(req: NextRequest) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirLogado();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const data = req.nextUrl.searchParams.get("data") || new Date().toISOString().slice(0, 10);
 

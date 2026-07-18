@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 
@@ -7,11 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const { data } = await db
     .from("clientes")
@@ -23,11 +21,9 @@ export async function GET() {
 
 // POST { nome, telefone, modo?, tumulo?:{identificacao,quadraCodigo,falecidoNome?}, plano?:{cadencia,qtdPorPassagem,valorVigente} }
 export async function POST(req: NextRequest) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const org = await orgAtual(db);
   if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });

@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const id = params.id;
 
@@ -21,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
 
   const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
-    db.from("tumulos").select("id,identificacao,falecido_nome,quadras(codigo)").eq("cliente_id", id),
+    db.from("tumulos").select("id,identificacao,falecido_nome,datas_gatilho,quadras(codigo)").eq("cliente_id", id),
     db.from("planos").select("id,cadencia,qtd_por_passagem,valor_vigente,data_valor_vigente,ativo").eq("cliente_id", id),
     db.from("movimentos").select("tipo,valor,status_conc").eq("cliente_id", id),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
@@ -50,11 +48,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // PATCH { nome?, telefone?, modo?, ativo_ia?, instrucoes_ia?, observacoes? }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};

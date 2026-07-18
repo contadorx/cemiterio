@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const id = params.id;
 
@@ -40,11 +38,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // PATCH { escalada_humano } — assumir (true) ou devolver à IA (false)
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const body = await req.json().catch(() => ({}));
   if (typeof body?.escalada_humano !== "boolean") {

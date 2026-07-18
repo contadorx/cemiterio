@@ -35,6 +35,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // G1: papel 'campo' não acessa o painel do dono
+  if (user && path.startsWith("/painel")) {
+    const { data: membro } = await supabase.from("membros").select("papel").limit(1).maybeSingle();
+    if ((membro as any)?.papel === "campo") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/campo";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return res;
 }
 

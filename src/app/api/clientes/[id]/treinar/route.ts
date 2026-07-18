@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -14,11 +14,9 @@ function anthropic() {
 
 // POST { historico } — IA destila o histórico colado num perfil curto e salva em perfil_ia.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const body = await req.json().catch(() => null);
   const historico = (body?.historico || "").trim();

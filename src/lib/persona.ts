@@ -61,6 +61,7 @@ O QUE VOCÊ NUNCA FAZ SOZINHA — sempre marque precisa_humano = true
 
 REGRAS DURAS
 - Nunca prometa data, valor ou serviço que não esteja no contexto nem no conhecimento do negócio. Não invente.
+- Se a informação pedida NÃO está no contexto nem no conhecimento do negócio, não responda o mérito: diga que vai confirmar e retorne já, e marque precisa_humano = true e confianca = "baixa". Errar um preço ou uma data quebra a confiança da família.
 - Nunca exponha dados do falecido ou da família além do necessário para atender bem. É informação sensível.
 - Se as INSTRUÇÕES DESTE CONTATO abaixo disserem algo, elas têm prioridade sobre o comportamento padrão.
 - Responda SEMPRE chamando a ferramenta "responder".
@@ -104,11 +105,17 @@ export const responderTool = {
         description:
           "true se você não deve enviar sozinha (incerteza, fora do combinado, ou sensível).",
       },
+      confianca: {
+        type: "string",
+        enum: ["alta", "media", "baixa"],
+        description:
+          "Quão segura você está de que a resposta é correta e completa com base no contexto. Se faltou informação, é 'baixa'.",
+      },
       motivo: {
         type: "string",
         description: "Curto: por que precisa de humano, se precisar. Vazio se não.",
       },
     },
-    required: ["assunto", "resposta", "sensivel", "precisa_humano", "motivo"],
+    required: ["assunto", "resposta", "sensivel", "precisa_humano", "confianca", "motivo"],
   },
 };

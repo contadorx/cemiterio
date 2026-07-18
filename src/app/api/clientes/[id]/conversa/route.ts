@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 
 export const runtime = "nodejs";
@@ -7,11 +7,9 @@ export const dynamic = "force-dynamic";
 
 // POST -> retorna (ou cria) a conversa aberta do cliente.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const clienteId = params.id;
 

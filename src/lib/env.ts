@@ -27,6 +27,16 @@ export const env = {
   // segurança do webhook (Evolution manda esse segredo)
   webhookSecret: () => req("SUREYA_WEBHOOK_SECRET"),
 
+  // segurança dos crons (Vercel manda Authorization: Bearer <CRON_SECRET>)
+  cronSecret: () => process.env.CRON_SECRET || "",
+
+  // transcrição de áudio (opcionais — usa o primeiro disponível)
+  GROQ_API_KEY: process.env.GROQ_API_KEY || "",
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+
+  // janela de agrupamento de rajadas (segundos)
+  DEBOUNCE_SEGUNDOS: Number(process.env.SUREYA_DEBOUNCE_SEGUNDOS || "20"),
+
   // score mínimo p/ soltar resposta automática em assunto rotineiro (0-100)
   SCORE_LIMITE_AUTO: Number(process.env.SUREYA_SCORE_LIMITE_AUTO || "80"),
 };

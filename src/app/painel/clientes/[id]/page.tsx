@@ -152,11 +152,13 @@ export default function FichaCliente() {
 
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Túmulos e planos</strong>
+          <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 0" }}>
+            As datas de memória (falecimento/nascimento) alimentam as mensagens de carinho — o sistema
+            sugere um rascunho 7 dias antes, todo ano.
+          </p>
           {d.tumulos.length === 0 && <p style={{ color: cor.cinza }}>Nenhum túmulo cadastrado.</p>}
           {d.tumulos.map((t: any) => (
-            <div key={t.id} style={{ padding: "8px 0", borderBottom: `1px solid ${cor.linha}` }}>
-              <b>{t.identificacao}</b> {t.quadras?.codigo ? `· quadra ${t.quadras.codigo}` : ""} {t.falecido_nome ? `· ${t.falecido_nome}` : ""}
-            </div>
+            <TumuloEdit key={t.id} t={t} onSalvo={carregar} />
           ))}
           {d.planos.map((p: any) => (
             <div key={p.id} style={{ fontSize: 14, color: cor.cinza, marginTop: 6 }}>
@@ -179,6 +181,70 @@ export default function FichaCliente() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TumuloEdit({ t, onSalvo }: { t: any; onSalvo: () => void }) {
+  const datas: any[] = Array.isArray(t.datas_gatilho) ? t.datas_gatilho : [];
+  const dFal = datas.find((d) => d?.tipo === "falecimento")?.data || "";
+  const dNas = datas.find((d) => d?.tipo === "nascimento")?.data || "";
+
+  const [editando, setEditando] = useState(false);
+  const [falecido, setFalecido] = useState(t.falecido_nome || "");
+  const [falec, setFalec] = useState(dFal);
+  const [nasc, setNasc] = useState(dNas);
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    const r = await fetch(`/api/tumulos/${t.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        falecido_nome: falecido,
+        data_falecimento: falec,
+        data_nascimento: nasc,
+      }),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) {
+      setEditando(false);
+      onSalvo();
+    } else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  return (
+    <div style={{ padding: "8px 0", borderBottom: `1px solid ${cor.linha}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span>
+          <b>{t.identificacao}</b> {t.quadras?.codigo ? `· quadra ${t.quadras.codigo}` : ""}{" "}
+          {t.falecido_nome ? `· ${t.falecido_nome}` : ""}
+          {dFal ? ` · 🕊 ${dFal}` : ""}
+        </span>
+        <button style={{ ...painel.botaoSec, padding: "6px 12px" }} onClick={() => setEditando(!editando)}>
+          {editando ? "Fechar" : "Editar"}
+        </button>
+      </div>
+      {editando && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div>
+            <label style={painel.rotulo}>Nome do falecido</label>
+            <input style={{ ...painel.input, width: 200 }} value={falecido} onChange={(e) => setFalecido(e.target.value)} />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Falecimento (MM-DD)</label>
+            <input style={{ ...painel.input, width: 110 }} value={falec} onChange={(e) => setFalec(e.target.value)} placeholder="07-23" />
+          </div>
+          <div>
+            <label style={painel.rotulo}>Nascimento (MM-DD)</label>
+            <input style={{ ...painel.input, width: 110 }} value={nasc} onChange={(e) => setNasc(e.target.value)} placeholder="01-15" />
+          </div>
+          <button style={painel.botao} onClick={salvar} disabled={salvando}>
+            {salvando ? "..." : "Salvar"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

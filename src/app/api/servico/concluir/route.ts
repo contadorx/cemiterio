@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { exigirLogado } from "@/lib/roles";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST { servicoId, fotoDepoisBase64, mimetype, fotoAntesBase64?, lat?, lng? }
-// A foto do DEPOIS fecha o serviço e é a mesma que vai pra família.
+// A foto do DEPOIS fecha o serviço, DEBITA o razão do cliente (A1) e vai pra família.
 export async function POST(req: NextRequest) {
-  const db = supabaseServer();
-  const {
-    data: { user },
-  } = await db.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, erro: "nao_autenticado" }, { status: 401 });
+  const auth = await exigirLogado();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const body = await req.json().catch(() => null);
   const servicoId: string = body?.servicoId;
@@ -26,15 +24,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "foto_depois_obrigatoria" }, { status: 400 });
   }
 
-  // sobe fotos
   const urlDepois = await subirFotoServico(servicoId, fotoDepois, mimetype, "depois");
   const urlAntes = fotoAntes ? await subirFotoServico(servicoId, fotoAntes, mimetype, "antes") : null;
-
   if (!urlDepois) {
     return NextResponse.json({ ok: false, erro: "falha_upload_foto" }, { status: 500 });
   }
 
-  // marca executado
+  // marca executado (idempotente: só transiciona se ainda não executado)
   const { data: serv, error } = await db
     .from("servicos")
     .update({
@@ -42,24 +38,70 @@ export async function POST(req: NextRequest) {
       data_executada: new Date().toISOString(),
       foto_depois_url: urlDepois,
       foto_antes_url: urlAntes,
-      executora_id: user.id,
+      executora_id: auth.userId,
     })
     .eq("id", servicoId)
-    .select("tumulo_id")
-    .single();
-  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    .neq("status", "executado")
+    .select("org_id,tumulo_id,cliente_id,valor,plano_id")
+    .maybeSingle();
 
-  // se o túmulo ainda não tem GPS, grava o ponto marcado agora (backstop visual)
-  if (lat != null && lng != null && (serv as any)?.tumulo_id) {
-    await db
-      .from("tumulos")
-      .update({ lat, lng })
-      .eq("id", (serv as any).tumulo_id)
-      .is("lat", null);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  if (!serv) {
+    // já estava executado antes — não duplica débito nem notificação
+    return NextResponse.json({ ok: true, jaExecutado: true });
   }
 
-  // dispara a foto pra família (transacional, direto — não passa pelo copiloto)
-  const notificado = await notificarFamilia(servicoId, urlDepois);
+  const orgId = (serv as any).org_id as string;
+  const clienteId = (serv as any).cliente_id as string | null;
 
+  // ----- A1: débito no razão (idempotente por servico_id) -----
+  if (clienteId) {
+    let valor = Number((serv as any).valor) || 0;
+    if (!valor && (serv as any).plano_id) {
+      const { data: plano } = await db
+        .from("planos")
+        .select("valor_vigente")
+        .eq("id", (serv as any).plano_id)
+        .maybeSingle();
+      valor = Number((plano as any)?.valor_vigente) || 0;
+    }
+    if (!valor) {
+      const { data: org } = await db
+        .from("orgs")
+        .select("valor_referencia_limpeza")
+        .eq("id", orgId)
+        .maybeSingle();
+      valor = Number((org as any)?.valor_referencia_limpeza) || 40;
+    }
+
+    const { data: jaDebitado } = await db
+      .from("movimentos")
+      .select("id")
+      .eq("servico_id", servicoId)
+      .eq("tipo", "debito")
+      .maybeSingle();
+
+    if (!jaDebitado) {
+      const { error: eDeb } = await db.from("movimentos").insert({
+        org_id: orgId,
+        cliente_id: clienteId,
+        tipo: "debito",
+        valor,
+        origem: "servico",
+        servico_id: servicoId,
+        status_conc: "confirmado",
+        descricao: "Limpeza executada",
+        data: new Date().toISOString().slice(0, 10),
+      });
+      if (eDeb) console.error("[concluir] débito falhou:", eDeb.message);
+    }
+  }
+
+  // GPS do túmulo na primeira conclusão
+  if (lat != null && lng != null && (serv as any)?.tumulo_id) {
+    await db.from("tumulos").update({ lat, lng }).eq("id", (serv as any).tumulo_id).is("lat", null);
+  }
+
+  const notificado = await notificarFamilia(servicoId, urlDepois);
   return NextResponse.json({ ok: true, notificado });
 }
