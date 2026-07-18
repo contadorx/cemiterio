@@ -115,6 +115,20 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
   };
 }
 
+// Conhecimento-base global do agente (treino do dono).
+export async function carregarConfigIa(): Promise<{ conhecimento: string | null; tom: string | null }> {
+  const db = supabaseAdmin();
+  const { data } = await db
+    .from("config_ia")
+    .select("conhecimento_base,tom")
+    .eq("org_id", env.orgId())
+    .maybeSingle();
+  return {
+    conhecimento: (data as any)?.conhecimento_base || null,
+    tom: (data as any)?.tom || null,
+  };
+}
+
 // Últimas N mensagens da conversa aberta, no formato do Anthropic.
 export async function historicoConversa(
   conversaId: string,

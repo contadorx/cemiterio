@@ -14,10 +14,11 @@ export const cor = {
 export function PainelNav({ atual }: { atual: string }) {
   const itens = [
     { href: "/painel", label: "Início" },
-    { href: "/painel/atendimento", label: "Atendimento" },
+    { href: "/painel/conversas", label: "Conversas" },
     { href: "/painel/financeiro", label: "Financeiro" },
     { href: "/painel/clientes", label: "Clientes" },
     { href: "/painel/reajustes", label: "Reajustes" },
+    { href: "/painel/agente", label: "Agente" },
   ];
   return (
     <nav style={nav.barra}>

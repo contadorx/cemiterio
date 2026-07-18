@@ -9,6 +9,7 @@ import {
   acharCliente,
   montarContexto,
   historicoConversa,
+  carregarConfigIa,
   type ClienteRow,
 } from "./context";
 
@@ -88,11 +89,12 @@ async function chamarIa(
 ): Promise<SaidaIa> {
   const ctx = await montarContexto(cliente);
   const historico = await historicoConversa(conversaId);
+  const config = await carregarConfigIa();
 
   const resp = await anthropic().messages.create({
     model: env.ANTHROPIC_MODEL,
     max_tokens: 1024,
-    system: montarSystemPrompt(ctx),
+    system: montarSystemPrompt(ctx, { conhecimento: config.conhecimento, tom: config.tom }),
     messages: historico.length
       ? historico
       : [{ role: "user", content: "(cliente iniciou conversa)" }],

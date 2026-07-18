@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
 
 export default function FichaCliente() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [d, setD] = useState<any>(null);
   const [inst, setInst] = useState("");
@@ -13,6 +14,28 @@ export default function FichaCliente() {
   const [ativo, setAtivo] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [hist, setHist] = useState("");
+  const [treinando, setTreinando] = useState(false);
+
+  async function abrirConversa() {
+    const r = await fetch(`/api/clientes/${id}/conversa`, { method: "POST" }).then((x) => x.json());
+    if (r.ok) router.push(`/painel/conversas/${r.conversaId}`);
+  }
+
+  async function treinar() {
+    if (!hist.trim()) return;
+    setTreinando(true);
+    const r = await fetch(`/api/clientes/${id}/treinar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ historico: hist }),
+    }).then((x) => x.json());
+    setTreinando(false);
+    if (r.ok) {
+      setHist("");
+      carregar();
+    }
+  }
 
   async function carregar() {
     const r = await fetch(`/api/clientes/${id}`).then((x) => x.json());
@@ -59,7 +82,10 @@ export default function FichaCliente() {
     <div style={painel.wrap}>
       <PainelNav atual="/painel/clientes" />
       <div style={painel.conteudo}>
-        <h1 style={painel.h1}>{c.nome}</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <h1 style={painel.h1}>{c.nome}</h1>
+          <button style={painel.botao} onClick={abrirConversa}>Abrir conversa</button>
+        </div>
 
         <div style={painel.card}>
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
@@ -109,6 +135,19 @@ export default function FichaCliente() {
               <p style={{ color: cor.cinza, fontSize: 14, whiteSpace: "pre-wrap" }}>{c.perfil_ia}</p>
             </div>
           )}
+
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
+            <label style={painel.rotulo}>Treinar com histórico — cole a conversa antiga do WhatsApp e a IA destila no perfil</label>
+            <textarea
+              style={{ ...painel.input, minHeight: 90, resize: "vertical", fontFamily: "inherit" }}
+              value={hist}
+              onChange={(e) => setHist(e.target.value)}
+              placeholder="Cole aqui as mensagens antigas deste cliente…"
+            />
+            <button style={{ ...painel.botaoSec, marginTop: 8 }} onClick={treinar} disabled={treinando}>
+              {treinando ? "Destilando…" : "Treinar com este histórico"}
+            </button>
+          </div>
         </div>
 
         <div style={painel.card}>

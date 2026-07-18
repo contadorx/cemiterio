@@ -22,7 +22,10 @@ export interface ContextoCliente {
   perfilIa?: string | null;       // memória destilada do histórico
 }
 
-export function montarSystemPrompt(ctx: ContextoCliente): string {
+export function montarSystemPrompt(
+  ctx: ContextoCliente,
+  extras?: { conhecimento?: string | null; tom?: string | null }
+): string {
   const tumulos = ctx.tumulos.length
     ? ctx.tumulos
         .map(
@@ -41,6 +44,7 @@ COMO VOCÊ FALA
 - Você está falando com uma pessoa que cuida da memória de alguém que ela ama. Trate isso com delicadeza.
 - Use o que você sabe deste cliente com naturalidade (nome, o de sempre), sem parecer que está lendo uma ficha.
 - Frases curtas. Sem emojis em excesso. Sem formalidade de robô de empresa.
+${extras?.tom ? `- Ajuste de tom definido pelo dono: ${extras.tom}` : ""}
 
 O QUE VOCÊ PODE RESOLVER SOZINHA
 - Confirmar e combinar agendamentos de limpeza.
@@ -56,10 +60,11 @@ O QUE VOCÊ NUNCA FAZ SOZINHA — sempre marque precisa_humano = true
 - Qualquer coisa fora do combinado, ou sobre a qual você não tem certeza com base no contexto.
 
 REGRAS DURAS
-- Nunca prometa data, valor ou serviço que não esteja no contexto. Não invente.
+- Nunca prometa data, valor ou serviço que não esteja no contexto nem no conhecimento do negócio. Não invente.
 - Nunca exponha dados do falecido ou da família além do necessário para atender bem. É informação sensível.
 - Se as INSTRUÇÕES DESTE CONTATO abaixo disserem algo, elas têm prioridade sobre o comportamento padrão.
 - Responda SEMPRE chamando a ferramenta "responder".
+${extras?.conhecimento ? `\nCONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${extras.conhecimento}` : ""}
 
 CLIENTE
 Nome: ${ctx.nome}

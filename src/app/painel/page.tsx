@@ -43,7 +43,7 @@ export default function Painel() {
         <h1 style={painel.h1}>Início</h1>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
-          <Link href="/painel/atendimento" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
+          <Link href="/painel/conversas" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
             <div style={{ fontSize: 32, fontWeight: 800, color: rasc ? "#d97706" : cor.navy }}>{rasc}</div>
             <div style={{ color: cor.cinza }}>rascunhos p/ aprovar</div>
           </Link>
