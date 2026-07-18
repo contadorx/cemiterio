@@ -33,3 +33,21 @@ delete from cemiterios where nome like '[TESTE]%';
 delete from materiais where nome like '[teste]%';
 ```
 (as tabelas filhas caem em cascata)
+
+## Famílias com mais de um jazigo
+
+**LINEU** (2 jazigos) e **Dra. YONE** (3) — mesmo telefone, mesma pessoa.
+Ficaram como **um cliente com vários jazigos**, e não como clientes separados.
+Motivo: é uma conversa só no WhatsApp e uma conta-corrente só.
+
+O que o sistema faz por causa disso:
+- **Saldo é da família**, somando todos os jazigos (LINEU: 2 × R$ 360/ano = R$ 720).
+- **Cobrança avisa o conjunto**: "…referente aos 2 jazigos".
+- **A foto sempre diz de qual jazigo é** — sem isso a pessoa receberia duas fotos
+  iguais sem saber qual é qual. (Era um bug real: com `falecido_nome` vazio, a
+  mensagem saía sem identificar nada.)
+- **A IA é avisada no prompt** de que a família tem mais de um jazigo, para nunca
+  falar "o jazigo" no singular nem confundir o valor.
+- **O portal mostra os irmãos**: quem abre o link de um jazigo vê os outros da
+  mesma família e navega entre eles. As plaquetas continuam uma por jazigo.
+- **A agenda continua por jazigo**: a Nina vê duas paradas, uma para cada.

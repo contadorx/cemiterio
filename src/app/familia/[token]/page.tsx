@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MARCA } from "@/lib/marca";
 import { useParams } from "next/navigation";
 
 interface Cab {
@@ -15,12 +16,20 @@ interface Item {
   data_executada: string;
   foto_depois_url: string;
 }
+interface Irmao {
+  token: string;
+  identificacao: string;
+  falecido_nome: string | null;
+  quadra: string;
+  rua: string | null;
+}
 
 export default function PortalFamilia() {
   const params = useParams();
   const token = params?.token as string;
   const [cab, setCab] = useState<Cab | null>(null);
   const [hist, setHist] = useState<Item[]>([]);
+  const [irmaos, setIrmaos] = useState<Irmao[]>([]);
   const [estado, setEstado] = useState<"carregando" | "ok" | "erro">("carregando");
   const [foto, setFoto] = useState<string | null>(null);
 
@@ -32,6 +41,7 @@ export default function PortalFamilia() {
         if (r.ok) {
           setCab(r.cabecalho);
           setHist(r.historico);
+          setIrmaos(r.irmaos || []);
           setEstado("ok");
         } else setEstado("erro");
       })
@@ -55,7 +65,7 @@ export default function PortalFamilia() {
     <div style={s.wrap}>
       <div style={s.container}>
         <header style={s.header}>
-          <div style={s.marca}>🕊 Sureya</div>
+          <div style={s.marca}>{MARCA.nome}</div>
           <h1 style={s.h1}>{cab?.falecido_nome || "Memória"}</h1>
           <p style={s.sub}>
             {cab?.cemiterio} · Quadra {cab?.quadra} · {cab?.identificacao}
@@ -93,8 +103,24 @@ export default function PortalFamilia() {
           </>
         )}
 
+        {irmaos.length > 0 && (
+          <div style={s.outros}>
+            <div style={s.outrosTitulo}>
+              {irmaos.length === 1 ? "A família também cuida de:" : "A família também cuida destes:"}
+            </div>
+            {irmaos.map((i) => (
+              <a key={i.token} href={`/familia/${i.token}`} style={s.outroLink}>
+                {i.falecido_nome || i.identificacao}
+                <span style={s.outroLocal}>
+                  {i.quadra}{i.rua ? ` · ${i.rua}` : ""}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+
         <footer style={s.footer}>
-          <p style={s.suave}>Cuidado e manutenção por Sureya · Cemitério da Saudade</p>
+          <p style={s.suave}>{`${MARCA.nome} · ${MARCA.assinatura}`}</p>
         </footer>
       </div>
 
@@ -127,6 +153,10 @@ const s: Record<string, React.CSSProperties> = {
   data: { display: "block", marginTop: 10, marginBottom: 4, fontSize: 14, color: NAVY },
   card: { background: "#fff", border: `1px solid #e7e0cf`, borderRadius: 12, padding: 28, textAlign: "center" },
   suave: { color: "#6b7280", fontSize: 15 },
+  outros: { marginTop: 32, paddingTop: 20, borderTop: "1px solid #e7e0cf" },
+  outrosTitulo: { color: GOLD, fontSize: 13, letterSpacing: 1, textTransform: "uppercase", marginBottom: 12, textAlign: "center" },
+  outroLink: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #e7e0cf", borderRadius: 10, padding: "12px 14px", marginBottom: 8, textDecoration: "none", color: NAVY, fontSize: 15 },
+  outroLocal: { color: "#6b7280", fontSize: 13 },
   footer: { textAlign: "center", marginTop: 40, paddingTop: 20, borderTop: `1px solid #e7e0cf` },
   overlay: { position: "fixed", inset: 0, background: "rgba(18,40,75,.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "zoom-out", zIndex: 50 },
   fotoGrande: { maxWidth: "100%", maxHeight: "90vh", borderRadius: 8 },
