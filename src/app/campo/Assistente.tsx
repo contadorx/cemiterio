@@ -128,16 +128,22 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              style={s.input}
-              value={entrada}
-              onChange={(e) => setEntrada(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && enviar()}
-              placeholder="Escreva aqui…"
-            />
-            <button style={s.enviar} onClick={() => enviar()} disabled={pensando}>Enviar</button>
-          </div>
+          <textarea
+            style={s.input}
+            value={entrada}
+            onChange={(e) => {
+              setEntrada(e.target.value);
+              // cresce conforme a pessoa escreve, até um limite confortável
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 220) + "px";
+            }}
+            rows={3}
+            placeholder="Escreva aqui o que aconteceu…"
+          />
+          <button style={s.enviar} onClick={() => enviar()} disabled={pensando || !entrada.trim()}>
+            {pensando ? "Enviando…" : "Enviar recado"}
+          </button>
         </div>
       )}
     </div>
@@ -157,11 +163,15 @@ const s: Record<string, React.CSSProperties> = {
   botaoSec: { padding: "14px 16px", background: "#fff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer" },
   chat: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, marginTop: 10 },
   mensagens: { maxHeight: 260, overflowY: "auto", marginBottom: 10 },
-  dica: { color: "#64748b", fontSize: 14, margin: "4px 0" },
+  dica: { fontSize: 15, color: "#475569", margin: "6px 0" },
   balaoMinha: { display: "inline-block", maxWidth: "85%", background: TEAL, color: "#fff", padding: "10px 14px", borderRadius: 14, fontSize: 15, textAlign: "left" },
   balaoDele: { display: "inline-block", maxWidth: "85%", background: "#e2e8f0", color: "#0f172a", padding: "10px 14px", borderRadius: 14, fontSize: 15, textAlign: "left" },
   atalhos: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 },
-  atalho: { padding: "8px 12px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 999, fontSize: 13, cursor: "pointer", color: "#0f172a" },
-  input: { flex: 1, padding: 12, fontSize: 16, borderRadius: 10, border: "1px solid #e2e8f0", boxSizing: "border-box" },
-  enviar: { padding: "12px 16px", background: TEAL, color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer" },
+  atalho: { minHeight: 52, padding: "14px 18px", background: "#f1f5f9", border: "2px solid #e7e0cf", borderRadius: 999, fontSize: 16, fontWeight: 600, cursor: "pointer", color: "#0f172a" },
+  input: { width: "100%", padding: 16, fontSize: 18, borderRadius: 12, border: "2px solid #e7e0cf",
+           boxSizing: "border-box", minHeight: 96, resize: "vertical", fontFamily: "inherit",
+           lineHeight: 1.5, color: "#0f172a" },
+  enviar: { width: "100%", minHeight: 60, padding: "18px 20px", background: TEAL, color: "#fff",
+            border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer",
+            marginTop: 10 },
 };

@@ -76,7 +76,7 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
                   style={{ width: 22, height: 22 }}
                 />
                 <span style={{ flex: 1, textTransform: "capitalize" }}>{i.nome}</span>
-                <span style={{ fontSize: 13, color: baixo ? "#dc2626" : "#64748b" }}>
+                <span style={{ fontSize: 17, color: baixo ? "#dc2626" : "#475569" }}>
                   {baixo ? "já está baixo" : `${i.estoque} ${i.unidade}`}
                 </span>
               </label>
@@ -110,12 +110,12 @@ const s: Record<string, React.CSSProperties> = {
   overlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 60 },
   caixa: { background: "#fff", width: "100%", maxWidth: 520, borderRadius: "16px 16px 0 0", padding: 18, maxHeight: "92vh", overflowY: "auto" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  fechar: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#64748b" },
-  dica: { color: "#64748b", fontSize: 14, margin: "4px 0 12px" },
+  fechar: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#475569" },
+  dica: { color: "#475569", fontSize: 18, margin: "4px 0 12px" },
   lista: { marginBottom: 12 },
-  item: { display: "flex", alignItems: "center", gap: 12, padding: "14px 12px", border: "1px solid #e2e8f0", borderRadius: 12, marginBottom: 8, fontSize: 16, cursor: "pointer" },
+  item: { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "16px 14px", border: "1px solid #e2e8f0", borderRadius: 12, marginBottom: 8, fontSize: 18, cursor: "pointer" },
   itemMarcado: { background: "#fef3c7", borderColor: "#fde68a" },
-  input: { width: "100%", padding: 12, fontSize: 16, borderRadius: 10, border: "1px solid #e2e8f0", boxSizing: "border-box", marginBottom: 10, fontFamily: "inherit" },
-  botao: { width: "100%", padding: 15, background: TEAL, color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer" },
-  ok: { textAlign: "center", fontSize: 16, color: "#0f172a", margin: "10px 0 18px" },
+  input: { width: "100%", padding: 12, fontSize: 18, borderRadius: 10, border: "1px solid #e2e8f0", boxSizing: "border-box", marginBottom: 10, fontFamily: "inherit" },
+  botao: { width: "100%", minHeight: 60, padding: 17, background: TEAL, color: "#fff", border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer" },
+  ok: { textAlign: "center", fontSize: 18, color: "#0f172a", margin: "10px 0 18px" },
 };
