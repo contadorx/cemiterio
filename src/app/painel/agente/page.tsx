@@ -84,7 +84,110 @@ export default function Agente() {
           </button>
           {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
         </div>
+
+        <div style={{ marginTop: 20 }}>
+          <Simulador />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function Simulador() {
+  const [msgs, setMsgs] = useState<{ papel: string; texto: string; meta?: any }[]>([]);
+  const [entrada, setEntrada] = useState("");
+  const [pensando, setPensando] = useState(false);
+
+  const exemplos = [
+    "Oi, quanto custa a limpeza?",
+    "Já paguei, mandei o pix ontem",
+    "Quando vocês vão lá de novo?",
+    "Minha mãe faleceu semana passada, preciso de ajuda",
+    "Não gostei, o túmulo continua sujo",
+  ];
+
+  async function enviar(texto?: string) {
+    const t = (texto ?? entrada).trim();
+    if (!t || pensando) return;
+    const novo = [...msgs, { papel: "cliente", texto: t }];
+    setMsgs(novo);
+    setEntrada("");
+    setPensando(true);
+
+    const r = await fetch("/api/simulador", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ historico: novo }),
+    }).then((x) => x.json()).catch(() => null);
+    setPensando(false);
+
+    if (r?.ok) {
+      setMsgs([...novo, { papel: "ia", texto: r.resposta, meta: r }]);
+    } else {
+      setMsgs([...novo, { papel: "ia", texto: "(erro: " + (r?.erro || "falha") + ")" }]);
+    }
+  }
+
+  return (
+    <div style={painel.card}>
+      <strong style={{ color: cor.navy }}>Simulador de treino</strong>
+      <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 12px" }}>
+        Converse com a IA como se fosse um cliente. <b>Nada é enviado no WhatsApp nem gravado</b> — serve
+        para você testar o conhecimento e o tom acima. Se a resposta não ficar boa, ajuste o texto e teste de novo.
+      </p>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {exemplos.map((e) => (
+          <button key={e} style={{ ...painel.botaoSec, padding: "8px 12px", fontSize: 13, minHeight: 0 }} onClick={() => enviar(e)}>
+            {e}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ background: "#f8fafc", borderRadius: 12, padding: 12, minHeight: 140, maxHeight: 380, overflowY: "auto", marginBottom: 12 }}>
+        {msgs.length === 0 && <p style={{ color: cor.cinza, fontSize: 14, margin: 0 }}>Mande uma mensagem para começar.</p>}
+        {msgs.map((m, i) => (
+          <div key={i} style={{ marginBottom: 10, textAlign: m.papel === "cliente" ? "left" : "right" }}>
+            <div
+              style={{
+                display: "inline-block",
+                maxWidth: "85%",
+                padding: "10px 14px",
+                borderRadius: 14,
+                background: m.papel === "cliente" ? "#e2e8f0" : cor.teal,
+                color: m.papel === "cliente" ? cor.navy : "#fff",
+                fontSize: 15,
+                textAlign: "left",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {m.texto}
+            </div>
+            {m.meta && (
+              <div style={{ fontSize: 12, color: cor.cinza, marginTop: 4 }}>
+                assunto: {m.meta.assunto} · confiança: {m.meta.confianca}
+                {m.meta.precisaHumano ? " · ⚠️ iria pra você aprovar" : " · ✓ sairia automático"}
+                {m.meta.motivo ? ` · ${m.meta.motivo}` : ""}
+              </div>
+            )}
+          </div>
+        ))}
+        {pensando && <p style={{ color: cor.cinza, fontSize: 14 }}>pensando…</p>}
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          style={{ ...painel.input, flex: 1 }}
+          value={entrada}
+          onChange={(e) => setEntrada(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && enviar()}
+          placeholder="Escreva como se fosse o cliente…"
+        />
+        <button style={painel.botao} onClick={() => enviar()} disabled={pensando}>Enviar</button>
+      </div>
+      {msgs.length > 0 && (
+        <button style={{ ...painel.botaoSec, marginTop: 10 }} onClick={() => setMsgs([])}>Limpar conversa</button>
+      )}
     </div>
   );
 }
