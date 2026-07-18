@@ -8,6 +8,8 @@ import { registrarComprovante } from "./conciliacao";
 import { transcreverAudio } from "./transcricao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
 import { registrarErro } from "./monitor";
+import { podeChamarIa } from "./custo-ia";
+import { quebrarEmBolhas, pausaMs } from "./bolhas";
 import {
   acharCliente,
   montarContexto,
@@ -84,6 +86,19 @@ async function gravarMensagem(
 }
 
 async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaIa> {
+  // teto de custo diário (A8): se estourou, escala pra humano em vez de gastar
+  const custo = await podeChamarIa();
+  if (!custo.pode) {
+    return {
+      assunto: "outro",
+      resposta: "",
+      sensivel: true,
+      precisa_humano: true,
+      confianca: "baixa",
+      motivo: `teto diário de IA atingido (${custo.usadas}/${custo.teto})`,
+    };
+  }
+
   const ctx = await montarContexto(cliente);
   const historico = await historicoConversa(conversaId);
   const config = await carregarConfigIa();
@@ -311,7 +326,12 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     out.confianca === "alta";
 
   if (podeAutomatico) {
-    await enviarTextoComRetry(cliente.telefone, out.resposta);
+    // B3: manda em 1-3 bolhas curtas, com pausa entre elas (mais humano)
+    const bolhas = quebrarEmBolhas(out.resposta);
+    for (let i = 0; i < bolhas.length; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, pausaMs(bolhas[i - 1])));
+      await enviarTextoComRetry(cliente.telefone, bolhas[i]);
+    }
     await gravarMensagem(conversaId, cliente.id, "saida", "ia", out.resposta);
     await db.from("interacoes_ia").insert({
       org_id: org,
