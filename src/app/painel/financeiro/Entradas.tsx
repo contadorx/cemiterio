@@ -239,23 +239,71 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
     valor: "", data: new Date().toISOString().slice(0, 10),
     remetente: "", identificador: "", observacao: "",
   });
+  const [busca, setBusca] = useState("");
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [cliente, setCliente] = useState<any>(null);
+  const [debitos, setDebitos] = useState<any[]>([]);
+  const [escolhidos, setEscolhidos] = useState<Record<string, boolean>>({});
   const [salvando, setSalvando] = useState(false);
+
+  const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
+
+  async function procurar(termo: string) {
+    setBusca(termo);
+    if (termo.length < 2) { setClientes([]); return; }
+    const r = await fetch(`/api/clientes?busca=${encodeURIComponent(termo)}`)
+      .then((x) => x.json()).catch(() => null);
+    setClientes((r?.clientes || []).slice(0, 6));
+  }
+
+  async function escolherCliente(c: any) {
+    setCliente(c);
+    setClientes([]);
+    setBusca("");
+    const r = await fetch(`/api/financeiro/debitos?cliente=${c.id}`)
+      .then((x) => x.json()).catch(() => null);
+    const lista = r?.debitos || [];
+    setDebitos(lista);
+    // marca tudo por padrão: o normal é o Pix pagar o que está em aberto
+    const m: Record<string, boolean> = {};
+    for (const d of lista) m[d.movimento_id] = true;
+    setEscolhidos(m);
+    // sugere o valor total em aberto, se ainda não digitou nada
+    if (!f.valor && r?.total) setF((v) => ({ ...v, valor: String(r.total) }));
+  }
 
   async function salvar() {
     const v = Number(String(f.valor).replace(",", "."));
     if (!v || v <= 0) return alert("Informe o valor que entrou.");
     setSalvando(true);
+    const marcados = debitos.filter((d) => escolhidos[d.movimento_id]).map((d) => d.movimento_id);
     const r = await fetch("/api/financeiro/entradas", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...f, valor: v }),
+      body: JSON.stringify({
+        ...f, valor: v,
+        clienteId: cliente?.id || null,
+        debitos: cliente && marcados.length ? marcados : null,
+      }),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (r?.ok) onPronto(); else alert("Falhou: " + (r?.erro || "erro"));
+    if (!r?.ok) return alert("Falhou: " + (r?.erro || "erro"));
+
+    if (cliente && r.sobrou > 0) {
+      alert(`Lançado. ${r.quitados} lavagem(ns) quitada(s) e ${money(r.sobrou)} ficaram como crédito da família.`);
+    } else if (cliente) {
+      alert(`Lançado e creditado para ${cliente.nome}. ${r.quitados} lavagem(ns) quitada(s).`);
+    }
+    onPronto();
   }
+
+  const totalEscolhido = debitos
+    .filter((d) => escolhidos[d.movimento_id])
+    .reduce((s, d) => s + Number(d.em_aberto), 0);
 
   return (
     <div style={{ ...painel.card, borderLeft: `4px solid ${cor.navy}` }}>
       <strong style={{ color: cor.navy }}>O que entrou no extrato</strong>
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
         <div>
           <label style={painel.rotulo}>Valor</label>
@@ -268,14 +316,105 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
                  onChange={(e) => setF({ ...f, data: e.target.value })} />
         </div>
         <div style={{ flex: 1, minWidth: 180 }}>
-          <label style={painel.rotulo}>Nome que aparece no extrato</label>
+          <label style={painel.rotulo}>Nome no extrato (opcional)</label>
           <input style={painel.input} value={f.remetente}
                  onChange={(e) => setF({ ...f, remetente: e.target.value })}
                  placeholder="ex.: ROBERTO C SILVA" />
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-        <div style={{ minWidth: 200 }}>
+
+      {/* ------------------ de quem é ------------------ */}
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${cor.linha}` }}>
+        <label style={painel.rotulo}>De qual família é este dinheiro?</label>
+
+        {cliente ? (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                        gap: 10, flexWrap: "wrap", background: "#f0fdfa", padding: 12,
+                        borderRadius: 10, border: `1px solid ${cor.teal}` }}>
+            <div>
+              <b style={{ color: cor.navy, fontSize: 16 }}>{cliente.nome}</b>
+              <div style={{ fontSize: 15, color: cliente.atrasado ? "#dc2626" : cor.cinza }}>
+                {cliente.saldo < 0 ? `deve ${money(Math.abs(cliente.saldo))}`
+                  : cliente.saldo > 0 ? `tem ${money(cliente.saldo)} de crédito` : "está em dia"}
+              </div>
+            </div>
+            <button style={painel.botaoSec}
+                    onClick={() => { setCliente(null); setDebitos([]); setEscolhidos({}); }}>
+              trocar
+            </button>
+          </div>
+        ) : (
+          <>
+            <input style={painel.input} value={busca} onChange={(e) => procurar(e.target.value)}
+                   placeholder="digite o nome da família…" />
+            {clientes.map((c: any) => (
+              <div key={c.id} style={{ display: "flex", justifyContent: "space-between",
+                     alignItems: "center", padding: "10px 0", borderTop: `1px solid ${cor.linha}` }}>
+                <div>
+                  <b style={{ color: cor.navy }}>{c.nome}</b>
+                  <div style={{ fontSize: 14, color: c.atrasado ? "#dc2626" : cor.cinza }}>
+                    {c.saldo < 0 ? `deve ${money(Math.abs(c.saldo))}` : c.saldo > 0 ? "adiantada" : "em dia"}
+                  </div>
+                </div>
+                <button style={painel.botaoSec} onClick={() => escolherCliente(c)}>É esta</button>
+              </div>
+            ))}
+            <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
+              Não sabe ainda? Deixe em branco — a entrada fica na fila e você identifica depois.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* ------------------ quais lavagens ------------------ */}
+      {cliente && debitos.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${cor.linha}` }}>
+          <label style={painel.rotulo}>Este pagamento é de quais lavagens?</label>
+          {debitos.map((d: any) => (
+            <label key={d.movimento_id}
+                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
+                            borderTop: `1px solid ${cor.linha}`, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!escolhidos[d.movimento_id]}
+                     onChange={(e) => setEscolhidos({ ...escolhidos, [d.movimento_id]: e.target.checked })}
+                     style={{ width: 20, height: 20 }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ color: cor.navy }}>
+                  {d.jazigo !== "—" ? d.jazigo : d.descricao}
+                </span>
+                <div style={{ fontSize: 14, color: cor.cinza }}>
+                  {d.data_lavagem
+                    ? `lavagem de ${new Date(d.data_lavagem + "T12:00:00").toLocaleDateString("pt-BR")}`
+                    : new Date(d.data + "T12:00:00").toLocaleDateString("pt-BR")}
+                  {Number(d.ja_quitado) > 0 && ` · já pago ${money(d.ja_quitado)} de ${money(d.valor)}`}
+                </div>
+              </div>
+              <b style={{ color: cor.navy }}>{money(d.em_aberto)}</b>
+            </label>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10,
+                        fontSize: 15, color: cor.cinza }}>
+            <span>selecionado</span>
+            <b style={{ color: cor.navy }}>{money(totalEscolhido)}</b>
+          </div>
+          {Number(f.valor) > 0 && Math.abs(Number(f.valor) - totalEscolhido) > 0.01 && (
+            <p style={{ fontSize: 14, color: "#92400e", background: "#fffbeb", padding: 10,
+                        borderRadius: 8, margin: "8px 0 0" }}>
+              {Number(f.valor) > totalEscolhido
+                ? `Entrou ${money(Number(f.valor) - totalEscolhido)} a mais — vira crédito da família.`
+                : `Falta ${money(totalEscolhido - Number(f.valor))} para quitar tudo que está marcado.`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {cliente && debitos.length === 0 && (
+        <p style={{ color: cor.cinza, fontSize: 15, marginTop: 12 }}>
+          Esta família não tem nada em aberto — o valor entra como crédito para as próximas.
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
           <label style={painel.rotulo}>Identificador da transação (opcional)</label>
           <input style={painel.input} value={f.identificador}
                  onChange={(e) => setF({ ...f, identificador: e.target.value })}
@@ -287,12 +426,10 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
                  onChange={(e) => setF({ ...f, observacao: e.target.value })} />
         </div>
       </div>
+
       <button style={{ ...painel.botao, marginTop: 12 }} onClick={salvar} disabled={salvando}>
-        {salvando ? "Lançando…" : "Lançar entrada"}
+        {salvando ? "Lançando…" : cliente ? `Lançar e creditar para ${cliente.nome.split(" ")[0]}` : "Lançar sem identificar"}
       </button>
-      <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
-        Depois de lançar, o sistema sugere de quem pode ser — pelo nome e por quem deve o valor.
-      </p>
     </div>
   );
 }

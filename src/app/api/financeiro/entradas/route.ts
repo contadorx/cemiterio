@@ -51,11 +51,32 @@ export async function POST(req: NextRequest) {
   const valor = Number(b?.valor);
   if (!valor || valor <= 0) return NextResponse.json({ ok: false, erro: "valor_invalido" }, { status: 400 });
 
+  // Se já se sabe de quem é (o caso mais comum), registra e credita de uma vez —
+  // e amarra às lavagens escolhidas, se houver.
+  if (b?.clienteId) {
+    const { data, error } = await auth.db.rpc("sureya_entrada_identificada", {
+      p_valor: valor,
+      p_data: b?.data || new Date().toISOString().slice(0, 10),
+      p_cliente: b.clienteId,
+      p_remetente: b?.remetente || null,
+      p_identificador: b?.identificador || null,
+      p_observacao: b?.observacao || null,
+      p_debitos: Array.isArray(b?.debitos) && b.debitos.length ? b.debitos : null,
+    });
+    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    const r = (Array.isArray(data) ? data[0] : data) || {};
+    return NextResponse.json({
+      ok: true, id: r.r_entrada, movimento: r.r_movimento,
+      quitados: r.r_quitados || 0, sobrou: Number(r.r_sobrou) || 0,
+    });
+  }
+
+  // sem dono ainda: fica na fila de identificação
   const { data, error } = await auth.db.rpc("sureya_registrar_entrada_banco", {
     p_valor: valor,
     p_data: b?.data || new Date().toISOString().slice(0, 10),
     p_remetente: b?.remetente || null,
-    p_cliente: b?.clienteId || null,
+    p_cliente: null,
     p_identificador: b?.identificador || null,
     p_observacao: b?.observacao || null,
   });
