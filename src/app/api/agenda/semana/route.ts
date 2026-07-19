@@ -20,10 +20,12 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from("servicos")
-    .select("id,data_prevista,ordem_dia,status,valor,tumulos(identificacao,falecido_nome,quadras(codigo)),clientes(nome)")
+    .select("id,data_prevista,ordem_dia,status,valor,estornado_em,motivo_estorno,tumulos(identificacao,falecido_nome,quadras(codigo)),clientes(nome)")
     .gte("data_prevista", inicio)
     .lte("data_prevista", fim)
-    .neq("status", "cancelado")
+    // cancelada some da agenda, MENOS quando foi estorno: aí precisa aparecer
+    // com a marca, para o erro e a correção ficarem visíveis
+    .or("status.neq.cancelado,estornado_em.not.is.null")
     .order("data_prevista", { ascending: true })
     .order("ordem_dia", { ascending: true });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
@@ -40,6 +42,8 @@ export async function GET(req: NextRequest) {
       falecido: (s as any).tumulos?.falecido_nome || null,
       cliente: (s as any).clientes?.nome || null,
       valor: (s as any).valor,
+      estornadoEm: (s as any).estornado_em || null,
+      motivoEstorno: (s as any).motivo_estorno || null,
     });
   }
 

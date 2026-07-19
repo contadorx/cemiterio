@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import Entradas from "./Entradas";
+import Equipe from "./Equipe";
 
 interface Comp {
   id: string;
@@ -15,7 +16,7 @@ interface Comp {
 }
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<"gestao" | "entradas" | "conferir" | "relatorio" | "jazigos">("gestao");
+  const [aba, setAba] = useState<"gestao" | "entradas" | "equipe" | "conferir" | "relatorio" | "jazigos">("gestao");
 
   return (
     <div style={painel.wrap}>
@@ -27,6 +28,7 @@ export default function Financeiro() {
             ["gestao", "Gestão do negócio"],
             ["conferir", "Comprovantes a conferir"],
             ["entradas", "Entradas do banco"],
+            ["equipe", "Conta da equipe"],
             ["relatorio", "Recebido no mês"],
             ["jazigos", "Resultado por jazigo"],
           ] as const).map(([v, rot]) => (
@@ -40,6 +42,7 @@ export default function Financeiro() {
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}
         {aba === "entradas" && <Entradas />}
+        {aba === "equipe" && <Equipe />}
         {aba === "relatorio" && <Relatorio />}
         {aba === "jazigos" && <PorJazigo />}
       </div>

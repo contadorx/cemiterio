@@ -440,6 +440,35 @@ async function rodar() {
            precisaDeVoce(t.c, t.r) === t.esperado, JSON.stringify(t.c));
   }
 
+  console.log("\n=== 4j. AGENDA DINÂMICA ===");
+  const fq2 = await import("../src/lib/frequencia");
+
+  // adiantou: a próxima conta do dia real, não da data antiga
+  const intervalo = fq2.intervaloEmDias("mensal", 1)!;
+  const previstaAntiga = new Date(Date.now() + 20 * 86400000);
+  const feitaHoje = new Date();
+  const proximaCalculada = new Date(feitaHoje.getTime() + intervalo * 86400000);
+  checar("adiantar traz a próxima para mais perto",
+         proximaCalculada.getTime() < previstaAntiga.getTime() + intervalo * 86400000,
+         "a próxima tem que contar do dia em que foi feita");
+
+  // dias de trabalho: sábado fora
+  const diasTrabalho = [1, 2, 3, 4, 5];
+  function proximoDiaUtil(d: Date): Date {
+    const x = new Date(d);
+    let guarda = 0;
+    while (!diasTrabalho.includes(x.getUTCDay()) && guarda < 10) {
+      x.setUTCDate(x.getUTCDate() + 1); guarda++;
+    }
+    return x;
+  }
+  const sabado = new Date(Date.UTC(2026, 6, 18));   // 18/07/2026 é sábado
+  checar("sábado é empurrado para segunda",
+         proximoDiaUtil(sabado).getUTCDay() === 1, String(proximoDiaUtil(sabado).getUTCDay()));
+  const quarta = new Date(Date.UTC(2026, 6, 22));
+  checar("dia de trabalho não é movido",
+         proximoDiaUtil(quarta).getTime() === quarta.getTime(), "");
+
   console.log("\n=== 5. CAMPANHAS ===");
   const camp = await import("../src/lib/campanha");
   const rc = await camp.executarCampanha({ nome: "Finados", mensagem: "Olá, {nome}! Finados chegando.", publico: "ativos" });

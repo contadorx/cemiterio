@@ -19,6 +19,7 @@ export default function AgendaPage() {
   const [carregando, setCarregando] = useState(true);
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
+  const [replanejar, setReplanejar] = useState(true);
   const [concluindo, setConcluindo] = useState<any>(null);
 
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
@@ -27,6 +28,7 @@ export default function AgendaPage() {
   const [mesAlvo, setMesAlvo] = useState(new Date().toISOString().slice(0, 7));
   const [incluirAvulsos, setIncluirAvulsos] = useState(false);
   const [dataAvulsos, setDataAvulsos] = useState("");
+  const [fora, setFora] = useState(0);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -40,6 +42,31 @@ export default function AgendaPage() {
   }, [periodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // quantas lavagens ficaram em dia que não se trabalha (ou já passaram)
+  useEffect(() => {
+    fetch("/api/agenda/reorganizar")
+      .then((x) => x.json())
+      .then((r) => r?.ok && setFora(r.foraDaJornada || 0))
+      .catch(() => null);
+  }, [dias]);
+
+  async function reorganizar() {
+    setGerando(true); setDiag(null);
+    const r = await fetch("/api/agenda/reorganizar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ diasAFrente: 120 }),
+    }).then((x) => x.json()).catch(() => null);
+    setGerando(false);
+    if (r?.ok) {
+      alert(
+        `${r.movidos} lavagem(ns) movida(s) para dias de trabalho.\n` +
+        `${r.agendados} redistribuída(s) em ${r.dias} dia(s).`
+      );
+      setFora(0);
+      carregar();
+    } else alert("Não consegui reorganizar.");
+  }
 
   async function gerarDias(n: number) {
     setGerando(true); setDiag(null);
@@ -63,13 +90,54 @@ export default function AgendaPage() {
     else alert("Falhou ao gerar o mês.");
   }
 
+  async function estornar(id: string, tumulo: string) {
+    const motivo = prompt(
+      `Estornar a lavagem de ${tumulo}?\n\n` +
+      `A lavagem é anulada e o valor cobrado volta como crédito para a família.\n` +
+      `O registro continua visível com o motivo — o extrato dela mostra que houve\n` +
+      `um erro e que foi corrigido.\n\nO que aconteceu?`,
+      ""
+    );
+    if (motivo === null) return;
+    if (!motivo.trim()) return alert("Preciso do motivo — ele fica no extrato da família.");
+
+    const r = await fetch(`/api/servico/${id}/estornar`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo }),
+    }).then((x) => x.json()).catch(() => null);
+
+    if (r?.ok) {
+      alert(r.valorEstornado > 0
+        ? `Estornada. R$ ${Number(r.valorEstornado).toFixed(2)} devolvidos para a família.`
+        : "Estornada. Não havia cobrança lançada.");
+      carregar();
+    } else alert(r?.erro || "Não consegui estornar.");
+  }
+
+  async function excluir(id: string) {
+    const r = await fetch(`/api/servico/${id}`, { method: "DELETE" })
+      .then((x) => x.json()).catch(() => null);
+    if (r?.ok) carregar();
+    else alert(r?.erro || "Não consegui excluir.");
+  }
+
   async function acao(id: string, corpo: any) {
     const r = await fetch(`/api/servico/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(corpo),
     }).then((x) => x.json()).catch(() => null);
-    if (!r?.ok) alert("Falhou: " + (r?.erro || "erro"));
+
+    if (!r?.ok) {
+      alert(r?.erro || "Não consegui fazer isso agora.");
+    } else if (corpo.acao === "remarcar" && r.seguintesMovidas > 0) {
+      // conta o que aconteceu: mover uma lavagem mexe na régua do jazigo
+      alert(
+        `Remarcada para ${new Date(r.novaData + "T12:00:00").toLocaleDateString("pt-BR")}.\n\n` +
+        `${r.seguintesMovidas} lavagem(ns) seguinte(s) deste jazigo também andaram, ` +
+        `para manter o intervalo combinado.`
+      );
+    }
     setRemarcando(null);
     setNovaData("");
     carregar();
@@ -109,6 +177,22 @@ export default function AgendaPage() {
                    onChange={(e) => setPeriodo({ ...periodo, fim: e.target.value })} />
           </div>
         </div>
+
+        {fora > 0 && (
+          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
+            <strong style={{ color: "#92400e" }}>
+              {fora} lavagem(ns) marcada(s) em dia que não se trabalha
+            </strong>
+            <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 12px", lineHeight: 1.5 }}>
+              Acontece quando você muda os dias da jornada: o que já estava marcado continua
+              no dia antigo. Reorganizar move tudo para o próximo dia de trabalho e redistribui
+              respeitando a capacidade.
+            </p>
+            <button style={painel.botao} onClick={reorganizar} disabled={gerando}>
+              {gerando ? "Reorganizando…" : "Reorganizar a agenda"}
+            </button>
+          </div>
+        )}
 
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
@@ -229,7 +313,9 @@ export default function AgendaPage() {
                         />
                         <button
                           style={painel.botao}
-                          onClick={() => novaData && acao(s.id, { acao: "remarcar", novaData })}
+                          onClick={() => novaData && acao(s.id, {
+                            acao: "remarcar", novaData, replanejar,
+                          })}
                         >
                           Salvar
                         </button>
@@ -242,8 +328,30 @@ export default function AgendaPage() {
                         <button style={painel.botaoSec} onClick={() => setRemarcando(s.id)}>
                           Remarcar
                         </button>
-                        <button style={painel.botaoSec} onClick={() => acao(s.id, { acao: "pular" })}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6,
+                                        fontSize: 14, color: cor.cinza }}>
+                          <input type="checkbox" checked={replanejar}
+                                 onChange={(e) => setReplanejar(e.target.checked)} />
+                          mover também as próximas deste jazigo
+                        </label>
+                        <button style={painel.botaoSec}
+                                onClick={() => {
+                                  const motivo = prompt(
+                                    "Pular esta lavagem?\n\n" +
+                                    "A próxima do jazigo já vem no ciclo seguinte.\n" +
+                                    "Motivo (opcional):", "");
+                                  if (motivo !== null) acao(s.id, { acao: "pular", motivo });
+                                }}>
                           Pular
+                        </button>
+                        <button style={painel.botaoPerigo}
+                                onClick={() => {
+                                  if (!confirm(
+                                    `Excluir a lavagem de ${s.tumulo}?\n\n` +
+                                    `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
+                                  excluir(s.id);
+                                }}>
+                          Excluir
                         </button>
                       </>
                     )}

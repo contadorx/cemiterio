@@ -752,8 +752,29 @@ function Jornada() {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(j),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); carregar(); }
-    else alert("Falhou: " + (r?.erro === "escolha_ao_menos_um_dia" ? "Escolha pelo menos um dia." : r?.erro));
+    if (!r?.ok) {
+      alert("Falhou: " + (r?.erro === "escolha_ao_menos_um_dia" ? "Escolha pelo menos um dia." : r?.erro));
+      return;
+    }
+    setOk(true); setTimeout(() => setOk(false), 2000); carregar();
+
+    // Mudar os dias não mexe no que já estava marcado — pergunta se quer arrumar.
+    const c = await fetch("/api/agenda/reorganizar").then((x) => x.json()).catch(() => null);
+    if (c?.ok && c.foraDaJornada > 0) {
+      const arrumar = confirm(
+        `${c.foraDaJornada} lavagem(ns) já agendada(s) ficaram em dias que não são mais de trabalho.\n\n` +
+        `Quer reorganizar agora? Elas vão para o próximo dia de trabalho.`
+      );
+      if (arrumar) {
+        const rr = await fetch("/api/agenda/reorganizar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ diasAFrente: 120 }),
+        }).then((x) => x.json()).catch(() => null);
+        alert(rr?.ok
+          ? `${rr.movidos} lavagem(ns) movida(s) e redistribuída(s).`
+          : "Não consegui reorganizar. Use o botão na tela de Agenda.");
+      }
+    }
   }
 
   async function bloquear() {
