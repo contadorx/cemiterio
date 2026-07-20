@@ -177,7 +177,7 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
               {buscando ? "…" : palpites ? "Ver de novo" : "De quem é?"}
             </button>
           )}
-          <button style={{ ...painel.botaoSec, padding: "8px 12px" }} disabled={ocupado} onClick={onApagar}>
+          <button style={painel.botaoMiniSec} disabled={ocupado} onClick={onApagar}>
             Apagar
           </button>
         </div>

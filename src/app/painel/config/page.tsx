@@ -10,6 +10,7 @@ export default function Config() {
       <PainelNav atual="/painel/config" />
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Configurações</h1>
+        <ChaveDisparos />
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {([
             ["casa", "A Casa"],
@@ -33,6 +34,66 @@ export default function Config() {
         {aba === "equipe" && <Equipe />}
         {aba === "campanhas" && <Campanhas />}
         {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && <Agregados aba={aba} />}
+      </div>
+    </div>
+  );
+}
+
+// Chave mestra dos disparos automáticos. Fica no topo da Config, sempre visível.
+function ChaveDisparos() {
+  const [ativo, setAtivo] = useState<boolean | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config/disparos")
+      .then((r) => r.json())
+      .then((j) => setAtivo(!!j?.ativo))
+      .catch(() => setAtivo(null));
+  }, []);
+
+  async function alternar() {
+    if (ativo === null) return;
+    const novo = !ativo;
+    if (novo && !confirm("Ligar os disparos automáticos? A IA volta a responder sozinha e os avisos automáticos passam a sair.")) return;
+    setSalvando(true);
+    const r = await fetch("/api/config/disparos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ativo: novo }),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) setAtivo(!!r.ativo);
+    else alert("Não consegui salvar: " + (r?.erro || "erro"));
+  }
+
+  const ligado = ativo === true;
+  const fundo = ativo === null ? "#f1f5f9" : ligado ? "#f0fdf4" : "#fef2f2";
+  const borda = ativo === null ? cor.linha : ligado ? "#16a34a" : "#dc2626";
+
+  return (
+    <div style={{ ...painel.card, background: fundo, borderLeft: `5px solid ${borda}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 220, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 999, display: "inline-block",
+              background: ativo === null ? "#94a3b8" : ligado ? "#16a34a" : "#dc2626" }} />
+            <strong style={{ color: cor.navy, fontSize: 17 }}>
+              Disparos automáticos: {ativo === null ? "…" : ligado ? "LIGADOS" : "DESLIGADOS"}
+            </strong>
+          </div>
+          <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
+            {ligado
+              ? "A IA responde sozinha (quando pode) e os avisos/convites automáticos saem normalmente."
+              : "A IA não responde sozinha — tudo vira rascunho para você aprovar. As mensagens dos clientes continuam chegando e suas respostas manuais continuam saindo. Ideal enquanto migra os dados e captura as quadras."}
+          </p>
+        </div>
+        <button
+          onClick={alternar}
+          disabled={ativo === null || salvando}
+          style={ligado ? painel.botaoPerigo : painel.botao}
+        >
+          {salvando ? "Salvando…" : ligado ? "Desligar disparos" : "Ligar disparos"}
+        </button>
       </div>
     </div>
   );
@@ -717,10 +778,10 @@ function Materiais() {
                 ` · dura ~${Math.round(1 / Number(m.consumo_por_limpeza))} limpezas`}
               {Number(m.custo_unitario) > 0 && ` · R$ ${Number(m.custo_unitario).toFixed(2)}/${m.unidade}`}
             </span>
-            <button style={{ ...painel.botaoSec, padding: "8px 12px" }} onClick={() => setComprando(m)}>
+            <button style={painel.botaoMiniSec} onClick={() => setComprando(m)}>
               Comprei
             </button>
-            <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }} onClick={() => remover(m.id, m.nome)}>
+            <button style={painel.botaoMiniPerigo} onClick={() => remover(m.id, m.nome)}>
               Remover
             </button>
           </div>
@@ -882,7 +943,7 @@ function Jornada() {
                                    padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
             <span>{new Date(b.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
               {b.motivo ? ` · ${b.motivo}` : ""}</span>
-            <button style={{ ...painel.botaoSec, padding: "6px 12px" }} onClick={() => desbloquear(b.id)}>
+            <button style={painel.botaoMiniSec} onClick={() => desbloquear(b.id)}>
               Liberar
             </button>
           </div>

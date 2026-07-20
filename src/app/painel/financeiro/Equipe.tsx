@@ -212,7 +212,7 @@ function Linha({ l, onRemover }: { l: any; onRemover?: () => void }) {
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <b style={{ color: l.pago_em ? cor.cinza : "#92400e" }}>{money(l.valor)}</b>
         {onRemover && (
-          <button style={{ ...painel.botaoSec, padding: "6px 12px", fontSize: 14 }}
+          <button style={painel.botaoMiniSec}
                   onClick={onRemover}>remover</button>
         )}
       </div>

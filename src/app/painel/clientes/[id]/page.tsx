@@ -137,7 +137,7 @@ export default function FichaCliente() {
                 <span>
                   {new Date(p.data + "T12:00:00").toLocaleDateString("pt-BR")} · <b style={{ color: "#16a34a" }}>R$ {Number(p.valor).toFixed(2)}</b>
                 </span>
-                <a href={`/painel/recibo/${p.id}`} target="_blank" rel="noreferrer" style={{ ...painel.botaoSec, padding: "6px 12px", textDecoration: "none" }}>
+                <a href={`/painel/recibo/${p.id}`} target="_blank" rel="noreferrer" style={painel.botaoMiniSec}>
                   Recibo
                 </a>
               </div>
@@ -456,7 +456,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
           {token ? " · 🔗" : ""}
           {migrado ? " · ✓ conferido" : ""}
         </span>
-        <button style={{ ...painel.botaoSec, padding: "6px 12px" }} onClick={() => setAberto(!aberto)}>
+        <button style={painel.botaoMiniSec} onClick={() => setAberto(!aberto)}>
           {aberto ? "Fechar" : "Editar"}
         </button>
       </div>
@@ -518,7 +518,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 {t.foto_enquadramento_url
                   ? <img src={t.foto_enquadramento_url} alt="de longe" style={miniFoto} />
                   : <div style={{ ...miniFoto, ...semFoto }}>sem foto</div>}
-                <button style={{ ...painel.botaoSec, padding: "6px 10px", marginTop: 6, fontSize: 15 }}
+                <button style={{ ...painel.botaoMiniSec, marginTop: 6 }}
                         onClick={() => refEnq.current?.click()}>
                   {t.foto_enquadramento_url ? "Trocar" : "Enviar"} foto de longe
                 </button>
@@ -527,7 +527,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 {t.foto_referencia_url
                   ? <img src={t.foto_referencia_url} alt="lápide" style={miniFoto} />
                   : <div style={{ ...miniFoto, ...semFoto }}>sem foto</div>}
-                <button style={{ ...painel.botaoSec, padding: "6px 10px", marginTop: 6, fontSize: 15 }}
+                <button style={{ ...painel.botaoMiniSec, marginTop: 6 }}
                         onClick={() => refRef.current?.click()}>
                   {t.foto_referencia_url ? "Trocar" : "Enviar"} close da lápide
                 </button>
@@ -1102,7 +1102,7 @@ function Identificacao({ c, onSalvo, registrar }: {
                 : c.telefone}
               {c.tratamento && ` · ${c.tratamento}`}
             </div>
-            <button style={{ ...painel.botaoSec, marginTop: 10, padding: "6px 14px" }}
+            <button style={{ ...painel.botaoMiniSec, marginTop: 10 }}
                     onClick={() => setEditando(true)}>
               Editar dados
             </button>

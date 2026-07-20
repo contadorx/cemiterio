@@ -151,7 +151,7 @@ function Simulador() {
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {exemplos.map((e) => (
-          <button key={e} style={{ ...painel.botaoSec, padding: "8px 12px", fontSize: 15, minHeight: 0 }} onClick={() => enviar(e)}>
+          <button key={e} style={painel.botaoMiniSec} onClick={() => enviar(e)}>
             {e}
           </button>
         ))}

@@ -391,13 +391,13 @@ function Avaliar({ servicoId }: { servicoId: string }) {
 
   if (link) {
     return (
-      <button style={{ ...painel.botaoSec, padding: "6px 10px" }} onClick={copiar}>
+      <button style={painel.botaoMiniSec} onClick={copiar}>
         {copiado ? "✓ copiado" : "Copiar link de avaliação"}
       </button>
     );
   }
   return (
-    <button style={{ ...painel.botaoSec, padding: "6px 10px" }} onClick={gerar} disabled={busy}>
+    <button style={painel.botaoMiniSec} onClick={gerar} disabled={busy}>
       {busy ? "..." : "Pedir avaliação"}
     </button>
   );

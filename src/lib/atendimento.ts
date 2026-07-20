@@ -3,6 +3,7 @@ import { env } from "./env";
 import { supabaseAdmin } from "./supabase-admin";
 import { baixarMidiaBase64 } from "./evolution";
 import { enviarTextoComRetry } from "./envio";
+import { disparosAtivos } from "./disparos";
 import { extrairComprovante } from "./comprovante";
 import { registrarComprovante } from "./conciliacao";
 import { transcreverAudio } from "./transcricao";
@@ -355,7 +356,12 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     score: cliente.score,
   });
 
+  // Chave mestra: se os disparos automáticos estão desligados (migração/captura
+  // das quadras), a IA NUNCA envia sozinha — vira rascunho para aprovação.
+  const disparosLigados = await disparosAtivos();
+
   const podeAutomatico =
+    disparosLigados &&
     cliente.modo === "automatico" &&
     !trava.reter &&
     cliente.score >= env.SCORE_LIMITE_AUTO &&
@@ -388,7 +394,8 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     assunto: out.assunto,
     rascunho: out.resposta,
     acao_humana: null,
-    motivo_retencao: trava.motivo
+    motivo_retencao: (!disparosLigados ? "disparos automáticos desligados" : null)
+      || trava.motivo
       || (cliente.modo !== "automatico" ? "contato em modo copiloto"
       : cliente.score < env.SCORE_LIMITE_AUTO ? `score ${Math.round(cliente.score)} abaixo de ${env.SCORE_LIMITE_AUTO}`
       : out.confianca !== "alta" ? "a IA ficou em dúvida" : null),

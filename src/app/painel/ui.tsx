@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { MARCA } from "@/lib/marca";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import EstiloMobile from "./EstiloMobile";
 
 export const cor = {
@@ -49,6 +49,38 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
 ];
 
 const ITENS = GRUPOS.flatMap((g) => g.itens);
+
+// Faixa de aviso que aparece em TODAS as telas do painel enquanto os disparos
+// automáticos estiverem desligados — para não esquecer que a IA não responde
+// sozinha durante a migração/captura das quadras.
+function AvisoDisparos() {
+  const [ligado, setLigado] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/config/disparos")
+      .then((r) => r.json())
+      .then((j) => { if (vivo) setLigado(!!j?.ativo); })
+      .catch(() => { if (vivo) setLigado(null); });
+    return () => { vivo = false; };
+  }, []);
+
+  if (ligado !== false) return null; // só aparece quando está DESLIGADO
+
+  return (
+    <div style={{
+      background: "#7f1d1d", color: "#fff", padding: "10px 16px",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      gap: 12, flexWrap: "wrap", fontSize: 14, textAlign: "center",
+    }}>
+      <span>⏸ <strong>Disparos automáticos desligados</strong> — a IA não responde sozinha e os avisos automáticos não saem.</span>
+      <Link href="/painel/config" style={{
+        color: "#7f1d1d", background: "#fff", fontWeight: 700, textDecoration: "none",
+        padding: "5px 12px", borderRadius: 8, fontSize: 13, whiteSpace: "nowrap",
+      }}>Ligar na Config</Link>
+    </div>
+  );
+}
 
 export function PainelNav({ atual }: { atual: string }) {
   const [aberto, setAberto] = useState(false);
@@ -115,6 +147,7 @@ export function PainelNav({ atual }: { atual: string }) {
         }
       `}</style>
     </nav>
+    <AvisoDisparos />
     </>
   );
 }
@@ -133,15 +166,44 @@ const nav: Record<string, React.CSSProperties> = {
   ativo: { background: "rgba(255,255,255,.15)", color: "#fff", fontWeight: 600 },
 };
 
+// Base comum a TODO botão: garante que <button>, <a> e <Link> estilizados como
+// botão fiquem com a MESMA altura e o texto centralizado.
+// - inline-flex + center: alinha o rótulo na vertical e faz o minHeight valer
+//   (num <a> inline o minHeight era ignorado — era a causa dos botões "de
+//   tamanhos distintos" quando um Link ficava ao lado de um <button>).
+// - boxSizing border-box: o padding não muda a altura final.
+// - textDecoration none: Link/<a> não vêm sublinhados.
+const botaoBase: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  boxSizing: "border-box",
+  lineHeight: 1.1,
+  textDecoration: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: 600,
+};
+
 export const painel: Record<string, React.CSSProperties> = {
   wrap: { minHeight: "100vh", background: cor.bg, fontFamily: "system-ui" },
   conteudo: { maxWidth: 900, margin: "0 auto", padding: 16 },
   h1: { fontSize: 23, color: cor.navy, margin: "8px 0 18px" },
   card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: 14, padding: 16, marginBottom: 14 },
-  // botões com altura de toque confortável no celular (>= 44px)
-  botao: { padding: "14px 20px", fontSize: 16, fontWeight: 700, borderRadius: 10, border: "none", background: cor.teal, color: "#fff", cursor: "pointer", minHeight: 48 },
-  botaoSec: { padding: "13px 18px", fontSize: 15, fontWeight: 600, borderRadius: 10, border: `1px solid ${cor.linha}`, background: "#fff", color: cor.navy, cursor: "pointer", minHeight: 48 },
-  botaoPerigo: { padding: "13px 18px", fontSize: 15, fontWeight: 600, borderRadius: 10, border: "none", background: "#dc2626", color: "#fff", cursor: "pointer", minHeight: 48 },
+
+  // ── Botões tamanho padrão (altura de toque confortável no celular, >= 48px) ──
+  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.teal, color: "#fff", minHeight: 48 },
+  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: `1px solid ${cor.linha}`, background: "#fff", color: cor.navy, minHeight: 48 },
+  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: "none", background: "#dc2626", color: "#fff", minHeight: 48 },
+
+  // ── Botões compactos (linhas densas de ação: uma medida única, sem improviso) ──
+  // Antes cada tela inventava um padding ("4px 10px", "6px 12px", "8px 14px"…);
+  // agora é um só tamanho para todos os botões pequenos.
+  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.teal, color: "#fff", minHeight: 40 },
+  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: "#fff", color: cor.navy, minHeight: 40 },
+  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "#dc2626", color: "#fff", minHeight: 40 },
+
   // fontSize 16 evita o zoom automático do iOS ao focar o campo
   input: { width: "100%", padding: 12, fontSize: 16, borderRadius: 10, border: `1px solid ${cor.linha}`, boxSizing: "border-box" },
   rotulo: { fontSize: 14, fontWeight: 600, color: cor.cinza, marginBottom: 4, display: "block" },

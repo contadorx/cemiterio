@@ -45,6 +45,8 @@ export default function Conversas() {
   const [erro, setErro] = useState("");
   const [f, setF] = useState({ situacao: "pendentes", assunto: "", busca: "", de: "", ate: "" });
   const [maisFiltros, setMaisFiltros] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [emMassa, setEmMassa] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -73,6 +75,9 @@ export default function Conversas() {
       }
       setUltimoAviso(marca);
       setLista(r.conversas || []);
+      // mantém selecionadas só as que ainda aparecem na lista
+      const presentes = new Set((r.conversas || []).map((c: any) => c.id));
+      setSel((prev) => new Set([...prev].filter((id) => presentes.has(id))));
       if (r.contadores) setCont(r.contadores);
     } finally {
       // sempre sai do "carregando", mesmo se algo acima falhar.
@@ -110,6 +115,36 @@ export default function Conversas() {
       body: JSON.stringify({ acao }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) carregar();
+    else alert("Falhou: " + (r?.erro || "erro"));
+  }
+
+  // conversas que podem entrar na seleção (recados de equipe ficam de fora,
+  // como já acontece nas ações por item)
+  const selecionaveis = lista.filter((c) => c.tipo !== "equipe");
+  const todasMarcadas = selecionaveis.length > 0 && selecionaveis.every((c) => sel.has(c.id));
+
+  function alternarUma(id: string) {
+    setSel((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+  function alternarTodas() {
+    setSel(todasMarcadas ? new Set() : new Set(selecionaveis.map((c) => c.id)));
+  }
+
+  async function acaoMassa(acao: string, confirmar?: string) {
+    const ids = [...sel];
+    if (!ids.length) return;
+    if (confirmar && !confirm(confirmar)) return;
+    setEmMassa(true);
+    const r = await fetch("/api/conversas/acao-massa", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, acao }),
+    }).then((x) => x.json()).catch(() => null);
+    setEmMassa(false);
+    if (r?.ok) { setSel(new Set()); carregar(); }
     else alert("Falhou: " + (r?.erro || "erro"));
   }
 
@@ -184,6 +219,49 @@ export default function Conversas() {
           )}
         </div>
 
+        {/* seleção em massa */}
+        {selecionaveis.length > 0 && (
+          <div style={{
+            position: "sticky", top: 0, zIndex: 5, marginBottom: 12,
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            background: sel.size > 0 ? cor.navy : "#fff",
+            color: sel.size > 0 ? "#fff" : cor.navy,
+            border: `1px solid ${sel.size > 0 ? cor.navy : cor.linha}`,
+            borderRadius: 12, padding: "10px 14px",
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 15 }}>
+              <input type="checkbox" checked={todasMarcadas} onChange={alternarTodas}
+                     style={{ width: 18, height: 18 }} />
+              {sel.size > 0 ? `${sel.size} selecionada(s)` : "Selecionar todas"}
+            </label>
+
+            {sel.size > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
+                {f.situacao === "arquivadas" ? (
+                  <button style={painel.botaoMiniSec} disabled={emMassa}
+                          onClick={() => acaoMassa("desarquivar")}>Reabrir</button>
+                ) : (
+                  <>
+                    <button style={painel.botaoMiniSec} disabled={emMassa}
+                            onClick={() => acaoMassa("resolver")}>Resolver</button>
+                    <button style={painel.botaoMiniSec} disabled={emMassa}
+                            onClick={() => acaoMassa("arquivar")}>Arquivar</button>
+                  </>
+                )}
+                <button style={painel.botaoMiniPerigo} disabled={emMassa}
+                        onClick={() => acaoMassa("excluir",
+                          `Excluir ${sel.size} conversa(s)? As mensagens serão apagadas. O histórico financeiro não é afetado.`)}>
+                  Excluir
+                </button>
+                <button style={{ ...painel.botaoMiniSec, background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}
+                        disabled={emMassa} onClick={() => setSel(new Set())}>
+                  Limpar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {carregando && <p style={{ color: cor.cinza }}>Carregando…</p>}
 
         {!carregando && erro && (
@@ -205,7 +283,8 @@ export default function Conversas() {
 
         {lista.map((c) => (
           <div key={c.id} style={{ ...painel.card,
-            background: c.tipo === "equipe" ? "#f0fdfa" : "#fff",
+            background: sel.has(c.id) ? "#eef2ff" : c.tipo === "equipe" ? "#f0fdfa" : "#fff",
+            outline: sel.has(c.id) ? `2px solid ${cor.navy}` : "none",
             borderLeft:
               c.tipo === "equipe" ? `4px solid ${cor.teal}`
               : (c.horasEsperando ?? 0) >= 24 ? "4px solid #b91c1c"     // esperando há mais de um dia
@@ -213,6 +292,15 @@ export default function Conversas() {
               : c.escalada ? "4px solid #dc2626"
               : `1px solid ${cor.linha}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              {c.tipo !== "equipe" && (
+                <input
+                  type="checkbox"
+                  checked={sel.has(c.id)}
+                  onChange={() => alternarUma(c.id)}
+                  aria-label={`Selecionar conversa com ${c.cliente}`}
+                  style={{ width: 18, height: 18, marginTop: 4, flexShrink: 0, cursor: "pointer" }}
+                />
+              )}
               <div style={{ flex: 1, minWidth: 200 }}>
                 <Link href={`/painel/conversas/${c.id}`} style={{ textDecoration: "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -263,23 +351,22 @@ export default function Conversas() {
               </div>
 
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "flex-start" }}>
-                <Link href={`/painel/conversas/${c.id}`}
-                      style={{ ...painel.botaoSec, textDecoration: "none", padding: "8px 12px" }}>
+                <Link href={`/painel/conversas/${c.id}`} style={painel.botaoMiniSec}>
                   Abrir
                 </Link>
                 {c.tipo !== "equipe" && !c.arquivada && !c.resolvida && (
-                  <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
+                  <button style={painel.botaoMiniSec}
                           onClick={() => acao(c.id, "resolver")}>Resolver</button>
                 )}
                 {c.tipo !== "equipe" && !c.arquivada && (
-                  <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
+                  <button style={painel.botaoMiniSec}
                           onClick={() => acao(c.id, "arquivar")}>Arquivar</button>
                 )}
                 {c.arquivada && (
-                  <button style={{ ...painel.botaoSec, padding: "8px 12px" }}
+                  <button style={painel.botaoMiniSec}
                           onClick={() => acao(c.id, "desarquivar")}>Reabrir</button>
                 )}
-                {c.tipo !== "equipe" && <button style={{ ...painel.botaoPerigo, padding: "8px 12px" }}
+                {c.tipo !== "equipe" && <button style={painel.botaoMiniPerigo}
                         onClick={() => acao(c.id, "excluir",
                           `Excluir a conversa com ${c.cliente}? As mensagens serão apagadas. O histórico financeiro não é afetado.`)}>
                   Excluir

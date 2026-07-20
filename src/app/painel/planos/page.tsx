@@ -159,7 +159,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
             {p.faltaData && " ← falta preencher"}
           </div>
         </div>
-        <button style={{ ...painel.botaoSec, padding: "8px 14px", alignSelf: "flex-start" }} onClick={onAbrir}>
+        <button style={{ ...painel.botaoMiniSec, alignSelf: "flex-start" }} onClick={onAbrir}>
           {aberto ? "Fechar" : "Editar"}
         </button>
       </div>

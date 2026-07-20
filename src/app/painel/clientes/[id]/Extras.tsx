@@ -125,7 +125,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
                 <b style={{ color: cor.navy }}>{money(p.total)}</b>
                 <button style={painel.botao} disabled={ocupado}
                         onClick={() => agir(p.id, "entregar")}>Entreguei</button>
-                <button style={{ ...painel.botaoSec, padding: "8px 12px" }} disabled={ocupado}
+                <button style={painel.botaoMiniSec} disabled={ocupado}
                         onClick={() => agir(p.id, "cancelar")}>Cancelar</button>
               </div>
             </div>
@@ -142,7 +142,8 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {itens.map((e) => (
                     <button key={e.id}
-                      style={{ ...painel.botaoSec, textAlign: "left", padding: "12px 14px",
+                      style={{ ...painel.botaoSec, flexDirection: "column", alignItems: "flex-start",
+                               textAlign: "left", padding: "12px 14px", minHeight: 0,
                                opacity: e.sazonal && !e.naEpoca ? 0.5 : 1 }}
                       onClick={() => escolher(e)}>
                       <div style={{ fontWeight: 700, color: cor.navy }}>{e.nome}</div>

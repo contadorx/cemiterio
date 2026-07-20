@@ -351,7 +351,7 @@ function Gestao() {
                 {l.tipo === "entrada" ? "+" : "−"} {money(l.valor)}
               </b>
               {!l.automatico && (
-                <button style={{ ...painel.botaoSec, padding: "4px 10px", fontSize: 14 }}
+                <button style={painel.botaoMiniSec}
                         onClick={() => excluir(l.id)}>excluir</button>
               )}
             </div>

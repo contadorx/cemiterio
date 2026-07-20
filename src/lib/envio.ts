@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { enviarWhatsapp, enviarWhatsappMidia } from "./evolution";
+import { disparosAtivos } from "./disparos";
 
 const MAX_TENTATIVAS = 5;
 
@@ -55,7 +56,13 @@ export async function enviarMidiaComRetry(
 }
 
 // Processa a fila (chamado pelo cron por minuto).
-export async function processarFilaEnvios(): Promise<{ enviados: number; falhas: number }> {
+export async function processarFilaEnvios(): Promise<{ enviados: number; falhas: number; pausado?: boolean }> {
+  // Chave mestra desligada: não drena a fila. Os itens continuam pendentes e
+  // saem sozinhos assim que os disparos forem religados.
+  if (!(await disparosAtivos())) {
+    return { enviados: 0, falhas: 0, pausado: true };
+  }
+
   const db = supabaseAdmin();
   const org = env.orgId();
   const agora = new Date().toISOString();
