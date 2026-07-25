@@ -16,7 +16,7 @@ interface Comp {
 }
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<"gestao" | "entradas" | "equipe" | "conferir" | "relatorio" | "jazigos">("gestao");
+  const [aba, setAba] = useState<"gestao" | "conferir" | "equipe" | "jazigos">("gestao");
 
   return (
     <div style={painel.wrap}>
@@ -26,10 +26,8 @@ export default function Financeiro() {
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {([
             ["gestao", "Gestão do negócio"],
-            ["conferir", "Comprovantes a conferir"],
-            ["entradas", "Entradas do banco"],
+            ["conferir", "Conferir entradas"],
             ["equipe", "Conta da equipe"],
-            ["relatorio", "Recebido no mês"],
             ["jazigos", "Resultado por jazigo"],
           ] as const).map(([v, rot]) => (
             <button key={v} style={aba === v ? painel.botao : painel.botaoSec}
@@ -41,22 +39,54 @@ export default function Financeiro() {
 
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}
-        {aba === "entradas" && <Entradas />}
         {aba === "equipe" && <Equipe />}
-        {aba === "relatorio" && <Relatorio />}
         {aba === "jazigos" && <PorJazigo />}
       </div>
     </div>
   );
 }
 
+/**
+ * CONFERIR ENTRADAS
+ *
+ * Antes eram três abas separadas para a mesma pergunta — "esse dinheiro entrou
+ * mesmo?" — cada uma partindo de um lado: o print que a família mandou, o valor
+ * que apareceu no extrato sem dono, e o crédito que a Sureya lançou na confiança
+ * para a cobrança parar. No celular, três abas viram três lugares para esquecer.
+ * Agora é uma aba só, com um seletor em cima. Bater com o banco estava pronto no
+ * código mas nunca tinha sido ligado na tela — aqui ele entra.
+ */
 function Conferir() {
+  const [sub, setSub] = useState<"comprovantes" | "entradas" | "banco">("comprovantes");
+  const abas: [typeof sub, string][] = [
+    ["comprovantes", "Comprovantes"],
+    ["entradas", "Entrou sem dono"],
+    ["banco", "Bater com o banco"],
+  ];
+  return (
+    <>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {abas.map(([v, rot]) => (
+          <button key={v} style={sub === v ? painel.botao : painel.botaoSec}
+                  onClick={() => setSub(v)}>
+            {rot}
+          </button>
+        ))}
+      </div>
+      {sub === "comprovantes" && <Comprovantes />}
+      {sub === "entradas" && <Entradas />}
+      {sub === "banco" && <BaterComBanco />}
+    </>
+  );
+}
+
+function Comprovantes() {
   const [itens, setItens] = useState<Comp[]>([]);
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   async function carregar() {
     const r = await fetch("/api/comprovantes").then((x) => x.json());
-    if (r.ok) setItens(r.comprovantes);
+    if (r.ok) setItens(Array.isArray(r.comprovantes) ? r.comprovantes : []);
   }
   useEffect(() => {
     carregar();
@@ -108,82 +138,6 @@ function Conferir() {
   );
 }
 
-function Relatorio() {
-  const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
-  const [d, setD] = useState<any>(null);
-  const [carregando, setCarregando] = useState(false);
-
-  async function carregar(m: string) {
-    setCarregando(true);
-    const r = await fetch(`/api/financeiro/relatorio?mes=${m}`).then((x) => x.json()).catch(() => null);
-    setD(r);
-    setCarregando(false);
-  }
-  useEffect(() => {
-    carregar(mes);
-  }, [mes]);
-
-  const real = (n: number) => `R$ ${Number(n).toFixed(2)}`;
-
-  return (
-    <>
-      <div style={painel.card}>
-        <label style={painel.rotulo}>Mês de referência</label>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ ...painel.input, width: 200 }} />
-          <a href={`/api/financeiro/export?mes=${mes}`} style={{ ...painel.botaoSec, textDecoration: "none", display: "inline-block" }}>
-            Exportar CSV
-          </a>
-        </div>
-      </div>
-
-      {carregando && <p style={{ color: cor.cinza }}>Carregando...</p>}
-
-      {d?.ok && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
-            <CartaoGestao titulo="Recebido no mês" valor={real(d.recebido)} cor="#16a34a" />
-            <CartaoGestao titulo="Serviço prestado" valor={real(d.executado)} cor={cor.navy} />
-            <CartaoGestao titulo="A conferir" valor={real(d.aConferir)} cor="#d97706" />
-            <CartaoGestao titulo="Total a receber" valor={real(d.totalReceber)} cor="#dc2626" />
-          </div>
-
-          <div style={painel.card}>
-            <strong style={{ color: cor.navy }}>Em aberto (a cobrar)</strong>
-            {d.emAberto.length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém em aberto. 🎉</p>}
-            {(d.emAberto || []).map((x: any, i: number) => (
-              <div key={i} style={linha}>
-                <span>{x.cliente}</span>
-                <span style={{ color: "#dc2626", fontWeight: 700 }}>{real(x.valor)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={painel.card}>
-            <strong style={{ color: cor.navy }}>Adiantados (crédito a usar)</strong>
-            {d.adiantados.length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém adiantado.</p>}
-            {(d.adiantados || []).map((x: any, i: number) => (
-              <div key={i} style={linha}>
-                <span>{x.cliente}</span>
-                <span style={{ color: "#16a34a", fontWeight: 700 }}>{real(x.valor)}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-function Cartao({ titulo, valor, cor: c }: { titulo: string; valor: string; cor: string }) {
-  return (
-    <div style={{ ...painel.card, marginBottom: 0 }}>
-      <div style={{ fontSize: 15, color: cor.cinza }}>{titulo}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: c, marginTop: 4 }}>{valor}</div>
-    </div>
-  );
-}
-
 const linha: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -198,12 +152,18 @@ const linha: React.CSSProperties = {
 function Gestao() {
   const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
   const [d, setD] = useState<any>(null);
+  // "Recebido no mês" foi dobrado aqui dentro: um lugar só para o mês, mesmo seletor.
+  const [rel, setRel] = useState<any>(null);
   const [novo, setNovo] = useState({ tipo: "saida", valor: "", data: new Date().toISOString().slice(0, 10), categoriaId: "", descricao: "" });
   const [lancando, setLancando] = useState(false);
 
   const carregar = useCallback(async () => {
-    const r = await fetch(`/api/financeiro/gestao?mes=${mes}`).then((x) => x.json()).catch(() => null);
-    if (r?.ok) setD(r);
+    const [g, r] = await Promise.all([
+      fetch(`/api/financeiro/gestao?mes=${mes}`).then((x) => x.json()).catch(() => null),
+      fetch(`/api/financeiro/relatorio?mes=${mes}`).then((x) => x.json()).catch(() => null),
+    ]);
+    if (g?.ok) setD(g);
+    setRel(r?.ok ? r : null);
   }, [mes]);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -357,6 +317,52 @@ function Gestao() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* recebido no mês (antes era uma aba à parte) */}
+      <div style={{ ...painel.card, marginTop: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <strong style={{ color: cor.navy }}>Recebido no mês</strong>
+          <a href={`/api/financeiro/export?mes=${mes}`}
+             style={{ ...painel.botaoSec, textDecoration: "none", display: "inline-block" }}>
+            Exportar CSV
+          </a>
+        </div>
+
+        {!rel && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Sem dados do mês.</p>}
+
+        {rel && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, margin: "12px 0" }}>
+              <CartaoGestao titulo="Recebido no mês" valor={money(rel.recebido)} cor="#16a34a" />
+              <CartaoGestao titulo="Serviço prestado" valor={money(rel.executado)} cor={cor.navy} />
+              <CartaoGestao titulo="A conferir" valor={money(rel.aConferir)} cor="#d97706" />
+              <CartaoGestao titulo="Total a receber" valor={money(rel.totalReceber)} cor="#dc2626" />
+            </div>
+
+            <div style={{ marginTop: 4 }}>
+              <strong style={{ color: cor.navy, fontSize: 15 }}>Em aberto (a cobrar)</strong>
+              {(rel.emAberto || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém em aberto. 🎉</p>}
+              {(rel.emAberto || []).map((x: any, i: number) => (
+                <div key={i} style={linha}>
+                  <span>{x.cliente}</span>
+                  <span style={{ color: "#dc2626", fontWeight: 700 }}>{money(x.valor)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <strong style={{ color: cor.navy, fontSize: 15 }}>Adiantados (crédito a usar)</strong>
+              {(rel.adiantados || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém adiantado.</p>}
+              {(rel.adiantados || []).map((x: any, i: number) => (
+                <div key={i} style={linha}>
+                  <span>{x.cliente}</span>
+                  <span style={{ color: "#16a34a", fontWeight: 700 }}>{money(x.valor)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
