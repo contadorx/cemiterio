@@ -94,7 +94,10 @@ export async function redigir(p: PedidoRedacao): Promise<string | null> {
     const r = await anthropic.messages.create({
       model: escolha.modelo,
       max_tokens: 600,
-      system: sistema,
+      // system 100% fixo (dados da família vão na mensagem do usuário): cacheável
+      // inteiro. Numa rodada de reajuste/campanha com muitas famílias, o conhecimento
+      // é cobrado uma vez e reaproveitado nas demais.
+      system: [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }] as any,
       messages: [{
         role: "user",
         content: `${INSTRUCAO[p.proposito]}\n\nCONTEXTO DESTA FAMÍLIA:\n${contexto}${conversa}`,

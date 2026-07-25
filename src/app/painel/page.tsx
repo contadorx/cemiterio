@@ -10,21 +10,24 @@ export default function Painel() {
   const [rasc, setRasc] = useState(0);
   const [comp, setComp] = useState(0);
   const [ind, setInd] = useState<any>(null);
+  const [hoje, setHoje] = useState<any>(null);
   const [gerando, setGerando] = useState(false);
   const [horizonte, setHorizonte] = useState(90);
   const [diag, setDiag] = useState<any>(null);
 
   async function carregar() {
-    const [c, r, cp, i] = await Promise.all([
+    const [c, r, cp, i, h] = await Promise.all([
       fetch("/api/capacidade").then((x) => x.json()),
       fetch("/api/rascunhos").then((x) => x.json()),
       fetch("/api/comprovantes").then((x) => x.json()),
       fetch("/api/indicadores").then((x) => x.json()),
+      fetch("/api/hoje").then((x) => x.json()),
     ]);
     if (c.ok) setCap(c);
     if (r.ok) setRasc(r.rascunhos.length);
     if (cp.ok) setComp(cp.comprovantes.length);
     if (i.ok) setInd(i);
+    if (h.ok) setHoje(h);
   }
   useEffect(() => {
     carregar();
@@ -51,6 +54,28 @@ export default function Painel() {
       <div style={painel.conteudo}>
         <InstalarApp />
         <h1 style={painel.h1}>Início</h1>
+
+        {hoje && (
+          <div style={{ ...painel.card, background: cor.navy, marginBottom: 12 }}>
+            <strong style={{ fontSize: 18, color: "#fff" }}>Hoje</strong>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginTop: 12 }}>
+              <Link href="/painel/conversas" style={{ textDecoration: "none" }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: hoje.aguardando ? "#fbbf24" : "#fff" }}>{hoje.aguardando}</div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>esperando resposta</div>
+              </Link>
+              <Link href="/painel/agenda" style={{ textDecoration: "none" }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: hoje.atrasadas ? "#fbbf24" : "#fff" }}>{hoje.limpezasAFazer}</div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>
+                  limpezas a fazer{hoje.atrasadas ? ` · ${hoje.atrasadas} atrasada${hoje.atrasadas > 1 ? "s" : ""}` : ""}
+                </div>
+              </Link>
+              <Link href="/painel/financeiro" style={{ textDecoration: "none" }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: "#4ade80" }}>R$ {Number(hoje.entrouHoje).toFixed(0)}</div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>entrou hoje</div>
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
           <Link href="/painel/conversas" style={{ ...painel.card, textDecoration: "none", display: "block" }}>

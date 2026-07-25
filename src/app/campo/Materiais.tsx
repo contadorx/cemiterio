@@ -22,7 +22,7 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
   useEffect(() => {
     fetch("/api/config/materiais")
       .then((x) => x.json())
-      .then((r) => r.ok && setItens(r.materiais))
+      .then((r) => r.ok && setItens(Array.isArray(r.materiais) ? r.materiais : []))
       .catch(() => {});
   }, []);
 

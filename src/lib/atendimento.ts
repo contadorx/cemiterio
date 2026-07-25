@@ -117,7 +117,24 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
   const resp = await anthropic().messages.create({
     model: escolha.modelo,
     max_tokens: 1024,
-    system: montarSystemPrompt(ctx, { conhecimento: config.conhecimento, tom: config.tom }),
+    // O conhecimento do negócio (~fixo, ~2-3k tokens) é o mesmo para todas as
+    // famílias. Colocado como bloco próprio com cache_control, ele é cobrado uma
+    // vez e reaproveitado nas chamadas seguintes (janela de 5 min) — inclusive
+    // entre famílias diferentes. O contexto do cliente vai no bloco seguinte,
+    // sem cache, porque muda a cada conversa.
+    system: [
+      {
+        type: "text",
+        text: `CONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${config.conhecimento || ""}`,
+        cache_control: { type: "ephemeral" },
+      },
+      {
+        type: "text",
+        text: montarSystemPrompt(ctx, { conhecimento: null, tom: config.tom }),
+      },
+      // cast: o cache_control é aceito pela API estável, mas os tipos do SDK 0.32
+      // só o declaram no namespace beta. Runtime OK.
+    ] as any,
     messages: historico.length
       ? historico
       : [{ role: "user", content: "(cliente iniciou conversa)" }],

@@ -61,13 +61,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const r = await anthropic.messages.create({
       model: escolha.modelo,
       max_tokens: 1200,
-      system:
-        `Você É a Sureya, da Zelo & Memória, escrevendo no WhatsApp.\n` +
-        `NUNCA se refira à Sureya na terceira pessoa — você é ela.\n\n` +
-        `${cfg.conhecimento || ""}\n\nTOM DA CASA:\n${cfg.tom || ""}\n\n` +
-        `Responda APENAS com um JSON no formato:\n` +
-        `{"opcoes":[{"titulo":"...","texto":"..."},{"titulo":"...","texto":"..."},{"titulo":"...","texto":"..."}]}\n` +
-        `Sem markdown, sem crases, sem explicação. Cada texto até 80 palavras.`,
+      // system 100% fixo (o que a família disse vai na mensagem do usuário).
+      // Cada "me ajuda a responder" reenviava ~3k tokens de conhecimento ao
+      // modelo caro. Com cache_control, cliques seguidos na mesma janela de 5 min
+      // reaproveitam o bloco em vez de recobrá-lo — era daqui que vinha o custo.
+      system: [{
+        type: "text",
+        cache_control: { type: "ephemeral" },
+        text:
+          `Você É a Sureya, da Zelo & Memória, escrevendo no WhatsApp.\n` +
+          `NUNCA se refira à Sureya na terceira pessoa — você é ela.\n\n` +
+          `${cfg.conhecimento || ""}\n\nTOM DA CASA:\n${cfg.tom || ""}\n\n` +
+          `Responda APENAS com um JSON no formato:\n` +
+          `{"opcoes":[{"titulo":"...","texto":"..."},{"titulo":"...","texto":"..."},{"titulo":"...","texto":"..."}]}\n` +
+          `Sem markdown, sem crases, sem explicação. Cada texto até 80 palavras.`,
+      }] as any,
       messages: [{
         role: "user",
         content:
