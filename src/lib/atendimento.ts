@@ -11,7 +11,7 @@ import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
 import { registrarErro } from "./monitor";
 import { podeChamarIa } from "./custo-ia";
 import { avaliarRetencao } from "./retencao";
-import { escolherModelo, registrarChamada } from "./modelo-ia";
+import { escolherModelo, registrarChamada, precisaModeloBom, type EscolhaModelo, type Proposito } from "./modelo-ia";
 import { quebrarEmBolhas, pausaMs } from "./bolhas";
 import {
   acharCliente,
@@ -106,59 +106,76 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
   const ctx = await montarContexto(cliente);
   const historico = await historicoConversa(conversaId);
   const config = await carregarConfigIa();
+  const score = Number((cliente as any).score) || 0;
 
-  // escolhe o modelo pelo assunto e pelo histórico deste contato
-  const escolha = await escolherModelo({
-    proposito: "atendimento",
-    assunto: (cliente as any).ultimo_assunto || null,
-    score: Number((cliente as any).score) || 0,
-  });
+  // O conhecimento do negócio (~fixo, ~2-3k tokens) é o mesmo para todas as
+  // famílias. Como bloco próprio com cache_control, é cobrado uma vez e
+  // reaproveitado nas chamadas seguintes (janela de 5 min) — inclusive entre
+  // famílias diferentes, e entre os dois passes abaixo. O contexto do cliente
+  // vai no bloco seguinte, sem cache, porque muda a cada conversa.
+  const system = [
+    {
+      type: "text",
+      text: `CONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${config.conhecimento || ""}`,
+      cache_control: { type: "ephemeral" },
+    },
+    {
+      type: "text",
+      text: montarSystemPrompt(ctx, { conhecimento: null, tom: config.tom }),
+    },
+    // cast: o cache_control é aceito pela API estável, mas os tipos do SDK 0.32
+    // só o declaram no namespace beta. Runtime OK.
+  ] as any;
+  const messages = historico.length
+    ? historico
+    : [{ role: "user" as const, content: "(cliente iniciou conversa)" }];
 
-  const resp = await anthropic().messages.create({
-    model: escolha.modelo,
-    max_tokens: 1024,
-    // O conhecimento do negócio (~fixo, ~2-3k tokens) é o mesmo para todas as
-    // famílias. Colocado como bloco próprio com cache_control, ele é cobrado uma
-    // vez e reaproveitado nas chamadas seguintes (janela de 5 min) — inclusive
-    // entre famílias diferentes. O contexto do cliente vai no bloco seguinte,
-    // sem cache, porque muda a cada conversa.
-    system: [
-      {
-        type: "text",
-        text: `CONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${config.conhecimento || ""}`,
-        cache_control: { type: "ephemeral" },
-      },
-      {
-        type: "text",
-        text: montarSystemPrompt(ctx, { conhecimento: null, tom: config.tom }),
-      },
-      // cast: o cache_control é aceito pela API estável, mas os tipos do SDK 0.32
-      // só o declaram no namespace beta. Runtime OK.
-    ] as any,
-    messages: historico.length
-      ? historico
-      : [{ role: "user", content: "(cliente iniciou conversa)" }],
-    tools: [responderTool],
-    tool_choice: { type: "tool", name: "responder" },
-  });
+  // Uma chamada ao modelo escolhido → saída estruturada (ou null se não estruturou).
+  const rodar = async (
+    escolha: EscolhaModelo,
+    proposito: Proposito,
+    assunto: string | null
+  ): Promise<SaidaIa | null> => {
+    const resp = await anthropic().messages.create({
+      model: escolha.modelo,
+      max_tokens: 1024,
+      system,
+      messages,
+      tools: [responderTool],
+      tool_choice: { type: "tool", name: "responder" },
+    });
+    await registrarChamada({
+      proposito, escolha, usage: (resp as any).usage,
+      assunto, clienteId: (cliente as any).id,
+    });
+    const bloco = resp.content.find((b) => b.type === "tool_use");
+    return !bloco || bloco.type !== "tool_use" ? null : (bloco.input as SaidaIa);
+  };
 
-  await registrarChamada({
-    proposito: "atendimento", escolha, usage: (resp as any).usage,
-    assunto: (cliente as any).ultimo_assunto || null, clienteId: (cliente as any).id,
-  });
-
-  const bloco = resp.content.find((b) => b.type === "tool_use");
-  if (!bloco || bloco.type !== "tool_use") {
+  // PASSE 1 — classificar + rascunhar BARATO (Haiku). Classificar é tarefa
+  // interna ("ninguém lê o rótulo"); a filosofia do sistema já manda ir de
+  // econômico. A mesma chamada já devolve um rascunho, que serve para a rotina.
+  const escolhaClass = await escolherModelo({ proposito: "classificacao" });
+  let saida = await rodar(escolhaClass, "classificacao", null);
+  if (!saida) {
     return {
-      assunto: "outro",
-      resposta: "",
-      sensivel: true,
-      precisa_humano: true,
-      confianca: "baixa",
-      motivo: "IA não retornou resposta estruturada",
+      assunto: "outro", resposta: "", sensivel: true, precisa_humano: true,
+      confianca: "baixa", motivo: "IA não retornou resposta estruturada",
     };
   }
-  return bloco.input as SaidaIa;
+
+  // PASSE 2 — só gasta o modelo BOM para ESCREVER quando o assunto pede cuidado
+  // (luto, reclamação, cobrança) ou o passe barato ficou em dúvida. Rotina com
+  // confiança alta fica com o rascunho barato. Reescreve apenas se o modelo bom
+  // for de fato diferente do que já classificou — senão seria pagar duas vezes.
+  if (precisaModeloBom(saida)) {
+    const escolhaBoa = await escolherModelo({ proposito: "atendimento", assunto: saida.assunto, score });
+    if (escolhaBoa.modelo !== escolhaClass.modelo) {
+      const melhor = await rodar(escolhaBoa, "atendimento", saida.assunto);
+      if (melhor) saida = melhor; // a palavra final, no caso sensível, é do modelo bom
+    }
+  }
+  return saida;
 }
 
 // ----------------------------------------------------------------------------

@@ -583,6 +583,34 @@ async function rodar() {
     banco.orgs[0].chave_pix = "zeloememoria@pix.com";
   }
 
+  // ---- Camada de classificação barata: quando escalar pro modelo bom ----
+  {
+    const mod = await import("../src/lib/modelo-ia");
+    const pmb = mod.precisaModeloBom;
+
+    // rotina com confiança alta: fica no barato, NÃO escala
+    checar("rotina confiante não escala pro modelo bom",
+           pmb({ assunto: "agendamento", sensivel: false, precisa_humano: false, confianca: "alta" }) === false, "");
+    checar("dúvida simples confiante não escala",
+           pmb({ assunto: "duvida", sensivel: false, precisa_humano: false, confianca: "alta" }) === false, "");
+
+    // sensível SEMPRE escala, mesmo se o passe barato se disser confiante
+    checar("luto escala pro modelo bom",
+           pmb({ assunto: "luto", sensivel: false, precisa_humano: false, confianca: "alta" }) === true, "");
+    checar("reclamação escala pro modelo bom",
+           pmb({ assunto: "reclamacao", sensivel: false, precisa_humano: false, confianca: "alta" }) === true, "");
+    checar("cobrança escala pro modelo bom",
+           pmb({ assunto: "cobranca", sensivel: false, precisa_humano: false, confianca: "alta" }) === true, "");
+
+    // sinais de cuidado escalam mesmo em assunto de rotina
+    checar("baixa confiança escala mesmo em rotina",
+           pmb({ assunto: "agendamento", sensivel: false, precisa_humano: false, confianca: "baixa" }) === true, "");
+    checar("IA marcou sensível: escala",
+           pmb({ assunto: "outro", sensivel: true, precisa_humano: false, confianca: "alta" }) === true, "");
+    checar("IA pediu humano: escala",
+           pmb({ assunto: "outro", sensivel: false, precisa_humano: true, confianca: "alta" }) === true, "");
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

@@ -85,6 +85,30 @@ export async function escolherModelo(p: {
   return escolher("padrao", "padrão");
 }
 
+/**
+ * Vale gastar o modelo BOM para ESCREVER esta resposta?
+ *
+ * A classificação é feita barata (Haiku). Depois desta decisão, o modelo bom
+ * só entra quando o assunto pede cuidado — luto, reclamação, cobrança — ou
+ * quando o passe barato ficou em dúvida. Rotina com confiança alta fica com o
+ * rascunho barato; a rede de palavras críticas e o rascunho abaixo do score
+ * seguram o que escapar.
+ */
+export function precisaModeloBom(s: {
+  assunto?: string | null;
+  sensivel?: boolean;
+  precisa_humano?: boolean;
+  confianca?: string | null;
+}): boolean {
+  const a = (s.assunto || "").toLowerCase();
+  if (SENSIVEIS.includes(a)) return true;      // luto, reclamacao, cancelamento
+  if (a === "cobranca") return true;           // o tom da cobrança decide a relação
+  if (s.sensivel) return true;                 // o passe barato levantou a mão
+  if (s.precisa_humano) return true;
+  if ((s.confianca || "") !== "alta") return true; // ficou em dúvida: não arrisca no barato
+  return false;
+}
+
 /** Custo em R$ de uma chamada, a partir dos tokens que a API devolveu. */
 export function custoDaChamada(e: EscolhaModelo, tokensEntrada: number, tokensSaida: number): number {
   const c = (tokensEntrada / 1e6) * e.precoEntrada + (tokensSaida / 1e6) * e.precoSaida;
