@@ -8,6 +8,7 @@ import Materiais from "./Materiais";
 import ConfirmarJazigo from "./ConfirmarJazigo";
 import NaoDeu from "./NaoDeu";
 import Concluir from "./Concluir";
+import CapturarJazigo from "./CapturarJazigo";
 
 interface Aviso { tipo: string; texto: string }
 
@@ -45,6 +46,7 @@ export default function Campo() {
   const [finalizando, setFinalizando] = useState<Item | null>(null);
   const [naoDeu, setNaoDeu] = useState<Item | null>(null);
   const [pedirMaterial, setPedirMaterial] = useState(false);
+  const [capturarJazigo, setCapturarJazigo] = useState(false);
   const [iniciando, setIniciando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
@@ -154,6 +156,10 @@ export default function Campo() {
         🧴 Pedir material que está faltando
       </button>
 
+      <button style={s.botaoCadastrar} onClick={() => setCapturarJazigo(true)}>
+        ➕ Cadastrar jazigo (GPS e fotos)
+      </button>
+
       {[...grupos.entries()].map(([local, itens]) => (
         <section key={local}>
           <div style={s.tituloRua}>{local}</div>
@@ -205,6 +211,13 @@ export default function Campo() {
       )}
 
       {pedirMaterial && <Materiais onFechar={() => setPedirMaterial(false)} />}
+
+      {capturarJazigo && (
+        <CapturarJazigo
+          onFechar={() => setCapturarJazigo(false)}
+          onPronto={() => { setCapturarJazigo(false); carregar(); }}
+        />
+      )}
     </main>
   );
 }
@@ -285,7 +298,10 @@ const s: Record<string, React.CSSProperties> = {
   contagem: { fontSize: 15, color: "#475569", marginTop: 6 },
   botaoMaterial: { width: "100%", minHeight: 60, padding: 18, background: "#fff", color: NAVY,
                    border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 17, fontWeight: 600,
-                   cursor: "pointer", marginBottom: 16 },
+                   cursor: "pointer", marginBottom: 12 },
+  botaoCadastrar: { width: "100%", minHeight: 60, padding: 18, background: "#0f766e", color: "#fff",
+                    border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700,
+                    cursor: "pointer", marginBottom: 16 },
   tituloRua: { fontSize: 14, fontWeight: 700, color: "#c6a15b", textTransform: "uppercase",
                letterSpacing: 1, margin: "20px 0 10px" },
   cartao: { background: "#fff", borderRadius: 16, padding: 18, marginBottom: 14,
