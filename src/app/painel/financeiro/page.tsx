@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
+import Reajustes from "./Reajustes";
 
 interface Comp {
   id: string;
@@ -15,8 +16,36 @@ interface Comp {
   cliente: string;
 }
 
+/**
+ * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
+ * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
+ */
+type AbaFin = "gestao" | "conferir" | "equipe" | "jazigos" | "reajustes";
+
+const ABAS_FIN: [AbaFin, string][] = [
+  ["gestao", "Gestão do negócio"],
+  ["conferir", "Conferir entradas"],
+  ["equipe", "Conta da equipe"],
+  ["jazigos", "Resultado por jazigo"],
+  ["reajustes", "Reajustes"],
+];
+
 export default function Financeiro() {
-  const [aba, setAba] = useState<"gestao" | "conferir" | "equipe" | "jazigos">("gestao");
+  const [aba, setAba] = useState<AbaFin>("gestao");
+
+  // a aba escolhida entra no endereco: da para mandar o link certo e o F5 nao
+  // devolve a pessoa para a primeira aba. Lido no window dentro do useEffect e
+  // NAO com useSearchParams — que no Next 14 exigiria <Suspense> na pagina toda.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("aba");
+    if (ABAS_FIN.some(([v]) => v === q)) setAba(q as AbaFin);
+  }, []);
+
+  function trocar(v: AbaFin) {
+    setAba(v);
+    const url = v === "gestao" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
+    window.history.replaceState(null, "", url);
+  }
 
   return (
     <div style={painel.wrap}>
@@ -24,14 +53,9 @@ export default function Financeiro() {
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Financeiro</h1>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          {([
-            ["gestao", "Gestão do negócio"],
-            ["conferir", "Conferir entradas"],
-            ["equipe", "Conta da equipe"],
-            ["jazigos", "Resultado por jazigo"],
-          ] as const).map(([v, rot]) => (
+          {ABAS_FIN.map(([v, rot]) => (
             <button key={v} style={aba === v ? painel.botao : painel.botaoSec}
-                    onClick={() => setAba(v)}>
+                    onClick={() => trocar(v)}>
               {rot}
             </button>
           ))}
@@ -41,6 +65,7 @@ export default function Financeiro() {
         {aba === "conferir" && <Conferir />}
         {aba === "equipe" && <Equipe />}
         {aba === "jazigos" && <PorJazigo />}
+        {aba === "reajustes" && <Reajustes />}
       </div>
     </div>
   );

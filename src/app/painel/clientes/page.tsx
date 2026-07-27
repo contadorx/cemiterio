@@ -6,6 +6,7 @@ import { PainelNav, painel, cor, numeroBR } from "../ui";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
+import VisaoMapa from "./VisaoMapa";
 
 /**
  * CARTEIRA — familia, jazigo e servico na MESMA tela.
@@ -18,6 +19,7 @@ import VincularLote from "./VincularLote";
  *   Familias        · quem paga, quanto deve, quando lava (a lista de sempre)
  *   Jazigos e planos· cada jazigo com valor, periodicidade e vencimento (a
  *                     antiga "Gestao", em VisaoJazigos.tsx)
+ *   Mapa            · a planta em escala real, mesma regua de cor (VisaoMapa)
  *   Do campo (n)    · os jazigos capturados no cemiterio esperando familia
  *
  * A aba fica no endereco (?aba=jazigos): dá para mandar o link certo para
@@ -25,11 +27,12 @@ import VincularLote from "./VincularLote";
  * feita no window (dentro do useEffect), NAO com useSearchParams — que no
  * Next 14 obriga um <Suspense> em volta da pagina inteira so por causa disso.
  */
-type Aba = "familias" | "jazigos" | "campo";
+type Aba = "familias" | "jazigos" | "mapa" | "campo";
 
 const ABAS: { chave: Aba; rotulo: string }[] = [
   { chave: "familias", rotulo: "Famílias" },
   { chave: "jazigos", rotulo: "Jazigos e planos" },
+  { chave: "mapa", rotulo: "Mapa" },
   { chave: "campo", rotulo: "Do campo" },
 ];
 
@@ -39,7 +42,7 @@ export default function Carteira() {
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("aba");
-    if (q === "jazigos" || q === "campo" || q === "familias") setAba(q);
+    if (ABAS.some((a) => a.chave === q)) setAba(q as Aba);
   }, []);
 
   // contador da aba "Do campo": o numero e o convite. Sem ele ninguem descobre
@@ -85,6 +88,7 @@ export default function Carteira() {
 
         {aba === "familias" && <VisaoFamilias />}
         {aba === "jazigos" && <VisaoJazigos />}
+        {aba === "mapa" && <VisaoMapa />}
         {aba === "campo" && <VincularLote onMudou={contarOrfaos} />}
       </div>
     </div>
