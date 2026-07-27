@@ -4,6 +4,92 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor, numeroBR } from "../ui";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
+import VisaoJazigos from "./VisaoJazigos";
+import VincularLote from "./VincularLote";
+
+/**
+ * CARTEIRA — familia, jazigo e servico na MESMA tela.
+ *
+ * Eram duas telas ("Familias" e "Gestao") e um caminho que nao existia (o que a
+ * equipe captura no campo). Nao havia razao para a separacao: se tem familia,
+ * tem jazigo, e se tem jazigo, tem servico — e quem trabalha precisa dos tres
+ * ao mesmo tempo. Agora sao abas:
+ *
+ *   Familias        · quem paga, quanto deve, quando lava (a lista de sempre)
+ *   Jazigos e planos· cada jazigo com valor, periodicidade e vencimento (a
+ *                     antiga "Gestao", em VisaoJazigos.tsx)
+ *   Do campo (n)    · os jazigos capturados no cemiterio esperando familia
+ *
+ * A aba fica no endereco (?aba=jazigos): dá para mandar o link certo para
+ * alguem e o F5 nao joga a pessoa de volta para a primeira aba. A leitura e
+ * feita no window (dentro do useEffect), NAO com useSearchParams — que no
+ * Next 14 obriga um <Suspense> em volta da pagina inteira so por causa disso.
+ */
+type Aba = "familias" | "jazigos" | "campo";
+
+const ABAS: { chave: Aba; rotulo: string }[] = [
+  { chave: "familias", rotulo: "Famílias" },
+  { chave: "jazigos", rotulo: "Jazigos e planos" },
+  { chave: "campo", rotulo: "Do campo" },
+];
+
+export default function Carteira() {
+  const [aba, setAba] = useState<Aba>("familias");
+  const [orfaos, setOrfaos] = useState<number | null>(null);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("aba");
+    if (q === "jazigos" || q === "campo" || q === "familias") setAba(q);
+  }, []);
+
+  // contador da aba "Do campo": o numero e o convite. Sem ele ninguem descobre
+  // que ha jazigo esperando familia — foi assim que a fila cresceu ate agora.
+  const contarOrfaos = useCallback(() => {
+    fetch("/api/tumulos")
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setOrfaos((r.semDono || []).length); })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { contarOrfaos(); }, [contarOrfaos]);
+
+  function trocar(a: Aba) {
+    setAba(a);
+    const url = a === "familias" ? "/painel/clientes" : `/painel/clientes?aba=${a}`;
+    window.history.replaceState(null, "", url);
+  }
+
+  return (
+    <div style={painel.wrap}>
+      <PainelNav atual="/painel/clientes" />
+      <div style={painel.conteudo}>
+        <h1 style={{ ...painel.h1, marginBottom: 10 }}>Carteira</h1>
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+          {ABAS.map((a) => {
+            const ativa = aba === a.chave;
+            const n = a.chave === "campo" ? orfaos : null;
+            return (
+              <button
+                key={a.chave}
+                onClick={() => trocar(a.chave)}
+                style={{
+                  ...(ativa ? painel.botaoMini : painel.botaoMiniSec),
+                  ...(a.chave === "campo" && !ativa && n ? { borderColor: "#d97706", color: "#92400e" } : {}),
+                }}
+              >
+                {a.rotulo}{n ? ` (${n})` : ""}
+              </button>
+            );
+          })}
+        </div>
+
+        {aba === "familias" && <VisaoFamilias />}
+        {aba === "jazigos" && <VisaoJazigos />}
+        {aba === "campo" && <VincularLote onMudou={contarOrfaos} />}
+      </div>
+    </div>
+  );
+}
 
 interface Cli {
   id: string;
@@ -14,7 +100,7 @@ interface Cli {
   ativo_ia: boolean;
 }
 
-export default function Clientes() {
+function VisaoFamilias() {
   const [d, setD] = useState<any>(null);
   const [f, setF] = useState({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
                                regua: "", venceEm: "", ordem: "nome", teste: false });
@@ -40,11 +126,8 @@ export default function Clientes() {
   const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
 
   return (
-    <div style={painel.wrap}>
-      <PainelNav atual="/painel/clientes" />
-      <div style={painel.conteudo}>
-        <h1 style={painel.h1}>Famílias</h1>
-
+    <div>
+      <div>
         <div style={{ ...painel.card, padding: 12 }}>
           <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input style={{ ...painel.input, flex: 1, minWidth: 180 }} value={f.busca}

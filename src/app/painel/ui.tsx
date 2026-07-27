@@ -31,8 +31,9 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
   {
     titulo: "Carteira",
     itens: [
-      { href: "/painel/clientes", label: "Famílias" },
-      { href: "/painel/planos", label: "Gestão" },
+      // "Famílias" e "Gestão" eram a mesma carteira em duas portas: uma
+      // mostrava quem paga, a outra o que se cobra. Agora é uma tela com abas.
+      { href: "/painel/clientes", label: "Carteira" },
       { href: "/painel/mapa", label: "Mapa" },
       { href: "/painel/financeiro", label: "Financeiro" },
       { href: "/painel/reajustes", label: "Reajustes" },

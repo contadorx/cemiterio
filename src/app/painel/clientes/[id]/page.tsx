@@ -1803,12 +1803,18 @@ function AdicionarTumulo({
   ) : null;
 
   if (!aberto) {
+    // Botão PRIMÁRIO e de largura cheia de propósito: ele já existia como
+    // botão secundário e passou despercebido duas vezes. É a única porta para
+    // incluir jazigo numa família já cadastrada — não pode parecer detalhe.
     return (
-      <div style={{ marginTop: 12 }}>
-        <button style={painel.botaoSec}
+      <div style={{ marginTop: 14, borderTop: `1px solid ${cor.linha}`, paddingTop: 14 }}>
+        <button style={{ ...painel.botao, width: "100%" }}
                 onClick={() => { setErro(null); setAviso(null); setAberto(true); }}>
-          + Adicionar túmulo
+          + Adicionar túmulo / jazigo
         </button>
+        <p style={{ color: cor.cinza, fontSize: 13, margin: "6px 0 0" }}>
+          Cadastre um jazigo novo ou puxe um que a equipe capturou no campo.
+        </p>
         {caixaAviso}
       </div>
     );
