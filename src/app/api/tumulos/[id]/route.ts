@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { normalizarMMDD } from "@/lib/memoria";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,16 +14,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};
 
-  for (const c of ["identificacao", "rua", "quadra_id", "numero"]) {
-    if (body[c] !== undefined) patch[c] = body[c] || null;
+  for (const c of ["identificacao", "rua", "quadra_id", "numero", "observacoes"]) {
+    // === "" e não `||`: "0" é um número de jazigo válido e não pode virar null
+    if (body[c] !== undefined) patch[c] = body[c] === "" || body[c] === null ? null : body[c];
   }
+  // vincular/desvincular o jazigo a uma família (ex.: um jazigo capturado no campo)
+  if (body.cliente_id !== undefined) patch.cliente_id = body.cliente_id || null;
   if (body.falecido_nome !== undefined) patch.falecido_nome = body.falecido_nome || null;
 
   if (body.data_falecimento !== undefined || body.data_nascimento !== undefined) {
     const datas: { tipo: string; data: string }[] = [];
-    const mmdd = (v: string) => (v || "").trim().slice(-5); // aceita completa ou MM-DD
-    if (body.data_falecimento) datas.push({ tipo: "falecimento", data: mmdd(body.data_falecimento) });
-    if (body.data_nascimento) datas.push({ tipo: "nascimento", data: mmdd(body.data_nascimento) });
+    for (const [campo, tipo] of [["data_falecimento", "falecimento"], ["data_nascimento", "nascimento"]]) {
+      if (!body[campo]) continue;
+      const d = normalizarMMDD(body[campo]);
+      if (!d) {
+        return NextResponse.json(
+          { ok: false, erro: `data de ${tipo} não entendida — use MM-DD (ex.: 07-23)` },
+          { status: 400 },
+        );
+      }
+      datas.push({ tipo, data: d });
+    }
     patch.datas_gatilho = datas;
   }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
+import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 
 interface Cli {
   id: string;
@@ -176,22 +177,51 @@ export default function Clientes() {
 function Importar({ onPronto }: { onPronto: () => void }) {
   const [modo, setModo] = useState<"nova" | "csv">("nova");
   const [f, setF] = useState({
-    nome: "", telefone: "", tratamento: "a senhora", jazigo: "", quadraId: "", rua: "",
-    cadencia: "mensal", valorMensal: 40, consentimento: false,
+    nome: "", telefone: "", tratamento: "a senhora", consentimento: false,
+    // jazigo
+    jazigoModo: "novo" as "novo" | "vincular",
+    vincularTumuloId: "",
+    identificacao: "", quadraCodigo: "", rua: "", falecidoNome: "",
+    // plano
+    atalho: 2, // índice em ATALHOS_FREQUENCIA (2 = "Uma vez por mês")
+    valorMensal: 40, inicio: "",
   });
-  const [quadras, setQuadras] = useState<any[]>([]);
+  const [quadras, setQuadras] = useState<string[]>([]);
+  const [semDono, setSemDono] = useState<any[]>([]);
   const [csv, setCsv] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
   useEffect(() => {
-    fetch("/api/quadras").then((x) => x.json()).then((r) => r.ok && setQuadras(r.quadras)).catch(() => {});
+    fetch("/api/tumulos").then((x) => x.json()).then((r) => {
+      if (!r?.ok) return;
+      const codigos = (r.cemiterios || []).flatMap((c: any) => (c.quadras || []).map((q: any) => q.codigo));
+      setQuadras([...new Set<string>(codigos)]);
+      setSemDono(r.semDono || []);
+    }).catch(() => {});
   }, []);
 
   async function criar() {
     if (!f.nome.trim() || !f.telefone.trim()) return alert("Nome e telefone são obrigatórios.");
+    if (f.jazigoModo === "vincular" && !f.vincularTumuloId) return alert("Escolha o jazigo já cadastrado ou troque para “novo”.");
+    if (f.jazigoModo === "novo" && f.identificacao.trim() && !f.quadraCodigo.trim())
+      return alert("Diga a quadra do jazigo.");
+
+    const at = ATALHOS_FREQUENCIA[f.atalho];
+    const temJazigo = f.jazigoModo === "vincular" ? !!f.vincularTumuloId : !!f.identificacao.trim();
+
     setOcupado(true);
     const r = await fetch("/api/clientes", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: f.nome, telefone: f.telefone, tratamento: f.tratamento, consentimento: f.consentimento,
+        jazigo: f.jazigoModo === "vincular"
+          ? { vincularTumuloId: f.vincularTumuloId, falecidoNome: f.falecidoNome }
+          : { identificacao: f.identificacao, quadraCodigo: f.quadraCodigo, rua: f.rua, falecidoNome: f.falecidoNome },
+        // só manda plano se há jazigo e a periodicidade não é avulso
+        plano: temJazigo && at.cadencia !== "avulso"
+          ? { cadencia: at.cadencia, lavagensPorCiclo: at.lavagens, valorMensal: f.valorMensal, inicio: f.inicio || undefined }
+          : undefined,
+      }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) onPronto();
@@ -209,6 +239,9 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     else alert("Falhou: " + (r?.erro || "erro"));
   }
 
+  const secao: React.CSSProperties = { borderTop: `1px solid ${cor.linha}`, marginTop: 14, paddingTop: 12 };
+  const tituloSecao: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: cor.cinza, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 };
+
   return (
     <div style={painel.card}>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -222,10 +255,13 @@ function Importar({ onPronto }: { onPronto: () => void }) {
 
       {modo === "nova" && (
         <>
+          {/* FAMÍLIA */}
+          <div style={tituloSecao}>Família</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 180 }}>
               <label style={painel.rotulo}>Nome da família</label>
-              <input style={painel.input} value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} />
+              <input style={painel.input} value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })}
+                     placeholder="Família SILVA" />
             </div>
             <div>
               <label style={painel.rotulo}>WhatsApp</label>
@@ -242,40 +278,90 @@ function Importar({ onPronto }: { onPronto: () => void }) {
               </select>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={painel.rotulo}>Jazigo</label>
-              <input style={painel.input} value={f.jazigo} onChange={(e) => setF({ ...f, jazigo: e.target.value })}
-                     placeholder="Família SILVA" />
+
+          {/* JAZIGO E LOCALIZAÇÃO */}
+          <div style={secao}>
+            <div style={tituloSecao}>Jazigo e localização</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button style={f.jazigoModo === "novo" ? painel.botaoMiniSec : { ...painel.botaoMiniSec, opacity: 0.6 }}
+                      onClick={() => setF({ ...f, jazigoModo: "novo" })}>Novo jazigo</button>
+              {semDono.length > 0 && (
+                <button style={f.jazigoModo === "vincular" ? painel.botaoMiniSec : { ...painel.botaoMiniSec, opacity: 0.6 }}
+                        onClick={() => setF({ ...f, jazigoModo: "vincular" })}>
+                  Vincular jazigo do campo ({semDono.length})
+                </button>
+              )}
             </div>
-            <div>
-              <label style={painel.rotulo}>Quadra</label>
-              <select style={{ ...painel.input, width: 120 }} value={f.quadraId}
-                      onChange={(e) => setF({ ...f, quadraId: e.target.value })}>
-                <option value="">—</option>
-                {quadras.map((q) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={painel.rotulo}>Rua</label>
-              <input style={{ ...painel.input, width: 100 }} value={f.rua}
-                     onChange={(e) => setF({ ...f, rua: e.target.value })} placeholder="RUA 1" />
-            </div>
-            <div>
-              <label style={painel.rotulo}>Periodicidade</label>
-              <select style={{ ...painel.input, width: 130 }} value={f.cadencia}
-                      onChange={(e) => setF({ ...f, cadencia: e.target.value })}>
-                {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
-                  <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={painel.rotulo}>Valor mensal</label>
-              <input type="number" style={{ ...painel.input, width: 110 }} value={f.valorMensal}
-                     onChange={(e) => setF({ ...f, valorMensal: Number(e.target.value) })} />
+
+            {f.jazigoModo === "novo" ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 150 }}>
+                  <label style={painel.rotulo}>Identificação (lote/número)</label>
+                  <input style={painel.input} value={f.identificacao}
+                         onChange={(e) => setF({ ...f, identificacao: e.target.value })} placeholder="045 · lote 12" />
+                </div>
+                <div>
+                  <label style={painel.rotulo}>Quadra</label>
+                  <input style={{ ...painel.input, width: 130 }} value={f.quadraCodigo} list="quadras-cad"
+                         onChange={(e) => setF({ ...f, quadraCodigo: e.target.value })} placeholder="Q-12" />
+                  <datalist id="quadras-cad">{quadras.map((c) => <option key={c} value={c} />)}</datalist>
+                </div>
+                <div>
+                  <label style={painel.rotulo}>Rua</label>
+                  <input style={{ ...painel.input, width: 100 }} value={f.rua}
+                         onChange={(e) => setF({ ...f, rua: e.target.value })} placeholder="RUA 1" />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={painel.rotulo}>Jazigo já cadastrado (capturado no campo)</label>
+                <select style={painel.input} value={f.vincularTumuloId}
+                        onChange={(e) => setF({ ...f, vincularTumuloId: e.target.value })}>
+                  <option value="">— escolha —</option>
+                  {semDono.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {[t.quadra, t.identificacao, t.rua].filter(Boolean).join(" · ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={{ marginTop: 10 }}>
+              <label style={painel.rotulo}>Falecido (opcional)</label>
+              <input style={painel.input} value={f.falecidoNome}
+                     onChange={(e) => setF({ ...f, falecidoNome: e.target.value })} placeholder="Nome no jazigo" />
             </div>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, margin: "12px 0" }}>
+
+          {/* PLANO / PERIODICIDADE / VENCIMENTO */}
+          <div style={secao}>
+            <div style={tituloSecao}>Plano e periodicidade</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ flex: 1, minWidth: 190 }}>
+                <label style={painel.rotulo}>Frequência das lavagens</label>
+                <select style={painel.input} value={f.atalho}
+                        onChange={(e) => setF({ ...f, atalho: Number(e.target.value) })}>
+                  {ATALHOS_FREQUENCIA.map((a, i) => <option key={i} value={i}>{a.rotulo}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={painel.rotulo}>Valor mensal</label>
+                <input type="number" style={{ ...painel.input, width: 110 }} value={f.valorMensal}
+                       onChange={(e) => setF({ ...f, valorMensal: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label style={painel.rotulo}>1ª lavagem</label>
+                <input type="date" style={{ ...painel.input, width: 160 }} value={f.inicio}
+                       onChange={(e) => setF({ ...f, inicio: e.target.value })} />
+              </div>
+            </div>
+            <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
+              A 1ª lavagem e a próxima cobrança já entram na data escolhida (ou hoje). “Só quando pedirem” não cria plano.
+            </p>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, margin: "14px 0" }}>
             <input type="checkbox" checked={f.consentimento}
                    onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
             A família autorizou o contato por WhatsApp (LGPD)

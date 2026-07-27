@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { diaOperacao, somaDias } from "./vencimento";
 
 // Dias de cada ciclo. qtd_por_passagem subdivide o ciclo:
 // mensal + 2/passagem => passa a cada ~15 dias (2x/mês). mensal + 1 => 30 dias.
@@ -11,16 +12,18 @@ export const DIAS_CICLO: Record<string, number> = {
   anual: 365,
 };
 
+// Hoje e a soma de dias vêm da MESMA fonte da régua de vencimento
+// (src/lib/vencimento.ts). Antes eram `toISOString()` do relógio da máquina:
+// das 21h à meia-noite de Brasília o gerador achava que já era amanhã e gravava
+// `proximo_servico` um dia à frente do que Gestão e Mapa mostravam.
 function isoHoje(): string {
-  return new Date().toISOString().slice(0, 10);
+  return diaOperacao();
 }
 function addDias(iso: string, dias: number): string {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + dias);
-  return d.toISOString().slice(0, 10);
+  return somaDias(iso, dias);
 }
 function ehDomingo(iso: string): boolean {
-  return new Date(iso + "T00:00:00").getDay() === 0;
+  return new Date(iso + "T12:00:00Z").getUTCDay() === 0;
 }
 // Jornada configurada: quais dias a equipe trabalha e quais datas estão bloqueadas.
 interface Jornada {

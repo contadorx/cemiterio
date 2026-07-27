@@ -1,45 +1,121 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PainelNav, painel, cor } from "../../ui";
+import { PainelNav, painel, cor, numeroBR, dinheiroBR } from "../../ui";
 import Extras from "./Extras";
 import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
+import { normalizarMMDD } from "@/lib/memoria";
+import { valorMensalDoPlano } from "@/lib/vencimento";
+
+/**
+ * REGISTRO DE PENDÊNCIAS — o mecanismo de salvar da ficha.
+ *
+ * A ficha é grande e tem vários blocos editáveis (dados da família, cada jazigo,
+ * régua de cobrança). Cada bloco que tem edição não salva se declara aqui,
+ * entregando a PRÓPRIA função de gravar e um rótulo legível. A barra do rodapé
+ * lê esse registro: sabe quantos e quais blocos estão pendentes e grava todos
+ * chamando as funções — sem simular clique no DOM e sem esperar por timeout,
+ * como fazia o mecanismo antigo.
+ */
+type Pendencia = { rotulo: string; salvar: () => Promise<boolean> };
+type Registrar = (chave: string, pendencia: Pendencia | null) => void;
+
+/**
+ * Registra/desregistra a pendência do bloco conforme ele fica sujo ou limpo.
+ * A função de gravar é lida de um ref, então a barra sempre chama a versão
+ * mais recente (com os valores atuais do formulário) mesmo tendo registrado
+ * uma vez só — o que mantém o pai re-renderizando só quando muda de estado.
+ */
+function usarPendencia(
+  registrar: Registrar | undefined,
+  chave: string,
+  rotulo: string,
+  sujo: boolean,
+  gravar: () => Promise<boolean>,
+) {
+  const gravarRef = useRef(gravar);
+  const rotuloRef = useRef(rotulo);
+  // atualizado depois do commit (não durante o render) — em React 18 um render
+  // descartado deixaria o ref apontando para um closure que nunca existiu
+  useEffect(() => {
+    gravarRef.current = gravar;
+    rotuloRef.current = rotulo;
+  });
+
+  useEffect(() => {
+    if (!registrar) return;
+    if (sujo) registrar(chave, { rotulo, salvar: () => gravarRef.current() });
+    else registrar(chave, null);
+  }, [registrar, chave, sujo, rotulo]);
+
+  // ao desmontar (jazigo excluído, ficha trocada) a pendência sai do registro
+  useEffect(() => () => registrar?.(chave, null), [registrar, chave]);
+}
 
 export default function FichaCliente() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
   const [d, setD] = useState<any>(null);
-  // cada bloco avisa aqui o que tem para salvar; a barra embaixo salva tudo junto
-  const [pendencias, setPendencias] = useState<Record<string, () => Promise<boolean>>>({});
+  const [pendencias, setPendencias] = useState<Record<string, Pendencia>>({});
   const [salvandoTudo, setSalvandoTudo] = useState(false);
 
-  function registrarPendencia(chave: string, salvar: (() => Promise<boolean>) | null) {
-    setPendencias((p) => {
-      const novo = { ...p };
-      if (salvar) novo[chave] = salvar; else delete novo[chave];
-      return novo;
+  // identidade estável: os blocos usam isto como dependência de efeito
+  const registrar = useCallback<Registrar>((chave, pendencia) => {
+    setPendencias((atual) => {
+      if (!pendencia) {
+        if (!(chave in atual)) return atual; // evita re-render à toa
+        const novo = { ...atual };
+        delete novo[chave];
+        return novo;
+      }
+      return { ...atual, [chave]: pendencia };
     });
-  }
+  }, []);
+
+  // trava em ref: dois eventos no mesmo tick (clique + Enter) passariam por um
+  // if() de estado, e o estado só volta a false depois do recarregamento
+  const salvandoRef = useRef(false);
 
   async function salvarTudo() {
+    const itens = Object.values(pendencias);
+    if (!itens.length || salvandoRef.current) return;
+    salvandoRef.current = true;
     setSalvandoTudo(true);
-    let falhou = 0;
-    for (const salvar of Object.values(pendencias)) {
-      const ok = await salvar().catch(() => false);
-      if (!ok) falhou++;
+    const falhas: string[] = [];
+    try {
+      for (const p of itens) {
+        const ok = await p.salvar().catch(() => false);
+        if (!ok) falhas.push(p.rotulo);
+      }
+      if (falhas.length) {
+        alert(
+          `Não consegui salvar: ${falhas.join(", ")}.\n` +
+          "O que salvou já está gravado. Confira esses campos e tente de novo.",
+        );
+      }
+      await carregar().catch(() => {});
+    } finally {
+      salvandoRef.current = false;
+      setSalvandoTudo(false);
     }
-    setSalvandoTudo(false);
-    setPendencias({});
-    carregar();
-    if (falhou) alert(`${falhou} bloco(s) não salvaram. Confira e tente de novo.`);
   }
+
+  // aviso do navegador se tentar sair com edição pendente
+  useEffect(() => {
+    if (!Object.keys(pendencias).length) return;
+    const aviso = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [pendencias]);
+
   const [inst, setInst] = useState("");
   const [modo, setModo] = useState("copiloto");
   const [ativo, setAtivo] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [erroIa, setErroIa] = useState("");
   const [hist, setHist] = useState("");
   const [treinando, setTreinando] = useState(false);
 
@@ -63,31 +139,52 @@ export default function FichaCliente() {
     }
   }
 
+  // este bloco (Atendimento da IA) tem estado próprio no topo da página; o
+  // recarregamento só pode sobrescrever o que o usuário digitou se ele NÃO
+  // estiver com edição pendente — senão "Salvar tudo" apagaria o texto dele
+  const iaSujoRef = useRef(false);
+
   async function carregar() {
     const r = await fetch(`/api/clientes/${id}`).then((x) => x.json());
     if (r.ok) {
       setD(r);
-      setInst(r.cliente.instrucoes_ia || "");
-      setModo(r.cliente.modo);
-      setAtivo(r.cliente.ativo_ia);
+      if (!iaSujoRef.current) {
+        setInst(r.cliente.instrucoes_ia || "");
+        setModo(r.cliente.modo);
+        setAtivo(r.cliente.ativo_ia);
+      }
     }
   }
   useEffect(() => {
     if (id) carregar();
   }, [id]);
 
-  async function salvar() {
+  async function gravarIa(): Promise<boolean> {
     setSalvando(true);
     setOk(false);
-    await fetch(`/api/clientes/${id}`, {
+    setErroIa("");
+    const r = await fetch(`/api/clientes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ instrucoes_ia: inst, modo, ativo_ia: ativo }),
-    });
+    }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    setOk(true);
-    setTimeout(() => setOk(false), 2000);
+    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); return true; }
+    setErroIa(String(r?.erro || "não consegui salvar"));
+    return false;
   }
+
+  async function salvar() {
+    const deu = await gravarIa();
+    if (deu) carregar();
+  }
+
+  const cli = d?.cliente;
+  const iaSujo = !!cli && (
+    inst !== (cli.instrucoes_ia || "") || modo !== cli.modo || ativo !== cli.ativo_ia
+  );
+  iaSujoRef.current = iaSujo;
+  usarPendencia(registrar, "ia", "atendimento da IA", iaSujo, gravarIa);
 
   if (!d) {
     return (
@@ -109,7 +206,7 @@ export default function FichaCliente() {
       <PainelNav atual="/painel/clientes" />
       <div style={painel.conteudo}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <Identificacao c={c} onSalvo={carregar} registrar={registrarPendencia} />
+          <Identificacao c={c} onSalvo={carregar} registrar={registrar} />
           <button style={painel.botao} onClick={abrirConversa}>Abrir conversa</button>
         </div>
 
@@ -168,8 +265,12 @@ export default function FichaCliente() {
             placeholder="Ex.: sempre confirmar a data antes de cobrar; ele costuma pagar dia 5; tratar com Sr."
           />
           <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-            <button style={painel.botao} onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
+            <button style={iaSujo ? painel.botao : painel.botaoSec} onClick={salvar}
+                    disabled={salvando || !iaSujo}>
+              {salvando ? "Salvando…" : iaSujo ? "Salvar" : "Sem alterações"}
+            </button>
             {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+            {erroIa && <span style={{ color: "#dc2626", fontSize: 14 }}>{erroIa}</span>}
           </div>
           {c.perfil_ia && (
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
@@ -199,12 +300,18 @@ export default function FichaCliente() {
             sugere um rascunho 7 dias antes, todo ano.
           </p>
           {d.tumulos.length === 0 && <p style={{ color: cor.cinza }}>Nenhum túmulo cadastrado.</p>}
-          {(d.tumulos || []).map((t: any) => (
-            <TumuloEdit key={t.id} t={t}
-                        plano={(d.planos || []).find((p: any) => p.tumulo_id === t.id) || null}
-                        onSalvo={carregar} />
-          ))}
+          {(d.tumulos || []).map((t: any) => {
+            const pl = (d.planos || []).find((p: any) => p.tumulo_id === t.id) || null;
+            // a key inclui o plano: quando um plano é criado agora, o bloco
+            // remonta e lê os valores reais (antes o estado interno seguia com
+            // os zeros do "sem plano" e a barra oferecia gravá-los)
+            return (
+              <TumuloEdit key={`${t.id}:${pl?.id ?? "novo"}`} t={t} plano={pl}
+                          onSalvo={carregar} registrar={registrar} />
+            );
+          })}
 
+          <VincularJazigo clienteId={id} onMudou={carregar} />
         </div>
 
         <div style={painel.card}>
@@ -221,7 +328,7 @@ export default function FichaCliente() {
           </div>
         </div>
 
-        <BarraSalvar />
+        <BarraSalvar pendencias={pendencias} salvando={salvandoTudo} onSalvarTudo={salvarTudo} />
 
         <Extras clienteId={id} tumulos={d.tumulos || []} onMudou={carregar} />
 
@@ -229,7 +336,7 @@ export default function FichaCliente() {
 
         <SaldoAbertura clienteId={id} saldoAtual={d.saldo} onSalvo={carregar} />
 
-        <ReguaCobranca cliente={c} onSalvo={carregar} registrar={registrarPendencia} />
+        <ReguaCobranca cliente={c} onSalvo={carregar} registrar={registrar} />
 
         <ExcluirCliente clienteId={id} nome={c.nome} />
 
@@ -327,7 +434,9 @@ function PrivacidadeIndicacao({ clienteId, consentimentoEm, codigo: codigoInicia
   );
 }
 
-function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => void }) {
+function TumuloEdit({ t, plano, onSalvo, registrar }: {
+  t: any; plano: any; onSalvo: () => void; registrar?: Registrar;
+}) {
   const datas: any[] = Array.isArray(t.datas_gatilho) ? t.datas_gatilho : [];
   const dFal = datas.find((d) => d?.tipo === "falecimento")?.data || "";
   const dNas = datas.find((d) => d?.tipo === "nascimento")?.data || "";
@@ -343,10 +452,10 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
     data_falecimento: dFal,
     data_nascimento: dNas,
   });
-  const [p, setP] = useState({
+  const [p, setP] = useState<Record<string, any>>({
     cadencia: plano?.cadencia || "mensal",
     lavagens_por_ciclo: plano?.lavagens_por_ciclo ?? plano?.qtd_por_passagem ?? 1,
-    valor_mensal: plano?.valor_mensal ?? plano?.valor_vigente ?? 0,
+    valor_mensal: dinheiroBR(valorMensalDoPlano(plano?.cadencia, plano?.valor_mensal, plano?.valor_vigente)),
     ativo: plano?.ativo !== false,
     pago_ate: (plano?.pago_ate || "").slice(0, 10),
     proximo_servico: (plano?.proximo_servico || "").slice(0, 10),
@@ -355,16 +464,151 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
   });
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [erro, setErro] = useState("");
   const [token, setToken] = useState<string | null>(t.qr_token || null);
+  // O FORMULARIO ATUAL, LEGIVEL DEPOIS DO AWAIT. gravar() fecha em cima do `p`
+  // do render em que foi criado; o PATCH demora e o usuario continua digitando.
+  // Sem este ref, o pos-salvamento julgava o campo pelo valor VELHO e apagava a
+  // marca da digitacao nova (ver "DIGITACAO DURANTE O SALVAMENTO").
+  const pRef = useRef<Record<string, any>>(p);
+  pRef.current = p;
   const [copiado, setCopiado] = useState(false);
   const [gpsMsg, setGpsMsg] = useState("");
   const refEnq = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
 
+  // CAMPOS TOCADOS DO PLANO — a ficha mandava o objeto inteiro em todo Salvar.
+  // Consequencias reais: (a) corrigir SO a data de "pago ate" reenviava cadencia
+  // e valor, e o servidor recalculava valor_vigente = mensal x meses em cima de
+  // um plano antigo importado, dobrando o valor debitado em cada lavagem;
+  // (b) o que o servidor mudou sozinho no meio (proxima lavagem depois de uma
+  // conclusao no campo, por exemplo) voltava com o valor velho por cima.
+  // Agora o PATCH leva apenas o que o usuario mexeu — mesma solucao da tela de
+  // Planos. Todo input do plano passa por mudarP().
+  const tocadoP = useRef<Record<string, true>>({});
+  function mudarP(campos: Record<string, any>) {
+    for (const k of Object.keys(campos)) tocadoP.current[k] = true;
+    setP((v) => ({ ...v, ...campos }));
+  }
+
   const MESES: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12, avulso: 0 };
-  const valorCiclo = (MESES[p.cadencia] || 0) > 0
-    ? (Number(p.valor_mensal) || 0) * MESES[p.cadencia]
-    : Number(p.valor_mensal) || 0;
+  // (o valor do ciclo e calculado depois de pBase/dinheiro — ver "CICLO NA TELA")
+
+  // Este jazigo tem edição não salva? (comparado com o que veio do banco)
+  // Serve para a barra "Salvar tudo" só tocar os que mudaram — antes ela clicava
+  // em todos e marcava jazigo intocado como "conferido", re-salvando à toa.
+  //
+  // A comparação usa o valor JÁ NORMALIZADO (data em MM-DD, dinheiro com 2 casas):
+  // é isso que o banco vai guardar, então é isso que tem de bater na volta —
+  // senão o bloco fica "sujo" para sempre depois de salvar.
+  const fCmp = (o: typeof f) => JSON.stringify({
+    ...o,
+    data_falecimento: normalizarMMDD(o.data_falecimento) ?? o.data_falecimento,
+    data_nascimento: normalizarMMDD(o.data_nascimento) ?? o.data_nascimento,
+  });
+  // normaliza para comparar e para mandar ao servidor: "40,50" e 40.5 viram
+  // "40.50". Texto invalido devolve "" (e o gravar() recusa antes de mandar).
+  // O ARREDONDAMENTO TEM DE SER O DO SERVIDOR. toFixed(2) e Math.round(x*100)/100
+  // discordam em numeros de 3 casas que caem no meio: "40,025" da "40.02" aqui e
+  // 40.03 na rota (/api/planos/[id] usa Math.round). O bloco ficava eternamente
+  // "diferente" do banco: barra de pendencia acesa, aviso de sair da pagina e
+  // "✓ salvo" na mesma tela, sem nada mais para salvar, ate apertar F5.
+  const dinheiro = (v: any) => {
+    const n = numeroBR(v);
+    return isFinite(n) ? (Math.round(n * 100) / 100).toFixed(2) : "";
+  };
+  const pCmp = (o: Record<string, any>) => JSON.stringify({
+    ...o, valor_mensal: dinheiro(o.valor_mensal), lavagens_por_ciclo: Number(o.lavagens_por_ciclo),
+  });
+
+  const fBase: typeof f = {
+    identificacao: t.identificacao || "", numero: t.numero || "", quadra_id: t.quadra_id || "",
+    rua: t.rua || "", falecido_nome: t.falecido_nome || "", data_falecimento: dFal, data_nascimento: dNas,
+  };
+  const pBase = {
+    cadencia: plano?.cadencia || "mensal",
+    lavagens_por_ciclo: plano?.lavagens_por_ciclo ?? plano?.qtd_por_passagem ?? 1,
+    valor_mensal: dinheiroBR(valorMensalDoPlano(plano?.cadencia, plano?.valor_mensal, plano?.valor_vigente)),
+    ativo: plano?.ativo !== false,
+    pago_ate: (plano?.pago_ate || "").slice(0, 10),
+    proximo_servico: (plano?.proximo_servico || "").slice(0, 10),
+    proxima_cobranca: (plano?.proxima_cobranca || "").slice(0, 10),
+    momento_cobranca: plano?.momento_cobranca || "depois",
+  };
+  // DADO NOVO DO SERVIDOR: a ficha recarrega sozinha (foto, GPS, "Salvar tudo"
+  // de outro jazigo) e o formulario ficava congelado no dado velho — o bloco
+  // seguia "alterado" para sempre e a barra oferecia salvar uma diferenca que
+  // nao existia mais. Aqui a base nova e adotada, mas SO quando o formulario
+  // ainda esta igual a base anterior: se o usuario digitou algo, a digitacao
+  // dele vence e nada e sobrescrito no meio da edicao.
+  const fBaseSig = fCmp(fBase);
+  const pBaseSig = pCmp(pBase);
+  const baseAnterior = useRef({ f: fBaseSig, p: pBaseSig });
+  useEffect(() => {
+    if (fBaseSig !== baseAnterior.current.f && fCmp(f) === baseAnterior.current.f) setF(fBase);
+    if (pBaseSig !== baseAnterior.current.p && pCmp(p) === baseAnterior.current.p) {
+      setP(pBase);
+      tocadoP.current = {};
+    }
+    baseAnterior.current = { f: fBaseSig, p: pBaseSig };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fBaseSig, pBaseSig]);
+
+  const alterado = fBaseSig !== fCmp(f) || (!!plano && pBaseSig !== pCmp(p));
+
+  // data de memoria que veio TORTA do banco (e nao foi o usuario que digitou):
+  // o Salvar nao trava mais por causa dela, mas a tela nao finge que esta certa.
+  const dataTorta = (normalizarMMDD(f.data_falecimento) === null && f.data_falecimento === fBase.data_falecimento)
+    || (normalizarMMDD(f.data_nascimento) === null && f.data_nascimento === fBase.data_nascimento);
+
+  // TOCADO **E** DIFERENTE. So "tocado" nao basta: digitar "45,0" e voltar para
+  // "45,00" deixa a flag armada para sempre. A barra amarela desaparece (a
+  // comparacao com a base diz "igual", e esta certa), mas o proximo Salvar
+  // — de uma data, por exemplo — ainda mandava valor_mensal. Em plano antigo o
+  // servidor entao grava valor_vigente = mensal x meses e cada lavagem passa a
+  // debitar o ciclo inteiro (R$ 540 em vez de R$ 45), sem aviso nenhum na tela.
+  // Agora o corpo do PATCH leva so o que ficou de fato diferente da base.
+  const camposMudados = () => Object.keys(tocadoP.current).filter((k) => {
+    if (k === "valor_mensal") {
+      // PLANO ANTIGO (coluna valor_mensal NULL): a base deste campo nao e a
+      // coluna, e um valor DERIVADO — valorMensalDoPlano le valor_vigente
+      // justamente porque a coluna esta vazia. Comparar contra ele filtrava
+      // fora o unico caminho de migracao que a tela oferece: o usuario
+      // confirmava os R$ 45 que o paragrafo pede para confirmar, o corpo saia
+      // sem valor_mensal, a coluna continuava NULL para sempre e a tela
+      // respondia "✓ salvo · ✓ conferido". Em plano antigo, mexer no campo de
+      // dinheiro JA E a declaracao do preco mensal — vai para o servidor.
+      // (mexeu e apagou? entra como mudanca e a validacao abaixo recusa com
+      // mensagem — melhor que sumir em silencio.)
+      if (legadoRef.current) return true;
+      return dinheiro(p.valor_mensal) !== dinheiro(pBase.valor_mensal);
+    }
+    if (k === "lavagens_por_ciclo") return Number(p[k]) !== Number((pBase as any)[k]);
+    return p[k] !== (pBase as any)[k];
+  });
+
+  // CICLO NA TELA — o que o campo "Cobranca do ciclo" pode afirmar sem mentir.
+  //
+  // Em plano ANTIGO (valor_mensal NULL no banco) o unico numero confiavel e o
+  // valor_vigente gravado, e nem se sabe se ele e mensal ou do ciclo (decisao
+  // pendente em migrations/0027_DECISAO_valor_vigente_diagnostico.sql). Trocar
+  // so o periodo de mensal para anual fazia a tela anunciar "R$ 540,00" de
+  // ciclo enquanto o cabecalho da linha e a Gestao continuavam em R$ 45 — e o
+  // servidor, corretamente, nao muda dinheiro nenhum nesse caso. Enquanto o
+  // valor nao for editado, um plano antigo mostra o valor GRAVADO, como esta.
+  const mensalNum = numeroBR(p.valor_mensal);
+  const meses = (MESES[p.cadencia] || 0) > 0 ? MESES[p.cadencia] : 1;
+  const legado = !!plano && plano.valor_mensal == null;
+  const legadoRef = useRef(legado);
+  legadoRef.current = legado;
+  const dinheiroIntacto = dinheiro(p.valor_mensal) === dinheiro(pBase.valor_mensal);
+  // O PRODUTO TAMBEM PRECISA DO ARREDONDAMENTO DO SERVIDOR. Faltava aqui: com
+  // mensal "57,205" a rota grava 57,21 (Math.round) e a tela anunciava
+  // R$ 57.20 (toFixed corta) — um centavo de diferenca entre o que a tela
+  // promete e o que o banco cobra, na linha em negrito.
+  const valorCiclo: number | null = legado && dinheiroIntacto
+    ? (plano?.valor_vigente == null ? null : Math.round(Number(plano.valor_vigente) * 100) / 100)
+    : (isFinite(mensalNum) ? Math.round(mensalNum * meses * 100) / 100 : null);
 
   useEffect(() => {
     if (!aberto || quadras.length) return;
@@ -375,22 +619,113 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/t/${token}`
     : "";
 
-  async function salvar() {
+  // gravar() é o que a barra "Salvar tudo" chama: grava e devolve se deu certo,
+  // sem alert nem recarregar (a barra cuida disso uma vez, no fim).
+  async function gravar(): Promise<boolean> {
+    // valida antes de mandar: campo numérico apagado não pode virar 0 no banco,
+    // e data de memória sem sentido não pode ser gravada pela metade
+    // DATA TORTA QUE JA ESTAVA NO BANCO NAO TRAVA O SALVAR DO RESTO. A rota
+    // antiga gravava "-1998" com um slice cego; a validacao nova cobrava o
+    // campo inteiro, tocado ou nao, entao um jazigo com essa heranca ficava
+    // impossivel de salvar — mexer no valor mensal devolvia "data de memoria:
+    // use MM-DD" para um campo que o usuario nao abriu. Agora so o que ELE
+    // digitou e cobrado; o lixo herdado sai do corpo (a rota o rejeitaria com
+    // 400) e a tela avisa que ele sera limpo, em vez de bloquear tudo.
+    const dataFal = normalizarMMDD(f.data_falecimento);
+    const dataNas = normalizarMMDD(f.data_nascimento);
+    if ((dataFal === null && f.data_falecimento !== fBase.data_falecimento)
+        || (dataNas === null && f.data_nascimento !== fBase.data_nascimento)) {
+      setErro("data de memória: use MM-DD (ex.: 07-23)");
+      return false;
+    }
+    const mudados = plano ? camposMudados() : [];
+    if (mudados.includes("valor_mensal") && !isFinite(numeroBR(p.valor_mensal))) {
+      setErro("valor mensal: use numeros, ex. 40,50");
+      return false;
+    }
+    // o formulário passa a mostrar o que o banco vai guardar
+    const fn = { ...f, data_falecimento: dataFal ?? "", data_nascimento: dataNas ?? "" };
+    if (fCmp(fn) !== fCmp(f)) setF(fn);
+
     setSalvando(true);
+    setErro("");
     const a = await fetch(`/api/tumulos/${t.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(f),
+      body: JSON.stringify(fn),
     }).then((x) => x.json()).catch(() => null);
-    const b = plano
+    // so os campos tocados; "migrado" so na PRIMEIRA conferencia (o servidor
+    // tambem protege, mas nao ha por que mandar o que nao muda nada)
+    const corpo: Record<string, any> = {};
+    for (const k of mudados) {
+      corpo[k] = k === "valor_mensal" ? numeroBR(p.valor_mensal) : p[k];
+    }
+    if (!plano?.migrado_em) corpo.migrado = true;
+    // o que foi realmente enviado, para comparar na volta
+    const enviado: Record<string, any> = { ...p };
+    const b = plano && Object.keys(corpo).length
       ? await fetch(`/api/planos/${plano.id}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...p, migrado: true }),
+          body: JSON.stringify(corpo),
         }).then((x) => x.json()).catch(() => null)
       : { ok: true };
+    if (b?.ok) {
+      // DIGITACAO DURANTE O SALVAMENTO. O PATCH leva tempo — e "Salvar tudo"
+      // grava um jazigo por vez, segundos — enquanto os campos continuam
+      // editaveis. Zerar tocadoP inteiro apagava a marca do que foi digitado no
+      // meio do voo: o Salvar seguinte montava corpo vazio, nem chamava o PATCH
+      // e devolvia "✓ salvo" em verde para sempre, com a tela mostrando R$ 500
+      // e o banco em R$ 45 — so um F5 revelava. Agora e desmarcado apenas o
+      // campo que ainda esta igual ao que acabou de ser enviado; o que mudou
+      // depois continua pendente e vai no proximo Salvar.
+      const atual = pRef.current;
+      const igualAoEnviado = (k: string) => k === "valor_mensal"
+        ? dinheiro(atual.valor_mensal) === dinheiro(enviado.valor_mensal)
+        : atual[k] === enviado[k];
+      for (const k of mudados) if (igualAoEnviado(k)) delete tocadoP.current[k];
+      // o campo passa a mostrar o que o banco guardou (2 casas, arredondadas do
+      // mesmo jeito) — igual ao que ja e feito com as datas logo acima. So se o
+      // texto ainda for o que foi enviado: normalizar por cima de "500" digitado
+      // no meio do voo trocava o numero do usuario por "45,00".
+      const n = numeroBR(atual.valor_mensal);
+      const norm = isFinite(n) ? dinheiroBR(Math.round(n * 100) / 100) : "";
+      if (isFinite(n) && norm !== atual.valor_mensal && igualAoEnviado("valor_mensal")) {
+        setP((v) => ({ ...v, valor_mensal: norm }));
+      }
+    }
     setSalvando(false);
-    if (a?.ok && b?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); onSalvo(); }
-    else alert("Falhou: " + (a?.erro || b?.erro || "erro"));
+    if (a?.ok && b?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); return true; }
+    setErro(String(a?.erro || b?.erro || "não consegui salvar"));
+    return false;
   }
+
+  async function salvar() {
+    const deu = await gravar();
+    if (deu) onSalvo();
+  }
+
+  // ABRIR/FECHAR NAO ERA CANCELAR. "Fechar" so escondia o formulario: f, p e as
+  // flags de tocado continuavam vivos, entao uma edicao ABANDONADA aqui era
+  // gravada depois pela barra "Salvar tudo" — inclusive dinheiro — e o erro de
+  // validacao, que so renderiza dentro do bloco aberto, ficava invisivel.
+  // Agora abrir zera o formulario com o dado do banco e fechar sujo pergunta.
+  function alternarAberto() {
+    // "DESCARTAR" NO MEIO DO SALVAMENTO ERA MENTIRA: o corpo do PATCH ja tinha
+    // sido montado e a requisicao estava no ar, entao o valor "descartado" era
+    // gravado alguns instantes depois. Enquanto grava, nao ha o que descartar.
+    if (salvando) return;
+    if (aberto && alterado && !confirm("Você tem alterações não salvas neste jazigo. Descartar?")) return;
+    setF(fBase);
+    setP(pBase);
+    tocadoP.current = {};
+    setErro("");
+    setAberto(!aberto);
+  }
+
+  usarPendencia(
+    registrar, `tumulo:${t.id}`,
+    `jazigo ${f.identificacao || t.identificacao || "sem identificação"}`,
+    alterado, gravar,
+  );
 
   async function subirFoto(tipo: "enquadramento" | "referencia", arq: File) {
     const buf = await arq.arrayBuffer();
@@ -456,7 +791,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
           {token ? " · 🔗" : ""}
           {migrado ? " · ✓ conferido" : ""}
         </span>
-        <button style={painel.botaoMiniSec} onClick={() => setAberto(!aberto)}>
+        <button style={painel.botaoMiniSec} onClick={() => alternarAberto()} disabled={salvando}>
           {aberto ? "Fechar" : "Editar"}
         </button>
       </div>
@@ -558,9 +893,17 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                        onChange={(e) => setF({ ...f, data_nascimento: e.target.value })} placeholder="01-15" />
               </div>
             </div>
+            {dataTorta && (
+              <p style={{ color: "#b45309", fontSize: 14, margin: "8px 0 0" }}>
+                Uma data acima está gravada em formato que o sistema não entende (herança da
+                importação antiga). Ela <b>não</b> dispara mensagem nenhuma e vai ser limpa no
+                próximo Salvar — corrija para MM-DD se souber o dia.
+              </p>
+            )}
           </div>
 
           {/* ---------------- PLANO E MIGRAÇÃO ---------------- */}
+          {!plano && <CriarPlano tumuloId={t.id} onSalvo={onSalvo} />}
           {plano && (
             <div style={{ ...bloco, background: migrado ? "#f0fdf4" : "#fffbeb",
                           borderColor: migrado ? "#bbf7d0" : "#fde68a" }}>
@@ -574,7 +917,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                   return (
                     <button key={a.rotulo}
                       style={{ ...(marcado ? painel.botao : painel.botaoSec), padding: "10px 14px", fontSize: 14 }}
-                      onClick={() => setP({ ...p, cadencia: a.cadencia, lavagens_por_ciclo: a.lavagens })}>
+                      onClick={() => mudarP({ cadencia: a.cadencia, lavagens_por_ciclo: a.lavagens })}>
                       {a.rotulo}
                     </button>
                   );
@@ -599,7 +942,7 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 <div>
                   <label style={painel.rotulo}>Período de cobrança</label>
                   <select style={{ ...painel.input, width: 130 }} value={p.cadencia}
-                          onChange={(e) => setP({ ...p, cadencia: e.target.value })}>
+                          onChange={(e) => mudarP({ cadencia: e.target.value })}>
                     {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
                       <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -608,25 +951,26 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                   <div>
                     <label style={painel.rotulo}>Lavagens no período</label>
                     <select style={{ ...painel.input, width: 110 }} value={p.lavagens_por_ciclo}
-                            onChange={(e) => setP({ ...p, lavagens_por_ciclo: Number(e.target.value) })}>
+                            onChange={(e) => mudarP({ lavagens_por_ciclo: Number(e.target.value) })}>
                       {[1,2,3,4,6,8,12].map((n) => <option key={n} value={n}>{n}x</option>)}
                     </select>
                   </div>
                 )}
                 <div>
                   <label style={painel.rotulo}>Valor mensal (R$)</label>
-                  <input type="number" style={{ ...painel.input, width: 110 }} value={p.valor_mensal}
-                         onChange={(e) => setP({ ...p, valor_mensal: Number(e.target.value) })} />
+                  <input type="text" inputMode="decimal" placeholder="0,00"
+                         style={{ ...painel.input, width: 110 }} value={p.valor_mensal}
+                         onChange={(e) => mudarP({ valor_mensal: e.target.value.replace(/[^\d.,]/g, "") })} />
                 </div>
                 <div>
-                  <label style={painel.rotulo}>Cobrança do ciclo</label>
+                  <label style={painel.rotulo}>{legado && dinheiroIntacto ? "Valor gravado" : "Cobrança do ciclo"}</label>
                   <div style={{ ...painel.input, width: 120, background: "#f8fafc", fontWeight: 700 }}>
-                    R$ {valorCiclo.toFixed(2)}
+                    {valorCiclo == null ? "—" : `R$ ${valorCiclo.toFixed(2)}`}
                   </div>
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12 }}>
                   <input type="checkbox" checked={p.ativo}
-                         onChange={(e) => setP({ ...p, ativo: e.target.checked })} />
+                         onChange={(e) => mudarP({ ativo: e.target.checked })} />
                   Ativo
                 </label>
               </div>
@@ -635,17 +979,17 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 <div>
                   <label style={painel.rotulo}>Pago até</label>
                   <input type="date" style={{ ...painel.input, width: 160 }} value={p.pago_ate}
-                         onChange={(e) => setP({ ...p, pago_ate: e.target.value })} />
+                         onChange={(e) => mudarP({ pago_ate: e.target.value })} />
                 </div>
                 <div>
                   <label style={painel.rotulo}>Próxima lavagem</label>
                   <input type="date" style={{ ...painel.input, width: 160 }} value={p.proximo_servico}
-                         onChange={(e) => setP({ ...p, proximo_servico: e.target.value })} />
+                         onChange={(e) => mudarP({ proximo_servico: e.target.value })} />
                 </div>
                 <div>
                   <label style={painel.rotulo}>Quando cobrar</label>
                   <select style={{ ...painel.input, width: 210 }} value={p.momento_cobranca}
-                          onChange={(e) => setP({ ...p, momento_cobranca: e.target.value })}>
+                          onChange={(e) => mudarP({ momento_cobranca: e.target.value })}>
                     <option value="depois">Depois da lavagem (padrão)</option>
                     <option value="antes">Antes — paga para a gente ir</option>
                     <option value="contra_foto">Contra a foto — cobra ao entregar</option>
@@ -654,9 +998,19 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
                 <div>
                   <label style={painel.rotulo}>Próxima cobrança</label>
                   <input type="date" style={{ ...painel.input, width: 160 }} value={p.proxima_cobranca}
-                         onChange={(e) => setP({ ...p, proxima_cobranca: e.target.value })} />
+                         onChange={(e) => mudarP({ proxima_cobranca: e.target.value })} />
                 </div>
               </div>
+              {legado && dinheiroIntacto && (
+                <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
+                  Este plano veio da importação sem valor mensal separado: o que está gravado é
+                  R$ {plano?.valor_vigente == null ? "—" : (Math.round(Number(plano.valor_vigente) * 100) / 100).toFixed(2)}.
+                  Mudar só o período <b>não</b> muda esse valor. Para o sistema passar a calcular
+                  o ciclo, digite o valor mensal no campo acima e salve
+                  {meses > 1 && <> — atenção: a cobrança do ciclo passa a ser
+                  o mensal × {meses} meses, e é esse número que vai ser cobrado</>}.
+                </p>
+              )}
               <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
                 Ao salvar, este jazigo é marcado como conferido — é assim que você acompanha o que já foi migrado.
               </p>
@@ -682,10 +1036,12 @@ function TumuloEdit({ t, plano, onSalvo }: { t: any; plano: any; onSalvo: () => 
           </div>
 
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
-            <button style={painel.botao} onClick={salvar} disabled={salvando} data-salvar="1">
-              {salvando ? "Salvando…" : "Salvar jazigo"}
+            <button style={alterado ? painel.botao : painel.botaoSec} onClick={salvar}
+                    disabled={salvando || !alterado}>
+              {salvando ? "Salvando…" : alterado ? "Salvar jazigo" : "Sem alterações"}
             </button>
             {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+            {erro && <span style={{ color: "#dc2626", fontSize: 14 }}>{erro}</span>}
             <button style={{ ...painel.botaoPerigo, marginLeft: "auto" }} onClick={excluirJazigo}>
               Excluir jazigo
             </button>
@@ -712,20 +1068,9 @@ const semFoto: React.CSSProperties = {
 };
 
 function ReguaCobranca({ cliente, onSalvo, registrar }: {
-  cliente: any; onSalvo: () => void;
-  registrar?: (chave: string, salvar: (() => Promise<boolean>) | null) => void;
+  cliente: any; onSalvo: () => void; registrar?: Registrar;
 }) {
-  const [f, setF] = useState({
-    tratamento: cliente.tratamento || "",
-    regua_cobranca: cliente.regua_cobranca || "padrao",
-    dias_entre_cobrancas: cliente.dias_entre_cobrancas ?? 7,
-    max_lembretes: cliente.max_lembretes ?? 3,
-    orientacao_cobranca: cliente.orientacao_cobranca || "",
-    ativacao_ativa: !!cliente.ativacao_ativa,
-    ativacao_meses: cliente.ativacao_meses ?? 6,
-    cobranca_antecipada: !!cliente.cobranca_antecipada,
-  });
-  const [inicial] = useState({
+  const [f, setF] = useState<Record<string, any>>({
     tratamento: cliente.tratamento || "",
     regua_cobranca: cliente.regua_cobranca || "padrao",
     dias_entre_cobrancas: cliente.dias_entre_cobrancas ?? 7,
@@ -737,7 +1082,10 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
   });
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [erro, setErro] = useState("");
 
+  // o que está no banco agora (vem por prop e é recarregado depois de salvar) —
+  // é a única referência de "sujo", para o aviso não ficar preso depois de gravar
   const original = JSON.stringify({
     tratamento: cliente.tratamento || "", regua_cobranca: cliente.regua_cobranca || "padrao",
     dias_entre_cobrancas: cliente.dias_entre_cobrancas ?? 7, max_lembretes: cliente.max_lembretes ?? 3,
@@ -745,26 +1093,36 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
     ativacao_meses: cliente.ativacao_meses ?? 6, cobranca_antecipada: !!cliente.cobranca_antecipada,
   });
 
+  const alterado = JSON.stringify(f) !== original;
+
   async function gravar(): Promise<boolean> {
+    // campo numérico apagado ("") não pode virar 0 — 0 dia entre lembretes ou
+    // 0 lembrete muda o comportamento da IA sem o usuário ter pedido
+    const numericos: [string, string][] = [
+      ["dias_entre_cobrancas", "dias entre lembretes"],
+      ["max_lembretes", "máximo de lembretes"],
+      ["ativacao_meses", "meses entre convites"],
+    ];
+    for (const [campo, nome] of numericos) {
+      if (f[campo] === "" || !isFinite(Number(f[campo]))) { setErro(`preencha ${nome}`); return false; }
+    }
+    setSalvando(true);
+    setErro("");
     const r = await fetch(`/api/clientes/${cliente.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(f),
     }).then((x) => x.json()).catch(() => null);
-    return !!r?.ok;
+    setSalvando(false);
+    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); return true; }
+    setErro(String(r?.erro || "não consegui salvar"));
+    return false;
   }
 
-  useEffect(() => {
-    if (!registrar) return;
-    registrar("regua", JSON.stringify(f) !== original ? gravar : null);
-    return () => registrar("regua", null);
-  }, [f]);
+  usarPendencia(registrar, "regua", "como a IA trata esta família", alterado, gravar);
 
   async function salvar() {
-    setSalvando(true);
-    const ok2 = await gravar();
-    setSalvando(false);
-    if (ok2) { setOk(true); setTimeout(() => setOk(false), 2000); onSalvo(); }
-    else alert("Não consegui salvar.");
+    const deu = await gravar();
+    if (deu) onSalvo();
   }
 
   const explica: Record<string, string> = {
@@ -775,8 +1133,7 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
   };
 
   return (
-    <div style={painel.card}
-         data-alterado={JSON.stringify(f) !== JSON.stringify(inicial) ? "1" : "0"}>
+    <div style={painel.card}>
       <strong style={{ color: cor.navy }}>Como a IA trata esta família</strong>
 
       <div style={{ marginTop: 12 }}>
@@ -813,13 +1170,13 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
             <div>
               <label style={painel.rotulo}>Dias entre lembretes</label>
               <input type="number" style={{ ...painel.input, width: 100 }} value={f.dias_entre_cobrancas}
-                     onChange={(e) => setF({ ...f, dias_entre_cobrancas: Number(e.target.value) })} />
+                     onChange={(e) => setF({ ...f, dias_entre_cobrancas: e.target.value === "" ? "" : Number(e.target.value) })} />
             </div>
             {f.regua_cobranca !== "suave" && (
               <div>
                 <label style={painel.rotulo}>Máx. de lembretes</label>
                 <input type="number" style={{ ...painel.input, width: 100 }} value={f.max_lembretes}
-                       onChange={(e) => setF({ ...f, max_lembretes: Number(e.target.value) })} />
+                       onChange={(e) => setF({ ...f, max_lembretes: e.target.value === "" ? "" : Number(e.target.value) })} />
               </div>
             )}
           </div>
@@ -848,7 +1205,7 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
           <div style={{ marginTop: 8 }}>
             <label style={painel.rotulo}>Convidar a cada quantos meses</label>
             <input type="number" style={{ ...painel.input, width: 100 }} value={f.ativacao_meses}
-                   onChange={(e) => setF({ ...f, ativacao_meses: Number(e.target.value) })} />
+                   onChange={(e) => setF({ ...f, ativacao_meses: e.target.value === "" ? "" : Number(e.target.value) })} />
             {cliente.ultima_ativacao_em && (
               <p style={{ color: cor.cinza, fontSize: 14, margin: "6px 0 0" }}>
                 Último convite: {new Date(cliente.ultima_ativacao_em).toLocaleDateString("pt-BR")}
@@ -862,11 +1219,13 @@ function ReguaCobranca({ cliente, onSalvo, registrar }: {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14 }}>
-        <button style={painel.botao} onClick={salvar} disabled={salvando}>
-          {salvando ? "Salvando…" : "Salvar"}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
+        <button style={alterado ? painel.botao : painel.botaoSec} onClick={salvar}
+                disabled={salvando || !alterado}>
+          {salvando ? "Salvando…" : alterado ? "Salvar" : "Sem alterações"}
         </button>
         {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
+        {erro && <span style={{ color: "#dc2626", fontSize: 14 }}>{erro}</span>}
       </div>
     </div>
   );
@@ -966,43 +1325,37 @@ function ExcluirCliente({ clienteId, nome }: { clienteId: string; nome: string }
  * parecidos. Mudanças em nome e telefone ficam registradas no histórico.
  */
 function Identificacao({ c, onSalvo, registrar }: {
-  c: any; onSalvo: () => void;
-  registrar?: (chave: string, salvar: (() => Promise<boolean>) | null) => void;
+  c: any; onSalvo: () => void; registrar?: Registrar;
 }) {
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState({ nome: c.nome || "", apelido: c.apelido || "", telefone: c.telefone || "" });
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const refFoto = useRef<HTMLInputElement>(null);
 
   const mudou = f.nome !== (c.nome || "") || f.apelido !== (c.apelido || "")
     || f.telefone !== (c.telefone || "");
 
-  useEffect(() => {
-    if (!registrar) return;
-    registrar("identificacao", mudou && editando ? gravar : null);
-    return () => registrar("identificacao", null);
-  }, [mudou, editando, f.nome, f.apelido, f.telefone]);
-
   async function gravar(): Promise<boolean> {
-    if (!f.nome.trim()) return false;
-    const r = await fetch(`/api/clientes/${c.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(f),
-    }).then((x) => x.json()).catch(() => null);
-    return !!r?.ok;
-  }
-
-  async function salvar() {
-    if (!f.nome.trim()) return alert("O nome não pode ficar em branco.");
+    if (!f.nome.trim()) { setErro("o nome não pode ficar em branco"); return false; }
     setSalvando(true);
+    setErro("");
     const r = await fetch(`/api/clientes/${c.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(f),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (r?.ok) { setEditando(false); onSalvo(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    if (r?.ok) { setEditando(false); return true; }
+    setErro(String(r?.erro || "não consegui salvar"));
+    return false;
+  }
+
+  usarPendencia(registrar, "identificacao", "dados da família", mudou && editando, gravar);
+
+  async function salvar() {
+    const deu = await gravar();
+    if (deu) onSalvo();
   }
 
   async function enviarFoto(arq: File) {
@@ -1054,9 +1407,7 @@ function Identificacao({ c, onSalvo, registrar }: {
         </button>
       </div>
 
-      <div style={{ flex: 1, minWidth: 240 }}
-           data-alterado={editando && (f.nome !== (c.nome || "") || f.apelido !== (c.apelido || "")
-             || f.telefone !== (c.telefone || "")) ? "1" : "0"}>
+      <div style={{ flex: 1, minWidth: 240 }}>
         {editando ? (
           <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1077,14 +1428,16 @@ function Identificacao({ c, onSalvo, registrar }: {
                        onChange={(e) => setF({ ...f, telefone: e.target.value })} />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button style={painel.botao} onClick={salvar} disabled={salvando} data-salvar="1">
+            <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button style={painel.botao} onClick={salvar} disabled={salvando}>
                 {salvando ? "Salvando…" : "Salvar"}
               </button>
               <button style={painel.botaoSec} onClick={() => {
                 setF({ nome: c.nome || "", apelido: c.apelido || "", telefone: c.telefone || "" });
+                setErro("");
                 setEditando(false);
               }}>Cancelar</button>
+              {erro && <span style={{ color: "#dc2626", fontSize: 14 }}>{erro}</span>}
             </div>
             <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
               Mudanças em nome e telefone ficam registradas, para não se perder o rastro.
@@ -1195,39 +1548,23 @@ function RegistrarPagamento({ clienteId, nome, onSalvo }:
 
 
 /**
- * BARRA DE SALVAR — a ficha tem vários blocos e cada um tinha o próprio botão.
- * Isso obriga a pessoa a lembrar de salvar em três lugares, e uma edição
- * esquecida se perde. A barra avisa quando há mudança pendente e salva tudo.
+ * BARRA DE SALVAR — a ficha tem vários blocos e cada um tem o próprio botão.
+ * Isso obrigaria a pessoa a lembrar de salvar em três lugares, e uma edição
+ * esquecida se perderia. A barra avisa quando há mudança pendente, DIZ QUAL é
+ * e salva todas de uma vez.
+ *
+ * Ela apenas exibe: quem sabe o que está pendente é o registro de pendências da
+ * ficha (ver `usarPendencia` no topo). Antes isso era descoberto varrendo o DOM
+ * a cada 800 ms e salvo com clique simulado + espera de 400 ms por bloco — o que
+ * podia salvar fora de ordem, perder erro e mentir na contagem.
  */
-function BarraSalvar() {
-  const [pendentes, setPendentes] = useState(0);
-  const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    // conta quantos formulários da ficha estão com mudança não salva
-    const conta = () => {
-      const marcados = document.querySelectorAll("[data-alterado='1']");
-      setPendentes(marcados.length);
-    };
-    conta();
-    const t = setInterval(conta, 800);
-    return () => clearInterval(t);
-  }, []);
-
-  async function salvarTudo() {
-    setSalvando(true);
-    // dispara o salvar de cada bloco alterado, em ordem
-    const botoes = Array.from(
-      document.querySelectorAll<HTMLButtonElement>("[data-salvar='1']")
-    );
-    for (const b of botoes) {
-      b.click();
-      await new Promise((r) => setTimeout(r, 400));
-    }
-    setSalvando(false);
-  }
-
-  if (!pendentes) return null;
+function BarraSalvar({ pendencias, salvando, onSalvarTudo }: {
+  pendencias: Record<string, Pendencia>;
+  salvando: boolean;
+  onSalvarTudo: () => void;
+}) {
+  const rotulos = Object.values(pendencias).map((p) => p.rotulo);
+  if (!rotulos.length) return null;
 
   return (
     <div style={{
@@ -1238,11 +1575,132 @@ function BarraSalvar() {
       boxShadow: "0 -4px 16px rgba(0,0,0,.06)",
     }}>
       <span style={{ color: "#92400e", fontSize: 15 }}>
-        {pendentes === 1 ? "Há uma alteração não salva" : `Há ${pendentes} alterações não salvas`}
+        {rotulos.length === 1 ? "Alteração não salva em " : `${rotulos.length} alterações não salvas: `}
+        <b>{rotulos.join(", ")}</b>
       </span>
-      <button style={painel.botao} onClick={salvarTudo} disabled={salvando}>
-        {salvando ? "Salvando…" : "Salvar tudo"}
+      <button style={painel.botao} onClick={onSalvarTudo} disabled={salvando}>
+        {salvando ? "Salvando…" : rotulos.length === 1 ? "Salvar" : "Salvar tudo"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Criar plano para um jazigo que ainda não tem (ex.: capturado no campo).
+ * Autocontido: faz o próprio POST e chama onSalvo — não passa pela BarraSalvar.
+ */
+function CriarPlano({ tumuloId, onSalvo }: { tumuloId: string; onSalvo: () => void }) {
+  const [atalho, setAtalho] = useState(2); // "Uma vez por mês"
+  const [valor, setValor] = useState(40);
+  const [inicio, setInicio] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function criar() {
+    const a = ATALHOS_FREQUENCIA[atalho];
+    setSalvando(true);
+    const r = await fetch("/api/planos", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tumuloId, cadencia: a.cadencia, lavagensPorCiclo: a.lavagens,
+        valorMensal: valor, inicio: inicio || undefined,
+      }),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) onSalvo(); else alert("Não consegui criar o plano: " + (r?.erro || "erro"));
+  }
+
+  return (
+    <div style={{ ...bloco, background: "#eff6ff", borderColor: "#bfdbfe" }}>
+      <div style={blocoTitulo}>Este jazigo ainda não tem plano</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <label style={painel.rotulo}>Frequência</label>
+          <select style={painel.input} value={atalho} onChange={(e) => setAtalho(Number(e.target.value))}>
+            {ATALHOS_FREQUENCIA.map((a, i) => <option key={i} value={i}>{a.rotulo}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={painel.rotulo}>Valor mensal</label>
+          <input type="number" style={{ ...painel.input, width: 110 }} value={valor}
+                 onChange={(e) => setValor(Number(e.target.value))} />
+        </div>
+        <div>
+          <label style={painel.rotulo}>1ª lavagem</label>
+          <input type="date" style={{ ...painel.input, width: 160 }} value={inicio}
+                 onChange={(e) => setInicio(e.target.value)} />
+        </div>
+        <button style={painel.botao} onClick={criar} disabled={salvando}>
+          {salvando ? "Criando…" : "Criar plano"}
+        </button>
+      </div>
+      <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
+        A próxima lavagem e a próxima cobrança já entram na data escolhida (ou hoje).
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Vincular a esta família um jazigo já cadastrado no campo (ainda sem dono).
+ * Só aparece quando existem jazigos órfãos.
+ */
+function VincularJazigo({ clienteId, onMudou }: { clienteId: string; onMudou: () => void }) {
+  const [orfaos, setOrfaos] = useState<any[]>([]);
+  const [escolha, setEscolha] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [aberto, setAberto] = useState(false);
+
+  async function carregar() {
+    const r = await fetch("/api/tumulos").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setOrfaos(r.semDono || []);
+  }
+  useEffect(() => { carregar(); }, []);
+
+  async function vincular() {
+    if (!escolha) return;
+    setOcupado(true);
+    const r = await fetch(`/api/tumulos/${escolha}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cliente_id: clienteId }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) { setEscolha(""); setAberto(false); carregar(); onMudou(); }
+    else alert("Não consegui vincular: " + (r?.erro || "erro"));
+  }
+
+  if (!orfaos.length) return null;
+
+  if (!aberto) {
+    return (
+      <button style={{ ...painel.botaoMiniSec, marginTop: 12 }} onClick={() => setAberto(true)}>
+        + Vincular jazigo do campo ({orfaos.length})
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ ...bloco, marginTop: 12, background: "#f0fdfa", borderColor: "#99f6e4" }}>
+      <div style={blocoTitulo}>Vincular jazigo do campo a esta família</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={painel.rotulo}>Jazigo sem família</label>
+          <select style={painel.input} value={escolha} onChange={(e) => setEscolha(e.target.value)}>
+            <option value="">— escolha —</option>
+            {orfaos.map((t) => (
+              <option key={t.id} value={t.id}>
+                {[t.quadra, t.identificacao, t.rua].filter(Boolean).join(" · ")}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button style={painel.botao} onClick={vincular} disabled={ocupado || !escolha}>
+          {ocupado ? "Vinculando…" : "Vincular"}
+        </button>
+        <button style={painel.botaoSec} onClick={() => setAberto(false)}>Cancelar</button>
+      </div>
+      <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
+        Depois de vincular, use “Criar plano” no jazigo para definir a periodicidade.
+      </p>
     </div>
   );
 }

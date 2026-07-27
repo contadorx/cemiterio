@@ -1,8 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { orgAtual } from "@/lib/org";
+import { diaOperacao, valorDoCiclo, valorMensalDoPlano, vencimentosIniciais } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// POST { tumuloId, clienteId?, cadencia, lavagensPorCiclo?, valorMensal, inicio? }
+// Cria o plano de um jazigo que ainda não tem, já com o vencimento calculado.
+// Se clienteId não vier, usa o dono atual do jazigo.
+export async function POST(req: NextRequest) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
+  const org = await orgAtual(db);
+  if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
+
+  const b = await req.json().catch(() => ({}));
+  const tumuloId = b?.tumuloId;
+  const cadencia = b?.cadencia || "mensal";
+  if (!tumuloId) return NextResponse.json({ ok: false, erro: "tumulo_obrigatorio" }, { status: 400 });
+
+  const { data: tum } = await db.from("tumulos").select("id,cliente_id").eq("id", tumuloId).maybeSingle();
+  if (!tum) return NextResponse.json({ ok: false, erro: "jazigo_nao_encontrado" }, { status: 404 });
+  const clienteId = b?.clienteId || (tum as any).cliente_id;
+  if (!clienteId) return NextResponse.json({ ok: false, erro: "jazigo_sem_familia" }, { status: 400 });
+
+  // um plano por jazigo: se já existe, não duplica
+  const { data: existente } = await db.from("planos").select("id").eq("tumulo_id", tumuloId).maybeSingle();
+  if (existente) return NextResponse.json({ ok: true, planoId: (existente as any).id, jaExistia: true });
+
+  const valorMensal = Number(b?.valorMensal) || 40;
+  const lav = Math.max(1, Math.min(12, Number(b?.lavagensPorCiclo) || 1));
+  const venc = vencimentosIniciais(cadencia, b?.inicio);
+
+  const { data: plano, error } = await db.from("planos").insert({
+    org_id: org,
+    cliente_id: clienteId,
+    tumulo_id: tumuloId,
+    cadencia,
+    qtd_por_passagem: lav,
+    lavagens_por_ciclo: lav,
+    valor_mensal: valorMensal,
+    valor_vigente: valorDoCiclo(cadencia, valorMensal),
+    data_valor_vigente: diaOperacao(),
+    ativo: true,
+    proximo_servico: venc.proximo_servico,
+    proxima_cobranca: venc.proxima_cobranca,
+    pago_ate: venc.pago_ate,
+  }).select("id").single();
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true, planoId: (plano as any).id });
+}
 
 /**
  * Lista dos planos com tudo que a gestão precisa ver e ajustar num lugar só:
@@ -20,9 +70,12 @@ export async function GET(req: NextRequest) {
             "data_valor_vigente,proximo_servico,proxima_cobranca,pago_ate,ativo,migrado_em," +
             "clientes(nome,telefone,tratamento,cobranca_antecipada,regua_cobranca)," +
             "tumulos(identificacao,rua,quadra_id,quadras(codigo))")
-    .limit(400);
+    // ordem explícita: sem ela o Postgres devolvia 400 linhas quaisquer e as
+    // contagens da tela mudavam entre recargas (e não fechavam com o Mapa)
+    .order("proxima_cobranca", { ascending: true, nullsFirst: false })
+    .limit(2000);
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
   let lista = (planos || []).map((p: any) => ({
     id: p.id,
     clienteId: p.cliente_id,
@@ -34,8 +87,13 @@ export async function GET(req: NextRequest) {
     quadra: p.tumulos?.quadras?.codigo || "",
     rua: p.tumulos?.rua || "",
     cadencia: p.cadencia,
-    valorMensal: Number(p.valor_mensal ?? p.valor_vigente ?? 0),
+    valorMensal: valorMensalDoPlano(p.cadencia, p.valor_mensal, p.valor_vigente),
     valorCiclo: Number(p.valor_vigente || 0),
+    // PLANO ANTIGO: veio da importacao/seed sem valor_mensal separado, so com
+    // valor_vigente. A tela precisa saber disto para NAO chamar esse numero de
+    // "mensal" nem multiplicar por cadencia (o significado da coluna esta em
+    // disputa — ver migrations/0027_DECISAO_valor_vigente_diagnostico.sql).
+    legado: p.valor_mensal == null,
     desde: p.data_valor_vigente,
     pagoAte: p.pago_ate,
     proximaLavagem: p.proximo_servico,
@@ -74,6 +132,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     planos: lista,
+    // as datas de referência dos baldes vão JUNTO com a lista: se a tela
+    // calculasse "hoje" no navegador, um computador com a data errada pintaria
+    // de vermelho quem está em dia — e discordaria do Mapa, que já lê a situação
+    // pronta do servidor. Um relógio só para as duas telas.
+    hoje,
+    sem7: diaOperacao(7),
+    mes30: diaOperacao(30),
     totais: {
       quantidade: lista.length,
       mensal: Math.round(lista.filter((p) => p.ativo).reduce((s, p) => s + p.valorMensal, 0) * 100) / 100,

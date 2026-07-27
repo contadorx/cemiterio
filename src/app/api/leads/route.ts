@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   let q = auth.db
     .from("leads")
-    .select("id,telefone,nome,nome_wa,contexto,jazigo_ref,mensagens,status,origem,proximo_passo,ignorado,motivo_ignorado,created_at,updated_at")
+    .select("id,telefone,nome,nome_wa,contexto,jazigo_ref,mensagens,status,origem,proximo_passo,ignorado,motivo_ignorado,cliente_id,created_at,updated_at")
     .order("updated_at", { ascending: false })
     .limit(200);
   if (status) q = q.eq("status", status);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 
 /**
@@ -14,6 +15,8 @@ export default function Leads() {
   const [f, setF] = useState({ status: "", origem: "", ocultos: false });
   const [novo, setNovo] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [emMassa, setEmMassa] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -22,11 +25,37 @@ export default function Leads() {
     if (f.origem) p.set("origem", f.origem);
     if (f.ocultos) p.set("ocultos", "1");
     const r = await fetch(`/api/leads?${p}`).then((x) => x.json()).catch(() => null);
-    setLista(r?.leads || []);
+    const leads = r?.leads || [];
+    setLista(leads);
+    const presentes = new Set(leads.map((l: any) => l.id));
+    setSel((prev) => new Set([...prev].filter((id) => presentes.has(id))));
     setCarregando(false);
   }, [f]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  const todasMarcadas = lista.length > 0 && lista.every((l) => sel.has(l.id));
+  function alternarUma(id: string) {
+    setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function alternarTodas() {
+    setSel(todasMarcadas ? new Set() : new Set(lista.map((l) => l.id)));
+  }
+  async function acaoMassa(acao: string, confirmar?: string) {
+    const ids = [...sel];
+    if (!ids.length) return;
+    if (confirmar && !confirm(confirmar)) return;
+    setEmMassa(true);
+    const r = await fetch("/api/leads/acao-massa", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, acao }),
+    }).then((x) => x.json()).catch(() => null);
+    setEmMassa(false);
+    if (r?.ok) {
+      if (acao === "converter" && r.falhas) alert(`${r.criados} convertido(s). ${r.falhas} não deu (ex.: telefone já é cliente).`);
+      setSel(new Set()); carregar();
+    } else alert("Falhou: " + (r?.erro || "erro"));
+  }
 
   return (
     <div style={painel.wrap}>
@@ -73,12 +102,50 @@ export default function Leads() {
 
         {novo && <NovoLead onPronto={() => { setNovo(false); carregar(); }} />}
 
+        {/* seleção em lote */}
+        {lista.length > 0 && (
+          <div style={{
+            position: "sticky", top: 0, zIndex: 5, marginBottom: 12,
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            background: sel.size > 0 ? cor.navy : "#fff",
+            color: sel.size > 0 ? "#fff" : cor.navy,
+            border: `1px solid ${sel.size > 0 ? cor.navy : cor.linha}`,
+            borderRadius: 12, padding: "10px 14px",
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 15 }}>
+              <input type="checkbox" checked={todasMarcadas} onChange={alternarTodas} style={{ width: 18, height: 18 }} />
+              {sel.size > 0 ? `${sel.size} selecionado(s)` : "Selecionar todos"}
+            </label>
+            {sel.size > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
+                <button style={painel.botaoMini} disabled={emMassa}
+                        onClick={() => acaoMassa("converter", `Transformar ${sel.size} lead(s) em cliente? Cada um cria uma ficha (você completa depois).`)}>
+                  Transformar em cliente
+                </button>
+                <button style={painel.botaoMiniSec} disabled={emMassa}
+                        onClick={() => acaoMassa("em_conversa")}>Em conversa</button>
+                <button style={painel.botaoMiniSec} disabled={emMassa}
+                        onClick={() => acaoMassa("descartar", `Descartar ${sel.size} lead(s)?`)}>Descartar</button>
+                <button style={painel.botaoMiniPerigo} disabled={emMassa}
+                        onClick={() => acaoMassa("nao_eh_lead", `Marcar ${sel.size} como "não é lead"? Os números entram na lista de bloqueio.`)}>
+                  🚫 Não é lead
+                </button>
+                <button style={{ ...painel.botaoMiniSec, background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}
+                        disabled={emMassa} onClick={() => setSel(new Set())}>Limpar</button>
+              </div>
+            )}
+          </div>
+        )}
+
         {carregando && <p style={{ color: cor.cinza }}>Carregando…</p>}
         {!carregando && lista.length === 0 && (
           <div style={painel.card}><p style={{ margin: 0, color: cor.cinza }}>Nenhum lead com esses filtros.</p></div>
         )}
 
-        {lista.map((l) => <Lead key={l.id} l={l} onMudou={carregar} />)}
+        {lista.map((l) => (
+          <Lead key={l.id} l={l} onMudou={carregar}
+                marcado={sel.has(l.id)} onMarcar={() => alternarUma(l.id)} />
+        ))}
       </div>
     </div>
   );
@@ -132,13 +199,29 @@ function NovoLead({ onPronto }: { onPronto: () => void }) {
   );
 }
 
-function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
+function Lead({ l, onMudou, marcado, onMarcar }: {
+  l: any; onMudou: () => void; marcado: boolean; onMarcar: () => void;
+}) {
   const [sugestao, setSugestao] = useState("");
   const [pensando, setPensando] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
 
   const msgs = Array.isArray(l.mensagens) ? l.mensagens : [];
   const doWhats = l.origem === "whatsapp";
+  const convertido = l.status === "convertido" || !!l.cliente_id;
+
+  async function converter() {
+    if (!confirm(`Transformar ${l.nome || l.nome_wa || l.telefone} em cliente? A conversa vai junto e você completa a ficha depois.`)) return;
+    setOcupado(true);
+    const r = await fetch(`/api/leads/${l.id}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "converter" }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok && r.clienteId) location.href = `/painel/clientes/${r.clienteId}`;
+    else alert("Não consegui converter: " + (r?.erro || "erro"));
+  }
 
   async function sugerir() {
     setPensando(true);
@@ -185,12 +268,20 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
   const linkWhats = `https://wa.me/${tel}${sugestao ? `?text=${encodeURIComponent(sugestao)}` : ""}`;
 
   return (
-    <div style={{ ...painel.card, borderLeft: doWhats ? "4px solid #d97706" : `4px solid ${cor.teal}` }}>
+    <div style={{ ...painel.card,
+      background: marcado ? "#eef2ff" : "#fff",
+      outline: marcado ? `2px solid ${cor.navy}` : "none",
+      borderLeft: doWhats ? "4px solid #d97706" : `4px solid ${cor.teal}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <input type="checkbox" checked={marcado} onChange={onMarcar}
+               aria-label={`Selecionar ${l.nome || l.nome_wa || l.telefone}`}
+               style={{ width: 18, height: 18, marginTop: 4, flexShrink: 0, cursor: "pointer" }} />
         <div style={{ flex: 1, minWidth: 200 }}>
-          <strong style={{ color: cor.navy, fontSize: 16 }}>
-            {l.nome || l.nome_wa || "Sem nome"}
-          </strong>
+          <Link href={`/painel/leads/${l.id}`} style={{ textDecoration: "none" }}>
+            <strong style={{ color: cor.navy, fontSize: 16 }}>
+              {l.nome || l.nome_wa || "Sem nome"}
+            </strong>
+          </Link>
           <div style={{ fontSize: 15, color: cor.cinza, marginTop: 2 }}>
             {l.telefone} · {doWhats ? "escreveu no WhatsApp" : l.origem === "manual" ? "prospecção" : l.origem}
             {" · "}{l.status}
@@ -232,6 +323,13 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        <Link href={`/painel/leads/${l.id}`} style={painel.botao}>Abrir conversa</Link>
+        {!convertido && (
+          <button style={painel.botaoSec} onClick={converter} disabled={ocupado}>Transformar em cliente</button>
+        )}
+        {convertido && l.cliente_id && (
+          <Link href={`/painel/clientes/${l.cliente_id}`} style={painel.botaoSec}>Abrir ficha do cliente</Link>
+        )}
         <button style={painel.botaoSec} onClick={sugerir} disabled={pensando}>
           {pensando ? "Pensando…" : sugestao ? "Sugerir outra" : "✨ Sugerir mensagem"}
         </button>
@@ -240,9 +338,8 @@ function Lead({ l, onMudou }: { l: any; onMudou: () => void }) {
             navigator.clipboard?.writeText(sugestao); setCopiado(true); setTimeout(() => setCopiado(false), 1500);
           }}>{copiado ? "✓ copiado" : "Copiar"}</button>
         )}
-        <a href={linkWhats} target="_blank" rel="noreferrer"
-           style={{ ...painel.botao, textDecoration: "none" }}>Abrir no WhatsApp</a>
-        {l.status !== "convertido" && (
+        <a href={linkWhats} target="_blank" rel="noreferrer" style={painel.botaoSec}>Abrir no WhatsApp</a>
+        {!convertido && l.status !== "em_conversa" && (
           <button style={painel.botaoSec} onClick={() => mudarStatus("em_conversa")}>Em conversa</button>
         )}
         {!l.ignorado && (

@@ -28,7 +28,21 @@ export async function GET() {
       .map((q: any) => ({ id: q.id, codigo: q.codigo })),
   }));
 
-  return NextResponse.json({ ok: true, cemiterios });
+  // jazigos ainda SEM família (ex.: capturados no campo) — para vincular no cadastro
+  const { data: orfaos } = await db
+    .from("tumulos")
+    .select("id,identificacao,rua,quadras(codigo)")
+    .is("cliente_id", null)
+    .order("identificacao")
+    .limit(300);
+  const semDono = (orfaos || []).map((t: any) => ({
+    id: t.id,
+    identificacao: t.identificacao,
+    rua: t.rua || null,
+    quadra: t.quadras?.codigo || null,
+  }));
+
+  return NextResponse.json({ ok: true, cemiterios, semDono });
 }
 
 // POST { quadraCodigo, identificacao, falecidoNome?, observacoes?, cemiterioId?, clienteId? }

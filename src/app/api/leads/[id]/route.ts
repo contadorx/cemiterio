@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { converterLead } from "@/lib/leads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// GET -> o lead completo (para a tela de conversa do lead)
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const { data, error } = await auth.db
+    .from("leads")
+    .select("id,telefone,nome,nome_wa,contexto,jazigo_ref,mensagens,status,origem,proximo_passo,ignorado,motivo_ignorado,cliente_id,created_at,updated_at")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
+  return NextResponse.json({ ok: true, lead: data });
+}
 
 // POST { acao: 'converter', nome } -> cria o cliente com o telefone do lead
 // POST { acao: 'descartar' }
@@ -15,13 +30,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json().catch(() => ({}));
   const acao = body?.acao;
 
-  const { data: lead } = await db
-    .from("leads")
-    .select("id,telefone,nome_wa,status")
-    .eq("id", params.id)
-    .maybeSingle();
-  if (!lead) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
-
   if (acao === "descartar") {
     await db.from("leads").update({ status: "descartado" }).eq("id", params.id);
     return NextResponse.json({ ok: true });
@@ -31,22 +39,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const org = await orgAtual(db);
     if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
 
-    const nome = (body?.nome || (lead as any).nome_wa || "Cliente").trim();
-    const { data: cli, error } = await db
-      .from("clientes")
-      .insert({
-        org_id: org,
-        nome,
-        telefone: (lead as any).telefone,
-        modo: "copiloto",
-        ativo_ia: true,
-      })
-      .select("id")
-      .single();
-    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-
-    await db.from("leads").update({ status: "convertido" }).eq("id", params.id);
-    return NextResponse.json({ ok: true, clienteId: (cli as any).id });
+    const r = await converterLead(db, org, params.id, body?.nome);
+    if (!r.ok) return NextResponse.json({ ok: false, erro: r.erro }, { status: 500 });
+    return NextResponse.json({ ok: true, clienteId: r.clienteId, jaEra: r.jaEra });
   }
 
   return NextResponse.json({ ok: false, erro: "acao_invalida" }, { status: 400 });

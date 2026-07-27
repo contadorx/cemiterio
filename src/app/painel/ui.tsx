@@ -32,6 +32,8 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
     titulo: "Carteira",
     itens: [
       { href: "/painel/clientes", label: "Famílias" },
+      { href: "/painel/planos", label: "Gestão" },
+      { href: "/painel/mapa", label: "Mapa" },
       { href: "/painel/financeiro", label: "Financeiro" },
       { href: "/painel/reajustes", label: "Reajustes" },
       { href: "/painel/leads", label: "Leads" },
@@ -208,3 +210,56 @@ export const painel: Record<string, React.CSSProperties> = {
   input: { width: "100%", padding: 12, fontSize: 16, borderRadius: 10, border: `1px solid ${cor.linha}`, boxSizing: "border-box" },
   rotulo: { fontSize: 14, fontWeight: 600, color: cor.cinza, marginBottom: 4, display: "block" },
 };
+
+/**
+ * DINHEIRO DIGITADO NO PADRAO BRASILEIRO.
+ *
+ * O <input type="number"> nao serve: no teclado do celular em pt-BR o usuario
+ * digita "40,50" e o campo devolve string vazia — o valor sumia sem aviso e a
+ * tela salvava 0. Os campos de dinheiro sao type="text" inputMode="decimal" e
+ * passam por aqui.
+ *
+ * Devolve NaN (nunca 0) quando o texto e ambiguo ou invalido, para a tela
+ * RECUSAR o salvamento em vez de gravar um numero inventado:
+ *   "40,50" -> 40.5      "1.234,56" -> 1234.56     "40.5" -> 40.5
+ *   "" -> NaN            "abc" -> NaN              "1,2,3" -> NaN
+ *   "," -> NaN        (virgula solta nao e zero: era um campo apagado)
+ *   "40.5,00" -> NaN  (nem 40,50 nem 405: "40.5" nao e milhar valido)
+ *   "1.500" -> NaN    (1500 para quem escreve em pt-BR, 1,5 para quem escreve
+ *                      em ingles — e o campo aceita os dois formatos. Um erro
+ *                      de 1000x no honorario nao pode sair de um palpite:
+ *                      devolve NaN e a tela pede "1500" ou "1.500,00".)
+ */
+export function numeroBR(v: any): number {
+  const t = String(v ?? "").trim();
+  if (!t || !/^[\d.,]+$/.test(t)) return NaN;
+  if (!/\d/.test(t)) return NaN;
+  if (/^\d{1,3}\.\d{3}$/.test(t)) return NaN;
+  const virgulas = (t.match(/,/g) || []).length;
+  const pontos = (t.match(/\./g) || []).length;
+  if (virgulas > 1) return NaN;
+  let limpo = t;
+  if (virgulas === 1) {
+    const i = t.indexOf(",");
+    const inteiro = t.slice(0, i), dec = t.slice(i + 1);
+    if (pontos && !/^\d{1,3}(\.\d{3})+$/.test(inteiro)) return NaN;
+    limpo = inteiro.replace(/\./g, "") + (dec ? "." + dec : "");
+  } else if (pontos > 1) {
+    if (!/^\d{1,3}(\.\d{3})+$/.test(t)) return NaN;
+    limpo = t.replace(/\./g, "");
+  }
+  const n = Number(limpo);
+  return isFinite(n) ? n : NaN;
+}
+
+/**
+ * Numero -> texto pt-BR com 2 casas ("40,50"), para preencher campo de dinheiro.
+ * null/undefined/"" devolvem "" (campo vazio), nunca "0,00": preco inventado num
+ * campo de dinheiro e pior que campo em branco.
+ */
+export function dinheiroBR(v: any): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  if (!isFinite(n)) return "";
+  return (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
+}

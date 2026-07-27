@@ -1,0 +1,212 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { PainelNav, painel, cor } from "../../ui";
+
+interface MsgLead { t?: string; texto: string; de?: "nos" }
+
+export default function LeadThread() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+
+  const [lead, setLead] = useState<any>(null);
+  const [erro, setErro] = useState("");
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [pensando, setPensando] = useState(false);
+  const fim = useRef<HTMLDivElement>(null);
+
+  async function carregar() {
+    const r = await fetch(`/api/leads/${id}`).then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setLead(r.lead); setErro(""); }
+    else setErro(r?.erro || "não consegui carregar");
+  }
+  useEffect(() => { if (id) carregar(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { fim.current?.scrollIntoView(); }, [lead]);
+
+  async function enviar() {
+    if (!texto.trim()) return;
+    setOcupado(true);
+    const r = await fetch(`/api/leads/${id}/responder`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) { setTexto(""); carregar(); }
+    else alert(r?.erro === "falha_envio"
+      ? "Não consegui enviar pelo WhatsApp: " + (r?.detalhe || "")
+      : "Não consegui enviar: " + (r?.erro || "erro"));
+  }
+
+  async function sugerir() {
+    setPensando(true);
+    const r = await fetch(`/api/leads/${id}/abordagem`, { method: "POST" })
+      .then((x) => x.json()).catch(() => null);
+    setPensando(false);
+    if (r?.ok) setTexto(r.texto);
+    else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
+  }
+
+  async function converter() {
+    if (!confirm(`Transformar ${lead.nome || lead.nome_wa || lead.telefone} em cliente? A conversa vai junto e você completa a ficha em seguida.`)) return;
+    setOcupado(true);
+    const r = await fetch(`/api/leads/${id}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "converter" }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok && r.clienteId) router.push(`/painel/clientes/${r.clienteId}`);
+    else alert("Não consegui converter: " + (r?.erro || "erro"));
+  }
+
+  async function patch(corpo: Record<string, any>, sair?: boolean) {
+    setOcupado(true);
+    const r = await fetch(`/api/leads/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) { sair ? router.push("/painel/leads") : carregar(); }
+    else alert("Não consegui atualizar: " + (r?.erro || "erro"));
+  }
+
+  function descartar() {
+    if (confirm("Descartar este lead? Ele some da lista ativa (volta se a pessoa escrever de novo).")) {
+      patch({ status: "descartado" }, true);
+    }
+  }
+  function naoEhLead() {
+    const motivo = prompt("Marcar como \"não é lead\"? O número entra na lista de bloqueio e não volta a aparecer.\n\nMotivo (opcional):", "");
+    if (motivo === null) return;
+    patch({ ignorado: true, motivoIgnorado: motivo || null }, true);
+  }
+
+  if (!lead && !erro) {
+    return (
+      <div style={painel.wrap}>
+        <PainelNav atual="/painel/leads" />
+        <div style={painel.conteudo}><p style={{ color: cor.cinza }}>Carregando…</p></div>
+      </div>
+    );
+  }
+  if (erro) {
+    return (
+      <div style={painel.wrap}>
+        <PainelNav atual="/painel/leads" />
+        <div style={painel.conteudo}>
+          <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
+            <strong style={{ color: "#991b1b" }}>Não consegui abrir este lead</strong>
+            <p style={{ color: "#7f1d1d", fontSize: 15 }}>{erro}</p>
+            <Link href="/painel/leads" style={painel.botaoSec}>Voltar aos leads</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const msgs: MsgLead[] = Array.isArray(lead.mensagens) ? lead.mensagens : [];
+  const doWhats = lead.origem === "whatsapp";
+  const convertido = lead.status === "convertido" || !!lead.cliente_id;
+
+  return (
+    <div style={painel.wrap}>
+      <PainelNav atual="/painel/leads" />
+      <div style={painel.conteudo}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <Link href="/painel/leads" style={{ color: cor.cinza, fontSize: 14, textDecoration: "none" }}>← Leads</Link>
+            <h1 style={{ ...painel.h1, margin: "4px 0 0" }}>{lead.nome || lead.nome_wa || "Sem nome"}</h1>
+          </div>
+          <a href={`https://wa.me/${String(lead.telefone || "").replace(/\D/g, "")}`}
+             target="_blank" rel="noreferrer" style={painel.botaoMiniSec}>WhatsApp ↗</a>
+        </div>
+        <p style={{ color: cor.cinza, marginTop: 4, fontSize: 14 }}>
+          {lead.telefone} · {doWhats ? "escreveu no WhatsApp" : lead.origem === "manual" ? "prospecção" : lead.origem} · {lead.status}
+          {lead.ignorado && <span style={{ color: "#b91c1c", fontWeight: 600 }}> · 🚫 não é lead</span>}
+        </p>
+
+        {lead.contexto && (
+          <div style={{ ...painel.card, background: "#f8fafc", padding: 12 }}>
+            <div style={painel.rotulo}>Contexto</div>
+            <p style={{ margin: 0, color: "#334155", fontSize: 14 }}>{lead.contexto}</p>
+            {lead.jazigo_ref && <p style={{ margin: "6px 0 0", color: cor.cinza, fontSize: 14 }}>Jazigo: {lead.jazigo_ref}</p>}
+          </div>
+        )}
+
+        {convertido && (
+          <div style={{ ...painel.card, borderLeft: `4px solid ${cor.teal}`, background: "#f0fdfa" }}>
+            <span style={{ color: cor.navy }}>Este lead já virou cliente. </span>
+            {lead.cliente_id && (
+              <Link href={`/painel/clientes/${lead.cliente_id}`} style={{ color: cor.teal, fontWeight: 700 }}>
+                Abrir a ficha do cliente →
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* histórico */}
+        <div style={{ ...painel.card, maxHeight: 420, overflowY: "auto" }}>
+          {msgs.length === 0 && <p style={{ color: cor.cinza }}>Nenhuma mensagem ainda. Escreva a primeira abaixo.</p>}
+          {msgs.map((m, i) => {
+            const nosso = m.de === "nos";
+            return (
+              <div key={i} style={{ margin: "8px 0", textAlign: nosso ? "right" : "left" }}>
+                <span style={{ display: "inline-block", maxWidth: "80%", padding: "8px 12px", borderRadius: 12,
+                               background: nosso ? "#1e293b" : "#e2e8f0", color: nosso ? "#fff" : cor.navy, fontSize: 14 }}>
+                  {m.texto}
+                  {m.t && <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
+                    {nosso ? "nós" : "lead"} · {new Date(m.t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </div>}
+                </span>
+              </div>
+            );
+          })}
+          <div ref={fim} />
+        </div>
+
+        {/* responder */}
+        {!lead.ignorado && !convertido && (
+          <div>
+            <textarea
+              rows={5}
+              style={{ ...painel.input, width: "100%", minHeight: 120, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+              placeholder="Escreva a resposta…"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviar(); }}
+            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+              <button style={painel.botao} onClick={enviar} disabled={ocupado || !texto.trim()}>Enviar pelo WhatsApp</button>
+              <button style={painel.botaoSec} onClick={sugerir} disabled={pensando}>
+                {pensando ? "Pensando…" : "✨ Sugerir mensagem"}
+              </button>
+              <span style={{ fontSize: 13, color: cor.cinza }}>Ctrl+Enter envia</span>
+            </div>
+          </div>
+        )}
+
+        {/* ações do lead */}
+        <div style={{ ...painel.card, marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {!convertido && (
+            <button style={painel.botao} onClick={converter} disabled={ocupado}>Transformar em cliente</button>
+          )}
+          {!lead.ignorado && lead.status !== "em_conversa" && !convertido && (
+            <button style={painel.botaoSec} onClick={() => patch({ status: "em_conversa" })} disabled={ocupado}>Marcar “em conversa”</button>
+          )}
+          {!lead.ignorado && !convertido && (
+            <>
+              <button style={painel.botaoSec} onClick={descartar} disabled={ocupado}>Descartar</button>
+              <button style={painel.botaoSec} onClick={naoEhLead} disabled={ocupado}>🚫 Não é lead</button>
+            </>
+          )}
+          {lead.ignorado && (
+            <button style={painel.botaoSec} onClick={() => patch({ ignorado: false, status: "novo" })} disabled={ocupado}>Voltar a mostrar</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
