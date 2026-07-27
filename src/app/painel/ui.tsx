@@ -23,7 +23,7 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
     titulo: "Dia a dia",
     itens: [
       { href: "/painel", label: "Início" },
-      { href: "/painel/conversas", label: "Conversas" },
+      { href: "/painel/conversas", label: "Atendimento" },
       { href: "/painel/agenda", label: "Agenda" },
       { href: "/campo", label: "📍 Campo" },
     ],
@@ -35,13 +35,11 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
       // mostrava quem paga, a outra o que se cobra. Agora é uma tela com abas.
       { href: "/painel/clientes", label: "Carteira" },
       { href: "/painel/financeiro", label: "Financeiro" },
-      { href: "/painel/leads", label: "Leads" },
     ],
   },
   {
     titulo: "Ajustes",
     itens: [
-      { href: "/painel/agente", label: "Agente" },
       { href: "/painel/whatsapp", label: "WhatsApp" },
       { href: "/painel/plaquetas", label: "Plaquetas" },
       { href: "/painel/config", label: "Config" },

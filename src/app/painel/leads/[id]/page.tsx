@@ -69,7 +69,7 @@ export default function LeadThread() {
       body: JSON.stringify(corpo),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) { sair ? router.push("/painel/leads") : carregar(); }
+    if (r?.ok) { sair ? router.push("/painel/conversas?aba=leads") : carregar(); }
     else alert("Não consegui atualizar: " + (r?.erro || "erro"));
   }
 
@@ -87,7 +87,7 @@ export default function LeadThread() {
   if (!lead && !erro) {
     return (
       <div style={painel.wrap}>
-        <PainelNav atual="/painel/leads" />
+        <PainelNav atual="/painel/conversas" />
         <div style={painel.conteudo}><p style={{ color: cor.cinza }}>Carregando…</p></div>
       </div>
     );
@@ -95,12 +95,12 @@ export default function LeadThread() {
   if (erro) {
     return (
       <div style={painel.wrap}>
-        <PainelNav atual="/painel/leads" />
+        <PainelNav atual="/painel/conversas" />
         <div style={painel.conteudo}>
           <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
             <strong style={{ color: "#991b1b" }}>Não consegui abrir este lead</strong>
             <p style={{ color: "#7f1d1d", fontSize: 15 }}>{erro}</p>
-            <Link href="/painel/leads" style={painel.botaoSec}>Voltar aos leads</Link>
+            <Link href="/painel/conversas?aba=leads" style={painel.botaoSec}>Voltar aos leads</Link>
           </div>
         </div>
       </div>
@@ -113,11 +113,11 @@ export default function LeadThread() {
 
   return (
     <div style={painel.wrap}>
-      <PainelNav atual="/painel/leads" />
+      <PainelNav atual="/painel/conversas" />
       <div style={painel.conteudo}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <div>
-            <Link href="/painel/leads" style={{ color: cor.cinza, fontSize: 14, textDecoration: "none" }}>← Leads</Link>
+            <Link href="/painel/conversas?aba=leads" style={{ color: cor.cinza, fontSize: 14, textDecoration: "none" }}>← Leads</Link>
             <h1 style={{ ...painel.h1, margin: "4px 0 0" }}>{lead.nome || lead.nome_wa || "Sem nome"}</h1>
           </div>
           <a href={`https://wa.me/${String(lead.telefone || "").replace(/\D/g, "")}`}
