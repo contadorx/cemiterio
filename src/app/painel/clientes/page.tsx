@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { PainelNav, painel, cor } from "../ui";
+import { PainelNav, painel, cor, numeroBR } from "../ui";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 
 interface Cli {
@@ -184,7 +184,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     identificacao: "", quadraCodigo: "", rua: "", falecidoNome: "",
     // plano
     atalho: 2, // índice em ATALHOS_FREQUENCIA (2 = "Uma vez por mês")
-    valorMensal: 40, inicio: "",
+    valorMensal: "", inicio: "",  // texto: pt-BR aceita "40,50"
   });
   const [quadras, setQuadras] = useState<string[]>([]);
   const [semDono, setSemDono] = useState<any[]>([]);
@@ -203,11 +203,16 @@ function Importar({ onPronto }: { onPronto: () => void }) {
   async function criar() {
     if (!f.nome.trim() || !f.telefone.trim()) return alert("Nome e telefone são obrigatórios.");
     if (f.jazigoModo === "vincular" && !f.vincularTumuloId) return alert("Escolha o jazigo já cadastrado ou troque para “novo”.");
-    if (f.jazigoModo === "novo" && f.identificacao.trim() && !f.quadraCodigo.trim())
-      return alert("Diga a quadra do jazigo.");
+
 
     const at = ATALHOS_FREQUENCIA[f.atalho];
     const temJazigo = f.jazigoModo === "vincular" ? !!f.vincularTumuloId : !!f.identificacao.trim();
+    // valor em pt-BR: NaN quando nao entende, e NaN barra aqui em vez de virar
+    // preco errado no banco (antes o padrao 40 entrava calado como honorario).
+    const mensal = numeroBR(f.valorMensal);
+    if (temJazigo && at.cadencia !== "avulso" && (!isFinite(mensal) || mensal <= 0)) {
+      return alert("Digite o valor mensal como 40 ou 40,50 (sem R$ e sem separador de milhar).");
+    }
 
     setOcupado(true);
     const r = await fetch("/api/clientes", {
@@ -219,13 +224,16 @@ function Importar({ onPronto }: { onPronto: () => void }) {
           : { identificacao: f.identificacao, quadraCodigo: f.quadraCodigo, rua: f.rua, falecidoNome: f.falecidoNome },
         // só manda plano se há jazigo e a periodicidade não é avulso
         plano: temJazigo && at.cadencia !== "avulso"
-          ? { cadencia: at.cadencia, lavagensPorCiclo: at.lavagens, valorMensal: f.valorMensal, inicio: f.inicio || undefined }
+          ? { cadencia: at.cadencia, lavagensPorCiclo: at.lavagens, valorMensal: Math.round(mensal * 100) / 100, inicio: f.inicio || undefined }
           : undefined,
       }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) onPronto();
-    else alert("Falhou: " + (r?.erro || "erro"));
+    if (!r?.ok) return alert("Falhou: " + (r?.erro || "erro"));
+    // a familia e criada mesmo se o jazigo/plano falhar — antes isso era mudo.
+    if (r.avisoJazigo) alert("Familia cadastrada, mas o jazigo NAO entrou:\n\n" + r.avisoJazigo);
+    else if (r.avisoPlano) alert("Familia e jazigo cadastrados, mas o plano nao foi criado:\n\n" + r.avisoPlano);
+    onPronto();
   }
 
   async function importar() {
@@ -235,8 +243,30 @@ function Importar({ onPronto }: { onPronto: () => void }) {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) { alert(`${r.criados || 0} linha(s) importada(s).`); onPronto(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    if (!r?.ok) { alert("Falhou: " + (r?.erro || "erro")); return; }
+    // r.criados e um objeto {clientes, tumulos, planos} — o alert antigo escrevia
+    // "[object Object] linha(s)". E r.erros, que e onde moram TODAS as linhas
+    // recusadas (valor ilegivel, jazigo de outra familia, duplicata), nao
+    // aparecia em lugar nenhum: 45 familias podiam ficar de fora e a tela dizia
+    // "pronto".
+    const c = r.criados || {};
+    const partes = [
+      `${c.clientes || 0} familia(s)`,
+      `${c.tumulos || 0} jazigo(s)`,
+      `${c.planos || 0} plano(s)`,
+    ].join(", ");
+    const erros: { linha: number; motivo: string }[] = r.erros || [];
+    if (erros.length) {
+      const lista = erros.slice(0, 20).map((e) => `linha ${e.linha}: ${e.motivo}`).join("\n");
+      const resto = erros.length > 20 ? `\n… e mais ${erros.length - 20} linha(s).` : "";
+      alert(
+        `Importado: ${partes}.\n\n${erros.length} linha(s) NAO entraram:\n\n${lista}${resto}` +
+        "\n\nCorrija essas linhas na planilha e importe so elas de novo."
+      );
+    } else {
+      alert(`Importado: ${partes}.`);
+    }
+    onPronto();
   }
 
   const secao: React.CSSProperties = { borderTop: `1px solid ${cor.linha}`, marginTop: 14, paddingTop: 12 };
@@ -311,6 +341,15 @@ function Importar({ onPronto }: { onPronto: () => void }) {
                   <input style={{ ...painel.input, width: 100 }} value={f.rua}
                          onChange={(e) => setF({ ...f, rua: e.target.value })} placeholder="RUA 1" />
                 </div>
+                {/* a quadra deixou de ser obrigatoria: quem ainda nao mapeou o
+                    cemiterio precisa cadastrar hoje. Mas o balde "S/Q" junta
+                    todos, e dois jazigos com o mesmo numero la dentro sao
+                    tratados como o MESMO jazigo — por isso o aviso. */}
+                <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0", width: "100%" }}>
+                  Sem quadra? Deixe em branco: o jazigo entra em “S/Q” e ganha a quadra
+                  certa na primeira passagem do campo. Atenção: dentro de “S/Q”, dois
+                  jazigos com a mesma identificação são tratados como o mesmo túmulo.
+                </p>
               </div>
             ) : (
               <div>
@@ -347,8 +386,9 @@ function Importar({ onPronto }: { onPronto: () => void }) {
               </div>
               <div>
                 <label style={painel.rotulo}>Valor mensal</label>
-                <input type="number" style={{ ...painel.input, width: 110 }} value={f.valorMensal}
-                       onChange={(e) => setF({ ...f, valorMensal: Number(e.target.value) })} />
+                <input type="text" inputMode="decimal" placeholder="40,00"
+                       style={{ ...painel.input, width: 110 }} value={f.valorMensal}
+                       onChange={(e) => setF({ ...f, valorMensal: e.target.value })} />
               </div>
               <div>
                 <label style={painel.rotulo}>1ª lavagem</label>
@@ -375,11 +415,18 @@ function Importar({ onPronto }: { onPronto: () => void }) {
       {modo === "csv" && (
         <>
           <label style={painel.rotulo}>
-            Cole as linhas (nome; telefone; jazigo; quadra; rua; periodicidade; valor mensal)
+            Cole a planilha COM a linha de cabeçalho
           </label>
+          {/* o rotulo antigo anunciava uma ordem de colunas que a API nao aceita
+              (e sem cabecalho); quem seguia a tela levava erro de cabecalho. */}
           <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 15 }}
                     value={csv} onChange={(e) => setCsv(e.target.value)}
-                    placeholder={"MARIA SILVA;11999998888;Família SILVA;QD 1;RUA 2;mensal;40"} />
+                    placeholder={"quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor\nQD 1;128;JOSE SILVA;MARIA SILVA;11999998888;mensal;1;40,00"} />
+          <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0" }}>
+            Obrigatórias: <b>quadra, identificacao, cliente_nome, telefone</b>. As outras são
+            opcionais — sem <b>cadencia</b> o jazigo entra sem plano. Valor em reais (40 ou 40,00);
+            valor que o sistema não entender faz a linha ser recusada, nunca vira um preço chutado.
+          </p>
           <button style={{ ...painel.botao, marginTop: 10 }} onClick={importar} disabled={ocupado}>
             {ocupado ? "Importando…" : "Importar"}
           </button>

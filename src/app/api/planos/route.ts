@@ -27,10 +27,20 @@ export async function POST(req: NextRequest) {
   if (!clienteId) return NextResponse.json({ ok: false, erro: "jazigo_sem_familia" }, { status: 400 });
 
   // um plano por jazigo: se já existe, não duplica
-  const { data: existente } = await db.from("planos").select("id").eq("tumulo_id", tumuloId).maybeSingle();
-  if (existente) return NextResponse.json({ ok: true, planoId: (existente as any).id, jaExistia: true });
+  // limit(2) em vez de maybeSingle(): jazigo com dois planos (heranca de
+  // importacao) fazia o maybeSingle estourar, o erro era descartado e a tela
+  // criava um TERCEIRO plano no mesmo jazigo.
+  const { data: existentes } = await db.from("planos").select("id").eq("tumulo_id", tumuloId).limit(2);
+  if ((existentes || []).length) {
+    return NextResponse.json({ ok: true, planoId: (existentes as any)[0].id, jaExistia: true });
+  }
 
-  const valorMensal = Number(b?.valorMensal) || 40;
+  // Sem valor legivel NAO inventa preco. O antigo `|| 40` transformava campo em
+  // branco, NaN e "R$ 60" em honorario real de R$ 40, calado, para sempre.
+  const valorMensal = Math.round((Number(b?.valorMensal) || NaN) * 100) / 100;
+  if (!isFinite(valorMensal) || valorMensal <= 0) {
+    return NextResponse.json({ ok: false, erro: "valor_mensal_invalido" }, { status: 400 });
+  }
   const lav = Math.max(1, Math.min(12, Number(b?.lavagensPorCiclo) || 1));
   const venc = vencimentosIniciais(cadencia, b?.inicio);
 

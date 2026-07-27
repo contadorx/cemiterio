@@ -3,7 +3,7 @@ import { exigirAdmin } from "@/lib/roles";
 import { descreverFrequencia } from "@/lib/frequencia";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
-import { valorDoCiclo, vencimentosIniciais } from "@/lib/vencimento";
+import { anexarJazigo, criarPlanoSeFaltar, explicarErroJazigo } from "@/lib/jazigo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -158,90 +158,37 @@ export async function POST(req: NextRequest) {
   if (e1) return NextResponse.json({ ok: false, erro: e1.message }, { status: 500 });
   const clienteId = (cli as any).id as string;
 
+  // JAZIGO + PLANO: a mesma funcao que a ficha da familia usa (src/lib/jazigo.ts).
+  // Antes isto vivia so aqui, em linha, e falhava CALADO: se a identificacao ja
+  // existisse em outra familia, a familia nascia sem jazigo e a tela dizia "ok".
   let tumuloId: string | null = null;
+  let avisoJazigo: string | null = null;
+  let avisoPlano: string | null = null;
 
-  // --- JAZIGO ---
-  if (jz?.vincularTumuloId) {
-    // vincula um jazigo já cadastrado (ex.: capturado no campo) a esta família.
-    // Só vincula se ainda estiver SEM dono — não rouba jazigo de outra família.
-    const patch: Record<string, any> = { cliente_id: clienteId };
-    if (jz.rua) patch.rua = jz.rua;
-    if (jz.falecidoNome) patch.falecido_nome = jz.falecidoNome.trim();
-    const { data: vinc } = await db.from("tumulos").update(patch)
-      .eq("id", jz.vincularTumuloId).is("cliente_id", null).select("id");
-    // só considera vinculado se a linha existia e estava órfã
-    tumuloId = (vinc && vinc.length) ? jz.vincularTumuloId : null;
-  } else if (jz?.identificacao) {
-    // cria um jazigo novo (garante cemitério + quadra por código)
-    let cemId = jz.cemiterioId || null;
-    if (!cemId) {
-      const { data: cem } = await db.from("cemiterios").select("id").limit(1).maybeSingle();
-      if (cem) cemId = (cem as any).id;
-      else {
-        const { data: novo } = await db.from("cemiterios")
-          .insert({ org_id: org, nome: "Cemitério" }).select("id").single();
-        cemId = (novo as any)?.id;
-      }
-    }
-    const codigo = String(jz.quadraCodigo || "S/Q").trim();
-    let { data: quad } = await db.from("quadras")
-      .select("id").eq("cemiterio_id", cemId).eq("codigo", codigo).maybeSingle();
-    if (!quad) {
-      const { data: novaQ } = await db.from("quadras")
-        .insert({ org_id: org, cemiterio_id: cemId, codigo }).select("id").single();
-      quad = novaQ as any;
-    }
-    const quadId = (quad as any).id;
-    const ident = String(jz.identificacao).trim();
-    const rua = jz.rua?.trim() || null;
-    const falecido = jz.falecidoNome?.trim() || null;
-
-    // já existe esse jazigo nessa quadra? reaproveita (evita duplicar)
-    const { data: existente } = await db.from("tumulos")
-      .select("id,cliente_id").eq("quadra_id", quadId).ilike("identificacao", ident).maybeSingle();
-
-    if (existente && !(existente as any).cliente_id) {
-      // existe e está órfão → vincula a esta família
-      await db.from("tumulos")
-        .update({ cliente_id: clienteId, rua, falecido_nome: falecido })
-        .eq("id", (existente as any).id);
-      tumuloId = (existente as any).id;
-    } else if (!existente) {
-      const { data: tum, error: e2 } = await db.from("tumulos").insert({
-        org_id: org, quadra_id: quadId, cliente_id: clienteId,
-        identificacao: ident, rua, falecido_nome: falecido,
-      }).select("id").single();
-      if (!e2) tumuloId = (tum as any).id;
-    }
-    // else: já existe e é de outra família → não mexe (evita duplicar e não rouba)
+  if (jz?.vincularTumuloId || jz?.identificacao) {
+    const r = await anexarJazigo(db, org, clienteId, {
+      vincularTumuloId: jz?.vincularTumuloId ?? null,
+      identificacao: jz?.identificacao ?? null,
+      quadraCodigo: jz?.quadraCodigo ?? null,
+      rua: jz?.rua ?? null,
+      numero: jz?.numero ?? null,
+      falecidoNome: jz?.falecidoNome ?? null,
+      cemiterioId: jz?.cemiterioId ?? null,
+    });
+    if (r.ok) tumuloId = r.tumuloId;
+    else avisoJazigo = explicarErroJazigo(r.erro, r.detalhe);
   }
 
-  // --- PLANO --- (com vencimento calculado a partir da periodicidade)
-  const cadencia = pl?.cadencia;
-  if (cadencia && cadencia !== "avulso" && tumuloId) {
-    // não duplica se o jazigo vinculado já tinha plano
-    const { data: jaTem } = await db.from("planos").select("id").eq("tumulo_id", tumuloId).maybeSingle();
-    if (!jaTem) {
-      const valorMensal = Number(pl.valorMensal ?? pl.valorVigente) || 40;
-      const lav = Math.max(1, Math.min(12, Number(pl.lavagensPorCiclo ?? pl.qtdPorPassagem) || 1));
-      const venc = vencimentosIniciais(cadencia, pl.inicio);
-      await db.from("planos").insert({
-        org_id: org,
-        cliente_id: clienteId,
-        tumulo_id: tumuloId,
-        cadencia,
-        qtd_por_passagem: lav,
-        lavagens_por_ciclo: lav,
-        valor_mensal: valorMensal,
-        valor_vigente: valorDoCiclo(cadencia, valorMensal),
-        data_valor_vigente: new Date().toISOString().slice(0, 10),
-        ativo: true,
-        proximo_servico: venc.proximo_servico,
-        proxima_cobranca: venc.proxima_cobranca,
-        pago_ate: venc.pago_ate,
-      });
-    }
+  if (tumuloId && pl?.cadencia && pl.cadencia !== "avulso") {
+    const rp = await criarPlanoSeFaltar(db, org, clienteId, tumuloId, {
+      cadencia: pl.cadencia,
+      lavagensPorCiclo: pl.lavagensPorCiclo ?? pl.qtdPorPassagem ?? null,
+      valorMensal: pl.valorMensal ?? pl.valorVigente ?? null,
+      inicio: pl.inicio ?? null,
+    });
+    if (!rp.ok) avisoPlano = explicarErroJazigo(rp.erro);
   }
 
-  return NextResponse.json({ ok: true, clienteId, tumuloId });
+  // A familia FOI criada mesmo quando o jazigo falha — por isso ok:true com aviso.
+  return NextResponse.json({ ok: true, clienteId, tumuloId, avisoJazigo, avisoPlano });
 }

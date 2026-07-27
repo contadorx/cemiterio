@@ -82,7 +82,7 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
       setTumuloId(r.tumuloId);
       setJaExistia(!!r.jaExistia);
     } else {
-      setErro("Não consegui criar: " + (r?.erro || "erro"));
+      setErro(r?.mensagem || "Não consegui criar: " + (r?.erro || "erro"));
     }
   }
 

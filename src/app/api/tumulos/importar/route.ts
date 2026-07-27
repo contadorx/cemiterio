@@ -2,6 +2,45 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
+import { diaOperacao } from "@/lib/vencimento";
+
+/**
+ * Dinheiro de planilha em pt-BR. Devolve NaN quando NAO entende — nunca 0 e
+ * nunca um valor de conveniencia. O codigo antigo fazia `Number(col) || 40`:
+ * celula vazia, "R$ 60" e "60,00" viravam todos R$ 40 no banco, calados, e
+ * viravam honorario real na primeira cobranca.
+ */
+function numeroPlanilha(bruto: string): number {
+  let t = String(bruto ?? "").replace(/R\$/gi, "").replace(/\s/g, "").trim();
+  if (!t) return NaN;
+  const temPonto = t.includes("."), temVirgula = t.includes(",");
+  if (temPonto && temVirgula) {
+    // quem manda e o separador MAIS A DIREITA: "1.500,00" e pt-BR, "1,500.00" e
+    // planilha exportada em ingles. Assumir pt-BR sempre lia R$ 1.500 como 1,50.
+    if (t.lastIndexOf(",") > t.lastIndexOf(".")) t = t.replace(/\./g, "").replace(",", ".");
+    else t = t.replace(/,/g, "");
+  }
+  else if (temVirgula) t = t.replace(",", ".");
+  else if (temPonto) {
+    // "60.00" e centavo de export; "1.500" e ambiguo (mil e quinhentos ou 1,5?)
+    const dep = t.slice(t.lastIndexOf(".") + 1);
+    if (dep.length !== 2) return NaN;
+  }
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return NaN;
+  const n = Number(t);
+  return isFinite(n) ? n : NaN;
+}
+
+/**
+ * `%` e `_` sao curingas do ilike: sem escapar, "L_128" casa com "L-128".
+ * `*` NAO entra aqui: o PostgREST troca `*` por `%` sem olhar escape, entao
+ * `\*` viraria um `%` literal e a busca deixaria de achar o proprio jazigo —
+ * falso negativo cria copia. Como a igualdade final e decidida no JS, deixar o
+ * `*` virar curinga so traz candidatos a mais, que o filtro descarta.
+ */
+function paraIlike(x: string): string {
+  return x.replace(/([\\%_])/g, "\\$1");
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +85,7 @@ export async function POST(req: NextRequest) {
   }
 
   // cemitério padrão
-  let { data: cem } = await db.from("cemiterios").select("id").limit(1).maybeSingle();
+  let { data: cem } = await db.from("cemiterios").select("id").order("nome").limit(1).maybeSingle();
   if (!cem) {
     const { data: novo } = await db
       .from("cemiterios")
@@ -72,7 +111,7 @@ export async function POST(req: NextRequest) {
     const tel = normalizarTelefone(cols[iTel] || "");
     const cad = iCad >= 0 ? (cols[iCad] || "").toLowerCase() : "";
     const qtd = iQtd >= 0 ? Number(cols[iQtd]) || 1 : 1;
-    const val = iVal >= 0 ? Number(cols[iVal]) || 40 : 40;
+    const val = iVal >= 0 ? numeroPlanilha(cols[iVal]) : NaN;
 
     if (!ident || !nome || !tel) {
       erros.push({ linha: i + 1, motivo: "faltou identificacao, cliente_nome ou telefone" });
@@ -124,14 +163,37 @@ export async function POST(req: NextRequest) {
         clienteCache.set(tel, clienteId!);
       }
 
-      // túmulo (evita duplicar mesma identificacao na quadra)
-      const { data: tExiste } = await db
+      // Tumulo: mesma identificacao na mesma quadra = o MESMO jazigo do mundo
+      // real. maybeSingle() aqui estourava quando ja havia duplicata no banco,
+      // o erro era descartado e a importacao INSERIA uma terceira copia.
+      const { data: cands, error: eBusca } = await db
         .from("tumulos")
-        .select("id")
+        .select("id,cliente_id,identificacao")
         .eq("quadra_id", quadraId)
-        .eq("identificacao", ident)
-        .maybeSingle();
-      let tumuloId = (tExiste as any)?.id as string | undefined;
+        .ilike("identificacao", paraIlike(ident))
+        .order("identificacao")
+        .limit(50);
+      if (eBusca) throw new Error(`tumulo: ${eBusca.message}`);
+      const alvoIdent = ident.trim().toLowerCase();
+      const iguais = (cands || []).filter(
+        (t: any) => String(t.identificacao || "").trim().toLowerCase() === alvoIdent
+      );
+      if (iguais.length > 1) {
+        throw new Error(`ja existe mais de um jazigo "${ident}" na quadra ${quadra} — resolva a duplicata antes`);
+      }
+      const tExiste = iguais[0] as any | undefined;
+      let tumuloId = tExiste?.id as string | undefined;
+      if (tumuloId) {
+        const dono = tExiste.cliente_id as string | null;
+        if (dono && dono !== clienteId) {
+          // nao rouba jazigo de outra familia por causa de uma planilha
+          throw new Error(`o jazigo "${ident}" da quadra ${quadra} ja e de outra familia`);
+        }
+        if (!dono) {
+          const { error } = await db.from("tumulos").update({ cliente_id: clienteId }).eq("id", tumuloId);
+          if (error) throw new Error(`tumulo: ${error.message}`);
+        }
+      }
       if (!tumuloId) {
         const { data: nt, error } = await db
           .from("tumulos")
@@ -151,6 +213,14 @@ export async function POST(req: NextRequest) {
 
       // plano opcional
       if (cad && cadenciasOk.includes(cad)) {
+        // Sem preco legivel nao cria plano e nao inventa numero: a familia e o
+        // jazigo ja entraram; so esta linha do plano fica pendente, e dita.
+        if (iVal < 0) {
+          throw new Error("a planilha tem 'cadencia' mas nao tem a coluna 'valor' — jazigo importado, plano NAO criado");
+        }
+        if (!isFinite(val) || val <= 0) {
+          throw new Error(`valor "${cols[iVal] ?? ""}" nao entendido — jazigo importado, plano NAO criado (use 60 ou 60,00)`);
+        }
         const { data: pExiste } = await db
           .from("planos")
           .select("id")
@@ -164,9 +234,11 @@ export async function POST(req: NextRequest) {
             tumulo_id: tumuloId,
             cadencia: cad,
             qtd_por_passagem: qtd,
-            valor_vigente: val,
-            data_valor_vigente: new Date().toISOString().slice(0, 10),
-            proximo_servico: cad === "avulso" ? null : new Date().toISOString().slice(0, 10),
+            // centavos como no resto do sistema; e diaOperacao() (America/Sao_Paulo)
+            // para a importacao das 21h nao datar tudo com o dia de amanha (UTC).
+            valor_vigente: Math.round(val * 100) / 100,
+            data_valor_vigente: diaOperacao(),
+            proximo_servico: cad === "avulso" ? null : diaOperacao(),
           });
           if (error) throw new Error(`plano: ${error.message}`);
           res.planos++;

@@ -299,7 +299,11 @@ export default function FichaCliente() {
             As datas de memória (falecimento/nascimento) alimentam as mensagens de carinho — o sistema
             sugere um rascunho 7 dias antes, todo ano.
           </p>
-          {d.tumulos.length === 0 && <p style={{ color: cor.cinza }}>Nenhum túmulo cadastrado.</p>}
+          {d.tumulos.length === 0 && (
+            <p style={{ color: cor.cinza }}>
+              Nenhum túmulo cadastrado ainda — inclua o primeiro abaixo.
+            </p>
+          )}
           {(d.tumulos || []).map((t: any) => {
             const pl = (d.planos || []).find((p: any) => p.tumulo_id === t.id) || null;
             // a key inclui o plano: quando um plano é criado agora, o bloco
@@ -311,7 +315,7 @@ export default function FichaCliente() {
             );
           })}
 
-          <VincularJazigo clienteId={id} onMudou={carregar} />
+          <AdicionarTumulo clienteId={id} vazio={d.tumulos.length === 0} onMudou={carregar} />
         </div>
 
         <div style={painel.card}>
@@ -1590,23 +1594,43 @@ function BarraSalvar({ pendencias, salvando, onSalvarTudo }: {
  * Autocontido: faz o próprio POST e chama onSalvo — não passa pela BarraSalvar.
  */
 function CriarPlano({ tumuloId, onSalvo }: { tumuloId: string; onSalvo: () => void }) {
-  const [atalho, setAtalho] = useState(2); // "Uma vez por mês"
-  const [valor, setValor] = useState(40);
+  const [atalho, setAtalho] = useState(2); // "Uma vez por mes"
+  // dinheiro como TEXTO: em pt-BR o campo number recusa virgula em parte dos
+  // teclados e "40,50" chegava vazio. numeroBR devolve NaN quando nao entende,
+  // e NaN vira recusa na tela em vez de um valor errado gravado.
+  const [valor, setValor] = useState("");
   const [inicio, setInicio] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function criar() {
     const a = ATALHOS_FREQUENCIA[atalho];
+    const n = numeroBR(valor);
+    // vale para TODA cadencia, inclusive "avulso": o valor ilegivel virava NaN,
+    // NaN virava null no JSON e a API antiga gravava 40 sem avisar ninguem.
+    if (!isFinite(n) || n <= 0) {
+      setErro("Digite o valor mensal como 40 ou 40,50 (sem R$ e sem separador de milhar).");
+      return;
+    }
+    setErro(null);
     setSalvando(true);
     const r = await fetch("/api/planos", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tumuloId, cadencia: a.cadencia, lavagensPorCiclo: a.lavagens,
-        valorMensal: valor, inicio: inicio || undefined,
+        valorMensal: Math.round(n * 100) / 100, inicio: inicio || undefined,
       }),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (r?.ok) onSalvo(); else alert("Não consegui criar o plano: " + (r?.erro || "erro"));
+    if (!r?.ok) { setErro("Nao consegui criar o plano: " + (r?.erro || "erro")); return; }
+    if (r.jaExistia) {
+      // ok:true com jaExistia NAO e plano criado. Como a ficha lista planos por
+      // familia e a checagem da API e por jazigo, um plano preso a outra familia
+      // some da tela: sem este aviso o operador clicava para sempre.
+      setErro("Este jazigo ja tem um plano no sistema, ligado a outra familia. Abra Planos para corrigir o vinculo — nada foi criado agora.");
+      return;
+    }
+    onSalvo();
   }
 
   return (
@@ -1621,8 +1645,9 @@ function CriarPlano({ tumuloId, onSalvo }: { tumuloId: string; onSalvo: () => vo
         </div>
         <div>
           <label style={painel.rotulo}>Valor mensal</label>
-          <input type="number" style={{ ...painel.input, width: 110 }} value={valor}
-                 onChange={(e) => setValor(Number(e.target.value))} />
+          <input type="text" inputMode="decimal" placeholder="40,00"
+                 style={{ ...painel.input, width: 110 }} value={valor}
+                 onChange={(e) => setValor(e.target.value)} />
         </div>
         <div>
           <label style={painel.rotulo}>1ª lavagem</label>
@@ -1633,56 +1658,193 @@ function CriarPlano({ tumuloId, onSalvo }: { tumuloId: string; onSalvo: () => vo
           {salvando ? "Criando…" : "Criar plano"}
         </button>
       </div>
+      {erro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "10px 0 0" }}>{erro}</p>}
       <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
-        A próxima lavagem e a próxima cobrança já entram na data escolhida (ou hoje).
+        A proxima lavagem e a proxima cobranca ja entram na data escolhida (ou hoje).
       </p>
     </div>
   );
 }
 
 /**
- * Vincular a esta família um jazigo já cadastrado no campo (ainda sem dono).
- * Só aparece quando existem jazigos órfãos.
+ * ADICIONAR TÚMULO a uma família já cadastrada.
+ *
+ * O bloco que faltava. Antes existia só "Vincular jazigo do campo", e ele
+ * começava com `if (!orfaos.length) return null` — ou seja: quem não tinha
+ * jazigo órfão capturado no campo não via NADA na ficha e não tinha como
+ * incluir um túmulo numa família já cadastrada. Só dava para cadastrar jazigo
+ * no momento de criar a família, uma vez, e nunca mais.
+ *
+ * Agora o botão está SEMPRE na tela, com dois caminhos:
+ *   · Novo jazigo   — digita identificação/quadra/rua (cria a quadra se faltar);
+ *   · Do campo      — escolhe um dos capturados sem dono (só se houver).
+ * O plano é opcional no mesmo formulário: quem já sabe a periodicidade e o
+ * valor resolve tudo numa tela; quem não sabe deixa "Definir depois" e o
+ * jazigo entra sem plano (o bloco "Criar plano" continua aparecendo nele).
+ *
+ * Autocontido: faz o próprio POST e chama onMudou — não passa pela barra de
+ * salvar (é criação, não edição pendente).
  */
-function VincularJazigo({ clienteId, onMudou }: { clienteId: string; onMudou: () => void }) {
+function AdicionarTumulo({
+  clienteId, vazio, onMudou,
+}: { clienteId: string; vazio: boolean; onMudou: () => void }) {
+  const [aberto, setAberto] = useState(vazio);
+  const [modo, setModo] = useState<"novo" | "campo">("novo");
   const [orfaos, setOrfaos] = useState<any[]>([]);
+  const [cemiterios, setCemiterios] = useState<any[]>([]);
+  const [cemId, setCemId] = useState("");
+
+  const [identificacao, setIdentificacao] = useState("");
+  const [quadra, setQuadra] = useState("");
+  const [rua, setRua] = useState("");
+  const [numero, setNumero] = useState("");
+  const [falecido, setFalecido] = useState("");
   const [escolha, setEscolha] = useState("");
+
+  const [atalho, setAtalho] = useState<string>(""); // "" = definir depois
+  const [valor, setValor] = useState("");
+  const [inicio, setInicio] = useState("");
+
   const [ocupado, setOcupado] = useState(false);
-  const [aberto, setAberto] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  // aviso NAO e erro: o jazigo entrou, so tem uma ressalva a contar. Pintar isso
+  // de vermelho fazia o operador achar que a inclusao falhou e tentar de novo.
+  const [aviso, setAviso] = useState<string | null>(null);
 
-  async function carregar() {
+  async function carregarOpcoes() {
     const r = await fetch("/api/tumulos").then((x) => x.json()).catch(() => null);
-    if (r?.ok) setOrfaos(r.semDono || []);
+    if (!r?.ok) return;
+    setOrfaos(r.semDono || []);
+    setCemiterios(r.cemiterios || []);
+    if (!cemId && (r.cemiterios || []).length) setCemId(r.cemiterios[0].id);
   }
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregarOpcoes(); }, []);
 
-  async function vincular() {
-    if (!escolha) return;
+  // códigos de quadra para o autocompletar (do cemitério escolhido, ou de todos)
+  const quadrasSugeridas: string[] = [];
+  for (const c of cemiterios) {
+    if (cemId && c.id !== cemId) continue;
+    for (const q of c.quadras || []) if (!quadrasSugeridas.includes(q.codigo)) quadrasSugeridas.push(q.codigo);
+  }
+
+  // So os campos. `erro` e `aviso` sao limpos por quem chama, no momento certo:
+  // depois de uma inclusao com ressalva, o formulario limpa E a caixa ambar fica.
+  function limpar() {
+    setIdentificacao(""); setQuadra(""); setRua(""); setNumero("");
+    setFalecido(""); setEscolha(""); setAtalho(""); setValor(""); setInicio("");
+  }
+
+  async function salvar() {
+    setErro(null);
+    setAviso(null);
+
+    const corpo: Record<string, any> = {};
+    if (modo === "campo") {
+      if (!escolha) { setErro("Escolha um jazigo da lista."); return; }
+      corpo.vincularTumuloId = escolha;
+    } else {
+      if (!identificacao.trim()) { setErro("Falta a identificação do jazigo (lote/número)."); return; }
+      corpo.identificacao = identificacao.trim();
+      corpo.quadraCodigo = quadra.trim() || null;
+      corpo.cemiterioId = cemId || null;
+    }
+    if (rua.trim()) corpo.rua = rua.trim();
+    if (numero.trim()) corpo.numero = numero.trim();
+    if (falecido.trim()) corpo.falecidoNome = falecido.trim();
+
+    if (atalho !== "") {
+      const a = ATALHOS_FREQUENCIA[Number(atalho)];
+      if (a.cadencia !== "avulso") {
+        // dinheiro em pt-BR: numeroBR devolve NaN em vez de 0 quando não entende,
+        // então valor ilegível vira recusa na tela e não honorário errado no banco.
+        const n = numeroBR(valor);
+        if (!isFinite(n) || n <= 0) {
+          setErro("Digite o valor mensal como 40 ou 40,50 (sem R$ e sem separador de milhar).");
+          return;
+        }
+        corpo.plano = {
+          cadencia: a.cadencia,
+          lavagensPorCiclo: a.lavagens,
+          valorMensal: Math.round(n * 100) / 100,
+          inicio: inicio || null,
+        };
+      }
+    }
+
     setOcupado(true);
-    const r = await fetch(`/api/tumulos/${escolha}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cliente_id: clienteId }),
+    const r = await fetch(`/api/clientes/${clienteId}/tumulos`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) { setEscolha(""); setAberto(false); carregar(); onMudou(); }
-    else alert("Não consegui vincular: " + (r?.erro || "erro"));
+
+    if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar. Tente de novo."); return; }
+
+    // O que a API fez de fato — a tela nunca diz "pronto" para algo que não
+    // aconteceu. Reaproveitado = esse jazigo JÁ era desta família (digitação
+    // repetida); planoCriado false com plano pedido = o jazigo já tinha plano.
+    const avisos: string[] = [];
+    if (r.reaproveitado) avisos.push("Esse jazigo já era desta família — nada de novo foi criado, só atualizei os dados que você preencheu.");
+    if (r.avisoPlano) avisos.push("O plano não foi criado: " + r.avisoPlano);
+    else if (corpo.plano && !r.planoCriado) avisos.push("Esse jazigo já tinha um plano — mantive o que existe. Se ele não aparecer aqui embaixo, o plano está ligado a outra família: veja em Planos.");
+
+    limpar();
+    setAviso(avisos.length ? avisos.join(" ") : null);
+    setAberto(false);
+    carregarOpcoes();
+    onMudou();
   }
 
-  if (!orfaos.length) return null;
+  const caixaAviso = aviso ? (
+    <p style={{
+      background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e",
+      fontSize: 14, borderRadius: 8, padding: "8px 10px", margin: "10px 0 0",
+    }}>{aviso}</p>
+  ) : null;
 
   if (!aberto) {
     return (
-      <button style={{ ...painel.botaoMiniSec, marginTop: 12 }} onClick={() => setAberto(true)}>
-        + Vincular jazigo do campo ({orfaos.length})
-      </button>
+      <div style={{ marginTop: 12 }}>
+        <button style={painel.botaoSec}
+                onClick={() => { setErro(null); setAviso(null); setAberto(true); }}>
+          + Adicionar túmulo
+        </button>
+        {caixaAviso}
+      </div>
     );
   }
 
+  const cadenciaEscolhida = atalho !== "" ? ATALHOS_FREQUENCIA[Number(atalho)]?.cadencia : null;
+  const rotuloValor = !!cadenciaEscolhida && cadenciaEscolhida !== "avulso";
+  // "So quando pedirem" (avulso) nao tem periodicidade nem vencimento: aqui ele
+  // nao cria plano nenhum. Antes a opcao existia e nao fazia nada, calada.
+  const avulsoEscolhido = cadenciaEscolhida === "avulso";
+
   return (
     <div style={{ ...bloco, marginTop: 12, background: "#f0fdfa", borderColor: "#99f6e4" }}>
-      <div style={blocoTitulo}>Vincular jazigo do campo a esta família</div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <div style={{ flex: 1, minWidth: 200 }}>
+      <div style={blocoTitulo}>Adicionar túmulo a esta família</div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <button style={modo === "novo" ? painel.botaoMini : painel.botaoMiniSec}
+                onClick={() => { setModo("novo"); setErro(null); setEscolha(""); }}>
+          Novo jazigo
+        </button>
+        <button style={modo === "campo" ? painel.botaoMini : painel.botaoMiniSec}
+                onClick={() => {
+                  // rua/nº saem da tela ao trocar de modo — se ficassem no
+                  // estado, sobrescreveriam a rua conferida no local pelo que
+                  // foi digitado por engano no outro modo.
+                  setModo("campo"); setErro(null);
+                  setIdentificacao(""); setQuadra(""); setRua(""); setNumero("");
+                }}
+                disabled={!orfaos.length}
+                title={orfaos.length ? "" : "Nenhum jazigo capturado no campo está sem família"}>
+          Do campo ({orfaos.length})
+        </button>
+      </div>
+
+      {modo === "campo" ? (
+        <div style={{ marginBottom: 10 }}>
           <label style={painel.rotulo}>Jazigo sem família</label>
           <select style={painel.input} value={escolha} onChange={(e) => setEscolha(e.target.value)}>
             <option value="">— escolha —</option>
@@ -1693,13 +1855,91 @@ function VincularJazigo({ clienteId, onMudou }: { clienteId: string; onMudou: ()
             ))}
           </select>
         </div>
-        <button style={painel.botao} onClick={vincular} disabled={ocupado || !escolha}>
-          {ocupado ? "Vinculando…" : "Vincular"}
-        </button>
-        <button style={painel.botaoSec} onClick={() => setAberto(false)}>Cancelar</button>
+      ) : (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {cemiterios.length > 1 && (
+            <div style={{ minWidth: 160 }}>
+              <label style={painel.rotulo}>Cemitério</label>
+              <select style={painel.input} value={cemId} onChange={(e) => setCemId(e.target.value)}>
+                {cemiterios.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <label style={painel.rotulo}>Identificação (lote/nº)</label>
+            <input style={painel.input} value={identificacao} placeholder="ex.: 128"
+                   onChange={(e) => setIdentificacao(e.target.value)} />
+          </div>
+          <div style={{ width: 130 }}>
+            <label style={painel.rotulo}>Quadra</label>
+            <input style={painel.input} value={quadra} list="quadras-ficha" placeholder="S/Q"
+                   onChange={(e) => setQuadra(e.target.value)} />
+            <datalist id="quadras-ficha">
+              {quadrasSugeridas.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+          <div style={{ width: 140 }}>
+            <label style={painel.rotulo}>Rua</label>
+            <input style={painel.input} value={rua} onChange={(e) => setRua(e.target.value)} />
+          </div>
+          <div style={{ width: 90 }}>
+            <label style={painel.rotulo}>Nº</label>
+            <input style={painel.input} value={numero} onChange={(e) => setNumero(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 10 }}>
+        <label style={painel.rotulo}>Falecido (opcional)</label>
+        <input style={painel.input} value={falecido} onChange={(e) => setFalecido(e.target.value)} />
       </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: 1, minWidth: 190 }}>
+          <label style={painel.rotulo}>Plano (frequência)</label>
+          <select style={painel.input} value={atalho} onChange={(e) => setAtalho(e.target.value)}>
+            <option value="">Definir depois</option>
+            {ATALHOS_FREQUENCIA.map((a, i) => <option key={i} value={String(i)}>{a.rotulo}</option>)}
+          </select>
+        </div>
+        {rotuloValor && (
+          <>
+            <div>
+              <label style={painel.rotulo}>Valor mensal</label>
+              <input type="text" inputMode="decimal" placeholder="40,00"
+                     style={{ ...painel.input, width: 110 }} value={valor}
+                     onChange={(e) => setValor(e.target.value)} />
+            </div>
+            <div>
+              <label style={painel.rotulo}>1ª lavagem</label>
+              <input type="date" style={{ ...painel.input, width: 160 }} value={inicio}
+                     onChange={(e) => setInicio(e.target.value)} />
+            </div>
+          </>
+        )}
+        <button style={painel.botao} onClick={salvar} disabled={ocupado}>
+          {ocupado ? "Salvando…" : "Adicionar"}
+        </button>
+        <button style={painel.botaoSec}
+                onClick={() => { limpar(); setErro(null); setAviso(null); setAberto(false); }}>Cancelar</button>
+      </div>
+
+      {erro && (
+        <p style={{ color: "#b91c1c", fontSize: 14, margin: "10px 0 0" }}>{erro}</p>
+      )}
+      {caixaAviso}
+      {avulsoEscolhido && (
+        <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
+          “Só quando pedirem” não cria plano: o túmulo entra sem periodicidade e sem
+          vencimento. Para registrar o preço por limpeza, use “Criar plano” no próprio
+          jazigo depois de incluí-lo.
+        </p>
+      )}
       <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
-        Depois de vincular, use “Criar plano” no jazigo para definir a periodicidade.
+        Sem quadra? Deixe em branco e o jazigo entra em “S/Q”. Só use isso se a quadra
+        for mesmo desconhecida: o sistema só reconhece dois registros como o mesmo túmulo
+        quando estão na mesma quadra — o que está em “S/Q” pode virar cópia do que a
+        equipe capturou no campo. Sem plano agora? Deixe “Definir depois”.
       </p>
     </div>
   );
