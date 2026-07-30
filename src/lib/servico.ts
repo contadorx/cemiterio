@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { enviarWhatsappMidia } from "./evolution";
 import { MARCA } from "./marca";
+import { subirArquivo, BUCKET_SERVICOS } from "./storage";
 
 // Sobe uma foto do serviço no Storage (bucket 'servicos'). Retorna URL pública.
 export async function subirFotoServico(
@@ -15,14 +16,12 @@ export async function subirFotoServico(
     const ext = (mimetype.split("/")[1] || "jpg").replace("jpeg", "jpg");
     const path = `${env.orgId()}/${servicoId}/${etapa}-${Date.now()}.${ext}`;
     const bytes = Buffer.from(base64, "base64");
-    const { error } = await db.storage
-      .from("servicos")
-      .upload(path, bytes, { contentType: mimetype, upsert: true });
-    if (error) {
-      console.error("[servico] upload foto falhou:", error.message);
+    const enviado = await subirArquivo(db, BUCKET_SERVICOS, path, bytes, mimetype);
+    if (!enviado.ok) {
+      console.error("[servico] upload foto falhou:", enviado.erro);
       return null;
     }
-    return db.storage.from("servicos").getPublicUrl(path).data?.publicUrl || null;
+    return enviado.url;
   } catch (e) {
     console.error("[servico] upload exceção:", (e as any)?.message || e);
     return null;

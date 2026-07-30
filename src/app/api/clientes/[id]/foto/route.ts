@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { env } from "@/lib/env";
+import { subirArquivo, BUCKET_SERVICOS } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,16 +20,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const ext = String(b.mimetype || "").includes("png") ? "png" : "jpg";
   const caminho = `clientes/${params.id}/${Date.now()}.${ext}`;
 
-  const { error: erroUp } = await adm.storage
-    .from("servicos")
-    .upload(caminho, Buffer.from(b.base64, "base64"), {
-      contentType: b.mimetype || "image/jpeg",
-      upsert: true,
-    });
-  if (erroUp) return NextResponse.json({ ok: false, erro: erroUp.message }, { status: 500 });
-
-  const { data: pub } = adm.storage.from("servicos").getPublicUrl(caminho);
-  const url = pub?.publicUrl || null;
+  const enviado = await subirArquivo(
+    adm, BUCKET_SERVICOS, caminho,
+    Buffer.from(b.base64, "base64"),
+    b.mimetype || "image/jpeg",
+  );
+  if (!enviado.ok) return NextResponse.json({ ok: false, erro: enviado.erro }, { status: 500 });
+  const url = enviado.url;
 
   const { error } = await adm
     .from("clientes").update({ foto_url: url })

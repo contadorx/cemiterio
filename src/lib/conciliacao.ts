@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import type { DadosComprovante, Midia } from "./comprovante";
+import { subirArquivo, BUCKET_COMPROVANTES } from "./storage";
 
 // Sobe a imagem do comprovante no Storage (best-effort). Se falhar, segue sem URL:
 // o registro do pagamento é mais importante que a imagem.
@@ -11,15 +12,14 @@ async function subirImagem(clienteId: string, midia: Midia): Promise<string | nu
     const path = `${env.orgId()}/${clienteId}/${Date.now()}.${ext}`;
     const bytes = Buffer.from(midia.base64, "base64");
 
-    const { error } = await db.storage
-      .from("comprovantes")
-      .upload(path, bytes, { contentType: midia.mimetype, upsert: false });
-    if (error) {
-      console.error("[conciliacao] upload falhou:", error.message);
+    const enviado = await subirArquivo(
+      db, BUCKET_COMPROVANTES, path, bytes, midia.mimetype, { upsert: false },
+    );
+    if (!enviado.ok) {
+      console.error("[conciliacao] upload falhou:", enviado.erro);
       return null;
     }
-    const { data } = db.storage.from("comprovantes").getPublicUrl(path);
-    return data?.publicUrl || null;
+    return enviado.url;
   } catch (e) {
     console.error("[conciliacao] upload exceção:", (e as any)?.message || e);
     return null;

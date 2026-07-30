@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { env } from "@/lib/env";
+import { subirArquivo, BUCKET_SERVICOS } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,12 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const path = `${env.orgId()}/tumulos/${params.id}/${tipo}-${Date.now()}.${ext}`;
     const bytes = Buffer.from(base64, "base64");
 
-    const { error } = await adm.storage
-      .from("servicos")
-      .upload(path, bytes, { contentType: mimetype, upsert: true });
-    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-
-    const url = adm.storage.from("servicos").getPublicUrl(path).data?.publicUrl;
+    const env1 = await subirArquivo(adm, BUCKET_SERVICOS, path, bytes, mimetype);
+    if (!env1.ok) return NextResponse.json({ ok: false, erro: env1.erro }, { status: 500 });
+    const url = env1.url;
     const campo = tipo === "referencia" ? "foto_referencia_url" : "foto_enquadramento_url";
 
     await adm.from("tumulos").update({ [campo]: url }).eq("id", params.id).eq("org_id", env.orgId());
