@@ -13,8 +13,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const quantidade = Math.max(1, Math.min(30, Number(body?.quantidade) || 5));
 
-  const { data: membro } = await auth.db.from("membros").select("papel").limit(1).maybeSingle();
-  const executoraId = (membro as any)?.papel === "campo" ? auth.userId : null;
+  const executoraId = auth.papel === "campo" ? auth.userId : null;
 
   const { data, error } = await auth.db.rpc("sureya_puxar_servicos", {
     p_executora: executoraId,

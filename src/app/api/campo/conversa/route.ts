@@ -24,9 +24,8 @@ export async function POST(req: NextRequest) {
   const org = await orgAtual(auth.db);
   if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
 
-  const { data: membro } = await auth.db.from("membros").select("nome,papel").limit(1).maybeSingle();
-  const executoraId = (membro as any)?.papel === "campo" ? auth.userId : null;
-  const nome = ((membro as any)?.nome || "").split(" ")[0];
+  const executoraId = auth.papel === "campo" ? auth.userId : null;
+  const nome = (auth.nome || "").split(" ")[0];
 
   const b = await montarBriefing(executoraId, nome);
   const contexto = [

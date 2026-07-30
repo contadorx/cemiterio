@@ -37,7 +37,13 @@ export async function middleware(req: NextRequest) {
 
   // G1: papel 'campo' não acessa o painel do dono
   if (user && path.startsWith("/painel")) {
-    const { data: membro } = await supabase.from("membros").select("papel").limit(1).maybeSingle();
+    // filtrar por user_id e obrigatorio: sem isso o limit(1) pode trazer a linha
+    // da ajudante e chutar o dono do painel para /campo.
+    const { data: membro } = await supabase
+      .from("membros")
+      .select("papel")
+      .eq("user_id", user.id)
+      .maybeSingle();
     if ((membro as any)?.papel === "campo") {
       const url = req.nextUrl.clone();
       url.pathname = "/campo";

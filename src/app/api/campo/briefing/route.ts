@@ -12,11 +12,10 @@ export async function GET(req: NextRequest) {
   const auth = await exigirLogado();
   if (auth.erro) return auth.erro;
 
-  const { data: membro } = await auth.db.from("membros").select("nome,papel").limit(1).maybeSingle();
-  const nome = ((membro as any)?.nome || "").split(" ")[0];
+  const nome = (auth.nome || "").split(" ")[0];
   // o dono também pode abrir o campo: assume a rota que escolher
   const escolhida = req.nextUrl.searchParams.get("executora");
-  const executoraId = (membro as any)?.papel === "campo"
+  const executoraId = auth.papel === "campo"
     ? auth.userId
     : escolhida && escolhida !== "todos" ? escolhida : null;
 

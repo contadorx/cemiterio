@@ -11,8 +11,7 @@ export async function POST(req: NextRequest) {
   if (auth.erro) return auth.erro;
 
   const body = await req.json().catch(() => ({}));
-  const { data: membro } = await auth.db.from("membros").select("papel").limit(1).maybeSingle();
-  const executoraId = (membro as any)?.papel === "campo" ? auth.userId : null;
+  const executoraId = auth.papel === "campo" ? auth.userId : null;
 
   const { data, error } = await auth.db.rpc("sureya_fechar_dia", {
     p_executora: executoraId,

@@ -21,7 +21,11 @@ export async function GET(req: NextRequest) {
       data: { user },
     } = await db.auth.getUser();
     if (user) {
-      const { data: membro } = await db.from("membros").select("papel").limit(1).maybeSingle();
+      const { data: membro } = await db
+        .from("membros")
+        .select("papel")
+        .eq("user_id", user.id)
+        .maybeSingle();
       ehEquipe = !!membro;
     }
   } catch {
