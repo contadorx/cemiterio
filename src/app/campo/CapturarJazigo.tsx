@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { capturarGps, qualidade } from "@/lib/gps";
+import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 
 /**
  * CAPTURAR JAZIGO no campo — cadastro completo na hora da lavagem:
@@ -10,8 +11,6 @@ import { capturarGps, qualidade } from "@/lib/gps";
  * Pensado para a fase de captura das quadras: a pessoa está de pé no cemitério,
  * então é um passo de cada vez, botão grande e nada obrigatório além do essencial.
  */
-type Foto = { b64: string; mt: string };
-
 export default function CapturarJazigo({ onFechar, onPronto }: {
   onFechar: () => void;
   onPronto: () => void;
@@ -35,12 +34,18 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   const [gpsMsg, setGpsMsg] = useState("");
 
   // fotos
-  const [enq, setEnq] = useState<Foto | null>(null);
-  const [ref, setRef] = useState<Foto | null>(null);
+  const [enq, setEnq] = useState<FotoPronta | null>(null);
+  const [ref, setRef] = useState<FotoPronta | null>(null);
   const [enqOk, setEnqOk] = useState(false);
   const [refOk, setRefOk] = useState(false);
+  const [enqMsg, setEnqMsg] = useState("");
+  const [refMsg, setRefMsg] = useState("");
+  const [enqIndo, setEnqIndo] = useState(false);
+  const [refIndo, setRefIndo] = useState(false);
   const refEnq = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
+  const refEnqGal = useRef<HTMLInputElement>(null);
+  const refRefGal = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/tumulos").then((x) => x.json()).then((j) => {
@@ -53,14 +58,6 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
 
   const cemAtual = cemiterios.find((c) => c.id === cemId);
   const quadrasExistentes: string[] = (cemAtual?.quadras || []).map((q: any) => q.codigo);
-
-  async function lerArquivo(f: File): Promise<Foto> {
-    const buf = await f.arrayBuffer();
-    let bin = "";
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return { b64: btoa(bin), mt: f.type || "image/jpeg" };
-  }
 
   async function criarJazigo() {
     setErro("");
@@ -118,24 +115,74 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
     }
   }
 
-  async function enviarFoto(tipo: "enquadramento" | "referencia", foto: Foto) {
-    if (!tumuloId) return false;
-    const r = await fetch(`/api/tumulos/${tumuloId}/foto-referencia`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64: foto.b64, mimetype: foto.mt, tipo }),
-    }).then((x) => x.json()).catch(() => null);
-    return !!r?.ok;
+  /**
+   * Sobe a foto e DEVOLVE O MOTIVO quando falha. A versao anterior devolvia so
+   * true/false, entao a tela nunca soube dizer por que a foto nao subiu — e a
+   * Nina ficava tocando de novo num botao que ia falhar igual.
+   */
+  async function enviarFoto(
+    tipo: "enquadramento" | "referencia",
+    foto: FotoPronta,
+  ): Promise<{ ok: boolean; erro?: string }> {
+    if (!tumuloId) return { ok: false, erro: "o jazigo ainda nao foi criado" };
+    try {
+      const resp = await fetch(`/api/tumulos/${tumuloId}/foto-referencia`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: foto.b64, mimetype: foto.mt, tipo }),
+      });
+      const j = await resp.json().catch(() => null);
+      if (resp.ok && j?.ok) return { ok: true };
+      if (resp.status === 413) return { ok: false, erro: "a foto ficou pesada demais" };
+      if (resp.status === 401 || resp.status === 403) return { ok: false, erro: "sua sessao caiu — entre de novo" };
+      return { ok: false, erro: String(j?.erro || `o servidor respondeu ${resp.status}`) };
+    } catch (e) {
+      return { ok: false, erro: motivoFalha(e) };
+    }
   }
 
-  async function escolherEnq(f: File) {
-    const foto = await lerArquivo(f);
-    setEnq(foto);
-    setEnqOk(await enviarFoto("enquadramento", foto));
+  async function escolher(tipo: "enquadramento" | "referencia", f: File) {
+    const ehEnq = tipo === "enquadramento";
+    const setFoto = ehEnq ? setEnq : setRef;
+    const setOk = ehEnq ? setEnqOk : setRefOk;
+    const setMsg = ehEnq ? setEnqMsg : setRefMsg;
+    const setIndo = ehEnq ? setEnqIndo : setRefIndo;
+
+    setOk(false);
+    setIndo(true);
+    setMsg("Preparando a foto...");
+
+    let foto: FotoPronta;
+    try {
+      // Reduz no aparelho antes de subir: 8 MB viram ~300 KB.
+      foto = await prepararFoto(f);
+    } catch (e) {
+      setIndo(false);
+      setMsg(motivoFalha(e));
+      return;
+    }
+
+    setFoto(foto);
+    setMsg(`Enviando ${foto.kb} KB...`);
+    const r = await enviarFoto(tipo, foto);
+    setIndo(false);
+    setOk(r.ok);
+    setMsg(r.ok ? "" : `Nao subiu: ${r.erro}`);
   }
-  async function escolherRef(f: File) {
-    const foto = await lerArquivo(f);
-    setRef(foto);
-    setRefOk(await enviarFoto("referencia", foto));
+
+  /** Tenta de novo a MESMA foto ja reduzida — nao pede para tirar outra. */
+  async function reenviar(tipo: "enquadramento" | "referencia") {
+    const ehEnq = tipo === "enquadramento";
+    const foto = ehEnq ? enq : ref;
+    if (!foto) return;
+    const setOk = ehEnq ? setEnqOk : setRefOk;
+    const setMsg = ehEnq ? setEnqMsg : setRefMsg;
+    const setIndo = ehEnq ? setEnqIndo : setRefIndo;
+    setIndo(true);
+    setMsg("Tentando de novo...");
+    const r = await enviarFoto(tipo, foto);
+    setIndo(false);
+    setOk(r.ok);
+    setMsg(r.ok ? "" : `Nao subiu: ${r.erro}`);
   }
 
   return (
@@ -210,27 +257,84 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
               </button>
             </div>
 
-            {/* fotos */}
+            {/* fotos: camera direto; galeria como saída quando a foto já foi tirada */}
             <input ref={refEnq} type="file" accept="image/*" capture="environment" hidden
-                   onChange={(e) => e.target.files?.[0] && escolherEnq(e.target.files[0])} />
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) escolher("enquadramento", f); }} />
+            <input ref={refEnqGal} type="file" accept="image/*" hidden
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) escolher("enquadramento", f); }} />
             <input ref={refRef} type="file" accept="image/*" capture="environment" hidden
-                   onChange={(e) => e.target.files?.[0] && escolherRef(e.target.files[0])} />
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) escolher("referencia", f); }} />
+            <input ref={refRefGal} type="file" accept="image/*" hidden
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) escolher("referencia", f); }} />
 
-            <button style={{ ...s.fotoBtn, ...(enqOk ? s.fotoOk : {}) }} onClick={() => refEnq.current?.click()}>
-              {enqOk ? "✓ Foto de longe (onde fica)" : "📷 Foto de longe — mostra o jazigo entre os vizinhos"}
-            </button>
-            <button style={{ ...s.fotoBtn, ...(refOk ? s.fotoOk : {}) }} onClick={() => refRef.current?.click()}>
-              {refOk ? "✓ Foto da lápide (close)" : "📷 Foto da lápide — close que confirma"}
-            </button>
-
-            {enq && !enqOk && <p style={s.erro}>A foto de longe não subiu. Toque de novo.</p>}
-            {ref && !refOk && <p style={s.erro}>A foto da lápide não subiu. Toque de novo.</p>}
+            <BlocoFoto
+              titulo={enqOk ? "✓ Foto de longe (onde fica)" : "📷 Foto de longe — mostra o jazigo entre os vizinhos"}
+              foto={enq} ok={enqOk} indo={enqIndo} msg={enqMsg}
+              onCamera={() => refEnq.current?.click()}
+              onGaleria={() => refEnqGal.current?.click()}
+              onTentarDeNovo={() => reenviar("enquadramento")}
+            />
+            <BlocoFoto
+              titulo={refOk ? "✓ Foto da lápide (close)" : "📷 Foto da lápide — close que confirma"}
+              foto={ref} ok={refOk} indo={refIndo} msg={refMsg}
+              onCamera={() => refRef.current?.click()}
+              onGaleria={() => refRefGal.current?.click()}
+              onTentarDeNovo={() => reenviar("referencia")}
+            />
 
             <button style={s.principal} onClick={onPronto}>Concluir</button>
             <p style={s.dica}>Pode concluir mesmo sem todas as fotos — dá para completar depois na ficha.</p>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Um bloco de foto: botao grande de CAMERA, previa do que foi tirado, estado do
+ * envio e — quando falha — o motivo em portugues com "tentar de novo" na mesma
+ * foto (nao obriga a tirar outra).
+ */
+function BlocoFoto({ titulo, foto, ok, indo, msg, onCamera, onGaleria, onTentarDeNovo }: {
+  titulo: string;
+  foto: FotoPronta | null;
+  ok: boolean;
+  indo: boolean;
+  msg: string;
+  onCamera: () => void;
+  onGaleria: () => void;
+  onTentarDeNovo: () => void;
+}) {
+  return (
+    <div>
+      <button style={{ ...s.fotoBtn, width: "100%", ...(ok ? s.fotoOk : {}) }}
+              onClick={onCamera} disabled={indo}>
+        {indo ? "Aguarde..." : titulo}
+      </button>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
+        {foto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={foto.previa} alt="prévia" style={s.previa} />
+        )}
+        <button style={s.linkMini} onClick={onGaleria} disabled={indo}>
+          escolher da galeria
+        </button>
+      </div>
+
+      {indo && <p style={s.aguarde}>{msg || "Enviando..."}</p>}
+      {!indo && !ok && msg && (
+        <div style={s.caixaErro}>
+          <p style={{ ...s.erro, marginBottom: 8 }}>{msg}</p>
+          {foto && (
+            <button style={s.tentar} onClick={onTentarDeNovo}>Tentar de novo</button>
+          )}
+        </div>
+      )}
+      {!indo && ok && foto && (
+        <p style={s.subiu}>Subiu ({foto.kb} KB).</p>
+      )}
     </div>
   );
 }
@@ -250,4 +354,10 @@ const s: Record<string, React.CSSProperties> = {
   gpsMsg: { fontSize: 17, margin: "0 0 8px", textAlign: "center" },
   dica: { fontSize: 15, color: "#475569", margin: "2px 0 0", textAlign: "center" },
   erro: { color: "#dc2626", margin: 0, fontSize: 16 },
+  previa: { width: 68, height: 68, objectFit: "cover", borderRadius: 10, border: "1px solid #e2e8f0" },
+  linkMini: { background: "none", border: "none", color: "#0f766e", fontSize: 16, textDecoration: "underline", padding: 0 },
+  aguarde: { color: "#475569", margin: "6px 0 0", fontSize: 16 },
+  subiu: { color: "#059669", margin: "6px 0 0", fontSize: 16 },
+  caixaErro: { marginTop: 6, padding: 10, borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca" },
+  tentar: { padding: "10px 14px", fontSize: 16, fontWeight: 700, borderRadius: 10, border: "none", background: "#b91c1c", color: "#fff" },
 };

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { painel, cor } from "../ui";
+import { prepararFoto, motivoFalha } from "@/lib/foto";
 
 /**
  * Concluir uma lavagem pelo painel — quando a Nina mandou a foto por WhatsApp,
@@ -18,14 +19,21 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
   const [resultado, setResultado] = useState<any>(null);
   const refD = useRef<HTMLInputElement>(null);
   const refA = useRef<HTMLInputElement>(null);
+  // Camera separada da galeria: sem o atributo capture, o celular so abre a
+  // galeria — o painel nao conseguia TIRAR foto, so recuperar foto ja tirada.
+  const refDCam = useRef<HTMLInputElement>(null);
+  const refACam = useRef<HTMLInputElement>(null);
+  const [fotoErro, setFotoErro] = useState("");
 
   async function ler(arq: File, set: (v: any) => void) {
-    const buf = await arq.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    const b64 = btoa(bin);
-    set({ b64, mt: arq.type || "image/jpeg", previa: `data:${arq.type};base64,${b64}` });
+    setFotoErro("");
+    try {
+      // Reduz no navegador: foto de celular em tamanho cheio nao cabia no envio.
+      const foto = await prepararFoto(arq);
+      set({ b64: foto.b64, mt: foto.mt, previa: foto.previa });
+    } catch (e) {
+      setFotoErro(motivoFalha(e));
+    }
   }
 
   async function concluir() {
@@ -83,23 +91,38 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
         </p>
 
         <input ref={refD} type="file" accept="image/*" hidden
-               onChange={(e) => e.target.files?.[0] && ler(e.target.files[0], setDepois)} />
+               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) ler(f, setDepois); }} />
         <input ref={refA} type="file" accept="image/*" hidden
-               onChange={(e) => e.target.files?.[0] && ler(e.target.files[0], setAntes)} />
+               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) ler(f, setAntes); }} />
+        <input ref={refDCam} type="file" accept="image/*" capture="environment" hidden
+               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) ler(f, setDepois); }} />
+        <input ref={refACam} type="file" accept="image/*" capture="environment" hidden
+               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) ler(f, setAntes); }} />
 
         <label style={painel.rotulo}>Foto do depois (obrigatória — é a que a família recebe)</label>
-        <button style={{ ...s.botaoFoto, ...(depois ? s.botaoFotoOk : {}) }}
-                onClick={() => refD.current?.click()}>
-          {depois ? "✓ foto escolhida — trocar" : "Escolher a foto"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={{ ...s.botaoFoto, flex: 1, ...(depois ? s.botaoFotoOk : {}) }}
+                  onClick={() => refDCam.current?.click()}>
+            {depois ? "✓ tirar outra" : "📷 Tirar foto agora"}
+          </button>
+          <button style={{ ...s.botaoFoto, flex: 1 }} onClick={() => refD.current?.click()}>
+            🖼 Da galeria
+          </button>
+        </div>
         {depois && <img src={depois.previa} alt="depois" style={s.previa} />}
 
         <label style={{ ...painel.rotulo, marginTop: 14 }}>Foto do antes (opcional)</label>
-        <button style={{ ...s.botaoFoto, ...(antes ? s.botaoFotoOk : {}) }}
-                onClick={() => refA.current?.click()}>
-          {antes ? "✓ foto escolhida — trocar" : "Escolher a foto"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={{ ...s.botaoFoto, flex: 1, ...(antes ? s.botaoFotoOk : {}) }}
+                  onClick={() => refACam.current?.click()}>
+            {antes ? "✓ tirar outra" : "📷 Tirar foto agora"}
+          </button>
+          <button style={{ ...s.botaoFoto, flex: 1 }} onClick={() => refA.current?.click()}>
+            🖼 Da galeria
+          </button>
+        </div>
         {antes && <img src={antes.previa} alt="antes" style={s.previa} />}
+        {fotoErro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "8px 0 0" }}>{fotoErro}</p>}
 
         <div style={{ marginTop: 14 }}>
           <label style={painel.rotulo}>Tempo gasto (minutos, se souber)</label>

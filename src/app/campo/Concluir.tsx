@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { capturarGps, qualidade } from "@/lib/gps";
+import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 import { concluirOuEnfileirar } from "@/lib/offline-fila";
 
 /**
@@ -17,9 +18,9 @@ export default function Concluir({
   onFechar: () => void;
   onPronto: (offline: boolean) => void;
 }) {
-  const [antes, setAntes] = useState<{ b64: string; mt: string } | null>(null);
-  const [depois, setDepois] = useState<{ b64: string; mt: string } | null>(null);
-  const [enquadramento, setEnquadramento] = useState<{ b64: string; mt: string } | null>(null);
+  const [antes, setAntes] = useState<FotoPronta | null>(null);
+  const [depois, setDepois] = useState<FotoPronta | null>(null);
+  const [enquadramento, setEnquadramento] = useState<FotoPronta | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [gpsEstado, setGpsEstado] = useState<"idle" | "buscando" | "ok" | "erro">("idle");
@@ -28,12 +29,17 @@ export default function Concluir({
   const refDepois = useRef<HTMLInputElement>(null);
   const refEnq = useRef<HTMLInputElement>(null);
 
-  async function lerArquivo(f: File): Promise<{ b64: string; mt: string }> {
-    const buf = await f.arrayBuffer();
-    let bin = "";
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return { b64: btoa(bin), mt: f.type || "image/jpeg" };
+  /**
+   * Le a foto do celular e JA REDUZ antes de guardar no estado: sem isto, uma
+   * foto de 8 MB vira ~11 MB em base64 e o envio morre no limite do servidor.
+   */
+  async function lerArquivo(f: File): Promise<FotoPronta | null> {
+    try {
+      return await prepararFoto(f);
+    } catch (e) {
+      setErro(motivoFalha(e));
+      return null;
+    }
   }
 
   // Confirmação de localização pela Nina: captura a melhor leitura possível e

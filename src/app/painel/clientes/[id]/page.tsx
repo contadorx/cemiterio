@@ -7,6 +7,7 @@ import Extras from "./Extras";
 import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
 import { normalizarMMDD } from "@/lib/memoria";
 import { valorMensalDoPlano } from "@/lib/vencimento";
+import { prepararFoto, motivoFalha } from "@/lib/foto";
 
 /**
  * REGISTRO DE PENDÊNCIAS — o mecanismo de salvar da ficha.
@@ -480,6 +481,13 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
   const [gpsMsg, setGpsMsg] = useState("");
   const refEnq = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
+  // Dois inputs por foto: um abre a CAMERA (capture), outro a galeria. Sem o
+  // capture, o Android/iOS so oferece a galeria — era por isso que no painel
+  // "so dava para recuperar foto ja tirada".
+  const refEnqCam = useRef<HTMLInputElement>(null);
+  const refRefCam = useRef<HTMLInputElement>(null);
+  const [fotoMsg, setFotoMsg] = useState("");
+  const [fotoIndo, setFotoIndo] = useState(false);
 
   // CAMPOS TOCADOS DO PLANO — a ficha mandava o objeto inteiro em todo Salvar.
   // Consequencias reais: (a) corrigir SO a data de "pago ate" reenviava cadencia
@@ -732,16 +740,24 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
   );
 
   async function subirFoto(tipo: "enquadramento" | "referencia", arq: File) {
-    const buf = await arq.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    const r = await fetch(`/api/tumulos/${t.id}/foto-referencia`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64: btoa(bin), mimetype: arq.type || "image/jpeg", tipo }),
-    }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) onSalvo();
-    else alert("Falhou ao enviar a foto.");
+    setFotoIndo(true);
+    setFotoMsg("Preparando a foto...");
+    try {
+      // Reduz no navegador antes de subir — foto de celular estourava o limite
+      // de tamanho do servidor e falhava sem dizer por que.
+      const foto = await prepararFoto(arq);
+      setFotoMsg(`Enviando ${foto.kb} KB...`);
+      const resp = await fetch(`/api/tumulos/${t.id}/foto-referencia`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: foto.b64, mimetype: foto.mt, tipo }),
+      });
+      const j = await resp.json().catch(() => null);
+      if (resp.ok && j?.ok) { setFotoMsg(""); setFotoIndo(false); onSalvo(); return; }
+      setFotoMsg(`Não subiu: ${j?.erro || `o servidor respondeu ${resp.status}`}`);
+    } catch (e) {
+      setFotoMsg(`Não subiu: ${motivoFalha(e)}`);
+    }
+    setFotoIndo(false);
   }
 
   async function capturarGps() {
@@ -849,29 +865,43 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
           <div style={bloco}>
             <div style={blocoTitulo}>Fotos de referência</div>
             <input ref={refEnq} type="file" accept="image/*" hidden
-                   onChange={(e) => e.target.files?.[0] && subirFoto("enquadramento", e.target.files[0])} />
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) subirFoto("enquadramento", f); }} />
             <input ref={refRef} type="file" accept="image/*" hidden
-                   onChange={(e) => e.target.files?.[0] && subirFoto("referencia", e.target.files[0])} />
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) subirFoto("referencia", f); }} />
+            <input ref={refEnqCam} type="file" accept="image/*" capture="environment" hidden
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) subirFoto("enquadramento", f); }} />
+            <input ref={refRefCam} type="file" accept="image/*" capture="environment" hidden
+                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) subirFoto("referencia", f); }} />
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <div style={{ textAlign: "center" }}>
                 {t.foto_enquadramento_url
                   ? <img src={t.foto_enquadramento_url} alt="de longe" style={miniFoto} />
                   : <div style={{ ...miniFoto, ...semFoto }}>sem foto</div>}
-                <button style={{ ...painel.botaoMiniSec, marginTop: 6 }}
-                        onClick={() => refEnq.current?.click()}>
-                  {t.foto_enquadramento_url ? "Trocar" : "Enviar"} foto de longe
-                </button>
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 6 }}>
+                  <button style={painel.botaoMini} disabled={fotoIndo}
+                          onClick={() => refEnqCam.current?.click()}>📷 Tirar foto</button>
+                  <button style={painel.botaoMiniSec} disabled={fotoIndo}
+                          onClick={() => refEnq.current?.click()}>Galeria</button>
+                </div>
+                <div style={{ fontSize: 13, color: cor.cinza }}>foto de longe</div>
               </div>
               <div style={{ textAlign: "center" }}>
                 {t.foto_referencia_url
                   ? <img src={t.foto_referencia_url} alt="lápide" style={miniFoto} />
                   : <div style={{ ...miniFoto, ...semFoto }}>sem foto</div>}
-                <button style={{ ...painel.botaoMiniSec, marginTop: 6 }}
-                        onClick={() => refRef.current?.click()}>
-                  {t.foto_referencia_url ? "Trocar" : "Enviar"} close da lápide
-                </button>
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 6 }}>
+                  <button style={painel.botaoMini} disabled={fotoIndo}
+                          onClick={() => refRefCam.current?.click()}>📷 Tirar foto</button>
+                  <button style={painel.botaoMiniSec} disabled={fotoIndo}
+                          onClick={() => refRef.current?.click()}>Galeria</button>
+                </div>
+                <div style={{ fontSize: 13, color: cor.cinza }}>close da lápide</div>
               </div>
             </div>
+            {fotoMsg && (
+              <p style={{ fontSize: 15, margin: "8px 0 0",
+                          color: fotoIndo ? cor.cinza : "#b91c1c" }}>{fotoMsg}</p>
+            )}
             <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
               A foto de longe é tirada do corredor e mostra o jazigo entre os vizinhos — é ela que ajuda a achar.
             </p>
@@ -1336,7 +1366,9 @@ function Identificacao({ c, onSalvo, registrar }: {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [fotoErro, setFotoErro] = useState("");
   const refFoto = useRef<HTMLInputElement>(null);
+  const refFotoCam = useRef<HTMLInputElement>(null);
 
   const mudou = f.nome !== (c.nome || "") || f.apelido !== (c.apelido || "")
     || f.telefone !== (c.telefone || "");
@@ -1364,16 +1396,22 @@ function Identificacao({ c, onSalvo, registrar }: {
 
   async function enviarFoto(arq: File) {
     setEnviandoFoto(true);
-    const buf = await arq.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    const r = await fetch(`/api/clientes/${c.id}/foto`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64: btoa(bin), mimetype: arq.type || "image/jpeg" }),
-    }).then((x) => x.json()).catch(() => null);
-    setEnviandoFoto(false);
-    if (r?.ok) onSalvo(); else alert("Não consegui enviar a foto.");
+    setFotoErro("");
+    try {
+      // Reduz antes de subir: retrato de celular passava do limite do servidor.
+      const foto = await prepararFoto(arq, 900);
+      const resp = await fetch(`/api/clientes/${c.id}/foto`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: foto.b64, mimetype: foto.mt }),
+      });
+      const j = await resp.json().catch(() => null);
+      setEnviandoFoto(false);
+      if (resp.ok && j?.ok) { onSalvo(); return; }
+      setFotoErro(String(j?.erro || `o servidor respondeu ${resp.status}`));
+    } catch (e) {
+      setEnviandoFoto(false);
+      setFotoErro(motivoFalha(e));
+    }
   }
 
   async function tirarFoto() {
@@ -1388,7 +1426,9 @@ function Identificacao({ c, onSalvo, registrar }: {
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap" }}>
       <input ref={refFoto} type="file" accept="image/*" hidden
-             onChange={(e) => e.target.files?.[0] && enviarFoto(e.target.files[0])} />
+             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) enviarFoto(f); }} />
+      <input ref={refFotoCam} type="file" accept="image/*" capture="environment" hidden
+             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) enviarFoto(f); }} />
 
       <div style={{ textAlign: "center" }}>
         {c.foto_url ? (
@@ -1404,11 +1444,22 @@ function Identificacao({ c, onSalvo, registrar }: {
             {iniciais}
           </div>
         )}
-        <button style={{ background: "none", border: "none", color: cor.cinza, fontSize: 14,
-                         cursor: "pointer", marginTop: 6 }}
-                onClick={() => (c.foto_url ? tirarFoto() : refFoto.current?.click())}>
-          {enviandoFoto ? "enviando…" : c.foto_url ? "remover" : "pôr foto"}
-        </button>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 6 }}>
+          <button style={{ background: "none", border: "none", color: cor.teal, fontSize: 14,
+                           cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => refFotoCam.current?.click()} disabled={enviandoFoto}>
+            📷 tirar
+          </button>
+          <button style={{ background: "none", border: "none", color: cor.cinza, fontSize: 14,
+                           cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => (c.foto_url ? tirarFoto() : refFoto.current?.click())}
+                  disabled={enviandoFoto}>
+            {enviandoFoto ? "enviando…" : c.foto_url ? "remover" : "galeria"}
+          </button>
+        </div>
+        {fotoErro && (
+          <p style={{ color: "#b91c1c", fontSize: 13, margin: "4px 0 0", maxWidth: 140 }}>{fotoErro}</p>
+        )}
       </div>
 
       <div style={{ flex: 1, minWidth: 240 }}>
