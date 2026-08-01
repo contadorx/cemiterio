@@ -9,11 +9,13 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import CorrigirGps from "./CorrigirGps";
+import { tilesPara, ATRIBUICAO_PADRAO } from "@/lib/tiles";
 import Link from "next/link";
 import { painel, cor } from "../ui";
 import {
-  ajustarAspecto, caixa, comprimentoRota, escalaBonita,
-  projetar, rotaVizinhoMaisProximo, separarDistantes, type Caixa,
+  ajustarAspecto, caixa, centroDe, comprimentoRota, escalaBonita,
+  projetar, rotaVizinhoMaisProximo, separarDistantes, type Caixa, type Geo,
 } from "@/lib/planta";
 
 const CORES: Record<string, string> = {
@@ -70,23 +72,33 @@ export default function VisaoMapa() {
   const [rotaLigada, setRotaLigada] = useState(false);
   const [selId, setSelId] = useState("");
 
+  // buscar virou funcao com nome porque agora tem quem chame de novo: apagar uma
+  // leitura de GPS muda a posicao (ou tira o jazigo do mapa) e a planta na tela
+  // continuaria desenhando o ponto velho ate alguem recarregar a pagina.
+  const [recarga, setRecarga] = useState(0);
+
   useEffect(() => {
+    let ativo = true;
     fetch("/api/localizacao").then((x) => x.json()).then((r) => {
+      if (!ativo) return;
       if (r?.ok) {
         setJazigos(r.jazigos || []);
         setTruncado(!!r.truncado);
         setLimite(Number(r.limite) || 0);
         const cems = [...new Set((r.jazigos || []).map((j: Jazigo) => j.cemiterio))]
           .map(String).sort((a, b) => a.localeCompare(b));
-        if (cems.length) setCemiterio(cems[0]);
+        // so na primeira carga: refazendo depois de apagar, isto jogaria a tela
+        // de volta para o primeiro cemiterio, longe de onde a pessoa estava
+        if (cems.length) setCemiterio((c) => (c && cems.includes(c) ? c : cems[0]));
       } else {
         // sem isto, falha do endpoint aparecia como "nenhum jazigo com GPS" e
         // mandava a equipe remarcar localização que já existe
         setErro(String(r?.erro || "não consegui carregar os jazigos"));
       }
       setCarregando(false);
-    }).catch(() => { setErro("não consegui falar com o servidor"); setCarregando(false); });
-  }, []);
+    }).catch(() => { if (ativo) { setErro("não consegui falar com o servidor"); setCarregando(false); } });
+    return () => { ativo = false; };
+  }, [recarga]);
 
   const cemiterios = useMemo(
     () => [...new Set(jazigos.map((j) => j.cemiterio))].sort((a, b) => a.localeCompare(b)),
@@ -146,11 +158,15 @@ export default function VisaoMapa() {
 
   // projeção em metros — feita sobre TODO o escopo, para que ligar/desligar
   // filtro não mexa na posição nem na escala do desenho.
-  const { pontos, distantes } = useMemo(() => {
+  const { pontos, distantes, centro } = useMemo(() => {
     const geo = comGps.map((j) => ({ ...j, lat: Number(j.lat), lng: Number(j.lng) }));
+    const bons = geo.filter((j) => !suspeitos.has(j.id));
     return {
-      pontos: projetar(geo.filter((j) => !suspeitos.has(j.id))),
+      pontos: projetar(bons),
       distantes: geo.filter((j) => suspeitos.has(j.id)),
+      // MESMA lista que foi projetada: o centro tem de ser o mesmo que projetar()
+      // usou por dentro, senão a imagem de satélite entra deslocada dos pontos.
+      centro: centroDe(bons),
     };
   }, [comGps, suspeitos]);
 
@@ -172,9 +188,14 @@ export default function VisaoMapa() {
   // escopo trocado, o cartão de detalhe ficava aberto num jazigo invisível
   useEffect(() => {
     if (!selId) return;
-    const vivo = visiveis.some((p) => p.id === selId) || semGpsVisiveis.some((p) => p.id === selId);
+    // distantesVisiveis entra aqui porque agora da para ABRIR um jazigo de GPS
+    // suspeito pelo chip — sem ele, o detalhe fechava sozinho no instante em que
+    // abria, justamente no unico caso em que existe algo a consertar.
+    const vivo = visiveis.some((p) => p.id === selId)
+      || semGpsVisiveis.some((p) => p.id === selId)
+      || distantesVisiveis.some((p) => p.id === selId);
     if (!vivo) setSelId("");
-  }, [selId, visiveis, semGpsVisiveis]);
+  }, [selId, visiveis, semGpsVisiveis, distantesVisiveis]);
 
   // BALDES SINTETICOS: /api/localizacao troca o vazio por um rotulo legivel, e
   // esses dois rotulos nao sao lugares — "sem quadra" pode juntar o cemiterio
@@ -385,11 +406,14 @@ export default function VisaoMapa() {
         )}
 
         {!carregando && !erro && pontos.length > 0 && (
-          <Planta pontos={pontos} visiveis={visiveis} selId={selId} onEscolher={setSelId}
+          <Planta pontos={pontos} centro={centro} visiveis={visiveis} selId={selId} onEscolher={setSelId}
                   agruparQuadras={!quadra} rotaLigada={rotaLigada} onRota={setRotaLigada} />
         )}
 
-        {selecionado && <Detalhe j={selecionado} onFechar={() => setSelId("")} />}
+        {selecionado && (
+          <Detalhe j={selecionado} onFechar={() => setSelId("")}
+                   onMudou={() => setRecarga((n) => n + 1)} />
+        )}
 
         {distantesVisiveis.length > 0 && (
           <div style={{ ...painel.card, borderLeft: "4px solid #d97706" }}>
@@ -398,11 +422,12 @@ export default function VisaoMapa() {
               {pontos.length === 0
                 ? "Neste cemitério não há maioria: as leituras se dividem em grupos afastados uns dos outros (pode ser 2 contra 2, e podem existir duas leituras vizinhas dentro de cada grupo), então não há como eleger qual grupo é o cemitério de verdade e nada é desenhado — sairia com quilômetros de largura. A coordenada existe; o que falta é confiança nela."
                 : "Estes jazigos têm coordenada gravada longe do grupo que a maioria formou neste cemitério (nenhum vizinho a menos de 5 km) — provavelmente marcada longe do cemitério ou com o sinal ruim. Ficam fora da planta para não distorcer o desenho."}
-              {" "}Remarque a localização na próxima passagem.
+              {" "}Clique no jazigo para ver as leituras e <b>apagar a errada</b> — remarcar no campo não
+              apaga leitura ruim, só dilui.
             </p>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {distantesVisiveis.map((t) => (
-                <ChipJazigo key={t.id} t={t as Jazigo} />
+                <ChipJazigo key={t.id} t={t as Jazigo} onSelecionar={setSelId} />
               ))}
             </div>
           </div>
@@ -416,7 +441,7 @@ export default function VisaoMapa() {
               localização — a planta se completa sozinha.
             </p>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {semGpsVisiveis.map((t) => <ChipJazigo key={t.id} t={t} />)}
+              {semGpsVisiveis.map((t) => <ChipJazigo key={t.id} t={t} onSelecionar={setSelId} />)}
             </div>
           </div>
         )}
@@ -425,7 +450,14 @@ export default function VisaoMapa() {
   );
 }
 
-function ChipJazigo({ t }: { t: Jazigo }) {
+/**
+ * O chip levava direto para a ficha da familia. Nos cartoes de "GPS suspeito" e
+ * "Sem GPS" isso e o destino errado: quem clica ali quer resolver a COORDENADA,
+ * e a ficha da familia nao tem nada sobre isso. Com onSelecionar o chip abre o
+ * detalhe do jazigo (onde mora o "Corrigir localização"); o link para a ficha
+ * continua sendo o comportamento padrao onde nao ha o que consertar.
+ */
+function ChipJazigo({ t, onSelecionar }: { t: Jazigo; onSelecionar?: (id: string) => void }) {
   const chip = (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13,
                    border: `1px solid ${cor.linha}`, borderRadius: 999, padding: "6px 10px",
@@ -434,6 +466,14 @@ function ChipJazigo({ t }: { t: Jazigo }) {
       {t.quadra} · {t.identificacao || "sem identificação"}
     </span>
   );
+  if (onSelecionar) {
+    return (
+      <button type="button" onClick={() => onSelecionar(t.id)}
+              style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer" }}>
+        {chip}
+      </button>
+    );
+  }
   return t.clienteId
     ? <Link href={`/painel/clientes/${t.clienteId}`} style={{ textDecoration: "none" }}>{chip}</Link>
     : chip;
@@ -463,8 +503,8 @@ function metrosBr(m: number) {
  * — e a largura em pixel é MEDIDA, não presumida: no celular o SVG tem ~360 px
  * e usar 640 fixo deixava ponto e fonte quase pela metade do tamanho pedido.
  */
-function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigada, onRota }: {
-  pontos: Ponto[]; visiveis: Ponto[]; selId: string;
+function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, rotaLigada, onRota }: {
+  pontos: Ponto[]; centro: Geo; visiveis: Ponto[]; selId: string;
   onEscolher: (id: string) => void;
   agruparQuadras: boolean;
   rotaLigada: boolean; onRota: (v: boolean) => void;
@@ -481,6 +521,15 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
   // arraste horizontal do mapa continua funcionando); quem quiser arrastar a
   // planta para cima/baixo liga o modo mão. No mouse nada disso importa.
   const [modoArraste, setModoArraste] = useState(false);
+  // SATELITE LIGADO POR PADRAO. Ponto sobre fundo branco nao localiza ninguem: a
+  // pessoa reconhece o cemiterio pelo portao, pela alameda, pelo telhado — nao
+  // por coordenada. Quem quiser o desenho limpo desliga no botao.
+  const [satelite, setSatelite] = useState(true);
+  // guardado por CHAVE do quadrado, não como contador: contador acumulava a cada
+  // arraste e, depois de rodar o mapa um pouco, acusava "sem imagem" com a
+  // imagem na tela. Aqui só conta falha dos quadrados que estão sendo pedidos
+  // agora, e um quadrado que falhou não é recontado ao voltar.
+  const [tilesRuins, setTilesRuins] = useState<Record<string, true>>({});
 
   // troca de escopo (quadra/cemitério) recentra a janela
   const chave = `${pontos.length}:${base.x.toFixed(1)}:${base.y.toFixed(1)}:${base.w.toFixed(1)}`;
@@ -504,6 +553,16 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
   }, []);
 
   const upx = vb.w / Math.max(larguraPx, 1);   // metros por pixel de tela
+
+  // os quadrados de imagem que cobrem a janela atual (zoom escolhido pelo upx)
+  const tiles = useMemo(
+    () => (satelite ? tilesPara(centro, vb, upx) : []),
+    [satelite, centro, vb.x, vb.y, vb.w, vb.h, upx], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // se TUDO falhou, o problema nao e o zoom nem o cemiterio: e o servico de
+  // imagem. Dizer isso e melhor que deixar a tela branca com o botao ligado.
+  const semImagem = satelite && tiles.length > 0 && tiles.every((t) => tilesRuins[t.chave]);
+
   const r = 7 * upx;                           // raio do ponto, constante na tela
   const fonte = 11 * upx;
   const traco = 1.5 * upx;
@@ -700,6 +759,11 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
                   title="No celular: ligado, o dedo arrasta a planta; desligado, o dedo rola a página.">
             {modoArraste ? "✓ mão" : "✋ mão"}
           </button>
+          <button style={satelite ? painel.botaoMini : painel.botaoMiniSec}
+                  onClick={() => { setSatelite((v) => !v); setTilesRuins({}); }}
+                  title="Imagem aérea atrás dos pontos.">
+            {satelite ? "✓ satélite" : "🛰 satélite"}
+          </button>
           <button style={rotaLigada ? painel.botaoMini : painel.botaoMiniSec}
                   onClick={() => onRota(!rotaLigada)}>
             {rotaLigada ? "✓ rota" : "rota a pé"}
@@ -725,11 +789,31 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
                     border: `1px solid ${cor.linha}`, borderRadius: 12,
                     touchAction: modoArraste ? "none" : "pan-y", cursor: "grab",
                     display: "block" }}>
+        {/* IMAGEM AÉREA — primeiro de tudo, para ficar ATRÁS de quadras, rota e
+            pontos. Cada quadrado vai posicionado pelos próprios cantos (ver
+            src/lib/tiles.ts). Quadrado que não carrega some sozinho: o desenho
+            não pode depender de um serviço de fora. */}
+        {tiles.map((t) => (
+          <image key={t.chave} href={t.url} x={t.x} y={t.y} width={t.w} height={t.h}
+                 preserveAspectRatio="none" style={{ pointerEvents: "none" }}
+                 onError={() => setTilesRuins((m) => (m[t.chave] ? m : { ...m, [t.chave]: true }))} />
+        ))}
+        {/* véu claro: sobre foto de satélite, ponto colorido e texto escuro
+            somem. Ele tira o contraste da imagem sem apagar a referência. */}
+        {tiles.length > 0 && (
+          <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h}
+                fill="#ffffff" fillOpacity={0.22} style={{ pointerEvents: "none" }} />
+        )}
+
         {/* caixas das quadras */}
         {caixasQuadra.map((q) => (
           <g key={q.codigo}>
+            {/* sobre satélite a caixa cheia apagava o terreno, que é justamente
+                o que a pessoa foi ver: fica só o contorno. */}
             <rect x={q.c.x} y={q.c.y} width={q.c.w} height={q.c.h} rx={2 * upx}
-                  fill="#e2e8f0" fillOpacity={0.5} stroke="#cbd5e1" strokeWidth={traco} />
+                  fill="#e2e8f0" fillOpacity={tiles.length ? 0.06 : 0.5}
+                  stroke={tiles.length ? "#0f172a" : "#cbd5e1"}
+                  strokeOpacity={tiles.length ? 0.45 : 1} strokeWidth={traco} />
             <text x={q.c.x + 2 * upx} y={q.c.y - 3 * upx} fontSize={fonte * 1.1} fontWeight={700} fill="#64748b">
               {q.codigo} ({q.qtd})
             </text>
@@ -801,6 +885,16 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
               style={{ pointerEvents: "none" }}>N ↑</text>
       </svg>
 
+      {semImagem && (
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#92400e" }}>
+          Não consegui carregar a imagem aérea agora (serviço de fora, sem contrato). A planta
+          continua valendo — desligue o satélite para ver o desenho limpo.
+        </p>
+      )}
+      {satelite && !semImagem && tiles.length > 0 && (
+        <p style={{ margin: "6px 0 0", fontSize: 11, color: cor.cinza }}>{ATRIBUICAO_PADRAO}</p>
+      )}
+
       <p style={{ margin: "8px 0 0", fontSize: 13, color: cor.cinza }}>
         No computador, arraste para mover. No celular, ligue “✋ mão” para arrastar a planta com o
         dedo (desligado, o dedo rola a página). ＋ / − aproximam.
@@ -826,7 +920,7 @@ function Planta({ pontos, visiveis, selId, onEscolher, agruparQuadras, rotaLigad
   );
 }
 
-function Detalhe({ j, onFechar }: { j: Jazigo; onFechar: () => void }) {
+function Detalhe({ j, onFechar, onMudou }: { j: Jazigo; onFechar: () => void; onMudou: () => void }) {
   const local = [j.quadra, j.rua, j.numero ? `nº ${j.numero}` : null].filter(Boolean).join(" · ");
   const mapaExterno = j.lat != null && j.lng != null
     ? `https://www.google.com/maps/search/?api=1&query=${j.lat},${j.lng}`
@@ -871,6 +965,10 @@ function Detalhe({ j, onFechar }: { j: Jazigo; onFechar: () => void }) {
             Abrir no mapa do celular
           </a>
         )}
+        {/* aparece sempre, inclusive sem coordenada: jazigo "sem GPS" pode ter
+            leitura registrada e descartada por precisao, e ver isso e o unico
+            jeito de entender por que ele nao entra na planta */}
+        <CorrigirGps tumuloId={j.id} onMudou={onMudou} />
       </div>
       {!j.temPlano && (
         <p style={{ margin: "10px 0 0", fontSize: 14, color: "#92400e" }}>

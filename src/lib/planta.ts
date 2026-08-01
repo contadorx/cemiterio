@@ -31,6 +31,41 @@ export function projetar<T extends Geo>(pontos: T[]): Array<T & XY> {
   }));
 }
 
+/**
+ * O CENTRO da projeção — o mesmo que `projetar` usa por dentro.
+ *
+ * `projetar` devolvia metros e engolia o centro, então não havia como voltar de
+ * metros para lat/lng. Enquanto o fundo do desenho era branco isso não fazia
+ * falta; para colocar IMAGEM DE SATÉLITE atrás dos pontos é obrigatório: as
+ * imagens vêm em quadrados endereçados por lat/lng, e sem a volta não dá para
+ * saber quais quadrados cobrem a janela que está na tela.
+ */
+export function centroDe(pontos: Geo[]): Geo {
+  if (!pontos.length) return { lat: 0, lng: 0 };
+  return {
+    lat: pontos.reduce((s, p) => s + p.lat, 0) / pontos.length,
+    lng: pontos.reduce((s, p) => s + p.lng, 0) / pontos.length,
+  };
+}
+
+/** De metros de volta para graus. Inverso exato de `projetar` no mesmo centro. */
+export function paraGeo(centro: Geo, p: XY): Geo {
+  const mLng = M_POR_GRAU_LNG * Math.cos((centro.lat * Math.PI) / 180);
+  return {
+    lat: centro.lat - p.y / M_POR_GRAU_LAT,
+    lng: centro.lng + p.x / mLng,
+  };
+}
+
+/** De graus para metros no mesmo centro (um ponto só, sem recentralizar). */
+export function paraMetros(centro: Geo, g: Geo): XY {
+  const mLng = M_POR_GRAU_LNG * Math.cos((centro.lat * Math.PI) / 180);
+  return {
+    x: (g.lng - centro.lng) * mLng,
+    y: (centro.lat - g.lat) * M_POR_GRAU_LAT,
+  };
+}
+
 /** Caixa que contém os pontos, com folga e um tamanho mínimo (metros). */
 export function caixa(pts: XY[], folga = 8, minimo = 24): Caixa {
   if (!pts.length) return { x: -minimo / 2, y: -minimo / 2, w: minimo, h: minimo };

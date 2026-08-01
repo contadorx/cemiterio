@@ -9,6 +9,7 @@ import ConfirmarJazigo from "./ConfirmarJazigo";
 import NaoDeu from "./NaoDeu";
 import Concluir from "./Concluir";
 import CapturarJazigo from "./CapturarJazigo";
+import ComoChegar from "./ComoChegar";
 
 interface Aviso { tipo: string; texto: string }
 
@@ -48,6 +49,7 @@ export default function Campo() {
   const [naoDeu, setNaoDeu] = useState<Item | null>(null);
   const [pedirMaterial, setPedirMaterial] = useState(false);
   const [capturarJazigo, setCapturarJazigo] = useState(false);
+  const [indo, setIndo] = useState<Item | null>(null);
   const [iniciando, setIniciando] = useState<string | null>(null);
   // admin que entrou no campo pelo painel precisa de porta de volta (pedido 01/08)
   const [podePainel, setPodePainel] = useState(false);
@@ -190,6 +192,7 @@ export default function Campo() {
               key={it.id}
               it={it}
               ocupado={iniciando === it.id}
+              onIndo={() => setIndo(it)}
               onIniciar={() => setConfirmando(it)}
               onFinalizar={() => setFinalizando(it)}
               onNaoDeu={() => setNaoDeu(it)}
@@ -210,6 +213,9 @@ export default function Campo() {
           jazigo={confirmando.falecido || confirmando.tumulo}
           tokenEsperado={confirmando.qrToken}
           fotoReferencia={confirmando.fotoEnquadramento || confirmando.fotoReferencia}
+          lat={confirmando.lat}
+          lng={confirmando.lng}
+          gpsPrecisao={confirmando.gpsPrecisao}
           onFechar={() => setConfirmando(null)}
           onConfirmado={(foto) => { const it = confirmando; setConfirmando(null); if (it) iniciar(it, foto); }}
         />
@@ -238,6 +244,18 @@ export default function Campo() {
         <CapturarJazigo
           onFechar={() => setCapturarJazigo(false)}
           onPronto={() => { setCapturarJazigo(false); carregar(); }}
+        />
+      )}
+
+      {indo && (
+        <ComoChegar
+          alvo={{
+            tumulo: indo.falecido ? `${indo.falecido} — ${indo.tumulo}` : indo.tumulo,
+            quadra: indo.quadra, rua: indo.rua, numero: indo.numero,
+            lat: indo.lat, lng: indo.lng, gpsPrecisao: indo.gpsPrecisao,
+            fotoEnquadramento: indo.fotoEnquadramento, fotoReferencia: indo.fotoReferencia,
+          }}
+          onFechar={() => setIndo(null)}
         />
       )}
     </main>
@@ -283,9 +301,9 @@ function Fotos({ it }: { it: Item }) {
   );
 }
 
-function Card({ it, ocupado, onIniciar, onFinalizar, onNaoDeu }: {
+function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
   it: Item; ocupado: boolean;
-  onIniciar: () => void; onFinalizar: () => void; onNaoDeu: () => void;
+  onIndo: () => void; onIniciar: () => void; onFinalizar: () => void; onNaoDeu: () => void;
 }) {
   const emAndamento = !!it.iniciadoEm;
   const [agora, setAgora] = useState(() => Date.now());
@@ -321,6 +339,16 @@ function Card({ it, ocupado, onIniciar, onFinalizar, onNaoDeu }: {
         <div style={s.cronometro}>
           Em andamento há {minutos < 1 ? "menos de 1 minuto" : `${minutos} min`}
         </div>
+      )}
+
+      {/* ANTES de "Começar": achar o jazigo vem primeiro. O botão aparece mesmo
+          sem coordenada — a tela explica o que fazer nesse caso, e sumir sem
+          explicação deixaria a pessoa procurando um botão que existe nos outros
+          cartões. */}
+      {!emAndamento && (
+        <button style={s.botaoChegar} onClick={onIndo}>
+          🧭 Como chegar{it.lat != null && it.lng != null ? "" : " (sem localização gravada)"}
+        </button>
       )}
 
       <div style={s.acoes}>
@@ -383,6 +411,9 @@ const s: Record<string, React.CSSProperties> = {
            borderRadius: 10, marginTop: 10, lineHeight: 1.4 },
   avisoUrgente: { color: "#991b1b", background: "#fef2f2" },
   cronometro: { fontSize: 16, color: TEAL, fontWeight: 600, marginTop: 12 },
+  botaoChegar: { width: "100%", minHeight: 56, marginTop: 14, background: "#fff", color: NAVY,
+                 border: `2px solid ${TEAL}`, borderRadius: 14, fontSize: 17, fontWeight: 700,
+                 cursor: "pointer", padding: "14px 16px" },
   acoes: { display: "flex", gap: 12, marginTop: 16 },
   botaoPrincipal: { flex: 1, minHeight: 64, padding: "18px 20px", background: TEAL, color: "#fff",
                     border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer" },

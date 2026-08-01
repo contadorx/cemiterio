@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
+import DistanciaAoVivo from "./DistanciaAoVivo";
 
 /**
  * Confirmação de que a ajudante está no jazigo certo — e a FOTO DO ANTES.
@@ -16,12 +17,15 @@ import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
  * mas virou a exceção, escrita em letra pequena.
  */
 export default function ConfirmarJazigo({
-  servicoId, jazigo, tokenEsperado, fotoReferencia, onConfirmado, onFechar,
+  servicoId, jazigo, tokenEsperado, fotoReferencia, lat, lng, gpsPrecisao, onConfirmado, onFechar,
 }: {
   servicoId: string;
   jazigo: string;
   tokenEsperado: string | null;
   fotoReferencia: string | null;
+  lat: number | null;
+  lng: number | null;
+  gpsPrecisao: number | null;
   onConfirmado: (foto: FotoPronta | null, comoConfirmou: "qr" | "visual") => void;
   onFechar: () => void;
 }) {
@@ -81,6 +85,9 @@ export default function ConfirmarJazigo({
           <button style={s.fechar} onClick={onFechar}>✕</button>
         </div>
         <p style={s.nome}>{jazigo}</p>
+
+        {/* a terceira prova, além do QR e da foto: o celular já sabe onde está */}
+        <DistanciaAoVivo lat={lat} lng={lng} precisao={gpsPrecisao} />
 
         {lendo ? (
           <>
