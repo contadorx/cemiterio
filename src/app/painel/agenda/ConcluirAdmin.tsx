@@ -8,6 +8,19 @@ import { prepararFoto, motivoFalha } from "@/lib/foto";
  * Concluir uma lavagem pelo painel — quando a Nina mandou a foto por WhatsApp,
  * quando o próprio dono foi ao cemitério, ou quando o registro falhou no campo.
  */
+// Traduz o motivo tecnico do envio para uma frase que diz o que fazer.
+function explicarEnvio(motivo?: string): string {
+  switch (motivo) {
+    case "desmarcado": return "você desmarcou o envio";
+    case "familia_desligada": return "o envio automático está DESLIGADO nesta família (ligue na ficha dela)";
+    case "disparos_desligados": return "a chave mestra de disparos está desligada (Config)";
+    case "sem_telefone": return "esta família não tem telefone cadastrado";
+    case "sem_cliente": return "este jazigo não está vinculado a nenhuma família";
+    case "falhou": return "o WhatsApp falhou; ficou na fila e tenta de novo sozinho";
+    default: return "não saiu agora";
+  }
+}
+
 export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
   servico: any; onFechar: () => void; onPronto: () => void;
 }) {
@@ -64,7 +77,7 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
             Lavagem registrada.
           </p>
           <ul style={{ color: cor.cinza, fontSize: 14, lineHeight: 1.8 }}>
-            <li>{resultado.notificado ? "Foto enviada para a família" : "Foto não enviada (você desmarcou ou o WhatsApp falhou)"}</li>
+            <li>{resultado.notificado ? "Foto enviada para a família" : `Foto não enviada — ${explicarEnvio(resultado.motivoEnvio)}`}</li>
             <li>{resultado.debitou ? "Cobrança lançada na conta da família" : "Sem cobrança (já paga ou já lançada)"}</li>
             {resultado.momento === "contra_foto" && (
               <li><b>Cobrança liberada pela entrega da foto</b> — é o combinado deste plano</li>

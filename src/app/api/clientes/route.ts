@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data: clientes } = await db
     .from("clientes")
-    .select("id,nome,telefone,modo,score,ativo_ia,regua_cobranca,cobranca_nivel,anonimizado_em,observacoes")
+    .select("id,nome,telefone,modo,score,ativo_ia,envio_automatico,regua_cobranca,cobranca_nivel,anonimizado_em,observacoes")
     .order("nome")
     .limit(400);
 
@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
   if (situacao === "adiantados") lista = lista.filter((c) => c.saldo > 0.005);
   if (situacao === "sem_telefone") lista = lista.filter((c) => String(c.telefone).startsWith("sem-tel"));
   if (situacao === "ia_desligada") lista = lista.filter((c) => !c.ativo_ia);
+  if (situacao === "envio_desligado") lista = lista.filter((c) => c.envio_automatico === false);
   if (situacao === "automatico") lista = lista.filter((c) => c.modo === "automatico");
   if (situacao === "falta_data") lista = lista.filter((c) => c.faltaData);
   if (situacao === "nao_conferido") lista = lista.filter((c) => !c.conferido);

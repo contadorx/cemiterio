@@ -57,7 +57,7 @@ export async function avisosSaldoBaixo(): Promise<number> {
 
   const { data: planos } = await db
     .from("planos")
-    .select("cliente_id,valor_vigente,qtd_por_passagem,cadencia,clientes(nome,aviso_saldo_em,cobranca_nivel)")
+    .select("cliente_id,valor_vigente,qtd_por_passagem,cadencia,clientes(nome,aviso_saldo_em,cobranca_nivel,envio_automatico)")
     .eq("org_id", org)
     .eq("ativo", true)
     .neq("cadencia", "avulso");
@@ -72,6 +72,7 @@ export async function avisosSaldoBaixo(): Promise<number> {
 
     const cli = (p as any).clientes;
     if (!cli) continue;
+    if (cli.envio_automatico === false) continue;   // familia em revisao: nada automatico
     if ((cli.cobranca_nivel || 0) > 0) continue; // já está na régua de cobrança
     if (!diasAtras(cli.aviso_saldo_em, 15)) continue;
 
@@ -107,6 +108,7 @@ export async function cobrancaGentil(): Promise<number> {
     .from("clientes")
     .select("id,nome,tratamento,cobranca_em,cobranca_nivel,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,anonimizado_em")
     .eq("org_id", org)
+    .eq("envio_automatico", true)                    // familia em revisao fica de fora
     .is("anonimizado_em", null);
 
   let n = 0;

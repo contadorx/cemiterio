@@ -145,6 +145,7 @@ function VisaoFamilias() {
               <option value="adiantados">Adiantados</option>
               <option value="automatico">IA no automático</option>
               <option value="ia_desligada">IA desligada</option>
+              <option value="envio_desligado">Envio automático desligado</option>
               <option value="sem_telefone">Sem telefone</option>
               <option value="falta_data">Falta data de lavagem ou cobrança</option>
               <option value="nao_conferido">Ainda não conferidos</option>
@@ -230,6 +231,9 @@ function VisaoFamilias() {
                     {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}
+                    {c.envio_automatico === false && (
+                      <span style={{ color: "#b45309", fontWeight: 600 }}> · em revisão (não envia)</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 15, marginTop: 3,
                                 color: c.faltaData ? "#d97706" : cor.cinza }}>

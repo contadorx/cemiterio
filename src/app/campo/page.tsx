@@ -48,6 +48,8 @@ export default function Campo() {
   const [pedirMaterial, setPedirMaterial] = useState(false);
   const [capturarJazigo, setCapturarJazigo] = useState(false);
   const [iniciando, setIniciando] = useState<string | null>(null);
+  // admin que entrou no campo pelo painel precisa de porta de volta (pedido 01/08)
+  const [podePainel, setPodePainel] = useState(false);
 
   const carregar = useCallback(async () => {
     const [a, b] = await Promise.all([
@@ -61,6 +63,14 @@ export default function Campo() {
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // pergunta ao servidor quem eu sou; so o admin ve o botao de voltar ao painel
+  useEffect(() => {
+    fetch("/api/eu")
+      .then((x) => x.json())
+      .then((r) => setPodePainel(!!r?.podePainel))
+      .catch(() => null);
+  }, []);
 
   useEffect(() => {
     const ligou = () => { setOnline(true); sincronizar().then(() => carregar()).catch(() => null); };
@@ -118,11 +128,18 @@ export default function Campo() {
       <div style={s.topo}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
           <div style={s.saudacao}>{brief?.saudacao || "Olá!"}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {podePainel && (
+            <button style={s.sair} onClick={() => { location.href = "/painel"; }}>
+              &larr; Painel
+            </button>
+          )}
           <button style={s.sair} onClick={async () => {
             if (!confirm("Sair?")) return;
             await fetch("/api/sair", { method: "POST" });
             location.href = "/login";
           }}>Sair</button>
+          </div>
         </div>
 
         <div style={s.resumo}>

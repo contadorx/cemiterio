@@ -69,8 +69,9 @@ export async function pedidosDeAvaliacao(opcoes?: {
     if (!token) continue;
 
     const cliente = await db
-      .from("clientes").select("id,nome,ativo_ia").eq("id", s.cliente_id).maybeSingle();
+      .from("clientes").select("id,nome,ativo_ia,envio_automatico").eq("id", s.cliente_id).maybeSingle();
     if (!(cliente.data as any)?.ativo_ia) continue;
+    if ((cliente.data as any)?.envio_automatico === false) continue;  // familia em revisao
 
     let texto = await redigir({
       clienteId: s.cliente_id, proposito: "avaliacao",

@@ -79,9 +79,12 @@ export async function POST(req: NextRequest) {
   }
 
   const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));
-  const notificado = b?.notificar === false ? false : await notificarFamilia(servicoId, urlDepois);
+  const aviso = b?.notificar === false
+    ? { enviado: false, motivo: "desmarcado" as const }
+    : await notificarFamilia(servicoId, urlDepois);
+  const notificado = aviso.enviado;
 
   return NextResponse.json({
-    ok: true, urlDepois, duracao, debitou, momento, notificado, material,
+    ok: true, urlDepois, duracao, debitou, momento, notificado, material, motivoEnvio: aviso.motivo,
   });
 }

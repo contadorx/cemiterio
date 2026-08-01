@@ -119,10 +119,11 @@ export async function POST(req: NextRequest) {
     }).then(() => null, () => null);
   }
 
-  const notificado = await notificarFamilia(servicoId, urlDepois);
+  const aviso = await notificarFamilia(servicoId, urlDepois);
+  const notificado = aviso.enviado;
 
   // baixa o estoque pelo consumo estimado e guarda o custo desta limpeza
   const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));
 
-  return NextResponse.json({ ok: true, duracao, material, notificado });
+  return NextResponse.json({ ok: true, duracao, material, notificado, motivoEnvio: aviso.motivo });
 }

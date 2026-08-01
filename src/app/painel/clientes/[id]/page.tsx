@@ -211,6 +211,8 @@ export default function FichaCliente() {
           <button style={painel.botao} onClick={abrirConversa}>Abrir conversa</button>
         </div>
 
+        <ChaveEnvio clienteId={id} ligado={c.envio_automatico !== false} onSalvo={carregar} />
+
         <div style={painel.card}>
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div>
@@ -347,6 +349,65 @@ export default function FichaCliente() {
 
         <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * CHAVE DE ENVIO AUTOMATICO DA FAMILIA
+ * -----------------------------------------------------------------------------
+ * Freio pedido pelo Leandro (01/08): antes de a familia entrar "no ar", ele quer
+ * conferir o cadastro. Com a chave DESLIGADA a Sureya nao dispara NADA sozinha
+ * para esta familia — nem a foto do jazigo limpo, nem cobranca, nem convite, nem
+ * pesquisa. Responder manualmente na conversa continua funcionando normalmente.
+ * O padrao de toda familia e LIGADO; ele desliga as que ainda estao em revisao.
+ */
+function ChaveEnvio({ clienteId, ligado, onSalvo }: {
+  clienteId: string;
+  ligado: boolean;
+  onSalvo: () => void;
+}) {
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function virar() {
+    const novo = !ligado;
+    if (!novo && !confirm("Colocar esta familia EM REVISAO?\n\nEnquanto estiver desligada a Sureya nao envia nada sozinha para ela (foto, cobranca, convite). Voce continua podendo responder pela conversa.")) return;
+    setSalvando(true);
+    setErro("");
+    const r = await fetch(`/api/clientes/${clienteId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ envio_automatico: novo }),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) onSalvo();
+    else setErro(String(r?.erro || "nao consegui salvar"));
+  }
+
+  return (
+    <div style={{ ...painel.card, borderLeft: `4px solid ${ligado ? "#166534" : "#b45309"}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontWeight: 700 }}>
+            Envio automatico:{" "}
+            <span style={{ color: ligado ? "#166534" : "#b45309" }}>{ligado ? "LIGADO" : "DESLIGADO (em revisao)"}</span>
+          </div>
+          <div style={{ color: cor.cinza, fontSize: 14, marginTop: 4, maxWidth: 620 }}>
+            {ligado
+              ? "A Sureya pode enviar sozinha para esta familia: foto do jazigo ao concluir o servico, lembrete de pagamento, convite e pesquisa."
+              : "A Sureya NAO envia nada sozinha para esta familia. Confira o cadastro (telefone, jazigos, plano) e ligue quando estiver certo. Responder pela conversa continua funcionando."}
+          </div>
+        </div>
+        <button
+          style={ligado ? painel.botaoSec : painel.botao}
+          onClick={virar}
+          disabled={salvando}
+        >
+          {salvando ? "salvando..." : ligado ? "Desligar (revisar)" : "Ligar envios"}
+        </button>
+      </div>
+      {erro && <div style={{ color: "#b91c1c", marginTop: 8, fontSize: 14 }}>{erro}</div>}
     </div>
   );
 }

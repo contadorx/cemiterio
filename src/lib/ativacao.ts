@@ -98,7 +98,7 @@ export async function convitesDeData(): Promise<number> {
   const { data: clientes } = await db
     .from("clientes")
     .select("id,nome,tratamento,anonimizado_em,tumulos(identificacao)")
-    .eq("org_id", org).is("anonimizado_em", null);
+    .eq("org_id", org).eq("envio_automatico", true).is("anonimizado_em", null);
 
   let n = 0;
   for (const d of devidas as any[]) {
@@ -124,7 +124,8 @@ export async function convitesPeriodicos(): Promise<number> {
   const { data: clientes } = await db
     .from("clientes")
     .select("id,nome,tratamento,ativacao_meses,ultima_ativacao_em,anonimizado_em,tumulos(identificacao)")
-    .eq("org_id", org).eq("ativacao_ativa", true).is("anonimizado_em", null);
+    .eq("org_id", org).eq("ativacao_ativa", true).eq("envio_automatico", true)
+    .is("anonimizado_em", null);
 
   let n = 0;
   for (const c of (clientes || []) as any[]) {

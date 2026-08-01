@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: cliente } = await db
     .from("clientes")
-    .select("id,nome,apelido,foto_url,telefone,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes,consentimento_em,codigo_indicacao,tratamento,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,cobranca_nivel,ativacao_ativa,ativacao_meses,ultima_ativacao_em,cobranca_antecipada")
+    .select("id,nome,apelido,foto_url,telefone,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes,consentimento_em,codigo_indicacao,tratamento,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,cobranca_nivel,ativacao_ativa,ativacao_meses,ultima_ativacao_em,cobranca_antecipada,envio_automatico")
     .eq("id", id)
     .maybeSingle();
   if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const camposRegua = [
     "tratamento", "regua_cobranca", "dias_entre_cobrancas", "max_lembretes",
     "orientacao_cobranca", "ativacao_ativa", "ativacao_meses", "cobranca_antecipada",
-    "apelido",
+    "apelido", "envio_automatico",
   ] as const;
   const patch: Record<string, any> = {};
   for (const campo of ["nome", "telefone", "modo", "ativo_ia", "instrucoes_ia", "observacoes", ...camposRegua]) {
