@@ -30,6 +30,7 @@ interface Item {
   qrToken: string | null;
   fotoReferencia: string | null;
   fotoEnquadramento: string | null;
+  fotoAntes: string | null;
   iniciadoEm: string | null;
   adiadoVezes: number;
   avisos: Aviso[];
@@ -92,11 +93,15 @@ export default function Campo() {
     }
   }, [lista]);
 
-  async function iniciar(it: Item) {
+  async function iniciar(it: Item, foto?: { b64: string; mt: string } | null) {
     setIniciando(it.id);
     const r = await fetch("/api/campo/iniciar", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ servicoId: it.id }),
+      body: JSON.stringify({
+        servicoId: it.id,
+        fotoBase64: foto?.b64,
+        mimetype: foto?.mt,
+      }),
     }).then((x) => x.json()).catch(() => null);
     setIniciando(null);
     if (r?.ok) carregar();
@@ -206,7 +211,7 @@ export default function Campo() {
           tokenEsperado={confirmando.qrToken}
           fotoReferencia={confirmando.fotoEnquadramento || confirmando.fotoReferencia}
           onFechar={() => setConfirmando(null)}
-          onConfirmado={() => { const it = confirmando; setConfirmando(null); if (it) iniciar(it); }}
+          onConfirmado={(foto) => { const it = confirmando; setConfirmando(null); if (it) iniciar(it, foto); }}
         />
       )}
 
@@ -240,6 +245,44 @@ export default function Campo() {
 }
 
 /** Card de um jazigo: local, nome, avisos e a ação do momento. */
+/**
+ * AS FOTOS NO PROPRIO CARD (pedido do Leandro, 01/08)
+ * ---------------------------------------------------------------------------
+ * Antes, a foto do jazigo so aparecia depois de abrir a confirmacao. A ajudante
+ * chega no corredor e precisa saber QUAL e o jazigo antes de tocar em qualquer
+ * botao. Entao a miniatura vem no card:
+ *   "onde fica"  = foto de longe, com os vizinhos — e a que orienta no corredor
+ *   "o jazigo"   = foto de perto, para conferir a lapide
+ *   "antes"      = a foto tirada hoje ao comecar, para ela comparar no fim
+ * Tocar abre em tamanho cheio.
+ */
+function Fotos({ it }: { it: Item }) {
+  const tem: Array<{ url: string; rotulo: string }> = [];
+  if (it.fotoEnquadramento) tem.push({ url: it.fotoEnquadramento, rotulo: "onde fica" });
+  if (it.fotoReferencia) tem.push({ url: it.fotoReferencia, rotulo: "o jazigo" });
+  if (it.fotoAntes) tem.push({ url: it.fotoAntes, rotulo: "antes (hoje)" });
+
+  if (!tem.length) {
+    return (
+      <div style={s.semFoto}>
+        Este jazigo ainda não tem foto. A que você tirar hoje já fica de referência.
+      </div>
+    );
+  }
+
+  return (
+    <div style={s.tiras}>
+      {tem.map((f) => (
+        <a key={f.rotulo} href={f.url} target="_blank" rel="noreferrer" style={s.tira}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={f.url} alt={f.rotulo} style={s.tiraFoto} />
+          <span style={s.tiraRotulo}>{f.rotulo}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function Card({ it, ocupado, onIniciar, onFinalizar, onNaoDeu }: {
   it: Item; ocupado: boolean;
   onIniciar: () => void; onFinalizar: () => void; onNaoDeu: () => void;
@@ -265,6 +308,8 @@ function Card({ it, ocupado, onIniciar, onFinalizar, onNaoDeu }: {
       <div style={s.local}>{local || "sem local"}</div>
       <div style={s.nome}>{it.falecido || it.tumulo}</div>
       {it.falecido && <div style={s.jazigo}>{it.tumulo}</div>}
+
+      <Fotos it={it} />
 
       {(it.avisos || []).map((a, i) => (
         <div key={i} style={{ ...s.aviso, ...(a.tipo === "adiado" ? s.avisoUrgente : {}) }}>
@@ -327,6 +372,13 @@ const s: Record<string, React.CSSProperties> = {
   local: { fontSize: 14, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 },
   nome: { fontSize: 20, fontWeight: 700, color: NAVY, marginTop: 3 },
   jazigo: { fontSize: 16, color: "#475569" },
+  tiras: { display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 2 },
+  tira: { flex: "0 0 auto", width: 104, textDecoration: "none", color: "#475569" },
+  tiraFoto: { width: 104, height: 78, objectFit: "cover", borderRadius: 10,
+              border: "1px solid #e7e0cf", display: "block", background: "#f1f5f9" },
+  tiraRotulo: { display: "block", fontSize: 13, marginTop: 4, textAlign: "center" },
+  semFoto: { fontSize: 15, color: "#78350f", background: "#fffbeb", padding: "10px 12px",
+             borderRadius: 10, marginTop: 12, lineHeight: 1.4 },
   aviso: { fontSize: 16, color: "#92400e", background: "#fffbeb", padding: "10px 12px",
            borderRadius: 10, marginTop: 10, lineHeight: 1.4 },
   avisoUrgente: { color: "#991b1b", background: "#fef2f2" },

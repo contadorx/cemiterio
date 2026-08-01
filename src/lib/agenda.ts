@@ -61,6 +61,86 @@ function proximoDiaUtil(iso: string, j?: Jornada): string {
 }
 
 // ----------------------------------------------------------------------------
+// ANTI-DUPLICATA (migration 0032)
+//
+// O gerador perguntava "ja existe servico deste plano na data X?" olhando
+// data_prevista. So que o ALOCADOR reescreve data_prevista com o dia da rota
+// logo depois. Na rodada seguinte o gerador nao reconhecia mais o servico que
+// ele mesmo criou e inseria outro. Apertar o botao 3x = 3 copias.
+//
+// Agora existem duas datas: data_plano (a teorica, congelada, chave de
+// unicidade) e data_prevista (o dia da rota, do alocador). A checagem passa a
+// ser em memoria, uma consulta por plano — o .maybeSingle() de antes tambem
+// piorava tudo: com 2+ linhas ele da erro e devolve null, lido como "nao
+// existe", inserindo mais uma.
+// ----------------------------------------------------------------------------
+interface ServicoExistente {
+  id: string;
+  data_plano: string | null;
+  data_prevista: string | null;
+  status: string;
+}
+
+function difDias(a: string, b: string): number {
+  const ms = new Date(a + "T12:00:00Z").getTime() - new Date(b + "T12:00:00Z").getTime();
+  return Math.round(ms / 86400000);
+}
+
+// A coluna so existe depois da 0032. Enquanto ela nao rodar o codigo opera no
+// modo antigo (por data_prevista) em vez de quebrar a geracao inteira.
+let colunaDataPlano: boolean | null = null;
+async function temDataPlano(db: any): Promise<boolean> {
+  if (colunaDataPlano !== null) return colunaDataPlano;
+  const { error } = await db.from("servicos").select("data_plano").limit(1);
+  colunaDataPlano = !error;
+  return colunaDataPlano;
+}
+
+async function servicosDoPlano(
+  db: any, org: string, planoId: string, comColuna: boolean
+): Promise<ServicoExistente[]> {
+  const campos = comColuna ? "id,data_plano,data_prevista,status" : "id,data_prevista,status";
+  const { data } = await db
+    .from("servicos")
+    .select(campos)
+    .eq("org_id", org)
+    .eq("plano_id", planoId)
+    .in("status", ["pendente", "agendado", "executado"]);
+  return ((data as any[]) || []).map((x) => ({
+    id: x.id,
+    data_plano: (x.data_plano as string) ?? null,
+    data_prevista: (x.data_prevista as string) ?? null,
+    status: x.status as string,
+  }));
+}
+
+/**
+ * Este plano ja tem servico para esta data teorica?
+ *
+ * `tolerancia` cobre o legado: em servico antigo (sem data_plano) a unica data
+ * que sobrou e a da rota, que o alocador mexeu alguns dias. Dois servicos do
+ * mesmo plano colados assim sao copia, nao ida nova — a tolerancia e sempre
+ * menor que meio passo do ciclo, entao nunca engole uma passagem legitima.
+ */
+function jaTemServico(
+  lista: ServicoExistente[], alvo: string, tolerancia: number, statusValidos: string[]
+): boolean {
+  for (const s of lista) {
+    if (!statusValidos.includes(s.status)) continue;
+    if (s.data_plano && s.data_plano === alvo) return true;
+    if (!s.data_plano && s.data_prevista === alvo) return true;
+    const ref = s.data_plano || s.data_prevista;
+    if (ref && tolerancia > 0 && Math.abs(difDias(ref, alvo)) <= tolerancia) return true;
+  }
+  return false;
+}
+
+/** meia janela do passo do ciclo, no maximo 14 dias */
+function toleranciaDoPasso(passo: number): number {
+  return Math.max(0, Math.min(14, Math.floor((passo - 1) / 2)));
+}
+
+// ----------------------------------------------------------------------------
 // GERADOR: transforma planos recorrentes vencidos em serviços "pendente".
 // Avança o proximo_servico de cada plano. Avulso/por_data não entram.
 // ----------------------------------------------------------------------------
@@ -111,22 +191,18 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     }
     noHorizonte++;
 
+    const comColuna = await temDataPlano(db);
+    const existentes = await servicosDoPlano(db, org, (p as any).id, comColuna);
+    const tolerancia = toleranciaDoPasso(passo);
+
     while (prox <= limite && guarda < 60) {
       guarda++;
 
-      // evita duplicar: já existe serviço aberto desse plano nessa data?
-      const { data: existe } = await db
-        .from("servicos")
-        .select("id")
-        .eq("org_id", org)
-        .eq("plano_id", (p as any).id)
-        .eq("data_prevista", prox)
-        .in("status", ["pendente", "agendado"])
-        .maybeSingle();
-
-      if (existe) jaExistiam++;
-      if (!existe) {
-        const { error } = await db.from("servicos").insert({
+      // evita duplicar: ja existe servico aberto desse plano nesta data teorica?
+      if (jaTemServico(existentes, prox, tolerancia, ["pendente", "agendado"])) {
+        jaExistiam++;
+      } else {
+        const linha: any = {
           org_id: org,
           tumulo_id: (p as any).tumulo_id,
           plano_id: (p as any).id,
@@ -134,8 +210,21 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
           data_prevista: prox,
           status: "pendente",
           valor: (p as any).valor_vigente,
-        });
-        if (!error) criados++;
+        };
+        if (comColuna) linha.data_plano = prox;
+
+        const { error } = await db.from("servicos").insert(linha);
+        if (!error) {
+          criados++;
+          // entra na lista para as proximas voltas do laco enxergarem
+          existentes.push({
+            id: "novo", data_plano: comColuna ? prox : null,
+            data_prevista: prox, status: "pendente",
+          });
+        } else {
+          // o indice unico da 0032 barrou: ja existia mesmo
+          jaExistiam++;
+        }
       }
       prox = addDias(prox, passo);
     }
@@ -352,17 +441,20 @@ export async function gerarCalendarioMes(
       const data = opcoes?.dataAvulsos || fim;
       if (data < ini || data > fim) continue;
 
-      const { data: existe } = await db
-        .from("servicos").select("id")
-        .eq("org_id", org).eq("plano_id", p.id).eq("data_prevista", data)
-        .in("status", ["pendente", "agendado"]).maybeSingle();
-      if (existe) { jaExistiam++; continue; }
+      const comColunaA = await temDataPlano(db);
+      const existentesA = await servicosDoPlano(db, org, p.id, comColunaA);
+      if (jaTemServico(existentesA, data, 0, ["pendente", "agendado", "executado"])) {
+        jaExistiam++; continue;
+      }
 
-      const { error } = await db.from("servicos").insert({
+      const linhaA: any = {
         org_id: org, tumulo_id: p.tumulo_id, plano_id: p.id, cliente_id: p.cliente_id,
         data_prevista: data, status: "pendente", valor: p.valor_vigente, prioridade: 5,
-      });
-      if (!error) { criados++; avulsosIncluidos++; }
+      };
+      if (comColunaA) linhaA.data_plano = data;
+
+      const { error } = await db.from("servicos").insert(linhaA);
+      if (!error) { criados++; avulsosIncluidos++; } else jaExistiam++;
       continue;
     }
 
@@ -375,23 +467,34 @@ export async function gerarCalendarioMes(
     let guarda = 0;
     while (prox < ini && guarda < 400) { prox = addDias(prox, passo); guarda++; }
 
+    const comColuna = await temDataPlano(db);
+    const existentes = await servicosDoPlano(db, org, p.id, comColuna);
+    const tolerancia = toleranciaDoPasso(passo);
+
     let entrouNoMes = false;
     while (prox >= ini && prox <= fim && guarda < 400) {
       guarda++;
       entrouNoMes = true;
 
-      const { data: existe } = await db
-        .from("servicos").select("id")
-        .eq("org_id", org).eq("plano_id", p.id).eq("data_prevista", prox)
-        .in("status", ["pendente", "agendado", "executado"]).maybeSingle();
-
-      if (existe) jaExistiam++;
-      else {
-        const { error } = await db.from("servicos").insert({
+      if (jaTemServico(existentes, prox, tolerancia, ["pendente", "agendado", "executado"])) {
+        jaExistiam++;
+      } else {
+        const linha: any = {
           org_id: org, tumulo_id: p.tumulo_id, plano_id: p.id, cliente_id: p.cliente_id,
           data_prevista: prox, status: "pendente", valor: p.valor_vigente,
-        });
-        if (!error) criados++;
+        };
+        if (comColuna) linha.data_plano = prox;
+
+        const { error } = await db.from("servicos").insert(linha);
+        if (!error) {
+          criados++;
+          existentes.push({
+            id: "novo", data_plano: comColuna ? prox : null,
+            data_prevista: prox, status: "pendente",
+          });
+        } else {
+          jaExistiam++;
+        }
       }
       prox = addDias(prox, passo);
     }

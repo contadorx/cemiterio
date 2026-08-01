@@ -14,17 +14,48 @@ export interface ClienteRow {
   instrucoes_ia: string | null;
 }
 
+const CAMPOS_CLIENTE =
+  "id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia,tratamento,regua_cobranca,orientacao_cobranca";
+
 // Acha o cliente pelo telefone dentro da org. É a allowlist:
 // telefone que não bater aqui = sem cliente = IA fica muda.
+//
+// Duas portas, nesta ordem:
+//   1) clientes.telefone      — o número principal da família;
+//   2) telefones_cliente      — os outros aparelhos da mesma família (marido,
+//      filho, comercial). É assim que o "vincular lead a cliente existente"
+//      não vira lead de novo na mensagem seguinte.
+// Se a tabela ainda não existe (migration 0033 não rodada), a segunda porta
+// simplesmente não encontra nada — nada quebra.
 export async function acharCliente(telefone: string): Promise<ClienteRow | null> {
   const db = supabaseAdmin();
+  const org = env.orgId();
+
   const { data } = await db
     .from("clientes")
-    .select("id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia,tratamento,regua_cobranca,orientacao_cobranca")
-    .eq("org_id", env.orgId())
+    .select(CAMPOS_CLIENTE)
+    .eq("org_id", org)
     .eq("telefone", telefone)
     .maybeSingle();
-  return (data as ClienteRow) || null;
+  if (data) return data as ClienteRow;
+
+  const { data: extra, error: erroExtra } = await db
+    .from("telefones_cliente")
+    .select("cliente_id")
+    .eq("org_id", org)
+    .eq("telefone", telefone)
+    .limit(1);
+  if (erroExtra) return null;               // tabela ausente = modo antigo
+  const clienteId = ((extra as any[]) || [])[0]?.cliente_id as string | undefined;
+  if (!clienteId) return null;
+
+  const { data: cli } = await db
+    .from("clientes")
+    .select(CAMPOS_CLIENTE)
+    .eq("org_id", org)
+    .eq("id", clienteId)
+    .maybeSingle();
+  return (cli as ClienteRow) || null;
 }
 
 function formatarData(d?: string | null): string | null {

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { env } from "@/lib/env";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
 import { consumirMaterial } from "@/lib/consumo";
+import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: serv } = await db
     .from("servicos")
-    .select("id,status,cliente_id,tumulo_id,valor,plano_id,planos(momento_cobranca)")
+    .select("id,status,cliente_id,tumulo_id,valor,plano_id,executora_id,planos(momento_cobranca,cadencia)")
     .eq("org_id", org).eq("id", servicoId).maybeSingle();
   if (!serv) return NextResponse.json({ ok: false, erro: "servico_nao_encontrado" }, { status: 404 });
   if ((serv as any).status === "executado") {
@@ -76,6 +77,21 @@ export async function POST(req: NextRequest) {
       });
       debitou = true;
     }
+  }
+
+  // remuneracao da executora deste servico (0031). Concluido pelo painel, a
+  // executora e quem estava na escala — nao quem clicou. Se ninguem estiver
+  // marcado, o painel pode informar b.executoraId.
+  const quem = b?.executoraId || (serv as any).executora_id || null;
+  if (quem) {
+    if (!(serv as any).executora_id) {
+      await db.from("servicos").update({ executora_id: quem }).eq("id", servicoId);
+    }
+    await carimbarRemuneracao(db, {
+      servicoId, orgId: org, executoraId: quem,
+      receita: Number((serv as any).valor) || 0,
+      avulso: ehAvulso(serv as any),
+    });
   }
 
   const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));

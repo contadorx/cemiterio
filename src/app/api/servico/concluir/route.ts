@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
 import { consumirMaterial } from "@/lib/consumo";
+import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,20 +39,34 @@ export async function POST(req: NextRequest) {
   const inicio = (antes as any)?.iniciado_em ? new Date((antes as any).iniciado_em).getTime() : null;
   const duracao = inicio ? Math.max(1, Math.round((Date.now() - inicio) / 60000)) : null;
 
+  // COMO ESTA FAMILIA PAGA (corrige a divergencia apontada na entrega 15):
+  // esta porta debitava sempre, mesmo em plano pre-pago — a familia que pagou
+  // adiantado era cobrada duas vezes. Agora as duas portas (campo e painel)
+  // leem o momento_cobranca do plano e se comportam igual.
+  const { data: planoCob } = await db
+    .from("servicos")
+    .select("planos(momento_cobranca)")
+    .eq("id", servicoId)
+    .maybeSingle();
+  const momento = ((planoCob as any)?.planos?.momento_cobranca as string) || "depois";
+  const agoraIso = new Date().toISOString();
+
   // marca executado (idempotente: só transiciona se ainda não executado)
   const { data: serv, error } = await db
     .from("servicos")
     .update({
       status: "executado",
-      data_executada: new Date().toISOString(),
+      data_executada: agoraIso,
       duracao_minutos: duracao,
       foto_depois_url: urlDepois,
       foto_antes_url: urlAntes,
       executora_id: auth.userId,
+      // no "contra_foto" e a entrega que libera a cobranca
+      ...(momento === "contra_foto" ? { cobranca_liberada_em: agoraIso } : {}),
     })
     .eq("id", servicoId)
     .neq("status", "executado")
-    .select("org_id,tumulo_id,cliente_id,valor,plano_id")
+    .select("org_id,tumulo_id,cliente_id,valor,plano_id,executora_id,planos(cadencia)")
     .maybeSingle();
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
@@ -65,7 +80,8 @@ export async function POST(req: NextRequest) {
   const clienteId = (serv as any).cliente_id as string | null;
 
   // ----- A1: débito no razão (idempotente por servico_id) -----
-  if (clienteId) {
+  // momento "antes" = pre-pago: a familia ja pagou, nao debita de novo.
+  if (clienteId && momento !== "antes") {
     let valor = Number((serv as any).valor) || 0;
     if (!valor && (serv as any).plano_id) {
       const { data: plano } = await db
@@ -118,6 +134,16 @@ export async function POST(req: NextRequest) {
       p_origem: "conclusao",
     }).then(() => null, () => null);
   }
+
+  // quanto ESTA lavagem vale para quem executou, congelado agora (0031).
+  // Nao derruba a conclusao se a regra ainda nao existir.
+  await carimbarRemuneracao(db, {
+    servicoId,
+    orgId,
+    executoraId: auth.userId,
+    receita: Number((serv as any).valor) || 0,
+    avulso: ehAvulso(serv as any),
+  });
 
   const aviso = await notificarFamilia(servicoId, urlDepois);
   const notificado = aviso.enviado;

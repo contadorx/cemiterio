@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
-import { converterLead } from "@/lib/leads";
+import { converterLead, vincularLeadACliente } from "@/lib/leads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ ok: true, lead: data });
 }
 
-// POST { acao: 'converter', nome } -> cria o cliente com o telefone do lead
+// POST { acao: 'converter', nome }              -> cria cliente novo
+// POST { acao: 'vincular', clienteId, rotulo }  -> liga a uma familia que ja existe
 // POST { acao: 'descartar' }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await exigirAdmin();
@@ -41,6 +42,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const r = await converterLead(db, org, params.id, body?.nome);
     if (!r.ok) return NextResponse.json({ ok: false, erro: r.erro }, { status: 500 });
+    return NextResponse.json({ ok: true, clienteId: r.clienteId, jaEra: r.jaEra });
+  }
+
+  if (acao === "vincular") {
+    const clienteId = String(body?.clienteId || "");
+    if (!clienteId) {
+      return NextResponse.json({ ok: false, erro: "sem_cliente" }, { status: 400 });
+    }
+    const org = await orgAtual(db);
+    if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
+
+    const r = await vincularLeadACliente(db, org, params.id, clienteId, body?.rotulo);
+    if (!r.ok) return NextResponse.json({ ok: false, erro: r.erro }, { status: 400 });
     return NextResponse.json({ ok: true, clienteId: r.clienteId, jaEra: r.jaEra });
   }
 

@@ -97,7 +97,9 @@ export default function Thread() {
                 </span>
               )}
               {m.texto}
-                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{m.autor}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
+                  {m.pelo_celular ? "você · pelo celular" : m.autor}
+                </div>
               </span>
             </div>
           ))}

@@ -3,8 +3,9 @@ import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 
 // Uma mensagem da thread do lead. Sem `de` = veio do lead (entrada).
-// `de: "nos"` = resposta que a Sureya mandou pelo app (saída).
-export type MsgLead = { t?: string; texto: string; de?: "nos" };
+// `de: "nos"` = resposta nossa (saída). `via: "celular"` = ela digitou no
+// aparelho, não no painel — capturada pelo webhook.
+export type MsgLead = { t?: string; texto: string; de?: "nos"; via?: "celular" };
 
 export type ResultadoConversao =
   | { ok: true; clienteId: string; jaEra?: boolean }
@@ -85,6 +86,114 @@ export async function converterLead(
     }
   } catch (e) {
     console.error("[converterLead] histórico não migrou:", (e as any)?.message || e);
+  }
+
+  await db.from("leads").update({ status: "convertido", cliente_id: clienteId }).eq("id", leadId);
+  return { ok: true, clienteId };
+}
+
+/**
+ * VINCULA o lead a uma família que JÁ EXISTE.
+ *
+ * Diferente do converterLead: aqui não nasce cliente nenhum. É o caso da
+ * família que já está na carteira e escreveu de outro aparelho (o do marido, o
+ * do filho, o comercial) — o sistema não reconheceu o número e abriu um lead.
+ *
+ * Faz três coisas:
+ *  1. leva a conversa do lead para a conversa aberta daquela família (ou abre
+ *     uma), preservando quem escreveu o quê;
+ *  2. GUARDA O NÚMERO em telefones_cliente. Sem isso o vínculo valeria uma vez
+ *     só: na mensagem seguinte o número voltaria a cair como lead;
+ *  3. marca o lead como convertido e aponta para o cliente.
+ *
+ * Idempotente: lead já vinculado devolve o cliente que já estava lá.
+ */
+export async function vincularLeadACliente(
+  db: SupabaseClient,
+  org: string,
+  leadId: string,
+  clienteId: string,
+  rotulo?: string
+): Promise<ResultadoConversao> {
+  const { data: lead } = await db
+    .from("leads")
+    .select("id,telefone,nome,nome_wa,contexto,mensagens,cliente_id,status")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (!lead) return { ok: false, erro: "nao_encontrado" };
+  if ((lead as any).cliente_id) {
+    return { ok: true, clienteId: (lead as any).cliente_id, jaEra: true };
+  }
+
+  const { data: cli } = await db
+    .from("clientes")
+    .select("id,telefone")
+    .eq("org_id", org)
+    .eq("id", clienteId)
+    .maybeSingle();
+  if (!cli) return { ok: false, erro: "cliente_nao_encontrado" };
+
+  const telefone = ((lead as any).telefone as string) || "";
+
+  // 1) o número passa a pertencer a esta família
+  if (telefone && telefone !== (cli as any).telefone) {
+    const { error } = await db.from("telefones_cliente").insert({
+      org_id: org,
+      cliente_id: clienteId,
+      telefone,
+      rotulo: rotulo || (lead as any).nome_wa || null,
+    });
+    // duplicado (número já de outra família) ou tabela ausente: não derruba o
+    // vínculo, mas avisa no log — é o único ponto que exige a migration 0033.
+    if (error) console.error("[vincularLead] telefone não guardado:", error.message);
+  }
+
+  // 2) a conversa vai junto (best-effort)
+  try {
+    const msgs: MsgLead[] = Array.isArray((lead as any).mensagens) ? (lead as any).mensagens : [];
+    if (msgs.length) {
+      const { data: aberta } = await db
+        .from("conversas")
+        .select("id")
+        .eq("org_id", org)
+        .eq("cliente_id", clienteId)
+        .eq("aberta", true)
+        .maybeSingle();
+      let conversaId = (aberta as any)?.id as string | undefined;
+      if (!conversaId) {
+        const { data: nova } = await db
+          .from("conversas")
+          .insert({ org_id: org, cliente_id: clienteId, aberta: true })
+          .select("id")
+          .single();
+        conversaId = (nova as any)?.id;
+      }
+      if (conversaId) {
+        const linhas = msgs
+          .filter((m) => m && m.texto)
+          .map((m) => ({
+            org_id: org,
+            conversa_id: conversaId,
+            cliente_id: clienteId,
+            direcao: m.de === "nos" ? "saida" : "entrada",
+            autor: m.de === "nos" ? "humano" : "cliente",
+            texto: m.texto,
+            processada: true, // já é histórico: a IA não reprocessa
+            pelo_celular: m.via === "celular",
+          }));
+        if (linhas.length) {
+          const { error } = await db.from("mensagens").insert(linhas);
+          if (error) {
+            // coluna pelo_celular ainda não existe (0033 não rodou)
+            await db.from("mensagens").insert(
+              linhas.map(({ pelo_celular, ...resto }) => resto)
+            );
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[vincularLead] histórico não migrou:", (e as any)?.message || e);
   }
 
   await db.from("leads").update({ status: "convertido", cliente_id: clienteId }).eq("id", leadId);

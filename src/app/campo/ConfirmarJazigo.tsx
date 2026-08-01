@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 
 /**
- * Confirmação de que a ajudante está no jazigo certo.
- * O QR da plaqueta é o jeito mais seguro — mas ela PODE seguir sem, porque a
- * plaqueta pode ter caído, sujado ou o jazigo ainda não ter uma.
+ * Confirmação de que a ajudante está no jazigo certo — e a FOTO DO ANTES.
+ *
+ * O QR da plaqueta é o jeito mais seguro de confirmar — mas ela PODE seguir sem,
+ * porque a plaqueta pode ter caído, sujado ou o jazigo ainda não ter uma.
+ *
+ * A foto do "antes" era pedida lá no fim, junto da foto do depois, e marcada
+ * como opcional: na prática nunca era tirada, porque no fim o jazigo já está
+ * limpo. Agora ela é o caminho natural do "Começar" — o botão principal é
+ * tirar a foto. Seguir sem foto continua possível (câmera falha, mão suja),
+ * mas virou a exceção, escrita em letra pequena.
  */
 export default function ConfirmarJazigo({
   servicoId, jazigo, tokenEsperado, fotoReferencia, onConfirmado, onFechar,
@@ -14,11 +22,13 @@ export default function ConfirmarJazigo({
   jazigo: string;
   tokenEsperado: string | null;
   fotoReferencia: string | null;
-  onConfirmado: (comoConfirmou: "qr" | "visual") => void;
+  onConfirmado: (foto: FotoPronta | null, comoConfirmou: "qr" | "visual") => void;
   onFechar: () => void;
 }) {
   const [lendo, setLendo] = useState(false);
   const [erro, setErro] = useState("");
+  const [antes, setAntes] = useState<FotoPronta | null>(null);
+  const refAntes = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -49,7 +59,7 @@ export default function ConfirmarJazigo({
             const valor = String(codigos[0].rawValue || "");
             streamRef.current.getTracks().forEach((t) => t.stop());
             setLendo(false);
-            if (tokenEsperado && valor.includes(tokenEsperado)) onConfirmado("qr");
+            if (tokenEsperado && valor.includes(tokenEsperado)) onConfirmado(antes, "qr");
             else setErro("Esse QR é de outro jazigo. Confira se está no lugar certo.");
             return;
           }
@@ -98,11 +108,54 @@ export default function ConfirmarJazigo({
           </div>
         )}
 
-        <button style={s.botaoSeguir} onClick={() => onConfirmado("visual")}>
-          Sim, é este — seguir
+        <input
+          ref={refAntes}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setErro("");
+            try {
+              setAntes(await prepararFoto(f));
+            } catch (err) {
+              setErro(motivoFalha(err));
+            }
+          }}
+        />
+
+        {antes && (
+          <div style={{ marginTop: 14 }}>
+            <p style={s.dica}>Foto do antes:</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={antes.previa} alt="antes" style={s.foto} />
+          </div>
+        )}
+
+        <button
+          style={{ ...s.botaoSeguir, ...(antes ? s.botaoOk : {}) }}
+          onClick={() => (antes ? onConfirmado(antes, "visual") : refAntes.current?.click())}
+        >
+          {antes ? "Começar a limpeza" : "📷 Tirar a foto do antes e começar"}
         </button>
+
+        {antes ? (
+          <button style={s.botaoRefazer} onClick={() => refAntes.current?.click()}>
+            Tirar outra
+          </button>
+        ) : (
+          <button style={s.botaoSemFoto} onClick={() => onConfirmado(null, "visual")}>
+            Começar sem a foto
+          </button>
+        )}
+
         <p style={s.rodape}>
-          Se a plaqueta estiver faltando ou suja, pode seguir assim mesmo.
+          A foto do antes é o par da foto do fim — é ela que mostra à família o
+          trabalho que foi feito. Se a plaqueta estiver faltando ou suja, pode
+          seguir assim mesmo.
         </p>
       </div>
     </div>
@@ -122,5 +175,8 @@ const s: Record<string, React.CSSProperties> = {
   foto: { width: "100%", borderRadius: 12, maxHeight: 220, objectFit: "cover" },
   botaoQr: { width: "100%", minHeight: 60, padding: 17, background: "#12284b", color: "#fff", border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer" },
   botaoSeguir: { width: "100%", minHeight: 60, padding: 17, background: TEAL, color: "#fff", border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer", marginTop: 14 },
+  botaoOk: { background: "#166534" },
+  botaoSemFoto: { width: "100%", minHeight: 50, padding: 12, background: "none", border: "none", color: "#475569", fontSize: 16, textDecoration: "underline", cursor: "pointer", marginTop: 10 },
+  botaoRefazer: { width: "100%", minHeight: 50, padding: 12, background: "#fff", border: "2px solid #e7e0cf", color: "#475569", borderRadius: 12, fontSize: 16, cursor: "pointer", marginTop: 10 },
   rodape: { color: "#475569", fontSize: 18, textAlign: "center", marginTop: 8 },
 };

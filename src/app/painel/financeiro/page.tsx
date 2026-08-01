@@ -6,6 +6,7 @@ import { PainelNav, painel, cor } from "../ui";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
+import Remuneracao from "./Remuneracao";
 
 interface Comp {
   id: string;
@@ -20,12 +21,13 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "gestao" | "conferir" | "equipe" | "jazigos" | "reajustes";
+type AbaFin = "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
   ["gestao", "Gestão do negócio"],
   ["conferir", "Conferir entradas"],
   ["equipe", "Conta da equipe"],
+  ["pagamento", "Pagamento da equipe"],
   ["jazigos", "Resultado por jazigo"],
   ["reajustes", "Reajustes"],
 ];
@@ -64,6 +66,7 @@ export default function Financeiro() {
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}
         {aba === "equipe" && <Equipe />}
+        {aba === "pagamento" && <Remuneracao />}
         {aba === "jazigos" && <PorJazigo />}
         {aba === "reajustes" && <Reajustes />}
       </div>

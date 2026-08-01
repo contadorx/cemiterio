@@ -7,7 +7,8 @@ import { concluirOuEnfileirar } from "@/lib/offline-fila";
 
 /**
  * FINALIZAR a lavagem: foto do depois, confirmação de local e envio.
- * A foto do "antes" agora é tirada no Começar, então aqui é opcional.
+ * A foto do "antes" é tirada no Começar (ConfirmarJazigo). Aqui ela só aparece
+ * confirmada — tirar de novo agora seria fotografar o jazigo já limpo.
  */
 export default function Concluir({
   item,
@@ -192,8 +193,17 @@ export default function Concluir({
           onChange={async (e) => e.target.files?.[0] && setEnquadramento(await lerArquivo(e.target.files[0]))}
         />
 
-        <button style={{ ...s.fotoBtn, ...(antes ? s.fotoOk : {}) }} onClick={() => refAntes.current?.click()}>
-          {antes ? "✓ Foto do antes" : "📷 Foto do antes (opcional)"}
+        {/* a foto do antes normalmente ja foi tirada no "Comecar"; aqui so
+            confirmamos, para ela nao tirar de novo com o jazigo ja limpo */}
+        <button
+          style={{ ...s.fotoBtn, ...(antes || item.fotoAntes ? s.fotoOk : {}) }}
+          onClick={() => refAntes.current?.click()}
+        >
+          {antes
+            ? "✓ Foto do antes (nova)"
+            : item.fotoAntes
+              ? "✓ Foto do antes já tirada — tocar para trocar"
+              : "📷 Foto do antes (opcional)"}
         </button>
         <button style={{ ...s.fotoBtn, ...(depois ? s.fotoOk : {}) }} onClick={() => refDepois.current?.click()}>
           {depois ? "✓ Foto do depois" : "📷 Foto do depois"}

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   let q = db
     .from("servicos")
     .select(
-      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
+      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,foto_antes_url,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
     )
     .eq("data_prevista", data)
     .in("status", ["pendente", "agendado", "executado"]);
@@ -51,6 +51,9 @@ export async function GET(req: NextRequest) {
     gpsPrecisao: s.tumulos?.gps_precisao ?? null,
     gpsAmostras: s.tumulos?.gps_amostras ?? 0,
     fotoReferencia: s.tumulos?.foto_referencia_url || null,
+    // foto do "antes" DESTE servico (nao a do cadastro do jazigo): existe
+    // quando a ajudante ja apertou Comecar e tirou a foto
+    fotoAntes: s.foto_antes_url || null,
     fotoEnquadramento: s.tumulos?.foto_enquadramento_url || null,
     rua: s.tumulos?.rua || "",
     numero: s.tumulos?.numero || "",

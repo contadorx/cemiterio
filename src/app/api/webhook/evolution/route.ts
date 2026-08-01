@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { normalizarTelefone } from "@/lib/evolution";
 import { registrarEntrada, aguardarEProcessar } from "@/lib/atendimento";
 import { tratarLead } from "@/lib/leads";
+import { registrarSaidaExterna } from "@/lib/espelho";
 import { transcreverAudio } from "@/lib/transcricao";
 import { avisarMensagemNova } from "@/lib/push";
 import { baixarMidiaBase64 } from "@/lib/evolution";
@@ -94,7 +95,6 @@ export async function POST(req: NextRequest) {
 
   const p = parsePayload(body);
   if (!p) return NextResponse.json({ ok: true, ignorado: "sem_mensagem" });
-  if (p.fromMe) return NextResponse.json({ ok: true, ignorado: "propria" });
   if (p.ehGrupo) return NextResponse.json({ ok: true, ignorado: "grupo" });
   if (!p.texto && !p.temMidia && !p.temAudio)
     return NextResponse.json({ ok: true, ignorado: "vazio" });
@@ -102,6 +102,19 @@ export async function POST(req: NextRequest) {
   try {
     if (p.msgId && (await eventoJaVisto(p.msgId))) {
       return NextResponse.json({ ok: true, ignorado: "duplicado" });
+    }
+
+    // SAIDA: o que ela digitou direto no celular. Antes isso era descartado e
+    // o painel mostrava so metade da conversa. Agora vira mensagem de saida na
+    // conversa da familia (ou na thread do lead que ja existe).
+    if (p.fromMe) {
+      const esp = await registrarSaidaExterna({
+        telefone: p.telefone,
+        texto: p.texto,
+        temMidia: p.temMidia,
+        temAudio: p.temAudio,
+      });
+      return NextResponse.json({ ok: true, resultado: "saida", espelho: esp.tipo });
     }
 
     // ÁUDIO: transcreve antes de registrar, para a conversa já nascer com o texto.

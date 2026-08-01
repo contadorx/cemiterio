@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../../ui";
 
-interface MsgLead { t?: string; texto: string; de?: "nos" }
+interface MsgLead { t?: string; texto: string; de?: "nos"; via?: "celular" }
+interface ClienteBusca { id: string; nome: string; telefone: string | null }
 
 export default function LeadThread() {
   const params = useParams();
@@ -17,6 +18,10 @@ export default function LeadThread() {
   const [texto, setTexto] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [pensando, setPensando] = useState(false);
+  const [abrirVinculo, setAbrirVinculo] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [achados, setAchados] = useState<ClienteBusca[]>([]);
+  const [buscando, setBuscando] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
 
   async function carregar() {
@@ -60,6 +65,39 @@ export default function LeadThread() {
     setOcupado(false);
     if (r?.ok && r.clienteId) router.push(`/painel/clientes/${r.clienteId}`);
     else alert("Não consegui converter: " + (r?.erro || "erro"));
+  }
+
+  // busca de família com debounce — não dispara a cada tecla
+  useEffect(() => {
+    if (!abrirVinculo) return;
+    const q = busca.trim();
+    if (q.length < 2) { setAchados([]); return; }
+    let vivo = true;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      const r = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q)}`)
+        .then((x) => x.json()).catch(() => null);
+      if (!vivo) return;
+      setBuscando(false);
+      setAchados(r?.ok ? r.clientes : []);
+    }, 300);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [busca, abrirVinculo]);
+
+  async function vincular(c: ClienteBusca) {
+    if (!confirm(
+      `Vincular esta conversa a ${c.nome}?\n\n` +
+      `O histórico vai para a conversa dessa família e o número ${lead.telefone} passa a ser reconhecido como dela — ` +
+      `a próxima mensagem deste aparelho não vira lead de novo.`
+    )) return;
+    setOcupado(true);
+    const r = await fetch(`/api/leads/${id}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "vincular", clienteId: c.id }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok && r.clienteId) router.push(`/painel/clientes/${r.clienteId}`);
+    else alert("Não consegui vincular: " + (r?.erro || "erro"));
   }
 
   async function patch(corpo: Record<string, any>, sair?: boolean) {
@@ -158,7 +196,7 @@ export default function LeadThread() {
                                background: nosso ? "#1e293b" : "#e2e8f0", color: nosso ? "#fff" : cor.navy, fontSize: 14 }}>
                   {m.texto}
                   {m.t && <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
-                    {nosso ? "nós" : "lead"} · {new Date(m.t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    {nosso ? (m.via === "celular" ? "você · pelo celular" : "nós") : "lead"} · {new Date(m.t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </div>}
                 </span>
               </div>
@@ -188,10 +226,52 @@ export default function LeadThread() {
           </div>
         )}
 
+        {/* vincular a uma família que já existe */}
+        {abrirVinculo && !convertido && (
+          <div style={{ ...painel.card, marginTop: 14, borderLeft: `4px solid ${cor.teal}` }}>
+            <div style={painel.rotulo}>Vincular a uma família da carteira</div>
+            <p style={{ margin: "0 0 8px", fontSize: 13, color: cor.cinza }}>
+              Para quando a família já é sua e escreveu de outro aparelho. O histórico entra na
+              conversa dela e este número passa a ser reconhecido — não vira lead de novo.
+            </p>
+            <input
+              style={{ ...painel.input, width: "100%" }}
+              placeholder="Nome ou telefone da família…"
+              value={busca}
+              autoFocus
+              onChange={(e) => setBusca(e.target.value)}
+            />
+            <div style={{ marginTop: 8 }}>
+              {buscando && <p style={{ fontSize: 13, color: cor.cinza, margin: 0 }}>Procurando…</p>}
+              {!buscando && busca.trim().length >= 2 && achados.length === 0 && (
+                <p style={{ fontSize: 13, color: cor.cinza, margin: 0 }}>
+                  Nenhuma família com esse nome. Se ela ainda não está na carteira, use
+                  “Transformar em cliente”.
+                </p>
+              )}
+              {achados.map((c) => (
+                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                                         gap: 8, padding: "8px 0", borderBottom: `1px solid ${cor.linha}` }}>
+                  <div>
+                    <div style={{ color: cor.navy, fontWeight: 600, fontSize: 14 }}>{c.nome}</div>
+                    <div style={{ color: cor.cinza, fontSize: 13 }}>{c.telefone || "sem telefone"}</div>
+                  </div>
+                  <button style={painel.botaoMini} onClick={() => vincular(c)} disabled={ocupado}>Vincular</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ações do lead */}
         <div style={{ ...painel.card, marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!convertido && (
-            <button style={painel.botao} onClick={converter} disabled={ocupado}>Transformar em cliente</button>
+            <>
+              <button style={painel.botao} onClick={converter} disabled={ocupado}>Transformar em cliente</button>
+              <button style={painel.botaoSec} onClick={() => setAbrirVinculo((v) => !v)} disabled={ocupado}>
+                🔗 Vincular a família existente
+              </button>
+            </>
           )}
           {!lead.ignorado && lead.status !== "em_conversa" && !convertido && (
             <button style={painel.botaoSec} onClick={() => patch({ status: "em_conversa" })} disabled={ocupado}>Marcar “em conversa”</button>

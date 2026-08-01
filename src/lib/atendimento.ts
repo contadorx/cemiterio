@@ -40,7 +40,7 @@ interface SaidaIa {
   motivo: string;
 }
 
-async function garantirConversa(
+export async function garantirConversa(
   clienteId: string
 ): Promise<{ id: string; escalada: boolean; ultimaEntrada: string | null }> {
   const db = supabaseAdmin();

@@ -18,8 +18,25 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .maybeSingle();
   if (!conv) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
 
-  const [{ data: msgs }, { data: rasc }] = await Promise.all([
-    db.from("mensagens").select("autor,direcao,texto,transcrita,created_at").eq("conversa_id", id).order("created_at", { ascending: true }),
+  // pelo_celular so existe depois da migration 0033. Sem o fallback, a conversa
+  // inteira sumiria da tela ate a migration rodar.
+  async function carregarMensagens() {
+    const r = await db
+      .from("mensagens")
+      .select("autor,direcao,texto,transcrita,pelo_celular,created_at")
+      .eq("conversa_id", id)
+      .order("created_at", { ascending: true });
+    if (!r.error) return r.data;
+    const r2 = await db
+      .from("mensagens")
+      .select("autor,direcao,texto,transcrita,created_at")
+      .eq("conversa_id", id)
+      .order("created_at", { ascending: true });
+    return r2.data;
+  }
+
+  const [msgs, { data: rasc }] = await Promise.all([
+    carregarMensagens(),
     db.from("interacoes_ia").select("id,rascunho,assunto,motivo_retencao").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
