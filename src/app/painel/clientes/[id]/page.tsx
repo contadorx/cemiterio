@@ -337,6 +337,8 @@ export default function FichaCliente() {
 
         <BarraSalvar pendencias={pendencias} salvando={salvandoTudo} onSalvarTudo={salvarTudo} />
 
+        <LimpezaAvulsa tumulos={d.tumulos || []} onCriado={carregar} />
+
         <Extras clienteId={id} tumulos={d.tumulos || []} onMudou={carregar} />
 
         <RegistrarPagamento clienteId={id} nome={c.nome} onSalvo={carregar} />
@@ -2058,6 +2060,132 @@ function AdicionarTumulo({
         for mesmo desconhecida: o sistema só reconhece dois registros como o mesmo túmulo
         quando estão na mesma quadra — o que está em “S/Q” pode virar cópia do que a
         equipe capturou no campo. Sem plano agora? Deixe “Definir depois”.
+      </p>
+    </div>
+  );
+}
+
+
+/**
+ * LIMPEZA AVULSA — a porta de entrada que faltava.
+ *
+ * Serviço esporádico chega por qualquer canal: telefonema, alguém que passou no
+ * cemitério e pediu ali mesmo, você lembrando de uma data. Até aqui só havia
+ * dois caminhos, e nenhum servia:
+ *   · plano com cadência "avulso" + "incluir avulsos" na agenda — isso é
+ *     CAMPANHA EM LOTE (Finados, Dia das Mães), joga a mesma data em todo mundo;
+ *   · o pedido nascido numa conversa de WhatsApp (0035) — só cobre quem pediu
+ *     por mensagem.
+ *
+ * Aqui é uma limpeza, um jazigo, uma data. Nasce fora de plano (avulso),
+ * pendente — que é como o alocador da agenda enxerga e o app de campo recebe.
+ */
+function LimpezaAvulsa({ tumulos, onCriado }:
+  { tumulos: any[]; onCriado: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [tumuloId, setTumuloId] = useState<string>(tumulos.length === 1 ? tumulos[0].id : "");
+  const [data, setData] = useState("");
+  const [valor, setValor] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [feito, setFeito] = useState("");
+
+  async function criar() {
+    setErro("");
+    if (!tumuloId) return setErro("Escolha o jazigo.");
+    if (!data) return setErro("Escolha até quando a limpeza precisa estar feita.");
+    setSalvando(true);
+    const r = await fetch("/api/servico", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tumuloId,
+        dataPrevista: data,
+        valor: valor === "" ? null : Number(String(valor).replace(",", ".")),
+        observacao,
+      }),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) {
+      setFeito("Limpeza marcada. Entra na próxima geração da agenda.");
+      setValor(""); setObservacao(""); setData("");
+      setAberto(false);
+      onCriado();
+      setTimeout(() => setFeito(""), 6000);
+    } else {
+      setErro(r?.mensagem || r?.erro || "Não consegui marcar.");
+    }
+  }
+
+  if (tumulos.length === 0) return null;
+
+  if (!aberto) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <button style={painel.botaoSec} onClick={() => setAberto(true)}>
+          🧽 Nova limpeza avulsa
+        </button>
+        {feito && (
+          <p style={{ color: "#166534", fontSize: 14, margin: "8px 0 0" }}>{feito}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...painel.card, borderLeft: `4px solid ${cor.teal}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong style={{ color: cor.navy }}>Nova limpeza avulsa</strong>
+        <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer",
+                         color: cor.cinza }} onClick={() => { setAberto(false); setErro(""); }}>✕</button>
+      </div>
+      <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0" }}>
+        Um serviço fora do plano, para esta família. Serve para o que foi pedido por
+        telefone, na porta do cemitério ou em qualquer conversa.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <label style={painel.rotulo}>Jazigo</label>
+          <select style={painel.input} value={tumuloId} onChange={(e) => setTumuloId(e.target.value)}>
+            <option value="">escolha…</option>
+            {tumulos.map((t: any) => (
+              <option key={t.id} value={t.id}>
+                {t.identificacao}{t.falecido ? ` — ${t.falecido}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={painel.rotulo}>Fazer até</label>
+          <input type="date" style={{ ...painel.input, width: 165 }} value={data}
+                 onChange={(e) => setData(e.target.value)} />
+        </div>
+        <div>
+          <label style={painel.rotulo}>Valor (R$)</label>
+          <input style={{ ...painel.input, width: 120 }} value={valor}
+                 onChange={(e) => setValor(e.target.value)} placeholder="opcional" />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <label style={painel.rotulo}>Recado para quem vai executar</label>
+        <input style={painel.input} value={observacao}
+               onChange={(e) => setObservacao(e.target.value)}
+               placeholder="ex.: pediu pessoalmente aqui, é o pai dela, Dia dos Pais — mandar foto" />
+      </div>
+
+      {erro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "10px 0 0" }}>{erro}</p>}
+
+      <button style={{ ...painel.botao, marginTop: 12 }} onClick={criar} disabled={salvando}>
+        {salvando ? "Marcando…" : "Marcar limpeza"}
+      </button>
+
+      <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
+        Nasce <b>pendente e fora de plano</b>: a próxima geração da agenda encaixa no dia
+        e o app de campo recebe. O valor pode ficar vazio se você ainda não decidiu — o
+        que não pode é o pedido sumir.
       </p>
     </div>
   );

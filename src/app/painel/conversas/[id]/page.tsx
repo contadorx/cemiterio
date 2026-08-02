@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
+import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
 
 export default function Thread() {
   const params = useParams();
@@ -12,6 +13,7 @@ export default function Thread() {
   const [rascText, setRascText] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
+  const [versaoPedidos, setVersaoPedidos] = useState(0);
 
   async function carregar() {
     const r = await fetch(`/api/conversas/${id}`).then((x) => x.json());
@@ -85,6 +87,9 @@ export default function Thread() {
           {d.conversa.escalada ? "Você está atendendo — a IA não responde." : "A IA está atendendo (rascunhos aparecem aqui)."}
         </p>
 
+        {/* pedido de servico adicional feito nesta conversa */}
+        <PedidosAdicionais key={versaoPedidos} conversaId={id} />
+
         <div style={{ ...painel.card, maxHeight: 420, overflowY: "auto" }}>
           {d.mensagens.length === 0 && <p style={{ color: cor.cinza }}>Sem mensagens ainda.</p>}
           {(d.mensagens || []).map((m: any, i: number) => (
@@ -150,6 +155,14 @@ export default function Thread() {
             </span>
           </div>
         </div>
+        <div style={{ marginTop: 12 }}>
+          <AnotarPedido
+            conversaId={id}
+            clienteId={d.conversa.clienteId || null}
+            aoPronto={() => setVersaoPedidos((v) => v + 1)}
+          />
+        </div>
+
         <MeAjuda conversaId={id} onEscolher={(t) => setTexto(t)} />
       </div>
     </div>

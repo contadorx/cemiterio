@@ -38,6 +38,11 @@ interface SaidaIa {
   precisa_humano: boolean;
   confianca: "alta" | "media" | "baixa";
   motivo: string;
+  // pedido de serviço ADICIONAL detectado na conversa (fora do plano)
+  pedido?: boolean;
+  pedido_resumo?: string;
+  pedido_prazo?: string;
+  pedido_ocasiao?: string;
 }
 
 export async function garantirConversa(
@@ -343,8 +348,12 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
 
   const out = await chamarIa(cliente, conversaId);
 
+  // Pedido de serviço adicional NUNCA sai sozinho: tem preço e ocupa agenda.
+  const temPedido = !!out.pedido && !!(out.pedido_resumo || "").trim();
+
   const sensivel =
-    out.sensivel || out.precisa_humano || ASSUNTOS_SENSIVEIS.includes(out.assunto);
+    out.sensivel || out.precisa_humano || temPedido ||
+    ASSUNTOS_SENSIVEIS.includes(out.assunto);
 
   await db
     .from("conversas")
@@ -381,6 +390,32 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // ---------------------------------------------------------------------
+  // O pedido não pode morrer dentro da conversa.
+  // Aqui ele vira um AVISO no painel — não vira serviço: preço e agenda são
+  // decisão de gente. O índice único da 0035 garante um aviso aberto por
+  // conversa, então follow-up ("e aí, já lavou?") não gera aviso novo.
+  // ---------------------------------------------------------------------
+  if (temPedido) {
+    const prazo = /^\d{4}-\d{2}-\d{2}$/.test((out.pedido_prazo || "").trim())
+      ? (out.pedido_prazo as string).trim()
+      : null;
+    await db.from("pedidos_conversa").insert({
+      org_id: org,
+      cliente_id: (conv as any).cliente_id,
+      conversa_id: conversaId,
+      resumo: (out.pedido_resumo || "").trim().slice(0, 400),
+      trecho: ((ultEntrada as any)?.texto || "").slice(0, 1000) || null,
+      prazo,
+      ocasiao: (out.pedido_ocasiao || "").trim().slice(0, 80) || null,
+      origem: "ia",
+      status: "novo",
+    });
+    // erro aqui não derruba o atendimento: ou é o índice único (já existe aviso
+    // aberto) ou é a migration 0035 ainda não rodada. A resposta à família não
+    // pode depender disso.
+  }
 
   const trava = await avaliarRetencao({
     assunto: out.assunto,
@@ -428,7 +463,8 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     assunto: out.assunto,
     rascunho: out.resposta,
     acao_humana: null,
-    motivo_retencao: (!disparosLigados ? "disparos automáticos desligados" : null)
+    motivo_retencao: (temPedido ? "pedido de serviço adicional — precisa de preço e agenda" : null)
+      || (!disparosLigados ? "disparos automáticos desligados" : null)
       || trava.motivo
       || (cliente.modo !== "automatico" ? "contato em modo copiloto"
       : cliente.score < env.SCORE_LIMITE_AUTO ? `score ${Math.round(cliente.score)} abaixo de ${env.SCORE_LIMITE_AUTO}`

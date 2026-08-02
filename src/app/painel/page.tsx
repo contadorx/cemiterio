@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "./ui";
 import InstalarApp from "../InstalarApp";
+import { PedidosAdicionais } from "./PedidosAdicionais";
 
 export default function Painel() {
   const [cap, setCap] = useState<any>(null);
@@ -76,6 +77,9 @@ export default function Painel() {
             </div>
           </div>
         )}
+
+        {/* pedido de servico adicional: e a unica coisa aqui com prazo dado pela familia */}
+        <PedidosAdicionais />
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
           <Link href="/painel/conversas" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
