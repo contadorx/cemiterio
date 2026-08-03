@@ -25,6 +25,9 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
       { href: "/painel", label: "Início" },
       { href: "/painel/conversas", label: "Atendimento" },
       { href: "/painel/agenda", label: "Agenda" },
+      // A fila dos avulsos: toda tela de serviço filtra por data, então o que
+      // foi pedido para daqui a dez dias não aparecia em lugar nenhum.
+      { href: "/painel/avulsos", label: "Avulsos" },
       { href: "/campo", label: "📍 Campo" },
     ],
   },

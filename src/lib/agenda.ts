@@ -250,6 +250,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 interface ServicoPend {
   id: string;
   data_prevista: string | null;
+  data_desejada?: string | null;   // a data que a família pediu (0037) — nunca reescrita
   prioridade?: number;
   tumulo: { identificacao: string; lat: number | null; lng: number | null; quadra_ordem: number };
 }
@@ -312,15 +313,30 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   const capacidadeDia = turnos.reduce((s, t) => s + t.capacidade, 0);
 
   // pendentes não alocados ou a realocar
-  const { data: pend } = await db
+  // (data_desejada é da migration 0037; se ela ainda não rodou, o select falha
+  //  e caímos no select antigo — a agenda continua funcionando como antes)
+  const r1 = await db
     .from("servicos")
-    .select("id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
+    .select("id,data_prevista,data_desejada,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
     .eq("org_id", org)
     .eq("status", "pendente");
+
+  let temDesejada = true;
+  let pend: any[] | null = r1.data as any;
+  if (!pend) {
+    temDesejada = false;
+    const r2 = await db
+      .from("servicos")
+      .select("id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
+      .eq("org_id", org)
+      .eq("status", "pendente");
+    pend = r2.data as any;
+  }
 
   const itens: ServicoPend[] = (pend || []).map((s: any) => ({
     id: s.id,
     data_prevista: s.data_prevista,
+    data_desejada: s.data_desejada ?? null,
     prioridade: s.prioridade || 0,
     tumulo: {
       identificacao: s.tumulos?.identificacao || "",
@@ -332,25 +348,113 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   if (!itens.length) return { agendados: 0, dias: 0 };
 
-  // prioridade: o que já foi adiado vem primeiro; depois vencimento; depois quadra
-  itens.sort((a, b) => {
-    const pa = (a as any).prioridade || 0;
-    const pb = (b as any).prioridade || 0;
+  const jornada = await carregarJornada();
+  const primeiroDia = proximoDiaUtil(isoHoje(), jornada);
+
+  // --------------------------------------------------------------------------
+  // MONTAGEM DOS DIAS
+  //
+  // Antes isto era uma fatia burra: ordenava tudo e cortava de N em N. A data
+  // que a família pediu não tinha voz nenhuma — o serviço caía onde a fila
+  // deixasse, inclusive DEPOIS do dia combinado.
+  //
+  // Agora são duas passadas:
+  //   1ª — quem tem DATA DESEJADA escolhe o dia: tenta o dia exato; se estiver
+  //        cheio, ANDA PARA TRÁS (antecipa) até achar vaga; nunca passa da data.
+  //        Se não couber nem antes, é marcado como estourado e vai para o dia
+  //        mais cedo com vaga — visível e vermelho, em vez de atrasado calado.
+  //   2ª — todo o resto preenche as vagas que sobraram, do dia mais próximo em
+  //        diante, na ordem de sempre (prioridade, vencimento, quadra).
+  // --------------------------------------------------------------------------
+  const slots = new Map<string, ServicoPend[]>();
+  const estourados = new Set<string>();
+
+  function vagas(d: string): number {
+    return capacidadeDia - (slots.get(d)?.length || 0);
+  }
+  function por(d: string, it: ServicoPend) {
+    const arr = slots.get(d) || [];
+    arr.push(it);
+    slots.set(d, arr);
+  }
+  function diaUtilAnterior(d: string): string {
+    let x = addDias(d, -1);
+    let guarda = 0;
+    while (proximoDiaUtil(x, jornada) !== x && guarda < 40) {
+      x = addDias(x, -1);
+      guarda++;
+    }
+    return x;
+  }
+  // primeiro dia útil com vaga, a partir de `de`
+  function primeiraVagaDe(de: string): string {
+    let d = proximoDiaUtil(de, jornada);
+    let guarda = 0;
+    while (vagas(d) <= 0 && guarda < 400) {
+      d = proximoDiaUtil(addDias(d, 1), jornada);
+      guarda++;
+    }
+    return d;
+  }
+
+  const ordemPadrao = (a: ServicoPend, b: ServicoPend) => {
+    const pa = a.prioridade || 0;
+    const pb = b.prioridade || 0;
     if (pa !== pb) return pb - pa;
     const da = a.data_prevista || "9999-99-99";
     const db_ = b.data_prevista || "9999-99-99";
     if (da !== db_) return da < db_ ? -1 : 1;
     return a.tumulo.quadra_ordem - b.tumulo.quadra_ordem;
-  });
+  };
 
-  // empacota em dias, começando hoje (pula domingo)
-  const jornada = await carregarJornada();
-  let dia = proximoDiaUtil(isoHoje(), jornada);
+  // 1ª passada — data pedida manda. Quem pediu para mais cedo escolhe primeiro.
+  const comData = itens
+    .filter((i) => !!i.data_desejada)
+    .sort((a, b) => {
+      const da = a.data_desejada!;
+      const db_ = b.data_desejada!;
+      if (da !== db_) return da < db_ ? -1 : 1;
+      return ordemPadrao(a, b);
+    });
+
+  for (const it of comData) {
+    // data já vencida (ou hoje) vira "o quanto antes"
+    const alvoBruto = it.data_desejada! < primeiroDia ? primeiroDia : it.data_desejada!;
+    const alvo = proximoDiaUtil(alvoBruto, jornada);
+
+    if (vagas(alvo) > 0) { por(alvo, it); continue; }
+
+    // dia cheio: anda para trás, nunca para frente
+    let d = diaUtilAnterior(alvo);
+    let achou: string | null = null;
+    let guarda = 0;
+    while (d >= primeiroDia && guarda < 400) {
+      if (vagas(d) > 0) { achou = d; break; }
+      d = diaUtilAnterior(d);
+      guarda++;
+    }
+
+    if (achou) { por(achou, it); continue; }
+
+    // não coube até a data pedida — o mais cedo possível, e marcado
+    estourados.add(it.id);
+    por(primeiraVagaDe(primeiroDia), it);
+  }
+
+  // 2ª passada — o resto ocupa o que sobrou
+  const semData = itens.filter((i) => !i.data_desejada).sort(ordemPadrao);
+  let cursor = primeiroDia;
+  for (const it of semData) {
+    cursor = primeiraVagaDe(cursor);
+    por(cursor, it);
+  }
+
   let dias = 0;
   let agendados = 0;
 
-  for (let i = 0; i < itens.length; i += capacidadeDia) {
-    const doDia = itens.slice(i, i + capacidadeDia);
+  for (const dia of [...slots.keys()].sort()) {
+    const doDia = slots.get(dia)!;
+    if (!doDia.length) continue;
     dias++;
 
     // dentro do dia: agrupa por quadra e ordena por proximidade
@@ -374,21 +478,19 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       pos += turno.capacidade;
       let ordem = 1;
       for (const it of bloco) {
-        await db
-          .from("servicos")
-          .update({
-            data_prevista: dia,
-            ordem_dia: ordem,
-            status: "agendado",
-            executora_id: turno.userId,
-          })
-          .eq("id", it.id)
-          .eq("org_id", org);
+        const campos: Record<string, any> = {
+          data_prevista: dia,
+          ordem_dia: ordem,
+          status: "agendado",
+          executora_id: turno.userId,
+        };
+        // só escreve o aviso se a coluna existe (0037)
+        if (temDesejada) campos.desejada_estourada = estourados.has(it.id);
+        await db.from("servicos").update(campos).eq("id", it.id).eq("org_id", org);
         ordem++;
         agendados++;
       }
     }
-    dia = proximoDiaUtil(addDias(dia, 1), jornada);
   }
 
   return { agendados, dias };

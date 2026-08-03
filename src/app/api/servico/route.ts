@@ -22,6 +22,10 @@ export const dynamic = "force-dynamic";
  * Corpo: { tumuloId, dataPrevista, valor?, observacao?, prioridade? }
  * Nasce com plano_id = null (avulso) e status "pendente" — é assim que o
  * alocador da agenda enxerga e o app de campo recebe.
+ *
+ * `dataPrevista` é gravada TAMBÉM em `data_desejada` (migration 0037): é a data
+ * que a família pediu, e essa o alocador nunca reescreve. Ele prefere esse dia,
+ * pode antecipar se estiver cheio, e nunca passa dele.
  */
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
@@ -93,15 +97,20 @@ export async function POST(req: NextRequest) {
 
   const observacao = String(b?.observacao || "").trim().slice(0, 400);
 
+  // Colunas das migrations 0036/0037. Se elas ainda não foram rodadas, o
+  // serviço nasce assim mesmo — sem o recado e sem a data congelada, nunca sem
+  // o trabalho.
+  const comExtras: Record<string, any> = { ...base, data_desejada: data };
+  if (observacao) comExtras.observacao = observacao;
+
   let { data: srv, error } = await db
     .from("servicos")
-    .insert(observacao ? { ...base, observacao } : base)
+    .insert(comExtras)
     .select("id")
     .maybeSingle();
 
-  // A coluna `observacao` é da migration 0036. Se ela ainda não foi rodada, o
-  // serviço nasce assim mesmo — sem o recado, nunca sem o trabalho.
-  const semColuna = `${error?.message || ""}`.toLowerCase().includes("observacao");
+  const msg = `${error?.message || ""}`.toLowerCase();
+  const semColuna = msg.includes("observacao") || msg.includes("data_desejada");
   if (error && semColuna) {
     const r2 = await db.from("servicos").insert(base).select("id").maybeSingle();
     srv = r2.data;
@@ -114,6 +123,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     servicoId: (srv as any)?.id,
     dataPrevista: data,
-    semObservacao: !!observacao && semColuna,
+    semMigration: semColuna,
   });
 }

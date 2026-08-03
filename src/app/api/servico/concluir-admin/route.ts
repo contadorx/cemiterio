@@ -64,18 +64,42 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
   // débito (idempotente): quem paga antes já pagou, não debita de novo
+  //
+  // O valor vinha cru de servicos.valor. Um AVULSO pode nascer sem valor (a
+  // ficha deixa em branco de propósito, quando você ainda não decidiu quanto
+  // cobrar) — e aí o débito entrava vazio: limpeza feita, nada a receber, e
+  // ninguém avisado. Agora cai na mesma cascata que o app de campo já usava:
+  // valor do serviço → valor do plano → valor de referência da casa.
   let debitou = false;
+  let valorDebitado: number | null = null;
   if (momento !== "antes") {
+    let valor = Number((serv as any).valor) || 0;
+    if (!valor && (serv as any).plano_id) {
+      const { data: plano } = await db
+        .from("planos").select("valor_vigente").eq("id", (serv as any).plano_id).maybeSingle();
+      valor = Number((plano as any)?.valor_vigente) || 0;
+    }
+    if (!valor) {
+      const { data: o } = await db
+        .from("orgs").select("valor_referencia_limpeza").eq("id", org).maybeSingle();
+      valor = Number((o as any)?.valor_referencia_limpeza) || 40;
+    }
+
     const { data: jaTem } = await db
       .from("movimentos").select("id").eq("servico_id", servicoId).eq("tipo", "debito").maybeSingle();
     if (!jaTem) {
       await db.from("movimentos").insert({
         org_id: org, cliente_id: (serv as any).cliente_id, tipo: "debito",
-        valor: (serv as any).valor, origem: "servico", servico_id: servicoId,
+        valor, origem: "servico", servico_id: servicoId,
         status_conc: "confirmado", descricao: "Limpeza executada",
         data: agora.slice(0, 10),
       });
       debitou = true;
+      valorDebitado = valor;
+      // congela no serviço o que foi cobrado, para a ficha e o relatório
+      if (!Number((serv as any).valor)) {
+        await db.from("servicos").update({ valor }).eq("id", servicoId).eq("org_id", org);
+      }
     }
   }
 
@@ -101,6 +125,6 @@ export async function POST(req: NextRequest) {
   const notificado = aviso.enviado;
 
   return NextResponse.json({
-    ok: true, urlDepois, duracao, debitou, momento, notificado, material, motivoEnvio: aviso.motivo,
+    ok: true, urlDepois, duracao, debitou, valorDebitado, momento, notificado, material, motivoEnvio: aviso.motivo,
   });
 }

@@ -236,7 +236,7 @@ function FormRegistrar({ pedido, aoPronto }: { pedido: Pedido; aoPronto: () => v
           </select>
         </div>
         <div>
-          <label style={painel.rotulo}>Fazer até</label>
+          <label style={painel.rotulo}>De preferência em</label>
           <input type="date" style={painel.input} value={data} onChange={(e) => setData(e.target.value)} />
         </div>
         <div>
@@ -252,7 +252,8 @@ function FormRegistrar({ pedido, aoPronto }: { pedido: Pedido; aoPronto: () => v
 
       <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0" }}>
         Entra como limpeza <b>avulsa</b> (fora do plano), pendente, com prioridade. Rode a agenda depois
-        para ela cair num dia de trabalho.
+        para ela cair num dia de trabalho. A data é <b>preferência</b>: a agenda tenta esse dia,
+        antecipa se ele estiver cheio e nunca passa dele.
       </p>
 
       {erro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "8px 0 0" }}>{erro}</p>}
@@ -310,7 +311,7 @@ export function AnotarPedido({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginTop: 8 }}>
         <div>
-          <label style={painel.rotulo}>Fazer até</label>
+          <label style={painel.rotulo}>De preferência em</label>
           <input type="date" style={painel.input} value={prazo} onChange={(e) => setPrazo(e.target.value)} />
         </div>
         <div>

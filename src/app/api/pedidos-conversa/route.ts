@@ -198,20 +198,31 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "valor_invalido" }, { status: 400 });
   }
 
-  const { data: srv, error: errSrv } = await db
+  // `data_prevista` é do alocador: ele reescreve a cada geração da agenda.
+  // `data_desejada` é a data que a família pediu — congelada, ele só lê.
+  // Sem a migration 0037 a coluna não existe: grava sem ela e segue.
+  const base: Record<string, any> = {
+    org_id: org,
+    tumulo_id: tumuloId,
+    plano_id: null, // avulso
+    cliente_id: (ped as any).cliente_id,
+    data_prevista: dataPrevista,
+    status: "pendente",
+    valor,
+    prioridade: 5, // pedido com data pedida pela família entra na frente
+  };
+
+  let { data: srv, error: errSrv } = await db
     .from("servicos")
-    .insert({
-      org_id: org,
-      tumulo_id: tumuloId,
-      plano_id: null, // avulso
-      cliente_id: (ped as any).cliente_id,
-      data_prevista: dataPrevista,
-      status: "pendente",
-      valor,
-      prioridade: 5, // pedido com data pedida pela família entra na frente
-    })
+    .insert({ ...base, data_desejada: dataPrevista })
     .select("id")
     .maybeSingle();
+
+  if (errSrv && `${errSrv.message || ""}`.toLowerCase().includes("data_desejada")) {
+    const r2 = await db.from("servicos").insert(base).select("id").maybeSingle();
+    srv = r2.data as any;
+    errSrv = r2.error as any;
+  }
 
   if (errSrv) return NextResponse.json({ ok: false, erro: errSrv.message }, { status: 400 });
 

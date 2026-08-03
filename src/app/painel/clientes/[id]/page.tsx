@@ -61,6 +61,8 @@ export default function FichaCliente() {
   const [d, setD] = useState<any>(null);
   const [pendencias, setPendencias] = useState<Record<string, Pendencia>>({});
   const [salvandoTudo, setSalvandoTudo] = useState(false);
+  // muda quando uma limpeza avulsa nasce aqui — o card de Limpezas relê sozinho
+  const [recargaLimpezas, setRecargaLimpezas] = useState(0);
 
   // identidade estável: os blocos usam isto como dependência de efeito
   const registrar = useCallback<Registrar>((chave, pendencia) => {
@@ -337,7 +339,12 @@ export default function FichaCliente() {
 
         <BarraSalvar pendencias={pendencias} salvando={salvandoTudo} onSalvarTudo={salvarTudo} />
 
-        <LimpezaAvulsa tumulos={d.tumulos || []} onCriado={carregar} />
+        <LimpezaAvulsa
+          tumulos={d.tumulos || []}
+          onCriado={() => { carregar(); setRecargaLimpezas((x) => x + 1); }}
+        />
+
+        <Limpezas clienteId={id} recarga={recargaLimpezas} />
 
         <Extras clienteId={id} tumulos={d.tumulos || []} onMudou={carregar} />
 
@@ -2094,7 +2101,7 @@ function LimpezaAvulsa({ tumulos, onCriado }:
   async function criar() {
     setErro("");
     if (!tumuloId) return setErro("Escolha o jazigo.");
-    if (!data) return setErro("Escolha até quando a limpeza precisa estar feita.");
+    if (!data) return setErro("Escolha a data em que a família quer a limpeza.");
     setSalvando(true);
     const r = await fetch("/api/servico", {
       method: "POST",
@@ -2158,9 +2165,12 @@ function LimpezaAvulsa({ tumulos, onCriado }:
           </select>
         </div>
         <div>
-          <label style={painel.rotulo}>Fazer até</label>
+          <label style={painel.rotulo}>De preferência em</label>
           <input type="date" style={{ ...painel.input, width: 165 }} value={data}
                  onChange={(e) => setData(e.target.value)} />
+          <div style={{ color: cor.cinza, fontSize: 13, marginTop: 3, maxWidth: 165, lineHeight: 1.4 }}>
+            faz nesse dia; se lotar, antes — nunca depois
+          </div>
         </div>
         <div>
           <label style={painel.rotulo}>Valor (R$)</label>
@@ -2184,8 +2194,179 @@ function LimpezaAvulsa({ tumulos, onCriado }:
 
       <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
         Nasce <b>pendente e fora de plano</b>: a próxima geração da agenda encaixa no dia
-        e o app de campo recebe. O valor pode ficar vazio se você ainda não decidiu — o
-        que não pode é o pedido sumir.
+        e o app de campo recebe. A data é <b>preferência, não prazo</b> — a agenda tenta
+        exatamente esse dia, antecipa se ele estiver cheio e nunca passa dele; se nem
+        antes couber, a limpeza aparece em vermelho na fila de <b>Avulsos</b> em vez de
+        chegar atrasada calada. O valor pode ficar vazio: ao concluir, o débito entra
+        com o valor de referência da configuração.
+      </p>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * Limpezas — o histórico que a ficha não tinha
+ *
+ * A ficha da família mostrava jazigos, planos, movimentos e mensagens. Serviço,
+ * não: nem o que vem, nem o que já foi feito. Para saber se a limpeza de julho
+ * saiu era preciso caçar na agenda — e a agenda só mostra uma janela de dias.
+ *
+ * Aqui estão as duas metades no mesmo lugar, avulso e plano juntos, com o mês
+ * de cada uma e se o débito foi lançado. É o controle que faltava: "em que
+ * meses eu realizei e em que meses eu cobrei".
+ * ------------------------------------------------------------------------- */
+function Limpezas({ clienteId, recarga }: { clienteId: string; recarga: number }) {
+  const [lista, setLista] = useState<any[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [tudo, setTudo] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    fetch(`/api/servicos?clienteId=${clienteId}&situacao=todos&limite=300`)
+      .then((r) => r.json())
+      .then((r) => { if (vivo) { setLista(r?.servicos || []); setCarregando(false); } })
+      .catch(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [clienteId, recarga]);
+
+  const dataBr = (d: string | null) => {
+    if (!d) return "—";
+    const [a, m, x] = String(d).slice(0, 10).split("-");
+    return `${x}/${m}`;
+  };
+  const grana = (v: number | null) =>
+    v === null || v === undefined ? "—" : `R$ ${Number(v).toFixed(2).replace(".", ",")}`;
+
+  const abertas = lista.filter((s) => s.status === "pendente" || s.status === "agendado");
+  const feitas = lista.filter((s) => s.status === "executado");
+  const mostradas = tudo ? feitas : feitas.slice(0, 12);
+  const cobradas = feitas.filter((s) => s.cobrado).length;
+
+  if (carregando) {
+    return (
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Limpezas</strong>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0" }}>Carregando…</p>
+      </div>
+    );
+  }
+
+  if (lista.length === 0) {
+    return (
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Limpezas</strong>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0", lineHeight: 1.6 }}>
+          Nenhuma limpeza registrada para esta família — nem de plano, nem avulsa. As de
+          plano nascem quando você gera a agenda; as avulsas, no botão aqui de cima.
+        </p>
+      </div>
+    );
+  }
+
+  const Etiqueta = ({ avulso, cadencia }: { avulso: boolean; cadencia: string | null }) => (
+    <span style={{
+      fontSize: 12, padding: "1px 6px", borderRadius: 6, whiteSpace: "nowrap",
+      background: avulso ? "#ecfeff" : "#f1f5f9",
+      color: avulso ? "#0e7490" : cor.cinza,
+      border: `1px solid ${avulso ? "#a5f3fc" : cor.linha}`,
+    }}>
+      {avulso ? "avulsa" : cadencia || "plano"}
+    </span>
+  );
+
+  return (
+    <div style={painel.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <strong style={{ color: cor.navy }}>Limpezas</strong>
+        <span style={{ color: cor.cinza, fontSize: 14 }}>
+          {feitas.length} feita(s) · {cobradas} com débito lançado · {abertas.length} a fazer
+        </span>
+      </div>
+
+      {abertas.length > 0 && (
+        <>
+          <div style={{ color: cor.cinza, fontSize: 14, margin: "12px 0 4px" }}>A FAZER</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 15 }}>
+            <tbody>
+              {abertas.map((s) => (
+                <tr key={s.id} style={{ borderTop: `1px solid ${cor.linha}`, background: s.estourou ? "#fef2f2" : undefined }}>
+                  <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
+                    <b>{dataBr(s.dataPrevista)}</b>
+                    {s.dataPedida && s.estourou && (
+                      <div style={{ color: "#b91c1c", fontSize: 13 }}>
+                        pediu {dataBr(s.dataPedida)}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 4px" }}>
+                    {s.tumulo} <Etiqueta avulso={s.avulso} cadencia={s.cadencia} />
+                    {s.observacao && (
+                      <div style={{ color: "#92400e", fontSize: 13 }}>💬 {s.observacao}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 4px", textAlign: "right", whiteSpace: "nowrap", color: cor.cinza }}>
+                    {grana(s.valor)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {feitas.length > 0 && (
+        <>
+          <div style={{ color: cor.cinza, fontSize: 14, margin: "16px 0 4px" }}>
+            JÁ FEITAS — mês a mês, com a cobrança
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 15 }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: cor.cinza, fontSize: 13 }}>
+                  <th style={{ padding: "4px" }}>Mês</th>
+                  <th style={{ padding: "4px" }}>Jazigo</th>
+                  <th style={{ padding: "4px" }}>Feita em</th>
+                  <th style={{ padding: "4px", textAlign: "right" }}>Cobrado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mostradas.map((s) => (
+                  <tr key={s.id} style={{ borderTop: `1px solid ${cor.linha}` }}>
+                    <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
+                      <b>{s.mes ? s.mes.split("-").reverse().join("/") : "—"}</b>
+                    </td>
+                    <td style={{ padding: "6px 4px" }}>
+                      {s.tumulo} <Etiqueta avulso={s.avulso} cadencia={s.cadencia} />
+                    </td>
+                    <td style={{ padding: "6px 4px", whiteSpace: "nowrap", color: cor.cinza }}>
+                      {dataBr(s.executadaEm)}
+                    </td>
+                    <td style={{ padding: "6px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {s.cobrado ? (
+                        <span style={{ color: "#166534" }}>{grana(s.valorCobrado)}</span>
+                      ) : (
+                        <span style={{ color: "#b45309" }}>sem lançamento</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {feitas.length > mostradas.length && (
+            <button style={{ ...painel.botaoMiniSec, marginTop: 8 }} onClick={() => setTudo(true)}>
+              Ver todas as {feitas.length}
+            </button>
+          )}
+        </>
+      )}
+
+      <p style={{ color: cor.cinza, fontSize: 14, margin: "12px 0 0", lineHeight: 1.6 }}>
+        <b>Cobrado</b> aqui não é um campo à parte: é o débito que entrou no extrato desta
+        família quando a limpeza foi concluída. Por isso essa coluna é prova do que foi
+        faturado, e não uma segunda contabilidade. Quem paga o quê continua sendo o saldo,
+        no Financeiro.
       </p>
     </div>
   );
