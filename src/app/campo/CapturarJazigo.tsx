@@ -20,8 +20,18 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   const [cemId, setCemId] = useState<string>("");
   const [quadra, setQuadra] = useState("");
   const [identificacao, setIdentificacao] = useState("");
+  // Rua/carreira: o campo que faltava. Sem ele, "12" da rua 1 e "12" da rua 3
+  // eram o mesmo jazigo para o sistema — foi assim que dois tumulos viraram um
+  // registro so, com a descricao de um e a foto do outro.
+  const [rua, setRua] = useState("");
   const [falecido, setFalecido] = useState("");
   const [obs, setObs] = useState("");
+
+  // A trava: quando o numero ja existe na quadra, o servidor NAO decide nada.
+  // Ele devolve a ficha do que ja esta la e a captura para aqui ate voce olhar
+  // a lapide e dizer se e o mesmo tumulo ou outro.
+  const [duplicado, setDuplicado] = useState<any | null>(null);
+  const [novoNumero, setNovoNumero] = useState("");
 
   // estado do jazigo já criado (a partir daqui anexamos GPS e fotos)
   const [tumuloId, setTumuloId] = useState<string | null>(null);
@@ -59,23 +69,42 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   const cemAtual = cemiterios.find((c) => c.id === cemId);
   const quadrasExistentes: string[] = (cemAtual?.quadras || []).map((q: any) => q.codigo);
 
-  async function criarJazigo() {
+  /**
+   * escolha:
+   *   null       -> primeira tentativa; se o numero ja existir, o servidor trava
+   *   "mesmo"    -> voce olhou a foto e confirmou: e o mesmo tumulo
+   *   "outro"    -> e outro tumulo; vai com um numero novo que nao colide
+   */
+  async function criarJazigo(escolha?: "mesmo" | "outro") {
     setErro("");
     if (!quadra.trim()) return setErro("Diga a quadra (ex.: Q-12).");
-    if (!identificacao.trim()) return setErro("Diga a identificação do jazigo (lote/número).");
+    const numero = escolha === "outro" ? novoNumero.trim() : identificacao.trim();
+    if (!numero) return setErro("Diga a identificação do jazigo (lote/número).");
     setSalvando(true);
     const r = await fetch("/api/tumulos", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         cemiterioId: cemId || undefined,
         quadraCodigo: quadra.trim(),
-        identificacao: identificacao.trim(),
+        identificacao: numero,
+        rua: rua.trim() || undefined,
         falecidoNome: falecido.trim() || undefined,
         observacoes: obs.trim() || undefined,
+        confirmarExistente: escolha === "mesmo" || undefined,
+        forcarNovo: escolha === "outro" || undefined,
       }),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
+
+    if (r?.erro === "confirmar_existente" || r?.erro === "identificacao_em_uso") {
+      setDuplicado(r.existente || duplicado);
+      setNovoNumero(r.sugestao || `${numero}-B`);
+      if (r?.erro === "identificacao_em_uso") setErro(r.mensagem || "");
+      return;
+    }
     if (r?.ok && r.tumuloId) {
+      if (escolha === "outro") setIdentificacao(numero);
+      setDuplicado(null);
       setTumuloId(r.tumuloId);
       setJaExistia(!!r.jaExistia);
     } else {
@@ -221,6 +250,15 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
             </div>
 
             <div>
+              <div style={s.rotulo}>Rua / carreira (opcional, mas ajuda muito)</div>
+              <input style={s.input} value={rua} onChange={(e) => setRua(e.target.value)}
+                     placeholder="Ex.: 3 · fileira do meio" />
+              <p style={{ ...s.dica, marginTop: 4 }}>
+                É a rua que separa dois túmulos com o mesmo número na mesma quadra.
+              </p>
+            </div>
+
+            <div>
               <div style={s.rotulo}>Falecido (opcional)</div>
               <input style={s.input} value={falecido} onChange={(e) => setFalecido(e.target.value)}
                      placeholder="Nome no jazigo" />
@@ -234,9 +272,65 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
             </div>
 
             {erro && <p style={s.erro}>{erro}</p>}
-            <button style={s.principal} onClick={criarJazigo} disabled={salvando}>
-              {salvando ? "Criando…" : "Criar jazigo e capturar"}
-            </button>
+
+            {duplicado ? (
+              <div style={s.trava}>
+                <strong style={{ fontSize: 17, color: "#92400e" }}>
+                  Já existe {quadra} · {identificacao}
+                </strong>
+                <p style={{ fontSize: 15, color: "#78350f", lineHeight: 1.5, margin: "6px 0 10px" }}>
+                  Olhe a lápide na sua frente e a ficha abaixo. Se eu seguir sozinho e não for o
+                  mesmo túmulo, a sua foto e o seu GPS entram no registro do vizinho.
+                </p>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  {duplicado.fotoLapide || duplicado.fotoLonge ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={duplicado.fotoLapide || duplicado.fotoLonge} alt="jazigo já cadastrado"
+                         style={{ width: 110, height: 110, objectFit: "cover", borderRadius: 8, border: "1px solid #fbbf24" }} />
+                  ) : (
+                    <div style={{ width: 110, height: 110, borderRadius: 8, background: "#fef3c7",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  color: "#92400e", fontSize: 14, textAlign: "center" }}>
+                      sem foto<br />cadastrada
+                    </div>
+                  )}
+                  <div style={{ fontSize: 15, color: "#78350f", lineHeight: 1.5 }}>
+                    <div><b>{duplicado.falecido || "(sem nome do falecido)"}</b></div>
+                    {duplicado.familia && <div>família: {duplicado.familia}</div>}
+                    {duplicado.observacoes && <div>{duplicado.observacoes}</div>}
+                    <div>{duplicado.temGps ? "já tem GPS marcado" : "sem GPS"}</div>
+                  </div>
+                </div>
+
+                <button style={{ ...s.principal, marginTop: 12 }}
+                        onClick={() => criarJazigo("mesmo")} disabled={salvando}>
+                  ✓ É ESTE MESMO — atualizar este jazigo
+                </button>
+
+                <div style={{ marginTop: 14, borderTop: "1px solid #fbbf24", paddingTop: 12 }}>
+                  <div style={s.rotulo}>É OUTRO túmulo — cadastrar com este número:</div>
+                  <input style={s.input} value={novoNumero}
+                         onChange={(e) => setNovoNumero(e.target.value)} />
+                  <p style={{ ...s.dica, marginTop: 4 }}>
+                    Dois jazigos não podem ter o mesmo número na mesma quadra — foi isso que
+                    embaralhou os cadastros. Se preencheu a rua, sugeri o número com ela.
+                  </p>
+                  <button style={{ ...s.fotoBtn, width: "100%" }}
+                          onClick={() => criarJazigo("outro")} disabled={salvando}>
+                    É outro — criar {novoNumero || "novo"}
+                  </button>
+                </div>
+
+                <button style={s.linkMini} onClick={() => { setDuplicado(null); setErro(""); }}>
+                  voltar e corrigir os dados
+                </button>
+              </div>
+            ) : (
+              <button style={s.principal} onClick={() => criarJazigo()} disabled={salvando}>
+                {salvando ? "Criando…" : "Criar jazigo e capturar"}
+              </button>
+            )}
           </>
         )}
 
@@ -245,7 +339,7 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
           <>
             <div style={s.criado}>
               ✓ Jazigo {jaExistia ? "encontrado" : "criado"}: <b>{quadra} · {identificacao}</b>
-              {jaExistia && <div style={{ fontSize: 15, marginTop: 4 }}>Já existia — vou atualizar a localização e as fotos.</div>}
+              {jaExistia && <div style={{ fontSize: 15, marginTop: 4 }}>Você confirmou que é este — a localização e as fotos entram neste registro.</div>}
             </div>
 
             {/* GPS */}
@@ -340,6 +434,10 @@ function BlocoFoto({ titulo, foto, ok, indo, msg, onCamera, onGaleria, onTentarD
 }
 
 const s: Record<string, React.CSSProperties> = {
+  trava: {
+    background: "#fffbeb", border: "2px solid #f59e0b",
+    borderRadius: 10, padding: 14, marginTop: 4,
+  },
   overlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "grid", placeItems: "end center", zIndex: 60 },
   modal: { width: "100%", maxWidth: 520, background: "#fff", borderRadius: "20px 20px 0 0", padding: 20, display: "flex", flexDirection: "column", gap: 12, maxHeight: "94vh", overflowY: "auto" },
   topo: { display: "flex", justifyContent: "space-between", alignItems: "center" },

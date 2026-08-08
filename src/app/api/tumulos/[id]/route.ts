@@ -5,7 +5,9 @@ import { normalizarMMDD } from "@/lib/memoria";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// PATCH { falecido_nome?, data_falecimento? ('MM-DD' ou 'AAAA-MM-DD'), data_nascimento? }
+// PATCH { identificacao?, rua?, numero?, quadra_id?, cliente_id?, observacoes?,
+//         falecido_nome?, data_falecimento? ('MM-DD' ou 'AAAA-MM-DD'), data_nascimento?,
+//         limparFoto?: 'lapide'|'longe'|'ambas', limparGps?: boolean }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
@@ -38,12 +40,55 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.datas_gatilho = datas;
   }
 
+  // Apagar a foto que entrou no jazigo errado. A imagem em si fica no storage
+  // (barato e reversivel); o que sai e o vinculo — que e o que engana quem olha.
+  const limparFoto = body.limparFoto; // "lapide" | "longe" | "ambas"
+  if (limparFoto === "lapide" || limparFoto === "ambas") patch.foto_referencia_url = null;
+  if (limparFoto === "longe" || limparFoto === "ambas") patch.foto_enquadramento_url = null;
+
+  // Apagar a posicao. Um ponto errado no mapa e pior que ponto nenhum: o ponto
+  // errado leva a ajudante ate o tumulo do vizinho com cara de certeza.
+  if (body.limparGps) {
+    patch.lat = null;
+    patch.lng = null;
+    patch.gps_precisao = null;
+    patch.gps_amostras = 0;
+    patch.gps_atualizado_em = null;
+  }
+
   if (!Object.keys(patch).length) {
     return NextResponse.json({ ok: false, erro: "nada_para_atualizar" }, { status: 400 });
   }
 
+  // Numero repetido na mesma quadra foi o que fundiu dois tumulos numa linha so.
+  // Nao vou deixar a tela de correcao recriar o problema que ela veio consertar.
+  if (patch.identificacao !== undefined || patch.quadra_id !== undefined) {
+    const { data: atual } = await db
+      .from("tumulos").select("id,quadra_id,identificacao").eq("id", params.id).maybeSingle();
+    const quadra = patch.quadra_id ?? (atual as any)?.quadra_id;
+    const ident = String(patch.identificacao ?? (atual as any)?.identificacao ?? "").trim().toLowerCase();
+    if (quadra && ident) {
+      const { data: vizinhos } = await db
+        .from("tumulos").select("id,identificacao").eq("quadra_id", quadra).limit(300);
+      const bate = ((vizinhos as any[]) || []).find(
+        (t) => t.id !== params.id && String(t.identificacao || "").trim().toLowerCase() === ident,
+      );
+      if (bate) {
+        return NextResponse.json(
+          { ok: false, erro: "identificacao_em_uso",
+            mensagem: `Ja existe outro jazigo com o numero ${patch.identificacao ?? ident} nesta quadra. Dois com o mesmo numero e exatamente o que embaralhou foto e descricao — use um numero que separe os dois (ex.: "12-A" e "12-B").` },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
   const { error } = await db.from("tumulos").update(patch).eq("id", params.id);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  // as leituras individuais mantem a media viva; limpar o GPS sem elas nao limpa
+  if (body.limparGps) await db.from("gps_leituras").delete().eq("tumulo_id", params.id);
+
   return NextResponse.json({ ok: true });
 }
 

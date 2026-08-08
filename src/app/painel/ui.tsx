@@ -37,6 +37,9 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
       // "Famílias" e "Gestão" eram a mesma carteira em duas portas: uma
       // mostrava quem paga, a outra o que se cobra. Agora é uma tela com abas.
       { href: "/painel/clientes", label: "Carteira" },
+      // O cemiterio inteiro numa lista so, com a FOTO ao lado da descricao.
+      // Sem isso nao havia como ver que dois tumulos viraram um registro.
+      { href: "/painel/jazigos", label: "Jazigos" },
       { href: "/painel/financeiro", label: "Financeiro" },
     ],
   },
