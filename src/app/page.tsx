@@ -63,10 +63,21 @@ export default function Home() {
       {/* ------------------------------------------------------------------ */}
       <header style={s.topo}>
         <div style={s.faixa}>
-          <span style={s.marca}>🕊 {MARCA.nome}</span>
-          <a href={linkWhats()} style={s.topoWhats} target="_blank" rel="noopener">
-            WhatsApp
-          </a>
+          {/* o logo ja existia no projeto como icone do app (public/icon-192.png):
+              o escudo navy com o ramo de oliveira. Trocar o arquivo troca em
+              todo lugar — topo, rodape, icone do celular e aba do navegador. */}
+          <Link href="/" style={s.marca}>
+            <img src="/icon-192.png" alt="" width={38} height={38} style={s.logo} />
+            <span>{MARCA.nome}</span>
+          </Link>
+          <nav style={s.menu}>
+            <Link href="/familia" style={s.topoLink}>
+              Já sou cliente
+            </Link>
+            <a href={linkWhats()} style={s.topoWhats} target="_blank" rel="noopener">
+              WhatsApp
+            </a>
+          </nav>
         </div>
 
         <div style={s.hero}>
@@ -113,6 +124,65 @@ export default function Home() {
               <p style={s.p}>{i.d}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* A CONVERSA — a parte visual                                         */}
+      {/*                                                                     */}
+      {/* Vem logo depois do passo 3 ("você recebe a foto") porque MOSTRA o    */}
+      {/* passo 3 em vez de prometer. O desenho da lápide é desenho mesmo,     */}
+      {/* de propósito: enquanto não houver foto real, exemplo tem que ter     */}
+      {/* cara de exemplo. Foto de banco de imagem aqui seria mentira.        */}
+      {/* ------------------------------------------------------------------ */}
+      <section style={{ ...s.secao, background: c.navy, color: "#fff" }}>
+        <div style={s.duas}>
+          <div style={{ alignSelf: "center" }}>
+            <p style={{ ...s.olho, textAlign: "left" }}>No dia do serviço</p>
+            <h2 style={{ ...s.h2, color: "#fff", textAlign: "left", marginBottom: 18 }}>
+              Assim chega no seu celular
+            </h2>
+            <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17, marginBottom: 18 }}>
+              Nada de relatório para você abrir, nem senha para lembrar. A mensagem chega
+              no WhatsApp que você já usa, com a foto de antes e a de depois — do mesmo
+              ângulo, para dar para comparar de verdade.
+            </p>
+            <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17 }}>
+              Se preferir ver tudo junto, cada família tem uma página só dela com o
+              histórico de todas as visitas.{" "}
+              <Link href="/familia" style={{ color: c.gold, fontWeight: 700 }}>
+                Já é cliente? Pegue o seu link
+              </Link>
+              .
+            </p>
+          </div>
+
+          <div style={s.celularFora}>
+            <div style={s.celular}>
+              <div style={s.zapTopo}>
+                <img src="/icon-192.png" alt="" width={30} height={30} style={s.logo} />
+                <div>
+                  <p style={s.zapNome}>{MARCA.nome}</p>
+                  <p style={s.zapStatus}>online</p>
+                </div>
+              </div>
+
+              <div style={s.zapCorpo}>
+                <Balao hora="09:12">
+                  Bom dia, dona Cleide. Passamos hoje no jazigo do seu pai. 🌿
+                </Balao>
+
+                <Balao hora="09:13" foto={<Lapide estado="antes" />} etiqueta="Antes" />
+                <Balao hora="09:13" foto={<Lapide estado="depois" />} etiqueta="Depois" />
+
+                <Balao hora="09:14">
+                  Tudo certo por aqui. A próxima visita fica para 12 de setembro — e no dia 3
+                  de outubro, aniversário dele, a gente deixa preparado.
+                </Balao>
+              </div>
+            </div>
+            <p style={s.exemplo}>Exemplo ilustrativo de uma mensagem de visita</p>
+          </div>
         </div>
       </section>
 
@@ -238,7 +308,10 @@ export default function Home() {
       <footer style={s.rodape}>
         <div style={s.rodapeGrid}>
           <div>
-            <p style={{ ...s.marca, color: "#fff", fontSize: 18 }}>🕊 {MARCA.nome}</p>
+            <p style={{ ...s.marca, color: "#fff", fontSize: 18, marginTop: 0 }}>
+              <img src="/icon-192.png" alt="" width={34} height={34} style={s.logo} />
+              <span>{MARCA.nome}</span>
+            </p>
             <p style={s.rodapeTexto}>{MARCA.assinatura}</p>
             <p style={s.rodapeTexto}>{MARCA.cemiterio}</p>
             <p style={s.rodapeTexto}>{MARCA.endereco}</p>
@@ -250,6 +323,9 @@ export default function Home() {
             <a href="#contato" style={s.rodapeLink}>
               Pedir um orçamento
             </a>
+            <Link href="/familia" style={s.rodapeLink}>
+              Já sou cliente — ver o acompanhamento
+            </Link>
           </div>
         </div>
 
@@ -278,6 +354,91 @@ export default function Home() {
   );
 }
 
+/** Um balão de mensagem recebida, com ou sem foto dentro. */
+function Balao({
+  children,
+  hora,
+  foto,
+  etiqueta,
+}: {
+  children?: React.ReactNode;
+  hora: string;
+  foto?: React.ReactNode;
+  etiqueta?: string;
+}) {
+  return (
+    <div style={s.balao}>
+      {foto ? (
+        <div style={s.balaoFoto}>
+          {foto}
+          {etiqueta ? <span style={s.etiqueta}>{etiqueta}</span> : null}
+        </div>
+      ) : null}
+      {children ? <p style={s.balaoTexto}>{children}</p> : null}
+      <span style={s.hora}>{hora} ✓✓</span>
+    </div>
+  );
+}
+
+/**
+ * O desenho da lápide, em dois estados.
+ *
+ * É SVG desenhado à mão, não foto. Duas razões: não existe foto real aprovada
+ * ainda, e foto de banco de imagem num serviço como este é mentira que o cliente
+ * percebe. Desenho todo mundo entende como exemplo.
+ *
+ * O par usa exatamente o mesmo enquadramento — que é a regra do serviço.
+ */
+function Lapide({ estado }: { estado: "antes" | "depois" }) {
+  const sujo = estado === "antes";
+  const pedra = sujo ? "#8d8b7a" : "#e8e3d6";
+  const sombra = sujo ? "#6f6d5e" : "#cfc9b8";
+  const risco = sujo ? "#6f6d5e" : "#a9a290";
+  const chao = sujo ? "#6b7355" : "#b9bda3";
+
+  return (
+    <svg viewBox="0 0 220 150" style={{ width: "100%", display: "block", background: sujo ? "#7c8168" : "#cdd2bb" }}>
+      {/* chão */}
+      <rect x="0" y="112" width="220" height="38" fill={chao} />
+
+      {/* base do túmulo */}
+      <rect x="42" y="96" width="136" height="20" rx="3" fill={sombra} />
+      <rect x="48" y="90" width="124" height="10" rx="2" fill={pedra} />
+
+      {/* lápide */}
+      <path d="M74 90 V46 a36 36 0 0 1 72 0 V90 Z" fill={pedra} />
+
+      {/* inscrição */}
+      <rect x="92" y="52" width="36" height="4" rx="2" fill={risco} />
+      <rect x="88" y="62" width="44" height="3" rx="1.5" fill={risco} opacity="0.75" />
+      <rect x="96" y="70" width="28" height="3" rx="1.5" fill={risco} opacity="0.55" />
+
+      {sujo ? (
+        <>
+          {/* manchas e mato: o que o tempo faz */}
+          <ellipse cx="88" cy="80" rx="12" ry="7" fill="#5f6b4a" opacity="0.5" />
+          <ellipse cx="132" cy="60" rx="9" ry="14" fill="#5f6b4a" opacity="0.35" />
+          <ellipse cx="110" cy="93" rx="30" ry="5" fill="#5f6b4a" opacity="0.4" />
+          <path d="M46 112 q4-16 9-20 M52 112 q1-14 7-19 M168 112 q-4-15-10-19 M176 112 q-2-12-8-16"
+                stroke="#4f5c3a" strokeWidth="3" fill="none" strokeLinecap="round" />
+          <path d="M60 116 q6-10 12-12 M156 116 q-7-9-13-11"
+                stroke="#4f5c3a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          {/* limpo, e um vaso com flor */}
+          <rect x="150" y="100" width="16" height="16" rx="2" fill="#b08968" />
+          <path d="M158 100 V88" stroke="#4f6b3a" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="158" cy="84" r="5" fill="#c96a7a" />
+          <circle cx="152" cy="88" r="3.4" fill="#d98a97" />
+          <circle cx="164" cy="88" r="3.4" fill="#d98a97" />
+          <path d="M78 44 a32 32 0 0 1 24-14" stroke="#fff" strokeWidth="3" fill="none" opacity="0.5" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 const s: Record<string, React.CSSProperties> = {
   pagina: {
     fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -298,7 +459,19 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: 16,
   },
-  marca: { fontSize: 19, fontWeight: 700, letterSpacing: 0.2 },
+  marca: {
+    fontSize: 19,
+    fontWeight: 700,
+    letterSpacing: 0.2,
+    color: "#fff",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+  },
+  logo: { borderRadius: 8, display: "block", flexShrink: 0 },
+  menu: { display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" },
+  topoLink: { color: "rgba(255,255,255,0.72)", textDecoration: "none", fontSize: 14.5, fontWeight: 600 },
   topoWhats: {
     color: c.gold,
     textDecoration: "none",
@@ -317,8 +490,10 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
-  h1: { margin: "0 0 20px", fontSize: 40, lineHeight: 1.2, fontWeight: 700, letterSpacing: -0.5 },
-  heroTexto: { margin: "0 auto 32px", fontSize: 18.5, color: "rgba(255,255,255,0.82)", maxWidth: 620 },
+  // clamp() = o texto acompanha a largura da tela sem media query: no celular
+  // encolhe sozinho, no monitor nao passa do teto.
+  h1: { margin: "0 0 20px", fontSize: "clamp(27px, 6.4vw, 40px)", lineHeight: 1.22, fontWeight: 700, letterSpacing: -0.5 },
+  heroTexto: { margin: "0 auto 32px", fontSize: "clamp(16px, 4.2vw, 18.5px)", color: "rgba(255,255,255,0.82)", maxWidth: 620 },
   botoes: { display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" },
   botaoOuro: {
     display: "inline-block",
@@ -344,8 +519,8 @@ const s: Record<string, React.CSSProperties> = {
   assinatura: { marginTop: 28, marginBottom: 0, color: "rgba(255,255,255,0.5)", fontSize: 14 },
 
   // seções
-  secao: { padding: "72px 24px" },
-  h2: { fontSize: 30, textAlign: "center", margin: "0 0 36px", fontWeight: 700, letterSpacing: -0.3 },
+  secao: { padding: "clamp(52px, 9vw, 72px) 24px" },
+  h2: { fontSize: "clamp(23px, 5.2vw, 30px)", textAlign: "center", margin: "0 0 36px", fontWeight: 700, letterSpacing: -0.3 },
   h3: { fontSize: 18, margin: "0 0 8px", fontWeight: 700 },
   p: { margin: 0, fontSize: 16, color: c.suave, lineHeight: 1.7 },
 
@@ -391,9 +566,57 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: "center",
   },
   precoRotulo: { margin: 0, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase", color: c.suave, fontWeight: 700 },
-  precoValor: { margin: "6px 0 0", fontSize: 56, fontWeight: 700, lineHeight: 1, letterSpacing: -1 },
+  precoValor: { margin: "6px 0 0", fontSize: "clamp(44px, 11vw, 56px)", fontWeight: 700, lineHeight: 1, letterSpacing: -1 },
   precoUnidade: { margin: "6px 0 20px", fontSize: 15, color: c.suave },
   precoTexto: { margin: "0 0 24px", fontSize: 14.5, color: c.suave, lineHeight: 1.7, textAlign: "left" },
+
+  // a conversa ilustrada
+  celularFora: { display: "grid", justifyItems: "center", gap: 12 },
+  celular: {
+    width: "100%",
+    maxWidth: 330,
+    background: "#ece5dd",
+    borderRadius: 26,
+    overflow: "hidden",
+    border: "6px solid #0a1a33",
+    boxShadow: "0 18px 44px rgba(0,0,0,0.35)",
+  },
+  zapTopo: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 14px",
+    background: "#0b2340",
+  },
+  zapNome: { margin: 0, fontSize: 14.5, fontWeight: 700, color: "#fff", lineHeight: 1.2 },
+  zapStatus: { margin: 0, fontSize: 11.5, color: "rgba(255,255,255,0.55)" },
+  zapCorpo: { padding: 14, display: "grid", gap: 10 },
+  balao: {
+    background: "#fff",
+    borderRadius: 12,
+    borderTopLeftRadius: 3,
+    padding: 8,
+    maxWidth: "88%",
+    boxShadow: "0 1px 1px rgba(0,0,0,0.12)",
+    position: "relative",
+  },
+  balaoFoto: { position: "relative", borderRadius: 8, overflow: "hidden" },
+  balaoTexto: { margin: "6px 4px 2px", fontSize: 13.5, lineHeight: 1.5, color: "#111b21" },
+  etiqueta: {
+    position: "absolute",
+    left: 8,
+    top: 8,
+    background: "rgba(0,0,0,0.62)",
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.6,
+    padding: "3px 9px",
+    borderRadius: 999,
+    textTransform: "uppercase",
+  },
+  hora: { display: "block", textAlign: "right", fontSize: 10.5, color: "#8696a0", marginTop: 2, marginRight: 4 },
+  exemplo: { margin: 0, fontSize: 12.5, color: "rgba(255,255,255,0.45)", textAlign: "center" },
 
   par: { margin: 0 },
   parFotos: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
