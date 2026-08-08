@@ -4,6 +4,14 @@ import { createServerClient } from "@supabase/ssr";
 const PROTEGIDAS = ["/campo", "/painel"];
 
 export async function middleware(req: NextRequest) {
+  // A home virou o site publico do Zelo & Memoria. Sem esta saida antecipada,
+  // TODA visita de familia dispararia uma checagem de sessao no Supabase antes
+  // de a pagina aparecer: ida e volta de rede pura, num visitante que nunca vai
+  // ter login. So /painel e /campo precisam saber quem esta logado.
+  if (!PROTEGIDAS.some((p) => req.nextUrl.pathname.startsWith(p))) {
+    return NextResponse.next({ request: req });
+  }
+
   let res = NextResponse.next({ request: req });
 
   const supabase = createServerClient(

@@ -9,6 +9,10 @@ export const MARCA = {
   desde: 1990,
   cemiterio: "Cemitério da Saudade — Vila Vitória, Mauá",
   site: "zeloememoria.com.br",
+  // ⚠ TROQUE AQUI pelo numero real, so digitos, com 55 na frente.
+  // E o numero que recebe o clique de WhatsApp do site inteiro.
+  whatsapp: "5511999999999",
+  endereco: "Vila Vitoria, Maua - SP",
   // paleta do logo (escudo azul + ramo de oliveira dourado)
   cores: {
     navy: "#12284b",
