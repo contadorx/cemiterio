@@ -6,7 +6,9 @@ import { PainelNav, painel, cor } from "../ui";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
+import Mes from "./Mes";
 import Remuneracao from "./Remuneracao";
+import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
 interface Comp {
   id: string;
@@ -21,9 +23,12 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
+type AbaFin = "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
+  // "O mês" é a primeira e a padrão: é a pergunta que se faz primeiro, e era a
+  // que exigia cruzar nove telas para responder.
+  ["mes", "O mês"],
   ["gestao", "Gestão do negócio"],
   ["conferir", "Conferir entradas"],
   ["equipe", "Conta da equipe"],
@@ -33,7 +38,7 @@ const ABAS_FIN: [AbaFin, string][] = [
 ];
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<AbaFin>("gestao");
+  const [aba, setAba] = useState<AbaFin>("mes");
 
   // a aba escolhida entra no endereco: da para mandar o link certo e o F5 nao
   // devolve a pessoa para a primeira aba. Lido no window dentro do useEffect e
@@ -45,7 +50,7 @@ export default function Financeiro() {
 
   function trocar(v: AbaFin) {
     setAba(v);
-    const url = v === "gestao" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
+    const url = v === "mes" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
     window.history.replaceState(null, "", url);
   }
 
@@ -63,6 +68,7 @@ export default function Financeiro() {
           ))}
         </div>
 
+        {aba === "mes" && <Mes />}
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}
         {aba === "equipe" && <Equipe />}
@@ -178,11 +184,11 @@ const linha: React.CSSProperties = {
 
 
 function Gestao() {
-  const [mes, setMes] = useState(new Date().toISOString().slice(0, 7));
+  const [mes, setMes] = useState(mesOperacao());
   const [d, setD] = useState<any>(null);
   // "Recebido no mês" foi dobrado aqui dentro: um lugar só para o mês, mesmo seletor.
   const [rel, setRel] = useState<any>(null);
-  const [novo, setNovo] = useState({ tipo: "saida", valor: "", data: new Date().toISOString().slice(0, 10), categoriaId: "", descricao: "" });
+  const [novo, setNovo] = useState({ tipo: "saida", valor: "", data: diaOperacao(), categoriaId: "", descricao: "" });
   const [lancando, setLancando] = useState(false);
 
   const carregar = useCallback(async () => {

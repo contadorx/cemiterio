@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
         .reduce((s: number, p: any) => s + Number(p.total), 0)),
       entregueMes: r2(lista.filter((p: any) =>
         p.status === "entregue" &&
-        String(p.data_entrega || "").slice(0, 7) === new Date().toISOString().slice(0, 7))
+        String(p.data_entrega || "").slice(0, 7) === mesOperacao())
         .reduce((s: number, p: any) => s + Number(p.total), 0)),
     },
   });

@@ -34,6 +34,12 @@ export const env = {
   GROQ_API_KEY: process.env.GROQ_API_KEY || "",
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
 
+  // PARA ONDE VAI O AVISO DE LEAD NOVO DO SITE (opcional).
+  // Se vazio, o aviso sai só como notificação no navegador (push) e como card
+  // no Início. Preenchendo com o seu celular pessoal (só dígitos, 55 na frente),
+  // um lead do site também chega como WhatsApp na hora.
+  avisoWhatsapp: () => String(process.env.SUREYA_AVISO_WHATSAPP || "").replace(/\D/g, ""),
+
   // janela de agrupamento de rajadas (segundos)
   DEBOUNCE_SEGUNDOS: Number(process.env.SUREYA_DEBOUNCE_SEGUNDOS || "20"),
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data, error } = await auth.db.rpc("sureya_saldo_abertura", {
     p_cliente: params.id,
     p_valor: -emAberto,
-    p_data: b?.data || new Date().toISOString().slice(0, 10),
+    p_data: b?.data || diaOperacao(),
     p_nota: b?.nota || null,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });

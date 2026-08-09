@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { diaOperacao } from "./vencimento";
 
 /**
  * CONSUMO DE MATERIAL POR LIMPEZA
@@ -97,7 +98,7 @@ export async function registrarCompra(args: {
     material_id: args.materialId,
     quantidade: args.quantidade,
     valor_total: args.valorTotal,
-    data: args.data || new Date().toISOString().slice(0, 10),
+    data: args.data || diaOperacao(),
     limpezas_periodo: limpezas,
     consumo_medido: consumoSugerido,
     aplicado: false,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const db = auth.db;
   const org = await orgAtual(db);
 
-  const mes = req.nextUrl.searchParams.get("mes") || new Date().toISOString().slice(0, 7);
+  const mes = req.nextUrl.searchParams.get("mes") || mesOperacao();
   const ini = `${mes}-01`;
   const d = new Date(ini + "T00:00:00");
   const fim = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
 
   const { error } = await auth.db.from("lancamentos").insert({
     org_id: org, tipo, valor,
-    data: b?.data || new Date().toISOString().slice(0, 10),
+    data: b?.data || diaOperacao(),
     categoria_id: b?.categoriaId || null,
     descricao: b?.descricao || null,
   });

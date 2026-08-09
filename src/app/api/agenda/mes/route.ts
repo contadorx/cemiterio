@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { gerarCalendarioMes } from "@/lib/agenda";
+import { mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   if (auth.erro) return auth.erro;
 
   const b = await req.json().catch(() => ({}));
-  const mes = String(b?.mes || "").match(/^\d{4}-\d{2}$/) ? b.mes : new Date().toISOString().slice(0, 7);
+  const mes = String(b?.mes || "").match(/^\d{4}-\d{2}$/) ? b.mes : mesOperacao();
 
   const r = await gerarCalendarioMes(mes, {
     incluirAvulsos: !!b?.incluirAvulsos,

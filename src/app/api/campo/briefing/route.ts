@@ -3,6 +3,7 @@ import { exigirLogado } from "@/lib/roles";
 import { montarBriefing } from "@/lib/briefing";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export async function GET(req: NextRequest) {
           {
             org_id: org,
             executora_id: executoraId,
-            data: new Date().toISOString().slice(0, 10),
+            // o "dia de campo" e o dia de Sao Paulo (mesmo dia da rota)
+            data: diaOperacao(),
             meta_tumulos: briefing.totalHoje,
             iniciado_em: new Date().toISOString(),
           },

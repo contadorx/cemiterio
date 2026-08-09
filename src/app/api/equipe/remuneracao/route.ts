@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/roles";
 import {
   carregarRegras, valorDoServico, ehAvulso, REGRA_VAZIA, type Regra,
 } from "@/lib/remuneracao";
+import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
 function faixaDoMes(mes: string) {
-  const base = /^\d{4}-\d{2}$/.test(mes) ? mes : new Date().toISOString().slice(0, 7);
+  const base = /^\d{4}-\d{2}$/.test(mes) ? mes : mesOperacao();
   const [a, m] = base.split("-").map(Number);
   const ini = `${base}-01`;
   const prox = m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, "0")}-01`;
@@ -51,13 +52,42 @@ export async function GET(req: NextRequest) {
   }
 
   // servicos EXECUTADOS no mes (a base do por-jazigo)
-  const { data: doMes } = await db
+  //
+  // ESTA TELA MOSTRAVA QUATRO ZEROS E NAO DIZIA QUE ESTAVA QUEBRADA.
+  // O select pedia `tumulos(codigo,quadra)` — colunas que NAO existem em
+  // tumulos (`codigo` e de quadras; o tumulo tem `identificacao` e `quadra_id`).
+  // O PostgREST rejeita o select INTEIRO por causa disso, e como o erro era
+  // descartado (`const { data } = await ...`, sem olhar `error`), a lista vinha
+  // vazia: jazigos 0, receita R$ 0,00, comparativo zerado — bem ao lado de um
+  // "A pagar" com o valor certo, porque aquela outra consulta nao tem join.
+  // Uma tela se contradizendo em silencio.
+  //
+  // Agora: colunas certas, e o erro aparece em vez de virar zero.
+  const { data: doMes, error: eDoMes } = await db
     .from("servicos")
-    .select("id,executora_id,valor,valor_executora,pago_executora_em,plano_id,data_executada,tumulos(codigo,quadra),planos(cadencia)")
+    .select("id,executora_id,valor,valor_executora,pago_executora_em,plano_id,data_executada,tumulos(identificacao,quadras(codigo)),planos(cadencia)")
     .eq("status", "executado")
     .gte("data_executada", ini)
     .lt("data_executada", prox)
     .order("data_executada", { ascending: false });
+
+  if (eDoMes) {
+    return NextResponse.json({
+      ok: false,
+      erro: "consulta_falhou",
+      dica: `Não consegui ler as limpezas do mês: ${eDoMes.message}`,
+    }, { status: 500 });
+  }
+
+  // O FIXO DESTE MES JA FOI PAGO? (0043)
+  // Sem isto, a tela oferecia pagar o mesmo salario de novo — e o banco nao
+  // tinha como saber que ja tinha saido.
+  const { data: fixosPagos } = await db
+    .from("acertos_equipe")
+    .select("membro_id,valor_mensal,created_at")
+    .eq("mes_ref", mes);
+  const jaPagouFixo = new Map<string, any>();
+  for (const f of (fixosPagos || []) as any[]) jaPagouFixo.set(f.membro_id, f);
 
   // tudo que ainda NAO foi pago, de qualquer mes — e isso que sai no acerto
   const { data: emAberto } = await db
@@ -100,8 +130,12 @@ export async function GET(req: NextRequest) {
       { ...regra, modo: "por_jazigo", so_avulso: false },
       { receita: Number(s.valor) || 0, avulso: true }), 0));
 
-    const mensalDevido = regra.modo === "por_jazigo" ? 0 : soMensal;
-    const totalDoMes = r2(mensalDevido + congelado);
+    const fixoDoMes = jaPagouFixo.get(id) || null;
+    const mensalDevidoBruto = regra.modo === "por_jazigo" ? 0 : soMensal;
+    // já pago = não deve mais. O total do MÊS continua contando o fixo (é o
+    // custo do mês, pago ou não); o que zera é o "a pagar".
+    const mensalDevido = fixoDoMes ? 0 : mensalDevidoBruto;
+    const totalDoMes = r2(mensalDevidoBruto + congelado);
 
     const meusAbertos = abertos.filter((s) => s.executora_id === id);
     const aPagarJazigos = r2(meusAbertos.reduce((t, s) => t + (Number(s.valor_executora) || 0), 0));
@@ -136,16 +170,23 @@ export async function GET(req: NextRequest) {
         // quanto ela ganha por jazigo hoje, na media
         ganhoMedio: meus.length ? r2(totalDoMes / meus.length) : 0,
       },
+      // o fixo deste mês já saiu? (0043)
+      fixoPago: !!fixoDoMes,
+      fixoPagoEm: fixoDoMes?.created_at || null,
+      fixoPagoValor: fixoDoMes ? Number(fixoDoMes.valor_mensal) : null,
       aPagar: {
         jazigos: aPagarJazigos,
         servicos: meusAbertos.length,
-        // o fixo do mes NAO fica em aberto no banco: e uma decisao do acerto
         maisAntigo: meusAbertos.map((s) => s.data_executada).sort()[0] || null,
       },
       servicos: meus.map((s) => ({
         id: s.id,
         data: s.data_executada,
-        jazigo: [s.tumulos?.quadra, s.tumulos?.codigo].filter(Boolean).join(" · ") || "sem código",
+        // quadra vem de tumulos->quadras->codigo; o numero do jazigo e a
+        // identificacao (as colunas antigas `codigo`/`quadra` nunca existiram
+        // em tumulos, e eram o motivo de a tela inteira vir zerada)
+        jazigo: [s.tumulos?.quadras?.codigo, s.tumulos?.identificacao]
+          .filter(Boolean).join(" · ") || "sem código",
         avulso: ehAvulso(s),
         receita: Number(s.valor) || 0,
         ganho: Number(s.valor_executora) || 0,
@@ -276,12 +317,39 @@ export async function POST(req: NextRequest) {
     const agora = new Date().toISOString();
     // um id de lote para saber, depois, o que saiu junto
     const lote = (globalThis.crypto as any)?.randomUUID?.() || null;
+    const mesRef = String(b?.mesRef || "").slice(0, 7) || agora.slice(0, 7);
 
-    if (lista.length) {
-      const { error: eMarca } = await db.from("servicos")
-        .update({ pago_executora_em: agora, ...(lote ? { pago_executora_lote: lote } : {}) })
-        .in("id", lista.map((s) => s.id));
-      if (eMarca) return NextResponse.json({ ok: false, erro: eMarca.message }, { status: 500 });
+    // ------------------------------------------------------------------
+    // O FIXO DO MÊS SÓ SAI UMA VEZ (0043).
+    //
+    // Antes, a parte fixa não ficava registrada em lugar nenhum — clicar
+    // "Acertar" duas vezes no mesmo mês pagava o salário duas vezes, e a única
+    // pista era a descrição do lançamento. Agora quem recusa é o banco: a
+    // chave primária é (org, membro, mês).
+    // ------------------------------------------------------------------
+    if (parteMensal > 0) {
+      const { error: eFixo } = await db.from("acertos_equipe").insert({
+        org_id: orgId,
+        membro_id: membroId,
+        mes_ref: mesRef,
+        valor_mensal: parteMensal,
+        lote,
+        observacao: b?.observacao || null,
+      });
+      if (eFixo) {
+        const jaPago = String(eFixo.code) === "23505" || /duplicat|unique/i.test(eFixo.message || "");
+        if (jaPago) {
+          return NextResponse.json({
+            ok: false,
+            erro: "fixo_ja_pago",
+            mensagem:
+              `O fixo de ${mesRef} desta pessoa já foi acertado. Se quiser pagar só os ` +
+              `jazigos que entraram depois, refaça o acerto sem incluir o fixo.`,
+          }, { status: 400 });
+        }
+        // tabela ainda não existe (0043 não rodada): avisa, mas não trava o acerto
+        console.error("[acerto] não registrei o fixo:", eFixo.message);
+      }
     }
 
     // saída no caixa, na categoria da equipe (usa a sua se já existir)
@@ -298,14 +366,56 @@ export async function POST(req: NextRequest) {
       (parteMensal ? ` + mensal R$ ${parteMensal.toFixed(2)}` : "") +
       (b?.observacao ? ` — ${b.observacao}` : "");
 
-    const { error: eLanc } = await db.from("lancamentos").insert({
+    // ------------------------------------------------------------------
+    // O CAIXA PRIMEIRO, OS JAZIGOS DEPOIS.
+    //
+    // A ordem era o contrário: os serviços eram marcados como pagos e, se o
+    // lançamento falhasse, viravam um aviso de texto — jazigos "pagos" sem
+    // saída nenhuma no caixa, e sem tela para desmarcar. Agora, se o caixa
+    // falhar, nada foi marcado e dá para tentar de novo à vontade.
+    // ------------------------------------------------------------------
+    const { data: lanc, error: eLanc } = await db.from("lancamentos").insert({
       org_id: orgId,
       tipo: "saida",
       valor: total,
-      data: b?.data || agora.slice(0, 10),
+      data: b?.data || diaOperacao(),
       categoria_id: (cat as any)?.id || null,
       descricao,
-    });
+    }).select("id").maybeSingle();
+
+    if (eLanc) {
+      // desfaz o registro do fixo: ninguém foi pago, então o mês continua aberto
+      if (parteMensal > 0) {
+        await db.from("acertos_equipe").delete()
+          .eq("org_id", orgId).eq("membro_id", membroId).eq("mes_ref", mesRef);
+      }
+      return NextResponse.json({
+        ok: false,
+        erro: "caixa_falhou",
+        mensagem: `Não lancei a saída no caixa (${eLanc.message}). Nada foi marcado como pago — pode tentar de novo.`,
+      }, { status: 500 });
+    }
+
+    if (lista.length) {
+      const { error: eMarca } = await db.from("servicos")
+        .update({ pago_executora_em: agora, ...(lote ? { pago_executora_lote: lote } : {}) })
+        .in("id", lista.map((s) => s.id));
+      if (eMarca) {
+        // o dinheiro já saiu no caixa; avisa com o que precisa ser conferido à mão
+        return NextResponse.json({
+          ok: true,
+          pago: total,
+          jazigos: lista.length,
+          somaJazigos,
+          parteMensal,
+          lancado: true,
+          avisoCaixa:
+            `A saída de R$ ${total.toFixed(2)} foi lançada no caixa, mas não consegui marcar ` +
+            `os ${lista.length} jazigo(s) como pagos (${eMarca.message}). Eles vão aparecer ` +
+            `de novo no próximo acerto — confira antes de pagar.`,
+        });
+      }
+    }
 
     return NextResponse.json({
       ok: true,
@@ -313,8 +423,10 @@ export async function POST(req: NextRequest) {
       jazigos: lista.length,
       somaJazigos,
       parteMensal,
-      lancado: !eLanc,
-      avisoCaixa: eLanc ? `Os jazigos foram marcados como pagos, mas a saída no caixa falhou: ${eLanc.message}` : null,
+      mesRef,
+      lancamentoId: (lanc as any)?.id || null,
+      lancado: true,
+      avisoCaixa: null,
     });
   }
 

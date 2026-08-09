@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { conversarCampo } from "@/lib/assistente-campo";
 import { montarBriefing } from "@/lib/briefing";
 import { registrarErro } from "@/lib/monitor";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const out = await conversarCampo(historico, contexto);
     const adm = supabaseAdmin();
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = diaOperacao();
 
     // acha (ou cria) o dia de campo
     const { data: dia } = await adm

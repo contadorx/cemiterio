@@ -822,7 +822,7 @@ function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, r
 
         {/* rota */}
         {rota && (
-          <polyline points={rota.ordem.map((p) => `${p.x},${p.y}`).join(" ")}
+          <polyline points={(rota.ordem || []).map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none" stroke={cor.teal} strokeWidth={traco * 1.6}
                     strokeDasharray={`${6 * upx} ${4 * upx}`} strokeLinejoin="round" />
         )}

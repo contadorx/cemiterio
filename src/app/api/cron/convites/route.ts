@@ -3,6 +3,7 @@ import { cronAutorizado } from "@/lib/cron-auth";
 import { convitesDeData, convitesPeriodicos } from "@/lib/ativacao";
 import { pedidosDeAvaliacao } from "@/lib/avaliacao-periodica";
 import { registrarErro } from "@/lib/monitor";
+import { carimbarRotina } from "@/lib/rotinas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,9 +19,11 @@ export async function GET(req: NextRequest) {
     const datas = await convitesDeData();
     const periodicos = await convitesPeriodicos();
     const avaliacoes = await pedidosDeAvaliacao();
+    await carimbarRotina("convites", true, { datas, periodicos, avaliacoes });
     return NextResponse.json({ ok: true, convites: { datas, periodicos }, avaliacoes });
   } catch (e) {
     await registrarErro("cron_convites", e);
+    await carimbarRotina("convites", false, undefined, (e as any)?.message || String(e));
     return NextResponse.json({ ok: false, erro: "falha" }, { status: 500 });
   }
 }

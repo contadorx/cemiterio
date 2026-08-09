@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { sincronizar, lerFila } from "@/lib/offline-fila";
+import { sincronizar, quantosPendentes, migrarFilaAntiga, iniciarOuEnfileirar } from "@/lib/offline-fila";
 import InstalarApp from "../InstalarApp";
 import Assistente from "./Assistente";
 import Materiais from "./Materiais";
@@ -13,6 +13,11 @@ import ComoChegar from "./ComoChegar";
 
 interface Aviso { tipo: string; texto: string }
 
+// Cache da rota do dia, para a tela nao ficar em branco quando a rede cai.
+const CACHE_DIA = "sureya_rota_do_dia";
+const hojeLocal = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
 interface Item {
   id: string;
   tumuloId: string;
@@ -20,6 +25,7 @@ interface Item {
   ordem: number | null;
   tumulo: string;
   quadra: string;
+  cemiterio: string | null;
   rua: string;
   numero: string;
   falecido: string | null;
@@ -59,13 +65,30 @@ export default function Campo() {
       fetch("/api/agenda/dia").then((x) => x.json()).catch(() => null),
       fetch("/api/campo/briefing").then((x) => x.json()).catch(() => null),
     ]);
-    if (a?.ok) setLista(Array.isArray(a.lista) ? a.lista : []);
+    // SEM SINAL A LISTA NAO PODE SUMIR. Quando a rede falha, `a` vem null e a
+    // tela ficava vazia — a Nina no corredor, com a rota do dia na mao, vendo
+    // "Tudo feito por hoje". Agora a ultima lista boa fica guardada no aparelho
+    // e continua na tela ate chegar uma nova.
+    if (a?.ok) {
+      const nova = Array.isArray(a.lista) ? a.lista : [];
+      setLista(nova);
+      try { localStorage.setItem(CACHE_DIA, JSON.stringify({ dia: hojeLocal(), lista: nova })); } catch {}
+    } else {
+      try {
+        const guardado = JSON.parse(localStorage.getItem(CACHE_DIA) || "null");
+        // só serve se for do MESMO dia: rota de ontem é pior que tela vazia
+        if (guardado?.dia === hojeLocal() && Array.isArray(guardado.lista)) setLista(guardado.lista);
+      } catch {}
+    }
     if (b?.ok) setBrief(b.briefing);
-    try { setPendentes(lerFila().length); } catch { /* sem localStorage */ }
+    setPendentes(await quantosPendentes());
     setCarregando(false);
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    // trabalho que ficou na fila da versao anterior nao pode se perder
+    migrarFilaAntiga().then(() => carregar()).catch(() => carregar());
+  }, [carregar]);
 
   // pergunta ao servidor quem eu sou; so o admin ve o botao de voltar ao painel
   useEffect(() => {
@@ -95,29 +118,57 @@ export default function Campo() {
     }
   }, [lista]);
 
+  /**
+   * COMECAR — agora funciona sem sinal.
+   *
+   * Era um fetch cru: falhou, alerta "tente de novo". Como o botao de finalizar
+   * so aparece depois de comecar, sem internet a Nina nao fechava jazigo
+   * nenhum — mesmo com a faixa dizendo "pode continuar, eu guardo e mando
+   * depois". Agora o inicio entra na mesma fila da conclusao, e a tela marca o
+   * jazigo como em andamento na hora, sem esperar o servidor.
+   */
   async function iniciar(it: Item, foto?: { b64: string; mt: string } | null) {
     setIniciando(it.id);
-    const r = await fetch("/api/campo/iniciar", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        servicoId: it.id,
-        fotoBase64: foto?.b64,
-        mimetype: foto?.mt,
-      }),
-    }).then((x) => x.json()).catch(() => null);
+    const modo = await iniciarOuEnfileirar({
+      servicoId: it.id,
+      fotoBase64: foto?.b64,
+      mimetype: foto?.mt,
+    });
     setIniciando(null);
-    if (r?.ok) carregar();
-    else alert("Não consegui registrar o começo. Tente de novo.");
+
+    if (modo === "perdido") {
+      alert(
+        "A memória do aparelho encheu e eu não consegui guardar.\n\n" +
+        "Procure um lugar com sinal e abra o app: assim que a internet voltar, " +
+        "o que já está guardado sobe e libera espaço."
+      );
+      return;
+    }
+
+    // marca em andamento AQUI, sem esperar a rede: o cartão muda para
+    // "Finalizar com a foto" e ela segue trabalhando
+    setLista((atual) => atual.map((x) =>
+      x.id === it.id
+        ? { ...x, iniciadoEm: x.iniciadoEm || new Date().toISOString(),
+            fotoAntes: foto?.b64 ? `data:${foto.mt};base64,${foto.b64}` : x.fotoAntes }
+        : x));
+
+    if (modo === "offline") setPendentes(await quantosPendentes());
+    else carregar();
   }
 
   const pendentesLista = lista.filter((x) => x.status !== "executado");
   const feitos = lista.filter((x) => x.status === "executado").length;
   const total = lista.length;
 
-  // agrupa por quadra e rua — é assim que se anda no cemitério
+  // Agrupa por cemitério, quadra e rua — é assim que se anda no cemitério.
+  // O nome do cemitério só entra no título quando o dia tem mais de um (0044):
+  // com um só, repetir o nome em toda faixa seria ruído.
+  const varios = new Set(pendentesLista.map((x) => x.cemiterio).filter(Boolean)).size > 1;
   const grupos = new Map<string, Item[]>();
   for (const it of pendentesLista) {
-    const chave = [it.quadra, it.rua].filter(Boolean).join(" · ") || "Sem local";
+    const chave = [varios ? it.cemiterio : null, it.quadra, it.rua]
+      .filter(Boolean).join(" · ") || "Sem local";
     grupos.set(chave, [...(grupos.get(chave) || []), it]);
   }
 
@@ -127,8 +178,8 @@ export default function Campo() {
     <main style={s.wrap}>
       {(!online || pendentes > 0) && (
         <div style={s.faixaOffline}>
-          {!online && "Sem internet. Pode continuar — eu guardo e mando depois."}
-          {pendentes > 0 && ` ${pendentes} esperando para enviar.`}
+          {!online && "Sem internet. Pode continuar — eu guardo e mando quando o sinal voltar."}
+          {pendentes > 0 && ` ${pendentes} ${pendentes === 1 ? "registro esperando" : "registros esperando"} para enviar.`}
         </div>
       )}
 
@@ -225,10 +276,10 @@ export default function Campo() {
         <Concluir
           item={finalizando}
           onFechar={() => setFinalizando(null)}
-          onPronto={(offline: boolean) => {
+          onPronto={async (offline: boolean) => {
             setFinalizando(null);
-            if (offline) { try { setPendentes(lerFila().length); } catch {} }
-            carregar();
+            if (offline) setPendentes(await quantosPendentes());
+            else carregar();
           }}
         />
       )}
@@ -256,6 +307,7 @@ export default function Campo() {
             fotoEnquadramento: indo.fotoEnquadramento, fotoReferencia: indo.fotoReferencia,
           }}
           onFechar={() => setIndo(null)}
+          onComecar={() => { const it = indo; setIndo(null); if (it) setConfirmando(it); }}
         />
       )}
     </main>

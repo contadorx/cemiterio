@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { env } from "@/lib/env";
+import { avisar } from "@/lib/push";
+import { enviarTextoComRetry } from "@/lib/envio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,5 +122,52 @@ export async function POST(req: NextRequest) {
     .update({ nome, contexto: jazigo || null })
     .eq("id", (criado as any).id);
 
+  // AVISA NA HORA (o buraco que fazia o funil inteiro não valer nada).
+  //
+  // O site promete "respondemos no mesmo dia". Antes desta parte, o lead era
+  // gravado e NINGUÉM ficava sabendo: ele dormia até alguém abrir o painel por
+  // acaso. Três avisos, do mais barato ao mais garantido:
+  //   1. push no navegador de quem está no painel (se as chaves VAPID existirem);
+  //   2. WhatsApp no seu celular, se SUREYA_AVISO_WHATSAPP estiver preenchida;
+  //   3. o card "leads do site" no Início, que não depende de configuração.
+  // Nada aqui pode derrubar a resposta ao visitante: tudo em try/catch.
+  await avisarLeadNovo(nome, telefone, jazigo, mensagem, (criado as any).id);
+
   return NextResponse.json({ ok: true, leadId: (criado as any).id });
+}
+
+async function avisarLeadNovo(
+  nome: string,
+  telefone: string,
+  jazigo: string,
+  mensagem: string,
+  leadId: string,
+) {
+  const resumo = [jazigo, mensagem].filter(Boolean).join(" · ").slice(0, 120);
+
+  try {
+    await avisar({
+      titulo: `Lead novo do site: ${nome}`,
+      corpo: resumo || telefone,
+      url: `/painel/leads/${leadId}`,
+      tag: `lead-${leadId}`,
+    });
+  } catch (e) {
+    console.error("[contato] push falhou:", (e as any)?.message || e);
+  }
+
+  const destino = env.avisoWhatsapp();
+  if (!destino) return;
+  try {
+    await enviarTextoComRetry(
+      destino,
+      `🔔 *Lead novo pelo site*\n\n` +
+        `*${nome}*\nWhatsApp: ${telefone}\n` +
+        (jazigo ? `Jazigo: ${jazigo}\n` : "") +
+        (mensagem ? `\n"${mensagem}"\n` : "") +
+        `\nAbrir: https://${(process.env.NEXT_PUBLIC_SITE_URL || "zeloememoria.com.br").replace(/^https?:\/\//, "")}/painel/leads/${leadId}`,
+    );
+  } catch (e) {
+    console.error("[contato] aviso por WhatsApp falhou:", (e as any)?.message || e);
+  }
 }

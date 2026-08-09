@@ -4,6 +4,7 @@ import { descreverFrequencia } from "@/lib/frequencia";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 import { anexarJazigo, criarPlanoSeFaltar, explicarErroJazigo } from "@/lib/jazigo";
+import { valorMensalDoPlano, valorMensalEfetivo, diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +43,13 @@ export async function GET(req: NextRequest) {
     const x = porCliente.get(p.cliente_id); if (!x) continue;
     if (p.ativo) {
       x.cadencias.push(descreverFrequencia(p.cadencia, p.lavagens_por_ciclo ?? 1));
-      x.mensal += Number(p.valor_mensal) || 0;
+      // "por mes" de verdade: preco por limpeza x limpezas do ciclo / meses.
+      // Somar valor_mensal cru punha um plano anual e um quinzenal no mesmo
+      // patamar, e o total da carteira ficava fantasioso.
+      x.mensal += valorMensalEfetivo(
+        p.cadencia, p.lavagens_por_ciclo,
+        valorMensalDoPlano(p.cadencia, p.valor_mensal, p.valor_vigente),
+      );
       if (p.proximo_servico && (!x.proximaLavagem || p.proximo_servico < x.proximaLavagem)) x.proximaLavagem = p.proximo_servico;
       if (p.proxima_cobranca && (!x.proximaCobranca || p.proxima_cobranca < x.proximaCobranca)) x.proximaCobranca = p.proxima_cobranca;
       x.temPlanoAtivo = true;
@@ -98,7 +105,7 @@ export async function GET(req: NextRequest) {
   const venceEm = Number(q.get("venceEm") || 0);
   if (venceEm > 0) {
     const limite = new Date(Date.now() + venceEm * 86400000).toISOString().slice(0, 10);
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = diaOperacao();
     lista = lista.filter((c) =>
       (c.proximaCobranca && c.proximaCobranca <= limite) ||
       (c.proximaLavagem && c.proximaLavagem >= hoje && c.proximaLavagem <= limite));

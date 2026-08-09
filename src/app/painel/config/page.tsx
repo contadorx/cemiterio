@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "jornada" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -15,6 +15,7 @@ export default function Config() {
           {([
             ["casa", "A Casa"],
             ["equipe", "Equipe"],
+            ["cemiterios", "Cemitérios"],
             ["campo", "Campo"],
             ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
@@ -32,6 +33,7 @@ export default function Config() {
         {aba === "casa" && <Casa />}
         {aba === "jornada" && <Jornada />}
         {aba === "equipe" && <Equipe />}
+        {aba === "cemiterios" && <Cemiterios />}
         {aba === "campanhas" && <Campanhas />}
         {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && <Agregados aba={aba} />}
       </div>
@@ -481,6 +483,169 @@ function Campanhas() {
   );
 }
 
+
+/**
+ * CEMITÉRIOS — onde a expansão é configurada.
+ *
+ * Duas coisas moram aqui, e as duas são OPCIONAIS (0044):
+ *   · os DIAS em que a equipe vai em cada cemitério;
+ *   · a PESSOA amarrada a um cemitério.
+ * Sem mexer em nada, a equipe inteira atende tudo, todos os dias — como sempre
+ * foi. Você escolhe o jeito depois de ver na prática qual funciona.
+ */
+function Cemiterios() {
+  const [d, setD] = useState<any>(null);
+  const [erro, setErro] = useState("");
+  const [novo, setNovo] = useState({ nome: "", endereco: "" });
+  const [salvando, setSalvando] = useState(false);
+
+  async function carregar() {
+    const r = await fetch("/api/cemiterios").then((x) => x.json()).catch(() => null);
+    if (r?.ok) { setD(r); setErro(""); }
+    else setErro(r?.dica || r?.erro || "não consegui carregar");
+  }
+  useEffect(() => { carregar(); }, []);
+
+  async function patch(corpo: any) {
+    setSalvando(true);
+    const r = await fetch("/api/cemiterios", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) carregar();
+    else alert(r?.erro || "não consegui salvar");
+  }
+
+  async function criar() {
+    if (!novo.nome.trim()) return alert("Diga o nome do cemitério.");
+    setSalvando(true);
+    const r = await fetch("/api/cemiterios", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(novo),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (r?.ok) { setNovo({ nome: "", endereco: "" }); carregar(); }
+    else alert(r?.erro || "não consegui criar");
+  }
+
+  if (erro) {
+    return (
+      <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
+        <p style={{ margin: 0, fontWeight: 600 }}>Esta aba precisa da migration 0044.</p>
+        <p style={{ margin: "8px 0 0", color: cor.cinza, lineHeight: 1.5 }}>{erro}</p>
+      </div>
+    );
+  }
+  if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;
+
+  const varios = (d.cemiterios || []).length > 1;
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      {d.semCemiterio > 0 && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
+          <b>{d.semCemiterio} jazigo(s) sem cemitério.</b>
+          <p style={{ margin: "6px 0 0", color: cor.cinza, lineHeight: 1.5 }}>
+            Deveriam ser zero depois da migration 0044. Rode a consulta 3.1 de dentro
+            dela para ver quais são.
+          </p>
+        </div>
+      )}
+
+      {(d.cemiterios || []).map((c: any) => (
+        <div key={c.id} style={painel.card}>
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+            <h3 style={{ margin: 0, fontSize: 19, color: cor.navy }}>{c.nome}</h3>
+            {!c.ativo && <span style={{ color: "#b45309", fontSize: 14 }}>· inativo</span>}
+            <span style={{ marginLeft: "auto", fontSize: 14, color: cor.cinza }}>
+              {c.jazigos} jazigo(s) · {c.familias} família(s) · {c.quadras} quadra(s)
+            </span>
+          </div>
+          {c.endereco && <p style={{ margin: "4px 0 0", color: cor.cinza, fontSize: 14 }}>{c.endereco}</p>}
+
+          {/* dias de atendimento */}
+          <div style={{ marginTop: 12 }}>
+            <label style={painel.rotulo}>Dias em que a equipe vem aqui</label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(d.dias || []).map((nome: string, i: number) => {
+                const marcado = c.diasSemana ? c.diasSemana.includes(i) : true;
+                return (
+                  <button key={i} disabled={salvando}
+                    style={{ ...(marcado ? painel.botaoMini : painel.botaoMiniSec), textTransform: "capitalize" }}
+                    onClick={() => {
+                      const atual: number[] = c.diasSemana || [0, 1, 2, 3, 4, 5, 6];
+                      const novoD = marcado ? atual.filter((x) => x !== i) : [...atual, i].sort();
+                      patch({ id: c.id, diasSemana: novoD });
+                    }}>
+                    {nome.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 14, color: cor.cinza, lineHeight: 1.5 }}>
+              {c.diasSemana
+                ? `A rota deste cemitério só é montada nestes dias.`
+                : `Sem marcação: a equipe vem em qualquer dia de trabalho da casa — que é o padrão.`}
+              {" "}Desmarcar todos volta ao padrão.
+            </p>
+          </div>
+
+          {/* quem trabalha aqui */}
+          {varios && (
+            <div style={{ marginTop: 12 }}>
+              <label style={painel.rotulo}>Quem trabalha só aqui</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {(d.equipeCampo || []).map((m: any) => {
+                  const aqui = m.cemiterioId === c.id;
+                  return (
+                    <button key={m.userId} disabled={salvando}
+                      style={aqui ? painel.botaoMini : painel.botaoMiniSec}
+                      onClick={() => patch({ membroId: m.userId, cemiterioId: aqui ? null : c.id })}>
+                      {aqui ? "✓ " : ""}{m.nome}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ margin: "6px 0 0", fontSize: 14, color: cor.cinza, lineHeight: 1.5 }}>
+                Quem não estiver marcado em lugar nenhum atende todos os cemitérios.
+              </p>
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <button style={painel.botaoMiniSec} disabled={salvando}
+              onClick={() => {
+                if (c.ativo && !confirm(
+                  `Desativar ${c.nome}?\n\nA rota do dia para de incluir os jazigos daqui. ` +
+                  `Nada é apagado — é só parar de agendar.`
+                )) return;
+                patch({ id: c.id, ativo: !c.ativo });
+              }}>
+              {c.ativo ? "Desativar" : "Reativar"}
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <div style={painel.card}>
+        <b style={{ color: cor.navy }}>Cadastrar outro cemitério</b>
+        <p style={{ margin: "4px 0 10px", color: cor.cinza, fontSize: 14, lineHeight: 1.5 }}>
+          Depois de cadastrar, o cadastro de jazigo passa a PERGUNTAR em qual cemitério
+          fica — em vez de escolher sozinho, que era como o mesmo jazigo acabava
+          cadastrado duas vezes.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input style={{ ...painel.input, maxWidth: 320 }} placeholder="Nome (ex.: Cemitério XXXX — Mauá)"
+                 value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} />
+          <input style={{ ...painel.input, maxWidth: 260 }} placeholder="Bairro, cidade (opcional)"
+                 value={novo.endereco} onChange={(e) => setNovo({ ...novo, endereco: e.target.value })} />
+          <button style={painel.botao} disabled={salvando} onClick={criar}>Cadastrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Casa() {
   const [f, setF] = useState<any>(null);

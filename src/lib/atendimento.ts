@@ -213,13 +213,24 @@ export async function registrarEntrada(params: {
   let escalarDireto = false;
 
   if (temAudio) {
-    const midia = await baixarMidiaBase64(mensagemRaw);
-    const transcrito = midia ? await transcreverAudio(midia.base64, midia.mimetype) : null;
-    if (transcrito) {
-      nota = `[áudio] ${transcrito}`;
+    // ÁUDIO JÁ TRANSCRITO NÃO SE TRANSCREVE DE NOVO.
+    //
+    // O webhook baixa a mídia e transcreve antes de chamar esta função — e
+    // manda o resultado em `texto`, com `transcrito: true`. Aqui o áudio era
+    // baixado e transcrito UMA SEGUNDA VEZ: custo dobrado no Groq/OpenAI em
+    // todo áudio de família, e o mesmo texto aparecendo duas vezes na conversa
+    // (uma limpo, outra com o prefixo "[áudio]").
+    if (transcrito && texto?.trim()) {
+      // nada a fazer: o texto que chegou JÁ é a transcrição
     } else {
-      nota = "[cliente enviou um áudio que não consegui ouvir]";
-      escalarDireto = true;
+      const midia = await baixarMidiaBase64(mensagemRaw);
+      const ouvido = midia ? await transcreverAudio(midia.base64, midia.mimetype) : null;
+      if (ouvido) {
+        nota = `[áudio] ${ouvido}`;
+      } else {
+        nota = "[cliente enviou um áudio que não consegui ouvir]";
+        escalarDireto = true;
+      }
     }
   } else if (temMidia) {
     const midia = await baixarMidiaBase64(mensagemRaw);

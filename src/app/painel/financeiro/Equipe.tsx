@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
+import { diaOperacao } from "@/lib/vencimento";
 
 /**
  * CONTA DA AJUDANTE
@@ -18,7 +19,7 @@ export default function Equipe() {
   const [novo, setNovo] = useState(false);
   const [f, setF] = useState({
     membroId: "", materialId: "", quantidade: "1", valor: "",
-    data: new Date().toISOString().slice(0, 10),
+    data: diaOperacao(),
   });
   const [ocupado, setOcupado] = useState(false);
 

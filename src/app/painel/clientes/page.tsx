@@ -177,7 +177,7 @@ function VisaoFamilias() {
                     onChange={(e) => setF({ ...f, ordem: e.target.value })}>
               <option value="nome">Ordenar por nome</option>
               <option value="saldo">Quem deve mais</option>
-              <option value="valor">Maior valor mensal</option>
+              <option value="valor">Maior valor por limpeza</option>
               <option value="lavagem">Próxima lavagem</option>
               <option value="cobranca">Próxima cobrança</option>
             </select>
@@ -302,7 +302,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     // preco errado no banco (antes o padrao 40 entrava calado como honorario).
     const mensal = numeroBR(f.valorMensal);
     if (temJazigo && at.cadencia !== "avulso" && (!isFinite(mensal) || mensal <= 0)) {
-      return alert("Digite o valor mensal como 40 ou 40,50 (sem R$ e sem separador de milhar).");
+      return alert("Digite o valor de UMA limpeza como 40 ou 40,50 (sem R$ e sem separador de milhar).");
     }
 
     setOcupado(true);
@@ -476,7 +476,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
                 </select>
               </div>
               <div>
-                <label style={painel.rotulo}>Valor mensal</label>
+                <label style={painel.rotulo}>Valor por limpeza</label>
                 <input type="text" inputMode="decimal" placeholder="40,00"
                        style={{ ...painel.input, width: 110 }} value={f.valorMensal}
                        onChange={(e) => setF({ ...f, valorMensal: e.target.value })} />

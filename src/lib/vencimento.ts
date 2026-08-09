@@ -17,6 +17,11 @@ export function diaOperacao(deslocamentoDias = 0): string {
   return deslocamentoDias ? somaDias(hoje, deslocamentoDias) : hoje;
 }
 
+/** O MÊS de hoje (AAAA-MM) no fuso da operação. Mesma razão do diaOperacao. */
+export function mesOperacao(): string {
+  return diaOperacao().slice(0, 7);
+}
+
 /**
  * Soma dias a uma data AAAA-MM-DD sem passar pelo fuso da máquina.
  *
@@ -53,7 +58,64 @@ export const MESES_CADENCIA: Record<string, number> = {
   mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12, avulso: 0, por_data: 0,
 };
 
-// Cobrança do ciclo = valor mensal × meses da cadência (uma verdade só).
+/**
+ * DECISAO TOMADA (08/08/2026) — `planos.valor_vigente` E O PRECO DE UMA LIMPEZA.
+ * ===========================================================================
+ * A pergunta em aberto da migration 0027 foi respondida: o numero que se digita
+ * no cadastro e quanto custa UMA limpeza; quem define o quanto a familia paga
+ * por mes e a PERIODICIDADE (o "prazo da lavagem"), nao uma multiplicacao
+ * escondida no momento de salvar.
+ *
+ * Isto ja era como o servidor LIA a coluna:
+ *   · lib/agenda.ts grava `servicos.valor = plano.valor_vigente` em cada lavagem;
+ *   · api/servico/concluir debita esse numero;
+ *   · lib/proativo.ts faz valor_vigente x qtd_por_passagem para achar o mes.
+ * E bate com o que o negocio cobra e com o que o site anuncia: "a partir de
+ * R$ 40 POR LIMPEZA".
+ *
+ * O que estava errado era quem ESCREVIA: as telas novas gravavam
+ * `valor_vigente = mensal x meses da cadencia`. Um plano anual de R$ 40 nascia
+ * com cada lavagem valendo R$ 480; um quinzenal de R$ 40 debitava R$ 80 no mes.
+ *
+ * `valor_mensal` continua existindo e passa a guardar O MESMO numero — ela e
+ * lida por meia duzia de telas so para mostrar o preco, e `valorMensalDoPlano`
+ * ja caia para `valor_vigente` quando ela era nula. Com as duas iguais, o
+ * reajuste (que so escreve valor_vigente) para de ser desfeito no proximo
+ * Salvar, que era como um aumento evaporava semanas depois sem ninguem ver.
+ */
+export function precoPorLimpeza(valorDigitado: number): number {
+  const v = Number(valorDigitado) || 0;
+  return Math.round(v * 100) / 100;
+}
+
+/**
+ * QUANTO ESTE PLANO RENDE POR MES — so para somar e mostrar, nunca para cobrar.
+ *
+ * Com o preco sendo por LIMPEZA, "R$ 40" nao quer dizer R$ 40 por mes: depende
+ * de quantas limpezas cabem no ciclo e de quantos meses o ciclo tem.
+ *   · quinzenal (mensal, 2 limpezas) a R$ 40  -> R$ 80/mes
+ *   · semestral (1 limpeza a cada 6 meses) a R$ 120 -> R$ 20/mes
+ * Somar `valor_vigente` cru como se fosse mensalidade inflava a carteira dos
+ * planos longos e escondia o peso dos curtos.
+ */
+export function valorMensalEfetivo(
+  cadencia: string,
+  lavagensPorCiclo: number | null | undefined,
+  precoDaLimpeza: number | null | undefined,
+): number {
+  const preco = Number(precoDaLimpeza) || 0;
+  const lav = Math.max(1, Number(lavagensPorCiclo) || 1);
+  const meses = MESES_CADENCIA[cadencia] ?? 0;
+  if (!meses) return 0;                     // avulso/por_data nao tem recorrencia
+  return Math.round((preco * lav / meses) * 100) / 100;
+}
+
+/**
+ * Quanto sai no ciclo inteiro — SO PARA MOSTRAR NA TELA, nunca para gravar em
+ * valor_vigente (ver a decisao acima).
+ *
+ * ex.: R$ 40 por limpeza, 2 limpezas por ciclo -> "R$ 80 por ciclo".
+ */
 export function valorDoCiclo(cadencia: string, valorMensal: number): number {
   const meses = MESES_CADENCIA[cadencia] ?? 1;
   const v = Number(valorMensal) || 0;

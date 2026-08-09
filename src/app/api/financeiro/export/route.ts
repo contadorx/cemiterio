@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (auth.erro) return auth.erro;
   const db = auth.db;
 
-  const mes = req.nextUrl.searchParams.get("mes") || new Date().toISOString().slice(0, 7);
+  const mes = req.nextUrl.searchParams.get("mes") || mesOperacao();
   const ini = `${mes}-01`;
   const fim = new Date(new Date(ini + "T00:00:00").getFullYear(), new Date(ini + "T00:00:00").getMonth() + 1, 0)
     .toISOString()

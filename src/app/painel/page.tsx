@@ -56,6 +56,8 @@ export default function Painel() {
         <InstalarApp />
         <h1 style={painel.h1}>Início</h1>
 
+        <Rotinas />
+
         {hoje && (
           <div style={{ ...painel.card, background: cor.navy, marginBottom: 12 }}>
             <strong style={{ fontSize: 18, color: "#fff" }}>Hoje</strong>
@@ -78,6 +80,33 @@ export default function Painel() {
           </div>
         )}
 
+        {/* LEAD DO SITE ESPERANDO.
+            O site promete resposta no mesmo dia. Este é o único lugar do painel
+            que mostra isso sem precisar abrir a aba certa — vem antes de tudo
+            porque é a única fila em que a demora custa um cliente novo. */}
+        {hoje?.leadsNovos > 0 && (
+          <Link
+            href="/painel/conversas?aba=leads"
+            style={{
+              ...painel.card, textDecoration: "none", display: "flex",
+              alignItems: "center", gap: 14, background: "#fffbeb",
+              border: "2px solid #f59e0b", marginBottom: 12,
+            }}
+          >
+            <span style={{ fontSize: 32 }}>🔔</span>
+            <span>
+              <b style={{ color: "#92400e", fontSize: 18 }}>
+                {hoje.leadsNovos === 1
+                  ? "1 pessoa nova esperando resposta"
+                  : `${hoje.leadsNovos} pessoas novas esperando resposta`}
+              </b>
+              <span style={{ display: "block", color: "#78350f", fontSize: 15, marginTop: 2 }}>
+                Chegaram pelo site ou pelo WhatsApp e ainda não foram atendidas.
+              </span>
+            </span>
+          </Link>
+        )}
+
         {/* pedido de servico adicional: e a unica coisa aqui com prazo dado pela familia */}
         <PedidosAdicionais />
 
@@ -94,7 +123,14 @@ export default function Painel() {
 
         {ind && (
           <div style={painel.card}>
-            <strong style={{ fontSize: 18, color: cor.navy }}>Este mês</strong>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <strong style={{ fontSize: 18, color: cor.navy }}>Este mês</strong>
+              {/* o fechamento inteiro numa tela só — inclusive a foto de meses
+                  passados, que aqui não dá para ver */}
+              <Link href="/painel/financeiro" style={{ ...painel.botaoMiniSec, marginLeft: "auto" }}>
+                Como foi o mês →
+              </Link>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginTop: 12 }}>
               <Metrica titulo="Recebido" valor={`R$ ${ind.recebidoMes.toFixed(0)}`} cor="#16a34a" />
               <Metrica titulo="A receber" valor={`R$ ${ind.aReceber.toFixed(0)}`} cor={ind.aReceber > 0 ? "#dc2626" : cor.navy} />
@@ -120,6 +156,28 @@ export default function Painel() {
               <b>{cap.cargaMensal}</b>. Sobra pra cerca de <b style={{ color: cor.teal }}>{cap.cabemTumulos} túmulos</b> novos
               ({cap.folgaMensal} limpezas/mês).
             </p>
+
+            {/* 0044 — com mais de um cemitério, o total esconde o gargalo: um
+                local atendido só às terças enche muito antes que a casa toda. */}
+            {(cap.porCemiterio || []).length > 1 && (
+              <div style={{ marginTop: 10, borderTop: `1px solid ${cor.linha}`, paddingTop: 10 }}>
+                {(cap.porCemiterio || []).map((c: any) => {
+                  const u = Math.round((c.utilizacao || 0) * 100);
+                  const cu = u >= 90 ? "#dc2626" : u >= 70 ? "#d97706" : cor.teal;
+                  return (
+                    <div key={c.cemiterioId} style={{ display: "flex", gap: 10, alignItems: "baseline",
+                                                      flexWrap: "wrap", marginTop: 6 }}>
+                      <b style={{ color: cor.navy, fontSize: 15 }}>{c.nome}</b>
+                      <span style={{ fontSize: 14, color: cor.cinza }}>
+                        {c.cargaMensal} de {c.capacidadeMensal} limpezas/mês
+                        {c.diasSemana ? ` · ${c.diasSemana.length} dia(s) por semana` : ""}
+                      </span>
+                      <b style={{ marginLeft: "auto", color: cu }}>{u}%</b>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -173,6 +231,13 @@ export default function Painel() {
                 {diag.geracao.jaExistiam > 0 && (
                   <li><b>{diag.geracao.jaExistiam}</b> já tinham limpeza criada (não duplicou)</li>
                 )}
+                {diag.geracao.falhas > 0 && (
+                  <li style={{ color: "#b91c1c", fontWeight: 700 }}>
+                    <b>{diag.geracao.falhas}</b> plano(s) deram erro e ficaram sem limpeza criada —
+                    veja o motivo em Config → Diagnóstico. Eles não avançaram de data, então rodar
+                    de novo depois de corrigir resolve.
+                  </li>
+                )}
                 <li><b>{diag.alocacao.agendados}</b> limpeza(s) distribuída(s) em <b>{diag.alocacao.dias}</b> dia(s) de trabalho</li>
               </ul>
               {diag.geracao.criados === 0 && diag.geracao.foraDoHorizonte > 0 && (
@@ -186,6 +251,71 @@ export default function Painel() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * AS ROTINAS ESTÃO RODANDO?
+ *
+ * Só aparece quando alguma parou — é aviso, não painel de controle. O modelo é
+ * o da faixa de disparos desligados (painel/ui.tsx), que é o único mecanismo de
+ * estado global que este sistema já resolvia bem.
+ *
+ * Antes disto não havia lugar nenhum que respondesse a pergunta. A tela de
+ * Diagnóstico lia só a lista de ERROS e, vazia, escrevia "Nenhum erro
+ * registrado ✓" — a mesma tela verde para "rodou perfeito" e para "não roda há
+ * uma semana".
+ */
+function Rotinas() {
+  const [d, setD] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/rotinas").then((x) => x.json()).then(setD).catch(() => null);
+  }, []);
+
+  if (!d) return null;
+
+  // migration 0039 ainda não rodou: avisa, em vez de ficar mudo
+  if (!d.ok && d.erro === "tabela_ausente") {
+    return (
+      <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
+        <b>As rotinas automáticas ainda não são monitoradas.</b>
+        <p style={{ margin: "6px 0 0", color: cor.cinza, lineHeight: 1.5 }}>{d.dica}</p>
+      </div>
+    );
+  }
+  if (!d.ok || !d.problemas) return null;
+
+  const paradas = (d.rotinas || []).filter((r: any) => r.atrasada);
+
+  return (
+    <div style={{ ...painel.card, background: "#fef2f2", border: "2px solid #dc2626" }}>
+      <b style={{ color: "#7f1d1d", fontSize: 18 }}>
+        {paradas.length === 1
+          ? "Uma rotina automática parou"
+          : `${paradas.length} rotinas automáticas pararam`}
+      </b>
+      <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: "#7f1d1d", lineHeight: 1.7 }}>
+        {paradas.map((r: any) => (
+          <li key={r.chave}>
+            <b>{r.nome}</b> —{" "}
+            {r.nuncaRodou
+              ? "nunca rodou"
+              : `sem rodar há ${
+                  r.minutosDesde >= 120
+                    ? `${Math.round(r.minutosDesde / 60)} h`
+                    : `${r.minutosDesde} min`
+                }`}
+            {r.ultimoErro ? ` · último erro: ${r.ultimoErro}` : ""}
+            <div style={{ fontSize: 14, opacity: 0.85 }}>{r.impacto}</div>
+          </li>
+        ))}
+      </ul>
+      <p style={{ margin: "10px 0 0", color: "#7f1d1d", fontSize: 14, lineHeight: 1.5 }}>
+        Confira <b>CRON_SECRET</b> nas variáveis da Vercel e se o projeto está num plano
+        que roda cron por minuto. O WhatsApp depende também da Evolution estar de pé.
+      </p>
     </div>
   );
 }

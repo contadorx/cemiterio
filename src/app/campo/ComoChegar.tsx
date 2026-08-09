@@ -41,7 +41,12 @@ type Alvo = {
   fotoReferencia: string | null;
 };
 
-export default function ComoChegar({ alvo, onFechar }: { alvo: Alvo; onFechar: () => void }) {
+export default function ComoChegar({ alvo, onFechar, onComecar }: {
+  alvo: Alvo;
+  onFechar: () => void;
+  /** Começar a limpeza sem fechar esta tela e procurar o botão no cartão. */
+  onComecar?: () => void;
+}) {
   const [pos, setPos] = useState<{ lat: number; lng: number; prec: number; heading: number | null } | null>(null);
   const [erro, setErro] = useState("");
   const [bussola, setBussola] = useState<number | null>(null);
@@ -219,6 +224,21 @@ export default function ComoChegar({ alvo, onFechar }: { alvo: Alvo; onFechar: (
           <img src={foto} alt="referência do jazigo" style={e.foto} />
         )}
 
+        {/* COMEÇAR AQUI MESMO.
+            Ela chegava no túmulo com esta tela aberta, fechava (1 toque) e
+            procurava "▶ Começar" no cartão (mais 1). Em 15 jazigos são 30
+            toques por dia só para sair de uma tela. O botão fica em destaque
+            quando o GPS diz que chegou, e discreto antes disso — para ela não
+            começar no jazigo errado por engano. */}
+        {onComecar && (
+          <button
+            style={chegou ? e.botaoComecar : { ...e.botaoSec, marginTop: 12 }}
+            onClick={onComecar}
+          >
+            ▶ Começar a limpeza deste jazigo
+          </button>
+        )}
+
         {mapaExterno && (
           <a href={mapaExterno} target="_blank" rel="noreferrer" style={e.botaoSec}>
             Abrir no mapa do celular
@@ -257,6 +277,10 @@ const e: Record<string, React.CSSProperties> = {
                 borderRadius: 12, marginTop: 14, lineHeight: 1.45 },
   foto: { width: "100%", maxHeight: 240, objectFit: "cover", borderRadius: 12, marginTop: 14,
           border: "1px solid #e7e0cf", display: "block" },
+  botaoComecar: { display: "block", width: "100%", minHeight: 64, marginTop: 14,
+                  background: "#0f766e", color: "#fff", border: "none", borderRadius: 14,
+                  fontSize: 18, fontWeight: 800, cursor: "pointer", padding: "18px 20px",
+                  textAlign: "center" },
   botaoSec: { display: "block", width: "100%", minHeight: 56, marginTop: 12, background: "#fff",
               color: NAVY, border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 17,
               fontWeight: 600, cursor: "pointer", textAlign: "center", padding: "16px 18px",

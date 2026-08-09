@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import type { DadosComprovante, Midia } from "./comprovante";
 import { subirArquivo, BUCKET_COMPROVANTES } from "./storage";
+import { diaOperacao } from "./vencimento";
 
 // Sobe a imagem do comprovante no Storage (best-effort). Se falhar, segue sem URL:
 // o registro do pagamento é mais importante que a imagem.
@@ -65,7 +66,7 @@ export async function registrarComprovante(
       comprovante_id: comprovanteId,
       status_conc: "a_conferir",
       descricao: "Comprovante de Pix (aguardando conferência)",
-      data: dados.data || new Date().toISOString().slice(0, 10),
+      data: dados.data || diaOperacao(),
     });
     if (e2) console.error("[conciliacao] movimento pendente falhou:", e2.message);
   }

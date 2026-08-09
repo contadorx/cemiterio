@@ -92,15 +92,21 @@ export default function Concluir({
     setEnviando(true);
     setErro("");
 
-    // aproveita a conclusão para registrar mais uma leitura (sem travar o fluxo)
-    const leitura = await capturarGps({ alvoMetros: 10, timeoutMs: 8000 });
-    if (leitura && leitura.precisao <= 30) {
-      fetch(`/api/tumulos/${item.tumuloId}/gps`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...leitura, origem: "conclusao" }),
-      }).catch(() => {});
-    }
+    // O GPS NAO SEGURA MAIS O ENVIO.
+    // Isto aqui esperava ate 8 segundos (`await capturarGps`) antes de mandar a
+    // conclusao — parada no sol, por uma leitura que e OPCIONAL: ela so entra
+    // numa media, e o botao "Confirmar que estou neste tumulo" ja faz esse
+    // trabalho com calma. Agora a leitura corre por fora, como a foto de longe
+    // logo abaixo ja fazia.
+    capturarGps({ alvoMetros: 10, timeoutMs: 8000 }).then((l) => {
+      if (l && l.precisao <= 30) {
+        fetch(`/api/tumulos/${item.tumuloId}/gps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...l, origem: "conclusao" }),
+        }).catch(() => {});
+      }
+    }).catch(() => {});
 
     // foto de enquadramento (referência do túmulo), se ela tirou uma nova
     if (enquadramento) {
@@ -116,10 +122,20 @@ export default function Concluir({
       fotoDepoisBase64: depois.b64,
       fotoAntesBase64: antes?.b64,
       mimetype: depois.mt,
-      lat: leitura?.lat,
-      lng: leitura?.lng,
     });
     setEnviando(false);
+
+    // "perdido" = nem subiu nem coube na memoria do aparelho. Este caso existia
+    // e era MUDO: a excecao subia, o botao ficava travado em "Enviando..." e o
+    // trabalho sumia. Agora ela sabe o que aconteceu e o que fazer.
+    if (modo === "perdido") {
+      setErro(
+        "A memória do aparelho encheu e eu não consegui guardar esta foto. " +
+        "Procure um lugar com sinal e abra o app: o que já está guardado sobe e libera espaço."
+      );
+      return;
+    }
+
     // online = subiu; offline = guardado no aparelho e sobe sozinho quando voltar o sinal.
     // Em ambos, a Nina segue em frente (o cemitério tem sinal ruim; travar não ajuda).
     onPronto(modo === "offline");

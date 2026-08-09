@@ -3,6 +3,8 @@ import { exigirLogado } from "@/lib/roles";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
 import { consumirMaterial } from "@/lib/consumo";
 import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
+import { diaOperacao } from "@/lib/vencimento";
+import { registrarErro } from "@/lib/monitor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +61,22 @@ export async function POST(req: NextRequest) {
       data_executada: agoraIso,
       duracao_minutos: duracao,
       foto_depois_url: urlDepois,
-      foto_antes_url: urlAntes,
+      // A FOTO DO ANTES SO E GRAVADA QUANDO VEM UMA NOVA.
+      //
+      // Ela normalmente ja subiu la no "Comecar" (api/campo/iniciar grava
+      // foto_antes_url). O Concluir so manda fotoAntesBase64 se a Nina tirar
+      // OUTRA — e a propria tela desaconselha isso ("aqui ela so aparece
+      // confirmada", senao fotografaria o jazigo ja limpo).
+      //
+      // Escrevendo `foto_antes_url: urlAntes` sem condicional, TODA conclusao
+      // normal do campo gravava null e APAGAVA a foto do antes: o arquivo
+      // continuava no Storage, mas o ponteiro do banco sumia. Ninguem percebia
+      // porque nem o portal da familia nem o WhatsApp mostram o antes — e o
+      // site vende "antes e depois" em tres lugares.
+      //
+      // O concluir-admin (painel) ja fazia certo; agora as duas portas
+      // se comportam igual.
+      ...(urlAntes ? { foto_antes_url: urlAntes } : {}),
       executora_id: auth.userId,
       // no "contra_foto" e a entrega que libera a cobranca
       ...(momento === "contra_foto" ? { cobranca_liberada_em: agoraIso } : {}),
@@ -79,10 +96,14 @@ export async function POST(req: NextRequest) {
   const orgId = (serv as any).org_id as string;
   const clienteId = (serv as any).cliente_id as string | null;
 
+  // O QUE ESTA LAVAGEM VALEU, resolvido uma vez e usado por todos daqui pra
+  // baixo: o debito, o carimbo da remuneracao e o proprio servico.
+  let valor = Number((serv as any).valor) || 0;
+  let debitoFalhou = false;
+
   // ----- A1: débito no razão (idempotente por servico_id) -----
   // momento "antes" = pre-pago: a familia ja pagou, nao debita de novo.
   if (clienteId && momento !== "antes") {
-    let valor = Number((serv as any).valor) || 0;
     if (!valor && (serv as any).plano_id) {
       const { data: plano } = await db
         .from("planos")
@@ -117,10 +138,32 @@ export async function POST(req: NextRequest) {
         servico_id: servicoId,
         status_conc: "confirmado",
         descricao: "Limpeza executada",
-        data: new Date().toISOString().slice(0, 10),
+        // o debito entra no dia de Sao Paulo: com UTC, limpeza concluida
+        // depois das 21h caia no dia (e no mes) seguinte
+        data: diaOperacao(),
       });
-      if (eDeb) console.error("[concluir] débito falhou:", eDeb.message);
+      // DEBITO QUE FALHA NAO PODE VIRAR ok:true CALADO.
+      // Antes: um console.error e a resposta seguia como sucesso. A limpeza
+      // ficava feita e NAO cobrada, sem sinal em lugar nenhum — o prejuizo so
+      // aparecia meses depois, se alguem cruzasse servicos com movimentos.
+      // Agora vai para erros_log (aparece em Config -> Diagnostico) e volta na
+      // resposta, para a tela poder avisar.
+      if (eDeb) {
+        debitoFalhou = true;
+        console.error("[concluir] débito falhou:", eDeb.message);
+        await registrarErro("servico/concluir: débito não lançado", eDeb.message, {
+          servicoId, clienteId, valor,
+        });
+      }
     }
+  }
+
+  // CONGELA O VALOR NO SERVICO (paridade com o concluir-admin, que ja fazia).
+  // O debito saia pela cascata valor -> plano -> referencia da casa, mas o
+  // servico continuava com `valor` nulo: a tela de Avulsos mostrava "—" ao lado
+  // de "lançada · R$ 40,00", e o Resultado por jazigo nao via receita nenhuma.
+  if (valor > 0 && !Number((serv as any).valor)) {
+    await db.from("servicos").update({ valor }).eq("id", servicoId);
   }
 
   // GPS do túmulo na primeira conclusão
@@ -137,11 +180,15 @@ export async function POST(req: NextRequest) {
 
   // quanto ESTA lavagem vale para quem executou, congelado agora (0031).
   // Nao derruba a conclusao se a regra ainda nao existir.
+  // A RECEITA E O VALOR RESOLVIDO, nao o que estava gravado antes.
+  // Passava `serv.valor` cru — que e nulo justamente nos avulsos. Numa regra
+  // por percentual, a familia pagava R$ 40 e a ajudante ganhava R$ 0,00, sem
+  // erro em lugar nenhum.
   await carimbarRemuneracao(db, {
     servicoId,
     orgId,
     executoraId: auth.userId,
-    receita: Number((serv as any).valor) || 0,
+    receita: valor,
     avulso: ehAvulso(serv as any),
   });
 
@@ -151,5 +198,5 @@ export async function POST(req: NextRequest) {
   // baixa o estoque pelo consumo estimado e guarda o custo desta limpeza
   const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));
 
-  return NextResponse.json({ ok: true, duracao, material, notificado, motivoEnvio: aviso.motivo });
+  return NextResponse.json({ ok: true, duracao, material, notificado, motivoEnvio: aviso.motivo, valor, debitoFalhou });
 }

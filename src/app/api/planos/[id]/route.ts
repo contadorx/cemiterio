@@ -5,9 +5,8 @@ import { diaOperacao, valorMensalDoPlano } from "@/lib/vencimento";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MESES: Record<string, number> = {
-  mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12, avulso: 0, por_data: 0,
-};
+// (a tabela de meses saiu daqui: esta rota nao multiplica mais preco por
+// cadencia — ver a decisao de 08/08 em lib/vencimento.ts)
 
 // PATCH — edita o plano do jazigo, incluindo os campos da migração.
 // Só mexe no que o corpo manda (a tela envia apenas os campos tocados), para um
@@ -37,15 +36,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // DINHEIRO — a regra e conservadora de proposito.
   //
-  // valor_vigente tem significado em disputa no sistema (preco por limpeza em
-  // migrations/0001 e em src/lib/agenda.ts; valor do ciclo no codigo novo, ver
-  // src/lib/vencimento.ts). Enquanto a decisao nao vier, esta rota:
-  //  - recalcula valor_vigente = mensal x meses SO quando o mensal e CONHECIDO
-  //    (veio no corpo, ou ja esta gravado na coluna valor_mensal);
-  //  - em plano antigo (valor_mensal NULL) e salvamento que nao mexeu no
-  //    dinheiro, NAO toca em valor_vigente nem inventa um valor_mensal. Antes
-  //    disso, salvar a data de um plano bimestral importado por R$ 45 gravava
-  //    valor_vigente = 90 e dobrava o valor debitado em cada lavagem.
+  // DECISAO DE 08/08: valor_vigente e o PRECO DE UMA LIMPEZA (lib/vencimento.ts).
+  //
+  // O QUE ISSO CONSERTA AQUI
+  // -------------------------------------------------------------------------
+  // Esta rota recalculava `valor_vigente = mensal x meses da cadencia` a cada
+  // Salvar. Como o RPC de reajuste escreve SO valor_vigente, a sequencia real
+  // era: aplico o reajuste de R$ 45 para R$ 50 -> semanas depois corrijo a
+  // periodicidade nesta tela -> o servidor regrava valor_vigente a partir do
+  // valor_mensal antigo (45) e O REAJUSTE EVAPORA, sem aviso nenhum, e a
+  // familia volta ao preco de antes.
+  //
+  // Agora o preco e um numero so, nas duas colunas. Mexer na cadencia nao toca
+  // mais no dinheiro — periodicidade e preco viraram coisas separadas, que e
+  // exatamente o que "o prazo da lavagem decide o plano" quer dizer.
   if (b.cadencia !== undefined || b.valor_mensal !== undefined) {
     const a = (await db.from("planos")
       .select("cadencia,valor_mensal,valor_vigente,data_valor_vigente")
@@ -53,16 +57,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const cadencia = b.cadencia ?? a?.cadencia;
     if (b.cadencia !== undefined) patch.cadencia = cadencia;
 
-    const mensal = b.valor_mensal !== undefined
-      ? Number(b.valor_mensal) || 0
-      : (a?.valor_mensal != null ? Number(a.valor_mensal) : null);
+    // SO mexe em dinheiro quando o dinheiro veio no corpo. Trocar mensal->anual
+    // nao e reprecificacao: antes, so mudar a cadencia reescrevia o valor.
+    const mensal = b.valor_mensal !== undefined ? Number(b.valor_mensal) || 0 : null;
 
     if (mensal != null) {
-      const meses = MESES[cadencia] ?? 1;
       patch.valor_mensal = Math.round(mensal * 100) / 100;
-      patch.valor_vigente = meses > 0
-        ? Math.round(mensal * meses * 100) / 100
-        : Math.round(mensal * 100) / 100;
+      patch.valor_vigente = Math.round(mensal * 100) / 100;
 
       // PRECO NOVO = DATA NOVA. data_valor_vigente e o "desde quando este preco
       // vale", e a Temperatura de reajuste (src/lib/reajuste.ts) mede a

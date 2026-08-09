@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { zerarReguaSeQuitou } from "@/lib/financeiro";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
   if (b?.clienteId) {
     const { data, error } = await auth.db.rpc("sureya_entrada_identificada", {
       p_valor: valor,
-      p_data: b?.data || new Date().toISOString().slice(0, 10),
+      p_data: b?.data || diaOperacao(),
       p_cliente: b.clienteId,
       p_remetente: b?.remetente || null,
       p_identificador: b?.identificador || null,
@@ -65,16 +67,18 @@ export async function POST(req: NextRequest) {
     });
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
     const r = (Array.isArray(data) ? data[0] : data) || {};
+    // entrada do banco identificada = dinheiro recebido: mesma regra da ficha
+    const reguaZerada = await zerarReguaSeQuitou(b.clienteId);
     return NextResponse.json({
       ok: true, id: r.r_entrada, movimento: r.r_movimento,
-      quitados: r.r_quitados || 0, sobrou: Number(r.r_sobrou) || 0,
+      quitados: r.r_quitados || 0, sobrou: Number(r.r_sobrou) || 0, reguaZerada,
     });
   }
 
   // sem dono ainda: fica na fila de identificação
   const { data, error } = await auth.db.rpc("sureya_registrar_entrada_banco", {
     p_valor: valor,
-    p_data: b?.data || new Date().toISOString().slice(0, 10),
+    p_data: b?.data || diaOperacao(),
     p_remetente: b?.remetente || null,
     p_cliente: null,
     p_identificador: b?.identificador || null,
@@ -101,7 +105,8 @@ export async function PUT(req: NextRequest) {
     p_entrada: b.entradaId, p_cliente: b.clienteId,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, movimentoId: data });
+  const reguaZerada = await zerarReguaSeQuitou(b.clienteId);
+  return NextResponse.json({ ok: true, movimentoId: data, reguaZerada });
 }
 
 // DELETE ?id= — remove a entrada (lançou errado)

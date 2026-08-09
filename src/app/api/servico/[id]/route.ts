@@ -42,12 +42,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ ok: false, erro: amigavel }, { status: 400 });
     }
     const r = (Array.isArray(data) ? data[0] : data) || {};
+
+    // REMARCAR À MÃO = DECISÃO DE PESSOA, E ELA MANDA (0041).
+    // Sem esta marca, o alocador automático devolvia o serviço para onde a fila
+    // mandasse na próxima rodada — no cron das 9h do dia seguinte, em silêncio.
+    // Se a coluna ainda não existir (0041 não rodada), o update falha e é
+    // ignorado: a remarcação acontece do mesmo jeito, só sem a proteção.
+    await db.from("servicos")
+      .update({ fixado_em: new Date().toISOString() })
+      .eq("id", params.id);
+
     return NextResponse.json({
       ok: true,
       novaData: r.nova_data,
       proximaDoJazigo: r.proxima_do_jazigo,
       seguintesMovidas: r.seguintes_movidas || 0,
+      fixado: true,
     });
+  }
+
+  // Devolve a lavagem para o alocador automático: ela volta a ser distribuída
+  // junto com o resto na próxima geração.
+  if (acao === "desfixar") {
+    const { error } = await db.from("servicos")
+      .update({ fixado_em: null })
+      .eq("id", params.id).neq("status", "executado");
+    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, fixado: false });
   }
 
   if (acao === "pular") {

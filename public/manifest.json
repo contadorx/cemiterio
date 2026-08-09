@@ -2,8 +2,8 @@
   "name": "Zelo & Memória",
   "short_name": "Zelo & Memória",
   "description": "Cuidado e conservação de jazigos — Por Dona Nadir, desde 1990",
-  "id": "/painel",
-  "start_url": "/painel",
+  "id": "/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -11,14 +11,35 @@
   "theme_color": "#12284b",
   "lang": "pt-BR",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Conversas", "url": "/painel/conversas" },
-    { "name": "Agenda", "url": "/painel/agenda" },
-    { "name": "Campo", "url": "/campo" }
+    {
+      "name": "Ver minhas visitas",
+      "url": "/familia"
+    }
   ]
 }

@@ -102,13 +102,27 @@ create index if not exists idx_servicos_pago_executora
 -- ===========================================================================
 -- O acerto lanca uma SAIDA no caixa. Se voce ja tem uma categoria com nome
 -- parecido, o codigo acha a sua e usa; este insert e so a rede de seguranca.
-insert into categorias_financeiras (org_id, nome, tipo, grupo, ativa)
-select o.id, 'Pagamento da equipe', 'saida', 'pessoal', true
-  from orgs o
- where not exists (
-   select 1 from categorias_financeiras c
-    where c.org_id = o.id and lower(c.nome) like '%equipe%' and c.tipo = 'saida'
- );
+-- CORRIGIDO (0045): `categorias_financeiras` nao era criada por migration
+-- nenhuma — ela nasceu direto no SQL Editor. Em base LIMPA este insert abortava
+-- com "relation does not exist" e derrubava a 0031 inteira, impedindo rodar as
+-- migrations em ordem num ambiente novo.
+--
+-- Agora o insert e tolerante: se a tabela ainda nao existir, nao faz nada e
+-- segue. A 0045 cria a tabela e replanta esta mesma semente.
+-- Em producao (onde a tabela existe) o comportamento e IDENTICO ao de antes.
+do $$
+begin
+  insert into categorias_financeiras (org_id, nome, tipo, grupo, ativa)
+  select o.id, 'Pagamento da equipe', 'saida', 'pessoal', true
+    from orgs o
+   where not exists (
+     select 1 from categorias_financeiras c
+      where c.org_id = o.id and lower(c.nome) like '%equipe%' and c.tipo = 'saida'
+   );
+exception
+  when undefined_table then
+    raise notice 'categorias_financeiras ainda nao existe — a 0045 planta esta semente';
+end $$;
 
 
 -- ---------------------------------------------------------------------------

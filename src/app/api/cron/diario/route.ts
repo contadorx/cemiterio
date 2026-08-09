@@ -3,6 +3,7 @@ import { cronAutorizado } from "@/lib/cron-auth";
 import { avisosSaldoBaixo, cobrancaGentil, gatilhosDeData } from "@/lib/proativo";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { registrarErro } from "@/lib/monitor";
+import { carimbarRotina } from "@/lib/rotinas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,12 @@ export async function GET(req: NextRequest) {
     await registrarErro("cron_diario_proativos", e);
     resultado.rascunhos = { erro: true };
   }
+
+  // "ok" so quando NENHUMA etapa falhou: meia rotina nao pode passar por
+  // rotina inteira no painel.
+  const tudoOk = !resultado.agenda?.erro && !resultado.rascunhos?.erro;
+  await carimbarRotina("diario", tudoOk, resultado,
+    tudoOk ? undefined : "uma das etapas falhou — veja erros_log");
 
   return NextResponse.json(resultado);
 }

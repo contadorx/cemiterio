@@ -20,8 +20,14 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
-  if (!(await podeChamarIa())) {
-    return NextResponse.json({ ok: false, erro: "teto_ia_atingido" }, { status: 429 });
+  // le .pode: o retorno e um objeto e objeto e sempre truthy — do jeito
+  // antigo o teto diario nunca segurava esta porta (ver redator.ts)
+  const custo = await podeChamarIa();
+  if (!custo.pode) {
+    return NextResponse.json({
+      ok: false, erro: "teto_ia_atingido",
+      mensagem: `Teto de IA do dia atingido (${custo.usadas} de ${custo.teto} chamadas). Escreva a mão hoje, ou aumente o teto na Config.`,
+    }, { status: 429 });
   }
   const org = await orgAtual(auth.db);
   const b = await req.json().catch(() => ({}));

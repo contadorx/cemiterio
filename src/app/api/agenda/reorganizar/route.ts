@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { alocarAgenda } from "@/lib/agenda";
+import { diaOperacao, somaDias } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +17,12 @@ export async function GET() {
     .select("id,data_prevista")
     .in("status", ["pendente", "agendado"])
     .not("data_prevista", "is", null)
-    .gte("data_prevista", new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
+    .gte("data_prevista", somaDias(diaOperacao(), -30))
     .limit(500);
 
   const { data: cfg } = await auth.db.from("orgs").select("dias_semana").limit(1).maybeSingle();
   const dias: number[] = (cfg as any)?.dias_semana || [1, 2, 3, 4, 5, 6];
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
 
   const foraDaJornada = (servicos || []).filter((s: any) => {
     const d = new Date(s.data_prevista + "T12:00:00Z").getUTCDay();

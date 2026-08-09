@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cronAutorizado } from "@/lib/cron-auth";
 import { destilarPerfisPendentes } from "@/lib/destilacao";
 import { registrarErro } from "@/lib/monitor";
+import { carimbarRotina } from "@/lib/rotinas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +16,11 @@ export async function GET(req: NextRequest) {
   }
   try {
     const perfis = await destilarPerfisPendentes();
+    await carimbarRotina("perfis", true, { perfis });
     return NextResponse.json({ ok: true, perfis });
   } catch (e) {
     await registrarErro("cron_perfis", e);
+    await carimbarRotina("perfis", false, undefined, (e as any)?.message || String(e));
     return NextResponse.json({ ok: false, erro: "falha" }, { status: 500 });
   }
 }

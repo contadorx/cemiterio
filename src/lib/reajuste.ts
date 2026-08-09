@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { diaOperacao } from "./vencimento";
 
 export interface Candidato {
   planoId: string;
@@ -56,7 +57,7 @@ export async function calcularTemperatura(db: SupabaseClient): Promise<Candidato
 
   for (const p of planos || []) {
     const valorAtual = Number((p as any).valor_vigente) || 0;
-    const desde = (p as any).data_valor_vigente || new Date().toISOString().slice(0, 10);
+    const desde = (p as any).data_valor_vigente || diaOperacao();
     const meses = Math.max(0, mesesEntre(desde));
     const anos = meses / 12;
 

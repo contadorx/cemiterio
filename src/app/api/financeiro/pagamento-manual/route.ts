@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
-import { calcularSaldo } from "@/lib/financeiro";
+import { zerarReguaSeQuitou } from "@/lib/financeiro";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,10 +29,8 @@ export async function POST(req: NextRequest) {
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  const s = await calcularSaldo(clienteId);
-  if (s.saldo >= -0.005) {
-    await db.from("clientes").update({ cobranca_nivel: 0, cobranca_em: null }).eq("id", clienteId);
-  }
+  // mesma regra das outras portas de dinheiro, agora num lugar só
+  const reguaZerada = await zerarReguaSeQuitou(clienteId);
 
-  return NextResponse.json({ ok: true, movimentoId: movId });
+  return NextResponse.json({ ok: true, movimentoId: movId, reguaZerada });
 }

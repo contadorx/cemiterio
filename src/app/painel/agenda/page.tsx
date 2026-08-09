@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import ConcluirAdmin from "./ConcluirAdmin";
+import { mesOperacao } from "@/lib/vencimento";
 
 interface Item {
   id: string;
@@ -12,6 +13,8 @@ interface Item {
   falecido: string | null;
   cliente: string | null;
   valor: number | null;
+  /** data escolhida à mão: a geração automática não mexe nesta lavagem (0041) */
+  fixado?: boolean;
 }
 
 export default function AgendaPage() {
@@ -25,7 +28,7 @@ export default function AgendaPage() {
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
   const [diag, setDiag] = useState<any>(null);
-  const [mesAlvo, setMesAlvo] = useState(new Date().toISOString().slice(0, 7));
+  const [mesAlvo, setMesAlvo] = useState(mesOperacao());
   const [incluirAvulsos, setIncluirAvulsos] = useState(false);
   const [dataAvulsos, setDataAvulsos] = useState("");
   const [fora, setFora] = useState(0);
@@ -295,6 +298,14 @@ export default function AgendaPage() {
                     Q{s.quadra} · {s.tumulo}
                   </span>{" "}
                   <span style={{ color: statusCor[s.status] || cor.cinza, fontSize: 15 }}>({s.status})</span>
+                  {s.fixado && (
+                    <span title="Data escolhida por você — a geração automática não mexe nesta lavagem"
+                          style={{ marginLeft: 6, fontSize: 13, fontWeight: 700, color: "#0f766e",
+                                   background: "#ecfdf5", border: "1px solid #99f6e4",
+                                   borderRadius: 999, padding: "2px 8px" }}>
+                      📌 data sua
+                    </span>
+                  )}
                   <p style={{ color: cor.cinza, fontSize: 15, margin: "2px 0 0" }}>
                     {s.falecido ? `${s.falecido} · ` : ""}
                     {s.cliente || "sem cliente"}
@@ -328,6 +339,20 @@ export default function AgendaPage() {
                         <button style={painel.botaoSec} onClick={() => setRemarcando(s.id)}>
                           Remarcar
                         </button>
+                        {s.fixado && (
+                          <button style={painel.botaoSec}
+                                  title="Devolve esta lavagem para a distribuição automática"
+                                  onClick={() => {
+                                    if (!confirm(
+                                      `Devolver ${s.tumulo} para a agenda automática?\n\n` +
+                                      "A data que você escolheu deixa de ser respeitada: na próxima " +
+                                      "geração ela pode mudar de dia."
+                                    )) return;
+                                    acao(s.id, { acao: "desfixar" });
+                                  }}>
+                            Soltar data
+                          </button>
+                        )}
                         <label style={{ display: "flex", alignItems: "center", gap: 6,
                                         fontSize: 14, color: cor.cinza }}>
                           <input type="checkbox" checked={replanejar}

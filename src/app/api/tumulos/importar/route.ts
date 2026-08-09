@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 import { diaOperacao } from "@/lib/vencimento";
+import { resolverCemiterio, explicarErroJazigo } from "@/lib/jazigo";
 
 /**
  * Dinheiro de planilha em pt-BR. Devolve NaN quando NAO entende — nunca 0 e
@@ -84,17 +85,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // cemitério padrão
-  let { data: cem } = await db.from("cemiterios").select("id").order("nome").limit(1).maybeSingle();
-  if (!cem) {
-    const { data: novo } = await db
-      .from("cemiterios")
-      .insert({ org_id: org, nome: "Cemitério da Saudade — Vila Vitória, Mauá" })
-      .select("id")
-      .single();
-    cem = novo as any;
+  // CEMITÉRIO (0044). Antes: pegava o primeiro em ordem alfabética e, se não
+  // houvesse nenhum, criava um com o nome do Cemitério da Saudade CRAVADO no
+  // código — o que dava errado na primeira importação de outro lugar.
+  // Agora: o informado no corpo, ou o único cadastrado; com vários, recusa.
+  const rc = await resolverCemiterio(db, org, (body as any)?.cemiterioId);
+  if (!rc.ok) {
+    return NextResponse.json({
+      ok: false, erro: rc.erro,
+      mensagem: explicarErroJazigo(rc.erro, (rc as any).detalhe),
+    }, { status: 400 });
   }
-  const cemId = (cem as any).id;
+  const cemId = rc.cemiterioId;
 
   const quadraCache = new Map<string, string>();
   const clienteCache = new Map<string, string>();

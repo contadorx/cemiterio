@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { avisosDoJazigo } from "@/lib/briefing";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +12,18 @@ export async function GET(req: NextRequest) {
   if (auth.erro) return auth.erro;
   const db = auth.db;
 
-  const data = req.nextUrl.searchParams.get("data") || new Date().toISOString().slice(0, 10);
+  // O DIA E O DE SAO PAULO, NUNCA O DA MAQUINA.
+  //
+  // O alocador grava data_prevista com diaOperacao() (America/Sao_Paulo), mas
+  // esta rota lia com toISOString() (UTC). A Vercel roda em UTC: das 21h a
+  // meia-noite de Brasilia o app de campo pedia o dia de AMANHA e a lista da
+  // Nina aparecia vazia. Uma funcao so para o sistema inteiro.
+  const data = req.nextUrl.searchParams.get("data") || diaOperacao();
 
   let q = db
     .from("servicos")
     .select(
-      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,foto_antes_url,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem)),clientes(nome)"
+      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,foto_antes_url,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem,cemiterios(nome))),clientes(nome)"
     )
     .eq("data_prevista", data)
     .in("status", ["pendente", "agendado", "executado"]);
@@ -44,6 +51,8 @@ export async function GET(req: NextRequest) {
     ordem: s.ordem_dia,
     tumulo: s.tumulos?.identificacao || "",
     quadra: s.tumulos?.quadras?.codigo || "—",
+    // 0044: com dois cemitérios, "Q-12" sozinho não diz onde a pessoa está
+    cemiterio: s.tumulos?.quadras?.cemiterios?.nome || null,
     falecido: s.tumulos?.falecido_nome || null,
     cliente: s.clientes?.nome || null,
     lat: s.tumulos?.lat ?? null,

@@ -138,7 +138,7 @@ export default function VisaoJazigos() {
   const tot = {
     quantidade: visiveis.length,
     mensal: Math.round(visiveis.filter((p) => p.ativo)
-      .reduce((s, p) => s + (Number(p.valorMensal) || 0), 0) * 100) / 100,
+      .reduce((s, p) => s + (Number(p.mensalEfetivo) || 0), 0) * 100) / 100,
     faltaData: visiveis.filter((p) => p.faltaData && p.ativo).length,
     naoConferidos: visiveis.filter((p) => !p.conferido).length,
   };
@@ -248,7 +248,7 @@ export default function VisaoJazigos() {
           // agrupado por quadra na ordem "rota"; senão, lista corrida
           if (f.ordem === "quadra" && porQuadra.size > 0) {
             return [...porQuadra.entries()].map(([q, itens]) => {
-              const somaMes = itens.filter((p) => p.ativo).reduce((s, p) => s + p.valorMensal, 0);
+              const somaMes = itens.filter((p) => p.ativo).reduce((s, p) => s + (Number(p.mensalEfetivo) || 0), 0);
               return (
                 <div key={q} style={{ marginBottom: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline",
@@ -315,17 +315,22 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
   // de dar tempo de digitar o centavo ("40." → 40 → impossível chegar a 40,50).
   const mensalNumBruto = numeroBR(e.valor_mensal);
   const mensalNum = isFinite(mensalNumBruto) ? mensalNumBruto : 0;
-  // PLANO ANTIGO (sem valor_mensal no banco): enquanto o valor nao for editado,
-  // a tela mostra o que esta GRAVADO. Calcular "mensal x meses" aqui anunciava
-  // R$ 540 de ciclo num plano de R$ 45 so por trocar o periodo — e o servidor,
-  // corretamente, nao mexe em dinheiro nesse caso. Ver a decisao pendente em
-  // migrations/0027_DECISAO_valor_vigente_diagnostico.sql.
+  // PLANO ANTIGO (sem valor_mensal no banco): o numero exibido sai de
+  // valor_vigente. Depois da migration 0038 as duas colunas guardam o mesmo
+  // valor — o preco de UMA limpeza — e este caso deixa de existir; enquanto ela
+  // nao rodar, mexer no campo de dinheiro continua contando como declaracao do
+  // preco (e por isso `p.legado` forca o envio no salvar, mais abaixo).
   const dinheiroIntacto = numeroBR(e.valor_mensal) === numeroBR(doServidor().valor_mensal)
     || e.valor_mensal === doServidor().valor_mensal;
-  const legadoIntacto = !!p.legado && dinheiroIntacto;
-  const ciclo = legadoIntacto
-    ? Number(p.valorCiclo || 0)
-    : ((MESES[e.cadencia] || 0) > 0 ? mensalNum * MESES[e.cadencia] : mensalNum);
+  // DECISAO 08/08: o campo e o preco de UMA limpeza. A caixa ao lado mostra o
+  // que isso DA POR MES (preco x limpezas do ciclo / meses do ciclo) — antes
+  // ela dizia "cobranca do ciclo" e era o numero que o servidor gravava, o que
+  // fazia um plano anual nascer com cada lavagem valendo o ano inteiro.
+  const lavagens = Math.max(1, Number((p as any).lavagens) || 1);
+  const mesesCad = MESES[e.cadencia] || 0;
+  const porMes = mesesCad > 0
+    ? Math.round((mensalNum * lavagens / mesesCad) * 100) / 100
+    : 0;
 
   async function salvar() {
     // TOCADO **E** DIFERENTE. Só "tocado" mandava de volta o mesmo valor quando
@@ -351,7 +356,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
     if ("valor_mensal" in corpo) {
       const n = numeroBR(corpo.valor_mensal);
       if (String(corpo.valor_mensal).trim() === "" || !Number.isFinite(n) || n < 0) {
-        alert("Informe o valor mensal (ou feche sem salvar).");
+        alert("Informe o valor de uma limpeza (ou feche sem salvar).");
         return;
       }
       corpo.valor_mensal = n;
@@ -383,10 +388,8 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
           <span style={{ color: cor.cinza }}> · {p.jazigo}</span>
           <div style={{ fontSize: 13, color: cor.cinza, marginTop: 3 }}>
             {p.quadra}{p.rua ? ` · ${p.rua}` : ""} · {p.cadencia} ·{" "}
-            <b style={{ color: cor.navy }}>{money(p.valorMensal)}{p.legado ? "" : "/mês"}</b>
-            {p.legado
-              ? " (valor gravado, sem mensal separado)"
-              : MESES[p.cadencia] > 1 && ` (${money(p.valorCiclo)} por cobrança)`}
+            <b style={{ color: cor.navy }}>{money(p.valorMensal)}</b> por limpeza
+            {p.mensalEfetivo > 0 && ` (${money(p.mensalEfetivo)}/mês)`}
             {p.antecipada && " · antecipada"}
             {!p.ativo && " · INATIVO"}
             {p.conferido && " · ✓"}
@@ -413,15 +416,15 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
               </select>
             </div>
             <div>
-              <label style={painel.rotulo}>Valor mensal</label>
+              <label style={painel.rotulo}>Valor por limpeza</label>
               <input type="text" inputMode="decimal" placeholder="0,00"
                      style={{ ...painel.input, width: 110 }} value={e.valor_mensal}
                      onChange={(x) => mudar("valor_mensal", x.target.value.replace(/[^\d.,]/g, ""))} />
             </div>
             <div>
-              <label style={painel.rotulo}>{legadoIntacto ? "Valor gravado" : "Cobrança do ciclo"}</label>
+              <label style={painel.rotulo}>Dá por mês</label>
               <div style={{ ...painel.input, width: 120, background: "#f8fafc", fontWeight: 700 }}>
-                {isFinite(mensalNumBruto) || legadoIntacto ? money(ciclo) : "—"}
+                {isFinite(mensalNumBruto) ? money(porMes) : "—"}
               </div>
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12 }}>

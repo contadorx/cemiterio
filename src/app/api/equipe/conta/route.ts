@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin, exigirLogado } from "@/lib/roles";
+import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
       aPagar: r2((saldos || []).reduce((s: number, x: any) => s + Number(x.a_receber), 0)),
       pagoNoMes: r2(lista
         .filter((l: any) => l.pago_em &&
-          String(l.pago_em).slice(0, 7) === new Date().toISOString().slice(0, 7))
+          String(l.pago_em).slice(0, 7) === mesOperacao())
         .reduce((s: number, l: any) => s + Number(l.valor), 0)),
     },
   });
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     p_material: b.materialId,
     p_quantidade: Number(b?.quantidade) || 1,
     p_valor: Number(b?.valor) || 0,
-    p_data: b?.data || new Date().toISOString().slice(0, 10),
+    p_data: b?.data || diaOperacao(),
     p_comprovante: b?.comprovante || null,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
@@ -71,7 +72,7 @@ export async function PUT(req: NextRequest) {
   const { data, error } = await auth.db.rpc("sureya_pagar_equipe", {
     p_membro: b.membroId,
     p_valor: b?.valor ? Number(b.valor) : null,
-    p_data: b?.data || new Date().toISOString().slice(0, 10),
+    p_data: b?.data || diaOperacao(),
     p_descricao: b?.descricao || null,
   });
   if (error) {

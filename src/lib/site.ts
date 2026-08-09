@@ -1,4 +1,4 @@
-import { MARCA } from "./marca";
+import { MARCA, cemiteriosEmTexto, CEMITERIOS } from "./marca";
 
 /**
  * TODO O TEXTO DO SITE, NUM ARQUIVO SÓ.
@@ -46,11 +46,16 @@ export const SITE = {
   // não estar deixando o pai, a mãe ou o filho no abandono.
   // -------------------------------------------------------------------------
   hero: {
-    olho: MARCA.cemiterio,
+    olho: `${cemiteriosEmTexto()} — ${MARCA.regiao}`,
     titulo: "O túmulo da sua família cuidado — mesmo quando você não pode ir.",
+    // DECISAO 08/08: a familia recebe A FOTO DO DEPOIS. A do antes continua
+    // sendo tirada, mas como prova nossa — nao como promessa. Prometer o par e
+    // mandar uma foto so era a distancia entre o site e o sistema.
+    // A frase fala da REGIÃO e a lista de cemitérios sai da marca: no dia em
+    // que o segundo abrir, o texto continua verdadeiro sem reescrita.
     texto:
-      "Limpeza e conservação de jazigos no Cemitério da Saudade, em Mauá. " +
-      "A cada visita você recebe no WhatsApp a foto de antes e a de depois. " +
+      `Limpeza e conservação de jazigos em ${MARCA.regiao}. ` +
+      "Terminado o serviço, chega no seu WhatsApp a foto do jazigo limpo. " +
       "Sem precisar acreditar: dá para ver.",
     cta: "Falar no WhatsApp",
     cta2: "Pedir um orçamento",
@@ -100,7 +105,7 @@ export const SITE = {
       {
         n: "3",
         t: "Você recebe a foto",
-        d: "Do mesmo ângulo, antes e depois, no dia do serviço. Sem foto do depois, o serviço não é dado como feito nem cobrado.",
+        d: "A foto do jazigo limpo, tirada ali, no dia. Sem ela o serviço não é dado como feito nem cobrado — é regra do sistema, não boa vontade.",
       },
     ],
   },
@@ -115,8 +120,8 @@ export const SITE = {
       "Limpeza do entorno: mato, folhas, terra levantada pela chuva",
       "Retirada das flores secas e dos vasos quebrados",
       "Conferência da placa e da inscrição — se estiver soltando ou apagando, você fica sabendo",
-      "Foto do antes e do depois, do mesmo ângulo, no WhatsApp",
-      "Aviso quando o cemitério mexer em alguma coisa perto do jazigo",
+      "Foto do jazigo limpo no WhatsApp, no dia da visita",
+      "Uma página só da sua família, com o histórico de todas as visitas",
     ],
     extras: {
       titulo: "Sob pedido",
@@ -148,13 +153,18 @@ export const SITE = {
   // -------------------------------------------------------------------------
   prova: {
     titulo: `Quem cuida, desde ${MARCA.desde}`,
+    // ESTA ERA A MELHOR FRASE DA PÁGINA — e a que morria no dia da expansão:
+    // "conhecemos ESTE cemitério quadra por quadra" deixa de ser verdade assim
+    // que abre o segundo. Reescrita para manter a força e sobreviver ao
+    // crescimento: o compromisso passa a ser o MÉTODO (mapear antes de vender),
+    // não o fato de atender um lugar só.
     texto:
-      "O trabalho é da Dona Nadir e da equipe dela, no Cemitério da Saudade, " +
-      "em Vila Vitória. Mais de trinta anos no mesmo cemitério, cuidando dos " +
-      "túmulos das mesmas famílias — muitas hoje já na segunda geração. " +
-      "Não somos uma empresa que atende a cidade inteira: conhecemos este " +
-      "cemitério quadra por quadra, e é por isso que a gente acha o seu jazigo " +
-      "pelo nome de quem está nele.",
+      "O trabalho é da Dona Nadir e da equipe dela, que cuidam de túmulos em " +
+      `${MARCA.regiao} desde 1990 — muitas das mesmas famílias, hoje já na ` +
+      "segunda geração. Não somos uma empresa que atende a cidade inteira: em " +
+      "cada cemitério onde entramos, mapeamos quadra por quadra antes de aceitar " +
+      "o primeiro cliente. É por isso que a gente acha o seu jazigo pelo nome de " +
+      "quem está nele.",
     // ⚠ AS FOTOS DE ANTES E DEPOIS.
     //
     // Enquanto `mostrarFotos` for false, a página NÃO mostra este bloco — nada
@@ -171,6 +181,27 @@ export const SITE = {
   },
 
   // -------------------------------------------------------------------------
+  // ONDE A GENTE ATENDE — a resposta para "vocês pegam o meu?".
+  //
+  // Vem logo depois de "quem cuida" porque é a última pergunta prática antes de
+  // chamar no WhatsApp. Cada cemitério tem página própria (/cemiterio/<slug>):
+  // é assim que se ganha busca local — quem digita o nome do cemitério cai numa
+  // página que fala DAQUELE lugar, não numa home genérica.
+  // -------------------------------------------------------------------------
+  onde: {
+    titulo: "Onde a gente atende",
+    texto:
+      CEMITERIOS.length <= 1
+        ? "Por enquanto, um cemitério só — e é de propósito: a gente só entra num lugar novo depois de mapear quadra por quadra."
+        : CEMITERIOS.some((c) => c.status === "chegando")
+        ? "A gente trabalha nestes cemitérios. Onde estamos chegando agora, dizemos isso com todas as letras — e a primeira limpeza é por nossa conta, para você ver o resultado antes de decidir."
+        : "A gente trabalha nestes cemitérios. Em cada um, conhecemos as quadras e sabemos chegar no jazigo pelo nome de quem está nele.",
+    rodape:
+      "Não achou o seu? Fale com a gente mesmo assim. A resposta pode ser " +
+      "\"ainda não\", mas a gente avisa quando chegar lá.",
+  },
+
+  // -------------------------------------------------------------------------
   // FAQ — as perguntas que travam a decisão.
   // -------------------------------------------------------------------------
   faq: {
@@ -178,15 +209,15 @@ export const SITE = {
     itens: [
       {
         p: "Como eu sei que o serviço foi feito mesmo?",
-        r: "Pela foto do depois, tirada no jazigo, no dia. É a regra da casa: sem a foto do depois, o serviço não fecha e não é cobrado. Você compara com a do antes e decide sozinho se ficou bom.",
+        r: "Pela foto, tirada no jazigo, no dia. É a regra da casa, e está no sistema: sem a foto, o serviço não fecha e não é cobrado. Todas ficam guardadas numa página só sua, então dá para ver a evolução visita a visita.",
       },
       {
         p: "Preciso assinar contrato ou ficar preso por algum tempo?",
         r: "Não. É mês a mês e você avisa quando quiser parar. Quem fica, fica porque quer.",
       },
       {
-        p: "Vocês atendem outros cemitérios?",
-        r: "Hoje o trabalho é no Cemitério da Saudade, em Mauá. É o cemitério que a gente conhece de verdade. Se o seu jazigo for em outro, fale com a gente mesmo assim — a resposta pode ser não, mas vai ser honesta.",
+        p: "Vocês atendem qual cemitério?",
+        r: `Hoje: ${cemiteriosEmTexto()}. São os cemitérios que a gente conhece quadra por quadra — e a gente só entra num lugar novo depois de mapear. Se o seu jazigo for em outro, fale com a gente mesmo assim: a resposta pode ser "ainda não", mas vai ser honesta, e a gente avisa quando chegar lá.`,
       },
       {
         p: "E se eu não souber onde fica o jazigo?",
@@ -202,7 +233,7 @@ export const SITE = {
       },
       {
         p: "Como eu pago?",
-        r: "Pix ou boleto, depois do serviço feito. Você recebe o comprovante com as fotos do período.",
+        r: "Pix, depois do serviço feito. Você recebe o comprovante com as fotos do período.",
       },
     ],
   },

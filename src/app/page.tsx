@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { MARCA } from "@/lib/marca";
+import { MARCA, CEMITERIOS, cemiteriosEmTexto } from "@/lib/marca";
 import { SITE, PRECO_A_PARTIR_DE, PRECO_UNIDADE, linkWhats } from "@/lib/site";
 import FormularioContato from "./_site/FormularioContato";
 
@@ -23,18 +23,33 @@ import FormularioContato from "./_site/FormularioContato";
 const c = MARCA.cores;
 
 export const metadata = {
-  title: `${MARCA.nome} — Limpeza e conservação de jazigos em Mauá`,
+  // "túmulo" é a palavra que a pessoa digita no Google; "jazigo" é a que a
+  // gente usa por dentro. O title carrega as duas, e a cidade junto.
+  title: `Limpeza de túmulo em ${MARCA.regiao} — ${MARCA.nome}`,
   description:
-    "Cuidado de túmulos no Cemitério da Saudade, em Mauá. Limpeza na frequência que você escolher, " +
-    "com foto do antes e do depois no WhatsApp. Desde 1990.",
+    `Cuidado de túmulos em ${MARCA.regiao} (${cemiteriosEmTexto()}). Limpeza na frequência que ` +
+    "você escolher, com a foto do jazigo limpo no seu WhatsApp. Desde 1990.",
+  // metadataBase faltava: sem ele, o Next nao consegue transformar "/og.png" em
+  // URL absoluta e o card do link sai sem imagem.
+  metadataBase: new URL(`https://${MARCA.site}`),
   alternates: { canonical: `https://${MARCA.site}` },
   openGraph: {
     title: `${MARCA.nome} — ${MARCA.assinatura}`,
-    description: "O túmulo da sua família cuidado, mesmo quando você não pode ir. Foto do antes e do depois, toda visita.",
+    description: "O túmulo da sua família cuidado, mesmo quando você não pode ir. A foto do jazigo limpo, toda visita.",
     url: `https://${MARCA.site}`,
     siteName: MARCA.nome,
     locale: "pt_BR",
     type: "website",
+    // A IMAGEM DO CARD. O canal deste negocio e WhatsApp: o link vai ser
+    // compartilhado entre irmaos, e ate aqui aparecia como retangulo cinza sem
+    // imagem nenhuma. Trocar public/og.png troca o card em todo lugar.
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: MARCA.nome }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${MARCA.nome} — ${MARCA.assinatura}`,
+    description: "O túmulo da sua família cuidado, mesmo quando você não pode ir.",
+    images: ["/og.png"],
   },
 };
 
@@ -44,19 +59,43 @@ const FICHA = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   name: MARCA.nome,
-  description: "Limpeza e conservação de jazigos no Cemitério da Saudade, em Mauá.",
+  description: `Limpeza e conservação de jazigos em ${MARCA.regiao}: ${cemiteriosEmTexto()}.`,
   url: `https://${MARCA.site}`,
   telephone: `+${MARCA.whatsapp}`,
   foundingDate: String(MARCA.desde),
-  areaServed: { "@type": "City", name: "Mauá" },
-  address: { "@type": "PostalAddress", addressLocality: "Mauá", addressRegion: "SP", addressCountry: "BR" },
+  // uma entrada por cidade atendida — com um cemitério só, é uma cidade só
+  areaServed: [...new Set(CEMITERIOS.map((c) => c.cidade))].map((cidade) => ({
+    "@type": "City", name: cidade,
+  })),
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: CEMITERIOS[0]?.cidade || MARCA.regiao,
+    addressRegion: CEMITERIOS[0]?.uf || "SP",
+    addressCountry: "BR",
+  },
+  image: `https://${MARCA.site}/og.png`,
+  logo: `https://${MARCA.site}/icon-512.png`,
   priceRange: "$",
+};
+
+// O FAQ da pagina, tambem em formato de ficha: e assim que as perguntas podem
+// aparecer abertas direto no resultado do Google. O texto e o MESMO de site.ts
+// — nao existe versao "para o Google" diferente da que a pessoa le.
+const FICHA_FAQ = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: SITE.faq.itens.map((i) => ({
+    "@type": "Question",
+    name: i.p,
+    acceptedAnswer: { "@type": "Answer", text: i.r },
+  })),
 };
 
 export default function Home() {
   return (
     <main style={s.pagina}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FICHA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FICHA_FAQ) }} />
 
       {/* ------------------------------------------------------------------ */}
       {/* TOPO                                                                */}
@@ -144,8 +183,8 @@ export default function Home() {
             </h2>
             <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17, marginBottom: 18 }}>
               Nada de relatório para você abrir, nem senha para lembrar. A mensagem chega
-              no WhatsApp que você já usa, com a foto de antes e a de depois — do mesmo
-              ângulo, para dar para comparar de verdade.
+              no WhatsApp que você já usa, com a foto do jazigo depois do serviço — tirada
+              ali, no dia.
             </p>
             <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17 }}>
               Se preferir ver tudo junto, cada família tem uma página só dela com o
@@ -172,8 +211,10 @@ export default function Home() {
                   Bom dia, dona Cleide. Passamos hoje no jazigo do seu pai. 🌿
                 </Balao>
 
-                <Balao hora="09:13" foto={<Lapide estado="antes" />} etiqueta="Antes" />
-                <Balao hora="09:13" foto={<Lapide estado="depois" />} etiqueta="Depois" />
+                {/* O MOCKUP MOSTRA O QUE O SISTEMA MANDA DE VERDADE: uma foto,
+                    a do jazigo limpo. Ele mostrava o par antes/depois — e a
+                    pessoa cobrava as duas na primeira visita. */}
+                <Balao hora="09:13" foto={<Lapide estado="depois" />} />
 
                 <Balao hora="09:14">
                   Tudo certo por aqui. A próxima visita fica para 12 de setembro — e no dia 3
@@ -269,6 +310,49 @@ export default function Home() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
+      {/* ONDE A GENTE ATENDE                                                 */}
+      {/*                                                                     */}
+      {/* Última pergunta prática antes de chamar no WhatsApp — e a que o FAQ */}
+      {/* respondia praticamente com "provavelmente não". Cada cemitério tem  */}
+      {/* página própria: é lá que mora o SEO local.                          */}
+      {/* ------------------------------------------------------------------ */}
+      <section style={{ ...s.secao, background: c.cream }} id="onde">
+        <h2 style={s.h2}>{SITE.onde.titulo}</h2>
+        <p style={{ ...s.p, textAlign: "center", maxWidth: 640, margin: "0 auto 24px" }}>
+          {SITE.onde.texto}
+        </p>
+        <div style={s.tres}>
+          {CEMITERIOS.map((cem) => {
+            const chegando = cem.status === "chegando";
+            return (
+              <Link key={cem.slug} href={`/cemiterio/${cem.slug}`}
+                    style={chegando ? { ...s.cartaoLink, ...s.cartaoNovo } : s.cartaoLink}>
+                {chegando && <span style={s.selo}>Chegando agora</span>}
+                <h3 style={s.h3}>{cem.nome}</h3>
+                <p style={{ ...s.p, fontSize: 16 }}>
+                  {cem.bairro}, {cem.cidade} — {cem.uf}
+                </p>
+                {/* a oferta aparece já na home: é o motivo de clicar */}
+                {chegando && cem.primeiraGratis && (
+                  <p style={s.ofertaCartao}>A primeira limpeza é por nossa conta</p>
+                )}
+                <span style={s.saibaMais}>
+                  {chegando ? "Ver como funciona aqui →" : "Ver como funciona aqui →"}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+        <p style={{ ...s.p, textAlign: "center", fontSize: 16, marginTop: 20 }}>
+          {SITE.onde.rodape}{" "}
+          <a href={linkWhats("Ola! O jazigo da minha familia fica em outro cemiterio. Voces atendem?")}
+             style={{ color: c.navy, fontWeight: 700 }} target="_blank" rel="noopener">
+            Perguntar no WhatsApp
+          </a>
+        </p>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
       {/* FAQ                                                                 */}
       {/* ------------------------------------------------------------------ */}
       <section style={{ ...s.secao, background: c.cream }}>
@@ -315,6 +399,14 @@ export default function Home() {
             <p style={s.rodapeTexto}>{MARCA.assinatura}</p>
             <p style={s.rodapeTexto}>{MARCA.cemiterio}</p>
             <p style={s.rodapeTexto}>{MARCA.endereco}</p>
+            {/* O TELEFONE ESCRITO, não só o botão azul. Quem vai confiar o
+                túmulo do pai a um desconhecido quer VER um número — e muita
+                gente mais velha prefere ligar a mandar mensagem. */}
+            <p style={s.rodapeTexto}>
+              <a href={`tel:+${MARCA.whatsapp}`} style={{ color: "#fff", textDecoration: "none" }}>
+                {MARCA.whatsappVisivel}
+              </a>
+            </p>
           </div>
           <div>
             <a href={linkWhats()} style={s.rodapeLink} target="_blank" rel="noopener">
@@ -602,6 +694,23 @@ const s: Record<string, React.CSSProperties> = {
   },
   balaoFoto: { position: "relative", borderRadius: 8, overflow: "hidden" },
   balaoTexto: { margin: "6px 4px 2px", fontSize: 13.5, lineHeight: 1.5, color: "#111b21" },
+  cartaoLink: {
+    background: "#fff", border: `1px solid ${c.linha}`, borderRadius: 16,
+    padding: 24, textDecoration: "none", display: "block", color: c.navy,
+  },
+  cartaoNovo: { border: `2px solid ${c.gold}` },
+  selo: {
+    display: "inline-block", background: c.gold, color: c.navy, fontWeight: 700,
+    fontSize: 13, padding: "4px 12px", borderRadius: 999, marginBottom: 10,
+    fontFamily: "system-ui, sans-serif", letterSpacing: 0.3,
+  },
+  ofertaCartao: {
+    margin: "10px 0 0", color: "#166534", fontWeight: 700, fontSize: 16,
+  },
+  saibaMais: {
+    display: "inline-block", marginTop: 10, color: c.navy,
+    fontWeight: 700, fontSize: 16,
+  },
   etiqueta: {
     position: "absolute",
     left: 8,

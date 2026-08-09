@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
+import { diaOperacao } from "@/lib/vencimento";
 
 /**
  * ENTRADAS DO BANCO
@@ -236,7 +237,7 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
 
 function NovaEntrada({ onPronto }: { onPronto: () => void }) {
   const [f, setF] = useState({
-    valor: "", data: new Date().toISOString().slice(0, 10),
+    valor: "", data: diaOperacao(),
     remetente: "", identificador: "", observacao: "",
   });
   const [busca, setBusca] = useState("");

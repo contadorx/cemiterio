@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cronAutorizado } from "@/lib/cron-auth";
 import { processarPendentes } from "@/lib/atendimento";
 import { processarFilaEnvios } from "@/lib/envio";
+import { carimbarRotina } from "@/lib/rotinas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,13 @@ export async function GET(req: NextRequest) {
       { status: 401 }
     );
   }
-  const [conversas, envios] = await Promise.all([processarPendentes(), processarFilaEnvios()]);
-  return NextResponse.json({ ok: true, conversas, envios });
+  try {
+    const [conversas, envios] = await Promise.all([processarPendentes(), processarFilaEnvios()]);
+    // carimba que passou por aqui: e assim que o painel sabe que a rotina vive
+    await carimbarRotina("minuto", true, { conversas, envios });
+    return NextResponse.json({ ok: true, conversas, envios });
+  } catch (e: any) {
+    await carimbarRotina("minuto", false, undefined, e?.message || String(e));
+    throw e;
+  }
 }

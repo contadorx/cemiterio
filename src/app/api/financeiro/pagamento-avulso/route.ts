@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { zerarReguaSeQuitou } from "@/lib/financeiro";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,10 +23,15 @@ export async function POST(req: NextRequest) {
   const { data, error } = await auth.db.rpc("sureya_pagamento_avulso", {
     p_cliente: b.clienteId,
     p_valor: valor,
-    p_data: b?.data || new Date().toISOString().slice(0, 10),
+    p_data: b?.data || diaOperacao(),
     p_descricao: b?.descricao || null,
     p_sem_comprovante: !!b?.semComprovante,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, movimentoId: data });
+
+  // A tela da familia diz, com todas as letras, que registrar o pagamento
+  // "zera a regua de cobranca". Ate aqui isso era so o texto do botao.
+  const reguaZerada = await zerarReguaSeQuitou(b.clienteId);
+
+  return NextResponse.json({ ok: true, movimentoId: data, reguaZerada });
 }

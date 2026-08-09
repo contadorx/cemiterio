@@ -10,6 +10,7 @@ import { avisarMensagemNova } from "@/lib/push";
 import { baixarMidiaBase64 } from "@/lib/evolution";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { registrarErro } from "@/lib/monitor";
+import { carimbarRotina } from "@/lib/rotinas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +95,12 @@ export async function POST(req: NextRequest) {
   }
 
   const p = parsePayload(body);
+  // CARIMBO DE VIDA DO WHATSAPP. Se a Evolution cair, ninguem descobre: o
+  // sistema nao faz polling e silencio de WhatsApp e indistinguivel de um dia
+  // calmo. Aqui fica gravado o instante da ultima mensagem que ENTROU, e o
+  // painel avisa quando esse instante fica velho demais.
+  await carimbarRotina("webhook", true, { evento: evento || "messages.upsert" });
+
   if (!p) return NextResponse.json({ ok: true, ignorado: "sem_mensagem" });
   if (p.ehGrupo) return NextResponse.json({ ok: true, ignorado: "grupo" });
   if (!p.texto && !p.temMidia && !p.temAudio)
@@ -171,6 +178,7 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error("[webhook] erro ao processar:", e?.message || e);
     await registrarErro("webhook", e, { telefone: p?.telefone });
+    await carimbarRotina("webhook", false, undefined, e?.message || String(e));
     return NextResponse.json({ ok: false, erro: "processamento" });
   }
 }

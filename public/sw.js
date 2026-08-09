@@ -5,7 +5,7 @@
  * Não faz cache agressivo de propósito: a agenda muda durante o dia e uma
  * página velha em cache seria pior que esperar a rede.
  */
-const VERSAO = "zm-v5";
+const VERSAO = "zm-v6";
 // Só ícones. NUNCA guardar página nem código aqui — ver a explicação no fetch.
 const ESSENCIAIS = ["/icon-192.png", "/icon-512.png"];
 const PAGINA_OFFLINE = "/offline.html";
@@ -48,7 +48,55 @@ self.addEventListener("fetch", (e) => {
     e.request.mode === "navigate" ||
     (e.request.headers.get("accept") || "").includes("text/html");
 
-  // ---- PÁGINA: sempre rede. Nunca serve HTML velho.
+  // ---- O APP DE CAMPO ABRE SEM SINAL --------------------------------------
+  //
+  // A regra "página sempre da rede" está certa para o painel e para o site, e
+  // continua valendo para eles. Mas ela deixava o /campo inutilizável no
+  // cemitério: sem sinal, a Nina caía no aviso de offline e não conseguia nem
+  // ver a rota do dia — enquanto a faixa do app prometia que dava para
+  // continuar. A fila offline só ajudava se a aba tivesse ficado aberta o dia
+  // inteiro.
+  //
+  // Aqui a estratégia é "rede primeiro, cache como rede reserva", SÓ para
+  // /campo: online ela recebe sempre a versão nova (nada de HTML velho pedindo
+  // JS que não existe mais, que é o medo legítimo escrito abaixo); offline, ela
+  // recebe a última página que funcionou.
+  //
+  // O cache é apagado inteiro a cada versão do service worker (VERSAO no topo,
+  // no `activate`), então uma publicação nova nunca deixa página antiga viva
+  // por mais de um ciclo — e o app tem o botão "atualizar" via postMessage.
+  const ehCampo = url.pathname === "/campo" || url.pathname.startsWith("/campo/");
+
+  if (ehPagina && ehCampo) {
+    e.respondWith(
+      fetch(e.request)
+        .then((r) => {
+          if (r && r.ok) {
+            const copia = r.clone();
+            caches.open(VERSAO).then((c) => c.put(e.request, copia));
+          }
+          return r;
+        })
+        .catch(() =>
+          caches.match(e.request).then(
+            (cacheado) =>
+              cacheado ||
+              caches.match(PAGINA_OFFLINE).then(
+                (r) =>
+                  r ||
+                  new Response(
+                    "<meta charset='utf-8'><p style='font:17px system-ui;padding:24px'>" +
+                      "Sem internet agora. Assim que o sinal voltar, é só recarregar.</p>",
+                    { headers: { "Content-Type": "text/html; charset=utf-8" } }
+                  )
+              )
+          )
+        )
+    );
+    return;
+  }
+
+  // ---- DEMAIS PÁGINAS: sempre rede. Nunca serve HTML velho.
   if (ehPagina) {
     e.respondWith(
       fetch(e.request).catch(() =>

@@ -117,11 +117,19 @@ export async function notificarFamilia(
   });
 
   const saiu = await enviarMidiaComRetry((cli as any).telefone, fotoDepoisUrl, caption);
-  await db
-    .from("servicos")
-    .update({ notificado_cliente: true })
-    .eq("org_id", org)
-    .eq("id", servicoId);
+  // SO MARCA COMO NOTIFICADO SE SAIU DE VERDADE.
+  // O update rodava antes de olhar o resultado: o banco dizia "notificado" e a
+  // familia nao tinha recebido nada. Isso ainda liberava o pedido de avaliacao
+  // (avaliacao-periodica le esta coluna) — pedir nota de um servico cuja foto
+  // nunca chegou. Quando o envio falha, a fila de reenvio assume; se ela
+  // conseguir depois, o proprio processarFilaEnvios entrega.
+  if (saiu) {
+    await db
+      .from("servicos")
+      .update({ notificado_cliente: true })
+      .eq("org_id", org)
+      .eq("id", servicoId);
+  }
   return { enviado: saiu, motivo: saiu ? "enviado" : "falhou" };
 }
 

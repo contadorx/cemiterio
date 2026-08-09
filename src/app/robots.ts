@@ -14,7 +14,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/familia"],
+        // as páginas por cemitério são o que responde a busca local
+        allow: ["/", "/cemiterio/", "/familia"],
         disallow: [
           "/painel",
           "/campo",

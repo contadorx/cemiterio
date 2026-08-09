@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { valorDoCiclo, vencimentosIniciais, diaOperacao } from "./vencimento";
+import { precoPorLimpeza, vencimentosIniciais, diaOperacao } from "./vencimento";
 
 /**
  * ANEXAR UM JAZIGO A UMA FAMÍLIA — um lugar só.
@@ -70,6 +70,49 @@ async function acharNaQuadra(db: SupabaseClient, quadraId: string, ident: string
   return { linha: (linhas[0] as any) || null };
 }
 
+
+/**
+ * QUAL CEMITÉRIO? — uma resposta só para o sistema inteiro (0044).
+ *
+ * Havia TRÊS lugares escolhendo o cemitério com `order("nome").limit(1)`: o
+ * primeiro em ordem alfabética, sempre. Com um cemitério só isso nunca deu
+ * problema; com dois, o cadastro pela ficha caía no cemitério errado em
+ * silêncio, criava a quadra "Q-12" lá também e o mesmo jazigo passava a existir
+ * duas vezes — em dois cemitérios diferentes, onde nenhuma trava enxerga.
+ *
+ * A regra agora:
+ *   · veio um cemitério explícito -> é ele;
+ *   · existe UM só cadastrado     -> é ele (não há ambiguidade possível);
+ *   · existem VÁRIOS             -> RECUSA e pede para escolher;
+ *   · não existe nenhum          -> cria o primeiro (instalação nova).
+ */
+export async function resolverCemiterio(
+  db: SupabaseClient,
+  org: string,
+  cemiterioId?: string | null,
+): Promise<{ ok: true; cemiterioId: string } | { ok: false; erro: string; detalhe?: string }> {
+  if (cemiterioId) return { ok: true, cemiterioId };
+
+  const { data: cems, error } = await db
+    .from("cemiterios").select("id,nome,ativo").eq("org_id", org).order("nome");
+  if (error) return { ok: false, erro: error.message };
+
+  const ativos = (cems || []).filter((c: any) => c.ativo !== false);
+  if (ativos.length === 1) return { ok: true, cemiterioId: (ativos[0] as any).id };
+  if (ativos.length > 1) {
+    return {
+      ok: false,
+      erro: "cemiterio_obrigatorio",
+      detalhe: ativos.map((c: any) => c.nome).join(", "),
+    };
+  }
+
+  const { data: criado, error: eCria } = await db
+    .from("cemiterios").insert({ org_id: org, nome: "Cemitério" }).select("id").single();
+  if (eCria) return { ok: false, erro: eCria.message };
+  return { ok: true, cemiterioId: (criado as any).id };
+}
+
 export async function anexarJazigo(
   db: SupabaseClient,
   org: string,
@@ -103,18 +146,62 @@ export async function anexarJazigo(
   const ident = txt(jz.identificacao);
   if (!ident) return { ok: false, erro: "identificacao_obrigatoria" };
 
-  let cemId = jz.cemiterioId || null;
-  if (!cemId) {
-    // order("nome") aqui e em TODO lugar que escolhe o cemiterio padrao: sem a
-    // mesma ordem, duas portas escolhiam cemiterios diferentes e duplicavam a
-    // quadra e o jazigo em orgs com mais de um cemiterio.
-    const { data: cem } = await db.from("cemiterios").select("id").order("nome").limit(1).maybeSingle();
-    if (cem) cemId = (cem as any).id;
-    else {
-      const { data: novo, error } = await db.from("cemiterios")
-        .insert({ org_id: org, nome: "Cemitério" }).select("id").single();
+  const rc = await resolverCemiterio(db, org, jz.cemiterioId);
+  if (!rc.ok) return { ok: false, erro: rc.erro, detalhe: (rc as any).detalhe };
+  const cemId = rc.cemiterioId;
+
+  const identBusca = txt(jz.identificacao);
+
+  // ---------------------------------------------------------------------
+  // O BURACO DO "S/Q" — como dois túmulos viravam um registro (ou dois).
+  //
+  // Quem cadastra pela ficha da família muitas vezes não sabe a quadra. O
+  // código então jogava o jazigo num balde chamado "S/Q" e procurava duplicata
+  // DENTRO desse balde — onde, por definição, o jazigo certo nunca está. O
+  // número 45 já cadastrado na Q-12 pelo campo virava um SEGUNDO registro em
+  // S/Q, com a foto de um e a descrição do outro.
+  //
+  // Agora, quando a quadra vem vazia, a busca é no CEMITÉRIO INTEIRO:
+  //   · achou um só  -> é ele. Reaproveita, e o jazigo mantém a quadra real.
+  //   · achou vários -> não decide sozinho: devolve erro pedindo a quadra.
+  //   · não achou    -> aí sim cria em S/Q, como antes.
+  // ---------------------------------------------------------------------
+  if (!txt(jz.quadraCodigo) && identBusca) {
+    const { data: candidatos, error: eBusca } = await db
+      .from("tumulos")
+      .select("id,cliente_id,identificacao,quadra_id,quadras!inner(codigo,cemiterio_id)")
+      .eq("quadras.cemiterio_id", cemId)
+      .ilike("identificacao", paraIlike(identBusca))
+      .limit(50);
+    if (eBusca) return { ok: false, erro: eBusca.message };
+
+    const alvo = identBusca.trim().toLowerCase();
+    const iguais = (candidatos || []).filter(
+      (t: any) => String(t.identificacao || "").trim().toLowerCase() === alvo,
+    );
+
+    if (iguais.length > 1) {
+      return {
+        ok: false,
+        erro: "identificacao_ambigua",
+        detalhe: iguais.map((t: any) => t.quadras?.codigo).filter(Boolean).join(", "),
+      };
+    }
+    if (iguais.length === 1) {
+      const achado = iguais[0] as any;
+      const dono = achado.cliente_id as string | null;
+      if (dono && dono !== clienteId) {
+        const { data: outro } = await db
+          .from("clientes").select("nome").eq("id", dono).maybeSingle();
+        return { ok: false, erro: "jazigo_de_outra_familia", detalhe: (outro as any)?.nome || undefined };
+      }
+      const patch: Record<string, any> = { cliente_id: clienteId };
+      if (txt(jz.rua)) patch.rua = txt(jz.rua);
+      if (txt(jz.numero)) patch.numero = txt(jz.numero);
+      if (txt(jz.falecidoNome)) patch.falecido_nome = txt(jz.falecidoNome);
+      const { error } = await db.from("tumulos").update(patch).eq("id", achado.id);
       if (error) return { ok: false, erro: error.message };
-      cemId = (novo as any).id;
+      return { ok: true, tumuloId: achado.id, reaproveitado: dono === clienteId };
     }
   }
 
@@ -162,7 +249,19 @@ export async function anexarJazigo(
   const { data: tum, error } = await db.from("tumulos").insert({
     org_id: org, quadra_id: quadraId, cliente_id: clienteId,
     identificacao: ident, rua, numero, falecido_nome: falecido,
+    // 0044: o cemitério fica no próprio túmulo, para consulta e rota não
+    // dependerem de um join triplo (o gatilho do banco é a rede de segurança)
+    cemiterio_id: cemId,
   }).select("id").single();
+  if (error && /cemiterio_id/i.test(error.message || "")) {
+    // banco sem a coluna (0044 nao rodada): grava sem ela
+    const r = await db.from("tumulos").insert({
+      org_id: org, quadra_id: quadraId, cliente_id: clienteId,
+      identificacao: ident, rua, numero, falecido_nome: falecido,
+    }).select("id").single();
+    if (r.error) return { ok: false, erro: r.error.message };
+    return { ok: true, tumuloId: (r.data as any).id, reaproveitado: false };
+  }
   if (error) return { ok: false, erro: error.message };
   return { ok: true, tumuloId: (tum as any).id, reaproveitado: false };
 }
@@ -213,8 +312,9 @@ export async function criarPlanoSeFaltar(
     cadencia,
     qtd_por_passagem: lav,
     lavagens_por_ciclo: lav,
-    valor_mensal: valorMensal,
-    valor_vigente: valorDoCiclo(cadencia, valorMensal),
+    // preco de UMA limpeza nas duas colunas (ver lib/vencimento.ts)
+    valor_mensal: precoPorLimpeza(valorMensal),
+    valor_vigente: precoPorLimpeza(valorMensal),
     data_valor_vigente: diaOperacao(),
     ativo: true,
     proximo_servico: venc.proximo_servico,
@@ -236,10 +336,18 @@ export function explicarErroJazigo(erro: string, detalhe?: string): string {
         : "Esse jazigo já pertence a outra família. Desvincule de lá antes de trazer para cá.";
     case "identificacao_duplicada":
       return "Ha mais de um jazigo com essa identificacao nessa quadra (duplicata antiga no banco). Nao da para adivinhar qual e o certo: abra o Mapa nessa quadra, apague ou renomeie a copia, e tente de novo.";
+    case "cemiterio_obrigatorio":
+      return detalhe
+        ? `Você atende mais de um cemitério (${detalhe}). Diga em qual fica este jazigo — sem isso eu cadastraria no lugar errado.`
+        : "Diga em qual cemitério fica este jazigo.";
+    case "identificacao_ambigua":
+      return detalhe
+        ? `Esse número existe em mais de uma quadra deste cemitério (${detalhe}). Informe a quadra para eu não cadastrar no túmulo errado.`
+        : "Esse número existe em mais de uma quadra deste cemitério. Informe a quadra para eu não cadastrar no túmulo errado.";
     case "identificacao_obrigatoria":
       return "Falta a identificação do jazigo (lote/número).";
     case "valor_mensal_invalido":
-      return "O valor mensal não foi entendido. Digite como 40 ou 40,50.";
+      return "O valor da limpeza não foi entendido. Digite como 40 ou 40,50.";
     case "sem_org":
       return "Sessão sem organização. Saia e entre de novo.";
     default:

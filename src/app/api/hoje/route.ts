@@ -15,7 +15,7 @@ export async function GET() {
 
   const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
 
-  const [{ data: servHoje }, { data: credHoje }, { data: conversas }] = await Promise.all([
+  const [{ data: servHoje }, { data: credHoje }, { data: conversas }, { data: leadsNovos }] = await Promise.all([
     // limpezas a fazer: previstas para hoje OU atrasadas (data no passado) que
     // ainda não saíram (pendente/agendado). Atrasada não some do radar.
     db.from("servicos").select("id,status,data_prevista").lte("data_prevista", hoje),
@@ -23,6 +23,9 @@ export async function GET() {
     db.from("movimentos").select("valor").eq("tipo", "credito").eq("status_conc", "confirmado").eq("data", hoje),
     // conversas abertas em que a família falou por último — esperam resposta nossa
     db.from("conversas").select("ultimo_autor").eq("aberta", true),
+    // quem chegou pelo site/WhatsApp e ainda não foi atendido. Sem isto, o lead
+    // ficava invisível no painel até alguém abrir a aba certa por acaso.
+    db.from("leads").select("id").eq("status", "novo"),
   ]);
 
   const pendentes = (servHoje || []).filter(
@@ -43,5 +46,6 @@ export async function GET() {
     atrasadas,
     entrouHoje: Math.round(entrouHoje * 100) / 100,
     aguardando,
+    leadsNovos: (leadsNovos || []).length,
   });
 }

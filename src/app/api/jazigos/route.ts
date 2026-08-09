@@ -60,10 +60,17 @@ export async function GET(req: NextRequest) {
 
   const linhas = (data as any[]) || [];
 
-  // quantas vezes cada identificação aparece — número repetido é o gatilho da fusão
+  // Quantas vezes cada identificação aparece — número repetido é o gatilho da
+  // fusão. A chave inclui o CEMITÉRIO (0044): contar sobre a lista inteira
+  // acusava "o número 45 aparece 3x" quando eram 3 cemitérios diferentes, e
+  // mandava procurar duplicata onde não havia nenhuma.
+  const chaveRep = (t: any) =>
+    `${t.quadras?.cemiterios?.nome || t.quadras?.cemiterio_id || "-"}|` +
+    String(t.identificacao || "").trim().toLowerCase();
+
   const vezes = new Map<string, number>();
   for (const t of linhas) {
-    const k = String(t.identificacao || "").trim().toLowerCase();
+    const k = chaveRep(t);
     vezes.set(k, (vezes.get(k) || 0) + 1);
   }
 
@@ -83,8 +90,16 @@ export async function GET(req: NextRequest) {
     }
     if (temFoto && !t.falecido_nome) motivos.push("tem foto, não tem nome do falecido");
     if (!temFoto && t.falecido_nome) motivos.push("tem nome, não tem foto");
-    const rep = vezes.get(String(t.identificacao || "").trim().toLowerCase()) || 0;
-    if (rep > 1) motivos.push(`o número ${t.identificacao} aparece ${rep}x no cemitério`);
+    // 0044: a contagem é POR CEMITÉRIO. Sobre o resultado inteiro, "o número 45
+    // aparece 3x" era falso quando eram 3 cemitérios diferentes — e mandava
+    // procurar duplicata onde não havia.
+    const rep = vezes.get(chaveRep(t)) || 0;
+    if (rep > 1) {
+      motivos.push(
+        `o número ${t.identificacao} aparece ${rep}x` +
+        (t.quadras?.cemiterios?.nome ? ` em ${t.quadras.cemiterios.nome}` : " neste cemitério"),
+      );
+    }
 
     return {
       id: t.id,

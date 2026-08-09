@@ -40,7 +40,14 @@ export interface PedidoRedacao {
 }
 
 export async function redigir(p: PedidoRedacao): Promise<string | null> {
-  if (!(await podeChamarIa())) return null;
+  // BUG QUE DESLIGAVA O FREIO DE GASTO:
+  // podeChamarIa() devolve o OBJETO {pode, usadas, teto}, e objeto em
+  // JavaScript e sempre "verdadeiro" — entao `if (!(await podeChamarIa()))`
+  // nunca era verdade e o teto diario NUNCA segurava nada aqui (campanha,
+  // reajuste, avaliacao periodica). Pior: a propria chamada ja incrementa o
+  // contador, entao o gasto subia e o freio nunca fechava.
+  const custo = await podeChamarIa();
+  if (!custo.pode) return null;
 
   const db = supabaseAdmin();
   const org = env.orgId();

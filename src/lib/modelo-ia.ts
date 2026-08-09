@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { diaOperacao } from "./vencimento";
 
 /**
  * ESCOLHA DO MODELO — economia sem abrir mão do que importa.
@@ -142,7 +143,7 @@ export async function registrarChamada(args: {
   });
 
   // consolida no acumulado do dia
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
   const { data: atual } = await db
     .from("uso_ia").select("id,chamadas,tokens_entrada,tokens_saida,custo_real")
     .eq("org_id", org).eq("dia", hoje).maybeSingle();

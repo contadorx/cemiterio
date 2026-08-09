@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
+import { mesOperacao } from "@/lib/vencimento";
 
 /**
  * PAGAMENTO DA EQUIPE — por mês, por jazigo, ou os dois.
@@ -18,7 +19,7 @@ import { painel, cor } from "../ui";
 const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
 
 function mesAtual() {
-  return new Date().toISOString().slice(0, 7);
+  return mesOperacao();
 }
 function nomeDoMes(m: string) {
   const [a, mm] = m.split("-").map(Number);
@@ -55,18 +56,24 @@ export default function Remuneracao() {
     else alert(r?.erro || "falhou");
   }
 
-  async function acertar(p: any) {
-    const incluirMensal = p.mensalDevido > 0 && confirm(
-      `Incluir também o fixo do mês de ${p.nome} (${money(p.mensalDevido)}) neste acerto?\n\n` +
-      `OK = paga jazigos + fixo.  Cancelar = paga só os jazigos.`
-    );
+  /**
+   * ACERTAR — quem decide se o fixo entra é o BOTÃO, não um confirm ambíguo.
+   *
+   * O fluxo antigo perguntava "incluir o fixo?" num confirm onde **Cancelar
+   * significava 'pagar só os jazigos'**. Quem tentasse abortar o acerto inteiro
+   * avançava para o segundo diálogo — o oposto do que o botão Cancelar quer
+   * dizer em qualquer outro lugar do mundo. Agora são dois botões separados,
+   * cada um dizendo o que vai fazer, e o Cancelar do confirm final cancela.
+   */
+  async function acertar(p: any, incluirMensal: boolean) {
     const total = p.aPagar.jazigos + (incluirMensal ? p.mensalDevido : 0);
     if (!confirm(
       `Acertar com ${p.nome}\n\n` +
       `${p.aPagar.servicos} jazigo(s): ${money(p.aPagar.jazigos)}\n` +
-      (incluirMensal ? `Fixo do mês: ${money(p.mensalDevido)}\n` : "") +
+      (incluirMensal ? `Fixo de ${nomeDoMes(mes)}: ${money(p.mensalDevido)}\n` : "") +
       `TOTAL: ${money(total)}\n\n` +
-      `Os jazigos ficam marcados como pagos e sai uma saída no caixa.`
+      `Sai uma saída no caixa e os jazigos ficam marcados como pagos.` +
+      (incluirMensal ? `\nO fixo deste mês não poderá ser pago de novo.` : "")
     )) return;
     setOcupado(true);
     const r = await fetch("/api/equipe/remuneracao", {
@@ -74,6 +81,7 @@ export default function Remuneracao() {
       body: JSON.stringify({
         acao: "acerto", membroId: p.membroId,
         valorMensal: incluirMensal ? p.mensalDevido : 0,
+        mesRef: mes,
         observacao: `ref. ${nomeDoMes(mes)}`,
       }),
     }).then((x) => x.json()).catch(() => null);
@@ -81,13 +89,19 @@ export default function Remuneracao() {
     if (r?.ok) {
       alert(`Pago ${money(r.pago)}.` + (r.avisoCaixa ? `\n\n⚠ ${r.avisoCaixa}` : "\nLançado no caixa como saída."));
       carregar();
-    } else alert(r?.erro || "falhou");
+    } else {
+      alert(r?.mensagem || r?.erro || "falhou");
+      if (r?.erro === "fixo_ja_pago") carregar();
+    }
   }
 
   if (erro) {
+    // o título não pode chutar a causa: a rota agora também devolve erro de
+    // consulta, e dizer "precisa da migration 0031" quando o problema é outro
+    // manda a pessoa procurar no lugar errado.
     return (
       <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
-        <p style={{ margin: 0, fontWeight: 600 }}>Esta aba precisa da migration 0031.</p>
+        <p style={{ margin: 0, fontWeight: 600 }}>Não consegui montar esta aba.</p>
         <p style={{ margin: "8px 0 0", color: cor.cinza, lineHeight: 1.5 }}>{erro}</p>
       </div>
     );
@@ -142,7 +156,7 @@ export default function Remuneracao() {
         </div>
       )}
 
-      {d.pessoas.map((p: any) => (
+      {(d.pessoas || []).map((p: any) => (
         <div key={p.membroId} style={painel.card}>
           <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
             <h3 style={{ margin: 0, fontSize: 19 }}>{p.nome}</h3>
@@ -175,7 +189,8 @@ export default function Remuneracao() {
               sub={`${p.jazigosAvulsos} avulso(s)`} />
             <Num rot="Receita gerada" val={money(p.receita)}
               sub="o que as famílias pagam" />
-            <Num rot="Fixo do mês" val={money(p.mensalDevido)} />
+            <Num rot="Fixo do mês" val={money(p.fixoPago ? (p.fixoPagoValor ?? 0) : p.mensalDevido)}
+              sub={p.fixoPago ? "já acertado" : undefined} />
             <Num rot="Por jazigo" val={money(p.porJazigoCongelado)}
               sub={p.divergente ? `regra de hoje daria ${money(p.porRegraHoje)}` : undefined}
               alerta={p.divergente} />
@@ -217,11 +232,27 @@ export default function Remuneracao() {
                 {p.aPagar.maisAntigo ? ` · desde ${String(p.aPagar.maisAntigo).slice(0, 10).split("-").reverse().join("/")}` : ""}
               </div>
             </div>
-            <button style={{ ...painel.botao, marginLeft: "auto" }} disabled={ocupado || (!p.aPagar.jazigos && !p.mensalDevido)}
-              onClick={() => acertar(p)}>
-              Acertar com {p.nome.split(" ")[0]}
-            </button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button style={painel.botaoSec} disabled={ocupado || !p.aPagar.jazigos}
+                onClick={() => acertar(p, false)}>
+                Pagar só os jazigos ({money(p.aPagar.jazigos)})
+              </button>
+              {p.mensalDevido > 0 && (
+                <button style={painel.botao} disabled={ocupado}
+                  onClick={() => acertar(p, true)}>
+                  Pagar jazigos + fixo ({money(p.aPagar.jazigos + p.mensalDevido)})
+                </button>
+              )}
+            </div>
           </div>
+
+          {p.fixoPago && (
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: cor.teal }}>
+              ✓ O fixo de {nomeDoMes(mes)} ({money(p.fixoPagoValor ?? 0)}) já foi acertado
+              {p.fixoPagoEm ? ` em ${new Date(p.fixoPagoEm).toLocaleDateString("pt-BR")}` : ""}.
+              Só os jazigos novos entram no próximo acerto.
+            </p>
+          )}
 
           {p.servicos.length > 0 && (
             <details style={{ marginTop: 12 }}>
@@ -236,7 +267,7 @@ export default function Remuneracao() {
                     <th style={th}>pago</th></tr>
                 </thead>
                 <tbody>
-                  {p.servicos.map((s: any) => (
+                  {(p.servicos || []).map((s: any) => (
                     <tr key={s.id}>
                       <td style={td}>{String(s.data || "").slice(0, 10).split("-").reverse().join("/")}</td>
                       <td style={td}>{s.jazigo}</td>

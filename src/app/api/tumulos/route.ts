@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin, exigirLogado } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
-import { explicarErroJazigo } from "@/lib/jazigo";
+import { explicarErroJazigo, resolverCemiterio } from "@/lib/jazigo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,18 +91,16 @@ export async function POST(req: NextRequest) {
   if (!identificacao) return NextResponse.json({ ok: false, erro: "identificacao_obrigatoria" }, { status: 400 });
   if (!quadraCodigo) return NextResponse.json({ ok: false, erro: "quadra_obrigatoria" }, { status: 400 });
 
-  // cemitério: o informado, senão o primeiro; cria um padrão se não houver nenhum
-  let cemId = b?.cemiterioId || null;
-  if (!cemId) {
-    const { data: cem } = await db.from("cemiterios").select("id").order("nome").limit(1).maybeSingle();
-    if (cem) cemId = (cem as any).id;
-    else {
-      const { data: novo, error } = await db.from("cemiterios")
-        .insert({ org_id: org, nome: "Cemitério" }).select("id").single();
-      if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-      cemId = (novo as any).id;
-    }
+  // cemitério: o informado; com mais de um cadastrado e nenhum informado, RECUSA
+  // em vez de escolher o primeiro em ordem alfabética (0044)
+  const rc = await resolverCemiterio(db, org, b?.cemiterioId);
+  if (!rc.ok) {
+    return NextResponse.json({
+      ok: false, erro: rc.erro,
+      mensagem: explicarErroJazigo(rc.erro, (rc as any).detalhe),
+    }, { status: 400 });
   }
+  const cemId = rc.cemiterioId;
 
   // quadra por código (cria se ainda não existe)
   let { data: quad } = await db
@@ -227,6 +225,9 @@ export async function POST(req: NextRequest) {
   const linha: Record<string, any> = {
       org_id: org,
       quadra_id: quadraId,
+      // 0044: o cemitério fica no próprio túmulo (o gatilho do banco também
+      // preenche, mas gravar aqui evita depender dele)
+      cemiterio_id: cemId,
       cliente_id: b?.clienteId || null,
       identificacao,
       falecido_nome: b?.falecidoNome?.trim() || null,
@@ -235,6 +236,12 @@ export async function POST(req: NextRequest) {
   if (String(b?.rua || "").trim()) linha.rua = String(b.rua).trim();
 
   let { data: tum, error } = await db.from("tumulos").insert(linha).select("id").single();
+  if (error && /cemiterio_id/i.test(error.message || "")) {
+    // banco sem a coluna (0044 nao rodada): grava o resto e segue
+    delete linha.cemiterio_id;
+    const r0 = await db.from("tumulos").insert(linha).select("id").single();
+    tum = r0.data; error = r0.error;
+  }
   if (error && /rua/i.test(error.message || "")) {
     // banco sem a coluna rua (0017 nao rodada): grava o resto e segue
     delete linha.rua;

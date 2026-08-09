@@ -81,6 +81,12 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
       alert(`Dia encerrado. ${r.feitos} feito(s)${r.devolvidos ? `, ${r.devolvidos} remarcado(s) para os próximos dias.` : "."}\n\nObrigado pelo seu trabalho hoje. 🌿`);
       setAberto(false);
       onMudou();
+    } else if (r?.erro === "executora_obrigatoria") {
+      // acontece quando quem está no /campo é o DONO: ele não pode encerrar o
+      // dia de todo mundo sem querer (0042)
+      alert(r.mensagem || "Diga de quem é o dia que você quer encerrar.");
+    } else {
+      alert("Não consegui encerrar o dia agora. Tente de novo daqui a pouco.");
     }
   }
 

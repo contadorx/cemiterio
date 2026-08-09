@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { diaOperacao, somaDias } from "./vencimento";
+import { registrarErro } from "./monitor";
 
 // Dias de cada ciclo. qtd_por_passagem subdivide o ciclo:
 // mensal + 2/passagem => passa a cada ~15 dias (2x/mês). mensal + 1 => 30 dias.
@@ -150,6 +151,7 @@ export interface DiagnosticoGeracao {
   planosNoHorizonte: number; // com data dentro da janela
   foraDoHorizonte: number;   // a próxima ida é depois da janela
   jaExistiam: number;        // a data já tinha serviço aberto
+  falhas: number;            // erros inesperados: o plano NÃO avançou o ponteiro
   proximaData: string | null;// quando volta a ter algo para gerar
   horizonteDias: number;
 }
@@ -172,6 +174,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 
   let criados = 0;
   let jaExistiam = 0;
+  let falhasTotais = 0;
   let noHorizonte = 0;
   let foraDoHorizonte = 0;
   let proximaData: string | null = null;
@@ -182,7 +185,8 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     const passo = Math.max(1, Math.round(cicloDias / qtd));
 
     let prox: string = (p as any).proximo_servico || isoHoje();
-    let guarda = 0; // trava anti-loop
+    let guarda = 0;      // trava anti-loop
+    let falhou = false;  // erro inesperado neste plano: nao avanca o ponteiro
 
     if (prox > limite) {
       foraDoHorizonte++;
@@ -221,15 +225,31 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
             id: "novo", data_plano: comColuna ? prox : null,
             data_prevista: prox, status: "pendente",
           });
-        } else {
+        } else if (String(error.code) === "23505" || /duplicat|unique/i.test(error.message || "")) {
           // o indice unico da 0032 barrou: ja existia mesmo
           jaExistiam++;
+        } else {
+          // QUALQUER OUTRO ERRO NAO PODE PASSAR POR "ja existia".
+          // Coluna nula, RLS, timeout do pool: tudo caia aqui, era contado como
+          // "ja existia" (uma mentira tranquilizadora na tela) e o ponteiro do
+          // plano avancava mesmo assim — a familia PULAVA uma limpeza, para
+          // sempre, sem sinal em lugar nenhum.
+          falhou = true;
+          falhasTotais++;
+          await registrarErro("agenda: nao consegui criar a limpeza", error.message, {
+            planoId: (p as any).id, data: prox,
+          });
+          break; // para este plano aqui: o ponteiro nao anda por cima do buraco
         }
       }
       prox = addDias(prox, passo);
     }
 
-    await db.from("planos").update({ proximo_servico: prox }).eq("id", (p as any).id);
+    // O PONTEIRO SO ANDA SE NAO HOUVE FALHA NESTE PLANO. Antes ele era gravado
+    // sempre — inclusive quando o insert falhou e quando nada foi criado.
+    if (!falhou) {
+      await db.from("planos").update({ proximo_servico: prox }).eq("id", (p as any).id);
+    }
   }
 
   return {
@@ -238,6 +258,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     planosNoHorizonte: noHorizonte,
     foraDoHorizonte,
     jaExistiam,
+    falhas: falhasTotais,
     proximaData,
     horizonteDias,
   };
@@ -252,6 +273,7 @@ interface ServicoPend {
   data_prevista: string | null;
   data_desejada?: string | null;   // a data que a família pediu (0037) — nunca reescrita
   prioridade?: number;
+  cemiterio_id?: string | null;    // 0044 — a rota do dia é por cemitério
   tumulo: { identificacao: string; lat: number | null; lng: number | null; quadra_ordem: number };
 }
 
@@ -293,44 +315,108 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     .maybeSingle();
   const capacidadePadrao = Number((orgRow as any)?.limpezas_por_dia) || 20;
 
-  // D5: ajudantes ativas (papel campo). Cada uma pode ter capacidade própria.
-  const { data: campo } = await db
+  // ==========================================================================
+  // MULTI-CEMITÉRIO (0044)
+  //
+  // Antes, esta função tratava o mundo como um cemitério só: agrupava por
+  // `quadras.ordem`, que é um inteiro GLOBAL. Com dois locais, duas quadras com
+  // a mesma ordem viravam um bloco só e a sequência do dia podia ser A → B → A,
+  // atravessando a cidade no meio da manhã — porque o custo de deslocamento
+  // ENTRE cemitérios é zero para o alocador (a proximidade só é calculada
+  // dentro da quadra).
+  //
+  // Agora a alocação roda POR CEMITÉRIO, e existem dois mecanismos, ambos
+  // OPCIONAIS e independentes:
+  //   · `cemiterios.dias_semana` — em que dias a equipe vai naquele lugar;
+  //   · `membros.cemiterio_id`   — pessoa amarrada a um lugar.
+  // Sem nada configurado (as duas colunas nulas), o resultado é IDÊNTICO ao de
+  // antes: um pote só, todo mundo atendendo tudo, todos os dias.
+  // ==========================================================================
+  const { data: cemsRaw } = await db
+    .from("cemiterios")
+    .select("id,nome,ativo,ordem,dias_semana")
+    .eq("org_id", org)
+    .order("ordem")
+    .order("nome");
+
+  // sem a migration 0044 as colunas não existem e o select devolve null:
+  // cai no modo antigo (um pote só), que continua correto.
+  const cemiterios = (cemsRaw || [])
+    .filter((c: any) => c.ativo !== false)
+    .map((c: any) => ({
+      id: c.id as string,
+      nome: (c.nome as string) || "cemitério",
+      dias: Array.isArray(c.dias_semana) && c.dias_semana.length ? (c.dias_semana as number[]) : null,
+    }));
+
+  // ---- equipe (com o vínculo de cemitério, se existir) ----------------------
+  let campo: any[] | null = null;
+  const rEq = await db
     .from("membros")
-    .select("user_id,nome,limpezas_por_dia,ativo")
+    .select("user_id,nome,limpezas_por_dia,ativo,cemiterio_id")
     .eq("org_id", org)
     .eq("papel", "campo");
+  campo = rEq.data as any;
+  if (!campo) {
+    const rEq2 = await db
+      .from("membros")
+      .select("user_id,nome,limpezas_por_dia,ativo")
+      .eq("org_id", org)
+      .eq("papel", "campo");
+    campo = rEq2.data as any;
+  }
 
   const equipe = (campo || [])
     .filter((m: any) => m.ativo !== false)
     .map((m: any) => ({
-      userId: m.user_id as string,
+      userId: m.user_id as string | null,
       capacidade: Number(m.limpezas_por_dia) || capacidadePadrao,
+      cemiterioId: (m.cemiterio_id as string | null) ?? null,
     }));
 
   // sem ajudante cadastrada: opera como antes (um turno único, sem executora)
-  const turnos =
-    equipe.length > 0 ? equipe : [{ userId: null as string | null, capacidade: capacidadePadrao }];
-  const capacidadeDia = turnos.reduce((s, t) => s + t.capacidade, 0);
+  const turnos = equipe.length > 0
+    ? equipe
+    : [{ userId: null as string | null, capacidade: capacidadePadrao, cemiterioId: null as string | null }];
 
-  // pendentes não alocados ou a realocar
-  // (data_desejada é da migration 0037; se ela ainda não rodou, o select falha
-  //  e caímos no select antigo — a agenda continua funcionando como antes)
-  const r1 = await db
-    .from("servicos")
-    .select("id,data_prevista,data_desejada,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
-    .eq("org_id", org)
-    .eq("status", "pendente");
+  // ---- pendentes (com o cemitério, quando a coluna existir) -----------------
+  const SEL_NOVO =
+    "id,data_prevista,data_desejada,prioridade,cemiterio_id," +
+    "tumulos(identificacao,lat,lng,cemiterio_id,quadras(ordem,cemiterio_id))";
+  const SEL_SEM_FIXADO =
+    "id,data_prevista,data_desejada,prioridade," +
+    "tumulos(identificacao,lat,lng,quadras(ordem,cemiterio_id))";
+  const SEL_ANTIGO =
+    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))";
 
+  // O que foi decidido por uma PESSOA não entra aqui (0041): remarcação manual
+  // fica onde está, em vez de ser desfeita pelo alocador na madrugada seguinte.
   let temDesejada = true;
+  let temCemiterio = true;
+  const r1 = await db
+    .from("servicos").select(SEL_NOVO)
+    .eq("org_id", org).eq("status", "pendente").is("fixado_em", null);
   let pend: any[] | null = r1.data as any;
+
+  if (!pend) {
+    temCemiterio = false;
+    const r2 = await db
+      .from("servicos").select(SEL_SEM_FIXADO)
+      .eq("org_id", org).eq("status", "pendente").is("fixado_em", null);
+    pend = r2.data as any;
+  }
+  if (!pend) {
+    const r3 = await db
+      .from("servicos").select(SEL_SEM_FIXADO)
+      .eq("org_id", org).eq("status", "pendente");
+    pend = r3.data as any;
+  }
   if (!pend) {
     temDesejada = false;
-    const r2 = await db
-      .from("servicos")
-      .select("id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))")
-      .eq("org_id", org)
-      .eq("status", "pendente");
-    pend = r2.data as any;
+    const r4 = await db
+      .from("servicos").select(SEL_ANTIGO)
+      .eq("org_id", org).eq("status", "pendente");
+    pend = r4.data as any;
   }
 
   const itens: ServicoPend[] = (pend || []).map((s: any) => ({
@@ -338,6 +424,8 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     data_prevista: s.data_prevista,
     data_desejada: s.data_desejada ?? null,
     prioridade: s.prioridade || 0,
+    // o cemitério vem da coluna nova; sem ela, da quadra do túmulo
+    cemiterio_id: s.cemiterio_id ?? s.tumulos?.cemiterio_id ?? s.tumulos?.quadras?.cemiterio_id ?? null,
     tumulo: {
       identificacao: s.tumulos?.identificacao || "",
       lat: s.tumulos?.lat ?? null,
@@ -351,148 +439,182 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   const jornada = await carregarJornada();
   const primeiroDia = proximoDiaUtil(isoHoje(), jornada);
 
-  // --------------------------------------------------------------------------
-  // MONTAGEM DOS DIAS
-  //
-  // Antes isto era uma fatia burra: ordenava tudo e cortava de N em N. A data
-  // que a família pediu não tinha voz nenhuma — o serviço caía onde a fila
-  // deixasse, inclusive DEPOIS do dia combinado.
-  //
-  // Agora são duas passadas:
-  //   1ª — quem tem DATA DESEJADA escolhe o dia: tenta o dia exato; se estiver
-  //        cheio, ANDA PARA TRÁS (antecipa) até achar vaga; nunca passa da data.
-  //        Se não couber nem antes, é marcado como estourado e vai para o dia
-  //        mais cedo com vaga — visível e vermelho, em vez de atrasado calado.
-  //   2ª — todo o resto preenche as vagas que sobraram, do dia mais próximo em
-  //        diante, na ordem de sempre (prioridade, vencimento, quadra).
-  // --------------------------------------------------------------------------
-  const slots = new Map<string, ServicoPend[]>();
-  const estourados = new Set<string>();
-
-  function vagas(d: string): number {
-    return capacidadeDia - (slots.get(d)?.length || 0);
-  }
-  function por(d: string, it: ServicoPend) {
-    const arr = slots.get(d) || [];
-    arr.push(it);
-    slots.set(d, arr);
-  }
-  function diaUtilAnterior(d: string): string {
-    let x = addDias(d, -1);
-    let guarda = 0;
-    while (proximoDiaUtil(x, jornada) !== x && guarda < 40) {
-      x = addDias(x, -1);
-      guarda++;
+  // ---- os grupos a alocar, um por cemitério --------------------------------
+  // Sem multi-cemitério configurado, isto vira UM grupo com tudo dentro — e o
+  // caminho é o mesmo de sempre.
+  type Grupo = { cemiterioId: string | null; nome: string; dias: number[] | null; itens: ServicoPend[] };
+  const grupos: Grupo[] = [];
+  if (cemiterios.length > 1 && temCemiterio) {
+    for (const c of cemiterios) {
+      const meus = itens.filter((i) => i.cemiterio_id === c.id);
+      if (meus.length) grupos.push({ cemiterioId: c.id, nome: c.nome, dias: c.dias, itens: meus });
     }
-    return x;
-  }
-  // primeiro dia útil com vaga, a partir de `de`
-  function primeiraVagaDe(de: string): string {
-    let d = proximoDiaUtil(de, jornada);
-    let guarda = 0;
-    while (vagas(d) <= 0 && guarda < 400) {
-      d = proximoDiaUtil(addDias(d, 1), jornada);
-      guarda++;
-    }
-    return d;
+    // órfãos (sem cemitério identificado) entram num grupo próprio, sem
+    // restrição de dia — melhor agendar do que sumir da agenda
+    const semCem = itens.filter((i) => !i.cemiterio_id || !cemiterios.some((c) => c.id === i.cemiterio_id));
+    if (semCem.length) grupos.push({ cemiterioId: null, nome: "sem cemitério", dias: null, itens: semCem });
+  } else {
+    grupos.push({ cemiterioId: null, nome: "todos", dias: null, itens });
   }
 
-  const ordemPadrao = (a: ServicoPend, b: ServicoPend) => {
-    const pa = a.prioridade || 0;
-    const pb = b.prioridade || 0;
-    if (pa !== pb) return pb - pa;
-    const da = a.data_prevista || "9999-99-99";
-    const db_ = b.data_prevista || "9999-99-99";
-    if (da !== db_) return da < db_ ? -1 : 1;
-    return a.tumulo.quadra_ordem - b.tumulo.quadra_ordem;
-  };
-
-  // 1ª passada — data pedida manda. Quem pediu para mais cedo escolhe primeiro.
-  const comData = itens
-    .filter((i) => !!i.data_desejada)
-    .sort((a, b) => {
-      const da = a.data_desejada!;
-      const db_ = b.data_desejada!;
-      if (da !== db_) return da < db_ ? -1 : 1;
-      return ordemPadrao(a, b);
-    });
-
-  for (const it of comData) {
-    // data já vencida (ou hoje) vira "o quanto antes"
-    const alvoBruto = it.data_desejada! < primeiroDia ? primeiroDia : it.data_desejada!;
-    const alvo = proximoDiaUtil(alvoBruto, jornada);
-
-    if (vagas(alvo) > 0) { por(alvo, it); continue; }
-
-    // dia cheio: anda para trás, nunca para frente
-    let d = diaUtilAnterior(alvo);
-    let achou: string | null = null;
-    let guarda = 0;
-    while (d >= primeiroDia && guarda < 400) {
-      if (vagas(d) > 0) { achou = d; break; }
-      d = diaUtilAnterior(d);
-      guarda++;
-    }
-
-    if (achou) { por(achou, it); continue; }
-
-    // não coube até a data pedida — o mais cedo possível, e marcado
-    estourados.add(it.id);
-    por(primeiraVagaDe(primeiroDia), it);
-  }
-
-  // 2ª passada — o resto ocupa o que sobrou
-  const semData = itens.filter((i) => !i.data_desejada).sort(ordemPadrao);
-  let cursor = primeiroDia;
-  for (const it of semData) {
-    cursor = primeiraVagaDe(cursor);
-    por(cursor, it);
-  }
+  // ---- capacidade CONSUMIDA, compartilhada entre os grupos -----------------
+  // Uma ajudante sem vínculo atende qualquer cemitério, mas o dia dela é UM só:
+  // sem este contador, dois cemitérios abertos no mesmo dia dobrariam a
+  // capacidade dela no papel — e a rota nasceria impossível de cumprir.
+  const usado = new Map<string, number>(); // `${dia}|${userId}` -> quantos já recebeu
+  const chave = (d: string, u: string | null) => `${d}|${u ?? "-"}`;
+  const restaDoTurno = (d: string, t: typeof turnos[number]) =>
+    Math.max(0, t.capacidade - (usado.get(chave(d, t.userId)) || 0));
 
   let dias = 0;
   let agendados = 0;
+  const diasComAlgo = new Set<string>();
 
-  for (const dia of [...slots.keys()].sort()) {
-    const doDia = slots.get(dia)!;
-    if (!doDia.length) continue;
-    dias++;
+  for (const grupo of grupos) {
+    // quem pode trabalhar NESTE cemitério: quem está amarrado a ele + quem não
+    // está amarrado a lugar nenhum
+    const turnosDoGrupo = turnos.filter(
+      (t) => !t.cemiterioId || !grupo.cemiterioId || t.cemiterioId === grupo.cemiterioId,
+    );
+    if (!turnosDoGrupo.length) continue;
 
-    // dentro do dia: agrupa por quadra e ordena por proximidade
-    const porQuadra = new Map<number, ServicoPend[]>();
-    for (const it of doDia) {
-      const arr = porQuadra.get(it.tumulo.quadra_ordem) || [];
+    // o dia serve para este cemitério? (jornada da casa ∩ dias do cemitério)
+    const diaServe = (d: string) =>
+      proximoDiaUtil(d, jornada) === d && (!grupo.dias || grupo.dias.includes(diaDaSemana(d)));
+
+    const proximoDiaDoGrupo = (d: string) => {
+      let x = proximoDiaUtil(d, jornada);
+      let guarda = 0;
+      while (!diaServe(x) && guarda < 400) { x = proximoDiaUtil(addDias(x, 1), jornada); guarda++; }
+      return x;
+    };
+    const diaAnteriorDoGrupo = (d: string) => {
+      let x = addDias(d, -1);
+      let guarda = 0;
+      while (!diaServe(x) && guarda < 400) { x = addDias(x, -1); guarda++; }
+      return x;
+    };
+
+    const slots = new Map<string, ServicoPend[]>();
+    const estourados = new Set<string>();
+
+    const vagas = (d: string) => {
+      if (!diaServe(d)) return 0;
+      const jaNoSlot = slots.get(d)?.length || 0;
+      const total = turnosDoGrupo.reduce((s, t) => s + restaDoTurno(d, t), 0);
+      return total - jaNoSlot;
+    };
+    const por = (d: string, it: ServicoPend) => {
+      const arr = slots.get(d) || [];
       arr.push(it);
-      porQuadra.set(it.tumulo.quadra_ordem, arr);
+      slots.set(d, arr);
+    };
+    const primeiraVagaDe = (de: string) => {
+      let d = proximoDiaDoGrupo(de);
+      let guarda = 0;
+      while (vagas(d) <= 0 && guarda < 400) { d = proximoDiaDoGrupo(addDias(d, 1)); guarda++; }
+      return d;
+    };
+
+    const ordemPadrao = (a: ServicoPend, b: ServicoPend) => {
+      const pa = a.prioridade || 0;
+      const pb = b.prioridade || 0;
+      if (pa !== pb) return pb - pa;
+      const da = a.data_prevista || "9999-99-99";
+      const db_ = b.data_prevista || "9999-99-99";
+      if (da !== db_) return da < db_ ? -1 : 1;
+      return a.tumulo.quadra_ordem - b.tumulo.quadra_ordem;
+    };
+
+    // 1ª passada — data pedida manda. Quem pediu para mais cedo escolhe primeiro.
+    const comData = grupo.itens
+      .filter((i) => !!i.data_desejada)
+      .sort((a, b) => {
+        const da = a.data_desejada!;
+        const db_ = b.data_desejada!;
+        if (da !== db_) return da < db_ ? -1 : 1;
+        return ordemPadrao(a, b);
+      });
+
+    for (const it of comData) {
+      const alvoBruto = it.data_desejada! < primeiroDia ? primeiroDia : it.data_desejada!;
+      const alvo = proximoDiaDoGrupo(alvoBruto);
+
+      if (vagas(alvo) > 0) { por(alvo, it); continue; }
+
+      // dia cheio: anda para trás, nunca para frente
+      let d = diaAnteriorDoGrupo(alvo);
+      let achou: string | null = null;
+      let guarda = 0;
+      while (d >= primeiroDia && guarda < 400) {
+        if (vagas(d) > 0) { achou = d; break; }
+        d = diaAnteriorDoGrupo(d);
+        guarda++;
+      }
+      if (achou) { por(achou, it); continue; }
+
+      estourados.add(it.id);
+      por(primeiraVagaDe(primeiroDia), it);
     }
-    const quadrasOrdenadas = [...porQuadra.keys()].sort((a, b) => a - b);
 
-    // sequência do dia já otimizada por quadra/proximidade
-    const sequencia: ServicoPend[] = [];
-    for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorProximidade(porQuadra.get(q)!));
+    // 2ª passada — o resto ocupa o que sobrou
+    const semData = grupo.itens.filter((i) => !i.data_desejada).sort(ordemPadrao);
+    let cursor = primeiroDia;
+    for (const it of semData) {
+      cursor = primeiraVagaDe(cursor);
+      por(cursor, it);
+    }
 
-    // reparte a sequência entre as ajudantes, em blocos contíguos
-    // (blocos contíguos preservam a proximidade: cada uma pega quadras vizinhas)
-    let pos = 0;
-    for (const turno of turnos) {
-      const bloco = sequencia.slice(pos, pos + turno.capacidade);
-      pos += turno.capacidade;
-      let ordem = 1;
-      for (const it of bloco) {
-        const campos: Record<string, any> = {
-          data_prevista: dia,
-          ordem_dia: ordem,
-          status: "agendado",
-          executora_id: turno.userId,
-        };
-        // só escreve o aviso se a coluna existe (0037)
-        if (temDesejada) campos.desejada_estourada = estourados.has(it.id);
-        await db.from("servicos").update(campos).eq("id", it.id).eq("org_id", org);
-        ordem++;
-        agendados++;
+    // ---- grava ------------------------------------------------------------
+    for (const dia of [...slots.keys()].sort()) {
+      const doDia = slots.get(dia)!;
+      if (!doDia.length) continue;
+      diasComAlgo.add(dia);
+
+      // dentro do dia: agrupa por quadra e ordena por proximidade.
+      // Como cada grupo é UM cemitério, a ordem da quadra volta a significar
+      // "a sequência em que se anda por aquele cemitério".
+      const porQuadra = new Map<number, ServicoPend[]>();
+      for (const it of doDia) {
+        const arr = porQuadra.get(it.tumulo.quadra_ordem) || [];
+        arr.push(it);
+        porQuadra.set(it.tumulo.quadra_ordem, arr);
+      }
+      const quadrasOrdenadas = [...porQuadra.keys()].sort((a, b) => a - b);
+      const sequencia: ServicoPend[] = [];
+      for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorProximidade(porQuadra.get(q)!));
+
+      // reparte entre quem pode trabalhar aqui, em blocos contíguos, respeitando
+      // o que cada uma JÁ recebeu neste dia (inclusive de outro cemitério)
+      let pos = 0;
+      for (const turno of turnosDoGrupo) {
+        const cabe = restaDoTurno(dia, turno);
+        if (cabe <= 0) continue;
+        const bloco = sequencia.slice(pos, pos + cabe);
+        if (!bloco.length) continue;
+        pos += bloco.length;
+        usado.set(chave(dia, turno.userId), (usado.get(chave(dia, turno.userId)) || 0) + bloco.length);
+
+        // a ordem do dia continua de 1 em diante POR PESSOA
+        let ordem = (usado.get(chave(dia, turno.userId)) || 0) - bloco.length + 1;
+        for (const it of bloco) {
+          const campos: Record<string, any> = {
+            data_prevista: dia,
+            ordem_dia: ordem,
+            status: "agendado",
+            executora_id: turno.userId,
+          };
+          if (temDesejada) campos.desejada_estourada = estourados.has(it.id);
+          if (temCemiterio && it.cemiterio_id) campos.cemiterio_id = it.cemiterio_id;
+          await db.from("servicos").update(campos).eq("id", it.id).eq("org_id", org);
+          ordem++;
+          agendados++;
+        }
       }
     }
   }
 
+  dias = diasComAlgo.size;
   return { agendados, dias };
 }
 

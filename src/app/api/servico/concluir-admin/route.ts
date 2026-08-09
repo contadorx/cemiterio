@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
 import { consumirMaterial } from "@/lib/consumo";
 import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +61,11 @@ export async function POST(req: NextRequest) {
     ...(duracao ? { duracao_ajustada: duracao, motivo_ajuste: b?.motivoAjuste || "informado pelo painel" } : {}),
     // no "contra_foto", a entrega é o que libera a cobrança
     ...(momento === "contra_foto" ? { cobranca_liberada_em: agora } : {}),
-  }).eq("id", servicoId).eq("org_id", org);
+    // MESMA TRAVA DO CAMPO: só transiciona quem ainda não está executado.
+    // Sem isto, a rota lia o status numa consulta e atualizava noutra — duas
+    // submissões simultâneas (duplo clique, aba repetida) passavam as duas e
+    // a família levava dois débitos pela mesma limpeza.
+  }).eq("id", servicoId).eq("org_id", org).neq("status", "executado");
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
   // débito (idempotente): quem paga antes já pagou, não debita de novo
@@ -92,7 +97,9 @@ export async function POST(req: NextRequest) {
         org_id: org, cliente_id: (serv as any).cliente_id, tipo: "debito",
         valor, origem: "servico", servico_id: servicoId,
         status_conc: "confirmado", descricao: "Limpeza executada",
-        data: agora.slice(0, 10),
+        // dia de Sao Paulo, igual ao campo (com UTC, conclusao depois das
+        // 21h caia no dia — e no mes — seguinte)
+        data: diaOperacao(),
       });
       debitou = true;
       valorDebitado = valor;
@@ -111,9 +118,12 @@ export async function POST(req: NextRequest) {
     if (!(serv as any).executora_id) {
       await db.from("servicos").update({ executora_id: quem }).eq("id", servicoId);
     }
+    // receita = o valor REALMENTE cobrado (cascata resolvida), nao o que
+    // estava gravado antes — que e nulo justamente nos avulsos. Com regra por
+    // percentual, o carimbo saia R$ 0,00 sem erro nenhum.
     await carimbarRemuneracao(db, {
       servicoId, orgId: org, executoraId: quem,
-      receita: Number((serv as any).valor) || 0,
+      receita: valorDebitado ?? (Number((serv as any).valor) || 0),
       avulso: ehAvulso(serv as any),
     });
   }

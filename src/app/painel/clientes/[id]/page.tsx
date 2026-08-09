@@ -6,7 +6,7 @@ import { PainelNav, painel, cor, numeroBR, dinheiroBR } from "../../ui";
 import Extras from "./Extras";
 import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
 import { normalizarMMDD } from "@/lib/memoria";
-import { valorMensalDoPlano } from "@/lib/vencimento";
+import { valorMensalDoPlano, diaOperacao } from "@/lib/vencimento";
 import { prepararFoto, motivoFalha } from "@/lib/foto";
 
 /**
@@ -688,9 +688,15 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
   // mensal "57,205" a rota grava 57,21 (Math.round) e a tela anunciava
   // R$ 57.20 (toFixed corta) — um centavo de diferenca entre o que a tela
   // promete e o que o banco cobra, na linha em negrito.
-  const valorCiclo: number | null = legado && dinheiroIntacto
-    ? (plano?.valor_vigente == null ? null : Math.round(Number(plano.valor_vigente) * 100) / 100)
-    : (isFinite(mensalNum) ? Math.round(mensalNum * meses * 100) / 100 : null);
+  // DECISAO 08/08: o campo guarda o preco de UMA limpeza. A caixa ao lado
+  // mostra quanto isso DA POR MES (preco x limpezas do ciclo / meses do ciclo).
+  // Ela mostrava "cobranca do ciclo" — o numero que o servidor gravava em
+  // valor_vigente — e era assim que um plano anual de R$ 45 passava a debitar
+  // R$ 540 por lavagem.
+  const lavagensCiclo = Math.max(1, Number(p.lavagens_por_ciclo) || 1);
+  const porMes: number | null = isFinite(mensalNum)
+    ? Math.round((mensalNum * lavagensCiclo / meses) * 100) / 100
+    : null;
 
   useEffect(() => {
     if (!aberto || quadras.length) return;
@@ -722,7 +728,7 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
     }
     const mudados = plano ? camposMudados() : [];
     if (mudados.includes("valor_mensal") && !isFinite(numeroBR(p.valor_mensal))) {
-      setErro("valor mensal: use numeros, ex. 40,50");
+      setErro("valor por limpeza: use numeros, ex. 40,50");
       return false;
     }
     // o formulário passa a mostrar o que o banco vai guardar
@@ -1061,15 +1067,15 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
                   </div>
                 )}
                 <div>
-                  <label style={painel.rotulo}>Valor mensal (R$)</label>
+                  <label style={painel.rotulo}>Valor por limpeza (R$)</label>
                   <input type="text" inputMode="decimal" placeholder="0,00"
                          style={{ ...painel.input, width: 110 }} value={p.valor_mensal}
                          onChange={(e) => mudarP({ valor_mensal: e.target.value.replace(/[^\d.,]/g, "") })} />
                 </div>
                 <div>
-                  <label style={painel.rotulo}>{legado && dinheiroIntacto ? "Valor gravado" : "Cobrança do ciclo"}</label>
+                  <label style={painel.rotulo}>Dá por mês</label>
                   <div style={{ ...painel.input, width: 120, background: "#f8fafc", fontWeight: 700 }}>
-                    {valorCiclo == null ? "—" : `R$ ${valorCiclo.toFixed(2)}`}
+                    {porMes == null ? "—" : `R$ ${porMes.toFixed(2)}`}
                   </div>
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12 }}>
@@ -1105,16 +1111,11 @@ function TumuloEdit({ t, plano, onSalvo, registrar }: {
                          onChange={(e) => mudarP({ proxima_cobranca: e.target.value })} />
                 </div>
               </div>
-              {legado && dinheiroIntacto && (
-                <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
-                  Este plano veio da importação sem valor mensal separado: o que está gravado é
-                  R$ {plano?.valor_vigente == null ? "—" : (Math.round(Number(plano.valor_vigente) * 100) / 100).toFixed(2)}.
-                  Mudar só o período <b>não</b> muda esse valor. Para o sistema passar a calcular
-                  o ciclo, digite o valor mensal no campo acima e salve
-                  {meses > 1 && <> — atenção: a cobrança do ciclo passa a ser
-                  o mensal × {meses} meses, e é esse número que vai ser cobrado</>}.
-                </p>
-              )}
+              <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
+                O valor é o de <b>uma limpeza</b> — é ele que entra na conta da família a cada
+                visita. Quem define quanto sai por mês é a periodicidade ao lado: mudar o período
+                <b> não</b> mexe no preço.
+              </p>
               <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>
                 Ao salvar, este jazigo é marcado como conferido — é assim que você acompanha o que já foi migrado.
               </p>
@@ -1601,7 +1602,7 @@ function RegistrarPagamento({ clienteId, nome, onSalvo }:
   { clienteId: string; nome: string; onSalvo: () => void }) {
   const [aberto, setAberto] = useState(false);
   const [f, setF] = useState({
-    valor: "", data: new Date().toISOString().slice(0, 10),
+    valor: "", data: diaOperacao(),
     descricao: "", semComprovante: true,
   });
   const [salvando, setSalvando] = useState(false);

@@ -264,7 +264,7 @@ function Cartao({
 
           {j.suspeito && (
             <div style={{ color: AMBAR, fontSize: 14, marginTop: 4 }}>
-              ⚠ {j.motivos.join(" · ")}
+              ⚠ {(j.motivos || []).join(" · ")}
             </div>
           )}
 

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { diaOperacao } from "./vencimento";
 
 /**
  * BRIEFING DO DIA — curto e direto.
@@ -67,11 +68,12 @@ export function avisosDoJazigo(s: any): AvisoJazigo[] {
 export async function montarBriefing(executoraId: string | null, nome: string): Promise<Briefing> {
   const db = supabaseAdmin();
   const org = env.orgId();
-  const hoje = new Date().toISOString().slice(0, 10);
+  // mesmo dia que a rota do campo e que o alocador usam (fuso de Sao Paulo)
+  const hoje = diaOperacao();
 
   let q = db
     .from("servicos")
-    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,rua,foto_referencia_url,lat,quadras(codigo))")
+    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,rua,foto_referencia_url,lat,quadras(codigo,cemiterios(nome)))")
     .eq("org_id", org)
     .eq("data_prevista", hoje);
   if (executoraId) q = q.or(`executora_id.eq.${executoraId},executora_id.is.null`);
@@ -81,7 +83,17 @@ export async function montarBriefing(executoraId: string | null, nome: string): 
   const feitos = todos.filter((s) => s.status === "executado").length;
   const pendentes = todos.filter((s) => s.status !== "executado");
 
-  const quadras = [...new Set(todos.map((s) => s.tumulos?.quadras?.codigo).filter(Boolean))].sort();
+  // 0044 — com mais de um cemitério no dia, "Q-12, Q-3" não diz para onde ir.
+  // Com um só, o texto continua exatamente como era.
+  const cems = [...new Set(todos.map((s) => s.tumulos?.quadras?.cemiterios?.nome).filter(Boolean))];
+  const quadras = [...new Set(
+    todos.map((s) => {
+      const q = s.tumulos?.quadras?.codigo;
+      if (!q) return null;
+      const c = s.tumulos?.quadras?.cemiterios?.nome;
+      return cems.length > 1 && c ? `${c} · ${q}` : q;
+    }).filter(Boolean),
+  )].sort();
   const precisamAtencao = pendentes.filter((s) => avisosDoJazigo(s).length > 0).length;
 
   const { data: mats } = await db

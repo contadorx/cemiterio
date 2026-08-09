@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
-import { diaOperacao, valorDoCiclo, valorMensalDoPlano, vencimentosIniciais } from "@/lib/vencimento";
+import { diaOperacao, precoPorLimpeza, valorMensalDoPlano, valorMensalEfetivo, vencimentosIniciais } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +51,11 @@ export async function POST(req: NextRequest) {
     cadencia,
     qtd_por_passagem: lav,
     lavagens_por_ciclo: lav,
-    valor_mensal: valorMensal,
-    valor_vigente: valorDoCiclo(cadencia, valorMensal),
+    // O numero digitado E o preco de UMA limpeza (decisao 08/08, ver
+    // lib/vencimento.ts). As duas colunas guardam o mesmo valor: assim o
+    // reajuste, que so escreve valor_vigente, nao e desfeito no proximo Salvar.
+    valor_mensal: precoPorLimpeza(valorMensal),
+    valor_vigente: precoPorLimpeza(valorMensal),
     data_valor_vigente: diaOperacao(),
     ativo: true,
     proximo_servico: venc.proximo_servico,
@@ -76,7 +79,7 @@ export async function GET(req: NextRequest) {
 
   const { data: planos } = await db
     .from("planos")
-    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,valor_mensal,valor_vigente," +
+    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_mensal,valor_vigente," +
             "data_valor_vigente,proximo_servico,proxima_cobranca,pago_ate,ativo,migrado_em," +
             "clientes(nome,telefone,tratamento,cobranca_antecipada,regua_cobranca)," +
             "tumulos(identificacao,rua,quadra_id,quadras(codigo))")
@@ -97,8 +100,16 @@ export async function GET(req: NextRequest) {
     quadra: p.tumulos?.quadras?.codigo || "",
     rua: p.tumulos?.rua || "",
     cadencia: p.cadencia,
+    lavagens: p.lavagens_por_ciclo ?? p.qtd_por_passagem ?? 1,
+    // o preco de UMA limpeza (o numero que se digita e o que e debitado)
     valorMensal: valorMensalDoPlano(p.cadencia, p.valor_mensal, p.valor_vigente),
     valorCiclo: Number(p.valor_vigente || 0),
+    // quanto isso REPRESENTA por mes — so para somar carteira, nunca para cobrar
+    mensalEfetivo: valorMensalEfetivo(
+      p.cadencia,
+      p.lavagens_por_ciclo ?? p.qtd_por_passagem,
+      valorMensalDoPlano(p.cadencia, p.valor_mensal, p.valor_vigente),
+    ),
     // PLANO ANTIGO: veio da importacao/seed sem valor_mensal separado, so com
     // valor_vigente. A tela precisa saber disto para NAO chamar esse numero de
     // "mensal" nem multiplicar por cadencia (o significado da coluna esta em
@@ -151,7 +162,9 @@ export async function GET(req: NextRequest) {
     mes30: diaOperacao(30),
     totais: {
       quantidade: lista.length,
-      mensal: Math.round(lista.filter((p) => p.ativo).reduce((s, p) => s + p.valorMensal, 0) * 100) / 100,
+      // soma do que a carteira rende POR MES (nao a soma dos precos por
+      // limpeza, que misturava plano quinzenal com plano anual na mesma conta)
+      mensal: Math.round(lista.filter((p) => p.ativo).reduce((s, p) => s + p.mensalEfetivo, 0) * 100) / 100,
       faltaData: lista.filter((p) => p.faltaData && p.ativo).length,
       naoConferidos: lista.filter((p) => !p.conferido).length,
     },

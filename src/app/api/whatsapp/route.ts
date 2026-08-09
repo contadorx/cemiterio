@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
     if (!origem) return NextResponse.json({ ok: false, erro: "origem_obrigatoria" }, { status: 400 });
     const url = `${origem}/api/webhook/evolution?secret=${env.webhookSecret()}`;
     const r = await configurarWebhook(url);
-    return NextResponse.json({ ...r, url });
+    // O SEGREDO NAO VOLTA PARA A TELA. A URL completa era impressa no navegador
+    // (e ia parar em print, log de acesso e histórico). O servidor configura o
+    // webhook com o segredo; a tela só precisa saber que foi configurado.
+    return NextResponse.json({ ...r, url: `${origem}/api/webhook/evolution?secret=•••` });
   }
 
   return NextResponse.json({ ok: false, erro: "acao_invalida" }, { status: 400 });
