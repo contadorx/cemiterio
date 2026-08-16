@@ -625,6 +625,94 @@ Os túmulos de teste foram removidos.
 
 ---
 
+## BUILD CORRIGIDO E VALIDADO
+
+O deploy quebrou em dois pontos. Os dois estão corrigidos, e desta vez o
+`next build` foi **executado de verdade aqui**: passou limpo, sem erro e sem
+um único warning.
+
+### 1. `PainelFechamento is not a valid Page export field`
+
+Um arquivo `page.tsx` do Next só pode exportar `default` e alguns campos
+reservados (`metadata`, `dynamic`, `revalidate`…). Eu exportei o componente
+dali para o Financeiro reusar — e isso derruba o build.
+
+O componente foi para **`src/app/painel/fechamento/Fechamento.tsx`**. A
+`page.tsx` ficou só com o `default`, e o Financeiro importa do arquivo novo.
+
+Varri **todos** os `page.tsx`, `layout.tsx` e `route.ts` do projeto atrás do
+mesmo padrão: nenhum outro caso.
+
+### 2. Três referências órfãs em `campo/page.tsx`
+
+`setFinalizando` e `setConfirmando` sobraram em dois lugares depois que os
+modais saíram: no link direto `?servico=ID` e no botão "começar" do
+*Como chegar*.
+
+Não dava para simplesmente apagar — os dois casos precisam levar a Nina até o
+jazigo certo. Agora ambos **destacam o cartão e o puxam para a tela**
+(`scrollIntoView` com contorno azul). Com a câmera dentro do botão não existe
+mais tela intermediária para abrir; o que faz sentido é mostrar onde tocar.
+
+### Como isso passou batido antes
+
+Eu vinha verificando por inspeção — contagem de chaves, busca por referências
+órfãs — porque não havia `node_modules` no ambiente. Instalei as dependências
+e rodei `tsc --noEmit` e `next build` completos. Os dois erros apareceram em
+segundos.
+
+**Daqui em diante, todo pacote passa pelo build antes de ser entregue.**
+
+---
+
+## A RUA 7 É DIVISA — corrigido
+
+### O problema
+
+A Rua 7 separa as quadras de baixo das de cima. Os túmulos de um lado dela são
+da Quadra 1; os do outro lado, da Quadra 3. Mas é **uma rua só no chão**: a
+Sureya percorre uma vez e limpa os dois lados.
+
+Duas falhas:
+
+1. No cadastro, a Rua 7 só existia nas quadras 1 e 2. Faltava nas de cima.
+2. Pior: o roteiro mandaria a Nina **andar a Rua 7 duas vezes no mesmo dia** —
+   uma no bloco da Quadra 1, outra no da Quadra 3 — porque a ordem era quadra
+   primeiro, rua depois.
+
+### A solução — `ruas.chave_fisica` *(já aplicada no banco)*
+
+Ruas que são o mesmo caminho no chão compartilham uma chave. O roteiro agrupa
+por ela e trata o conjunto como **uma parada só**, posicionada onde a primeira
+metade cai na caminhada.
+
+- Rua 7 criada nas quadras 3 e 4, com ordem 0 — subindo o cemitério, ela é a
+  primeira rua das quadras de cima.
+- `rua7-direita` amarra Quadra 1 + Quadra 3; `rua7-esquerda` amarra 2 + 4. Os
+  lados seguem separados porque a Principal passa no meio.
+- Fica nula para rua comum: nada muda para as outras.
+
+### No código
+
+A divisão por quadra saiu do alocador e passou para dentro de
+`ordenarPorEndereco`. Enquanto o dia era partido por quadra **antes** de
+ordenar, nenhuma rua compartilhada conseguiria se juntar.
+
+**Testado:** com túmulos na Rua 5, 6 e 7 da Quadra 1 e na Rua 7 e 8 da Quadra
+3, a ordem sai `Rua 5 → Rua 6 → Rua 7 (Q1) → Rua 7 (Q3) → Rua 8`. A Rua 7
+aparece uma vez, com os dois lados juntos, no lugar certo.
+
+`next build` executado: passou limpo.
+
+### Fica em aberto
+
+As **transversais têm a mesma natureza**: a Transversal 3 corre da Rua 1 à Rua
+13 e hoje está partida entre Quadra 1 e Quadra 3 (já com 11 e 1 túmulos). Se a
+Sureya também as percorre inteiras de uma vez, é só me dizer que eu aplico a
+mesma chave.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

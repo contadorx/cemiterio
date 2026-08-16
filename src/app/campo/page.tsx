@@ -73,6 +73,10 @@ export default function Campo() {
   const [pedirMaterial, setPedirMaterial] = useState(false);
   const [capturarJazigo, setCapturarJazigo] = useState(false);
   const [indo, setIndo] = useState<Item | null>(null);
+  // Qual cartão puxar para a tela e realçar. Substitui os modais que abriam
+  // sozinhos: com a câmera dentro do botão, não há mais tela intermediária
+  // para abrir — o que faz sentido é levar a Nina até o cartão certo.
+  const [destaque, setDestaque] = useState<string | null>(null);
   const [iniciando, setIniciando] = useState<string | null>(null);
   // admin que entrou no campo pelo painel precisa de porta de volta (pedido 01/08)
   const [podePainel, setPodePainel] = useState(false);
@@ -131,7 +135,7 @@ export default function Campo() {
     if (!id) return;
     const it = lista.find((x) => x.id === id);
     if (it && it.status !== "executado") {
-      it.iniciadoEm ? setFinalizando(it) : setConfirmando(it);
+      setDestaque(it.id);
     }
   }, [lista]);
 
@@ -312,6 +316,7 @@ export default function Campo() {
               onIniciar={(foto) => iniciar(it, foto)}
               onFinalizar={(foto) => terminar(it, foto)}
               onNaoDeu={() => setNaoDeu(it)}
+              destacado={destaque === it.id}
             />
           ))}
         </section>
@@ -351,7 +356,7 @@ export default function Campo() {
             fotoEnquadramento: indo.fotoEnquadramento, fotoReferencia: indo.fotoReferencia,
           }}
           onFechar={() => setIndo(null)}
-          onComecar={() => { const it = indo; setIndo(null); if (it) setConfirmando(it); }}
+          onComecar={() => { const it = indo; setIndo(null); if (it) setDestaque(it.id); }}
         />
       )}
     </main>
@@ -411,12 +416,13 @@ function Fotos({ it }: { it: Item }) {
  * treinamento formal e usa isto de pé, no sol: se o botão precisa de
  * explicação, o botão está errado.
  */
-function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
+function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, destacado }: {
   it: Item; ocupado: boolean;
   onIndo: () => void;
   onIniciar: (foto: FotoPronta) => void;
   onFinalizar: (foto: FotoPronta) => void;
   onNaoDeu: () => void;
+  destacado?: boolean;
 }) {
   const emAndamento = !!it.iniciadoEm;
   const [agora, setAgora] = useState(() => Date.now());
@@ -424,6 +430,14 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
   const [erroFoto, setErroFoto] = useState("");
   const camera = useRef<HTMLInputElement | null>(null);
   const pendente = useRef<"comecar" | "terminar" | null>(null);
+  const caixa = useRef<HTMLDivElement | null>(null);
+
+  // Puxa o cartão para a tela quando ele é o alvo — de um link direto ou de
+  // voltar do "Como chegar". Sem isto ela abriria a lista e teria que
+  // procurar o jazigo no meio dos outros.
+  useEffect(() => {
+    if (destacado) caixa.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [destacado]);
 
   function tocar(acao: "comecar" | "terminar") {
     setErroFoto("");
@@ -465,7 +479,11 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
     .filter(Boolean).join(" · ");
 
   return (
-    <div style={{ ...s.cartao, ...(emAndamento ? s.cartaoAtivo : {}) }}>
+    <div ref={caixa} style={{
+      ...s.cartao,
+      ...(emAndamento ? s.cartaoAtivo : {}),
+      ...(destacado ? s.cartaoDestacado : {}),
+    }}>
       <div style={s.local}>{local || "sem local"}</div>
       <div style={s.nome}>{it.falecido || it.tumulo}</div>
       {it.falecido && <div style={s.jazigo}>{it.tumulo}</div>}
@@ -574,6 +592,7 @@ const s: Record<string, React.CSSProperties> = {
   erroFoto: { background: "#FDECEC", border: "1px solid #E9B4B4", borderRadius: 12,
               padding: "12px 14px", margin: "12px 0 0", fontSize: 16, color: "#8B2020" },
   botaoTerminar: { background: "#1565C0" },
+  cartaoDestacado: { outline: "3px solid #1565C0", outlineOffset: 2 },
   botaoNaoDeu: { minHeight: 64, padding: "18px 22px", background: "#fff", color: "#475569",
                  border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 16, cursor: "pointer" },
   feitosBox: { background: "#f0fdf4", color: "#166534", padding: 18, borderRadius: 14,

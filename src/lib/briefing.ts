@@ -108,6 +108,8 @@ export async function montarBriefing(executoraId: string | null, nome: string): 
   for (const sv of pendentes) {
     const nome = (sv as any).tumulos?.ruas?.nome;
     if (!nome) continue;
+    // A Rua 7 é divisa e existe em duas quadras. Agrupando pelo NOME, ela
+    // aparece uma vez só na frase da manhã — que é como a Nina a percorre.
     const ord = Number((sv as any).tumulos?.ruas?.ordem ?? 9999);
     if (!ruasComOrdem.has(nome)) ruasComOrdem.set(nome, ord);
     contagem.set(nome, (contagem.get(nome) || 0) + 1);

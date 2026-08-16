@@ -283,6 +283,10 @@ interface ServicoPend {
     rua_ordem: number | null;      // sequência de caminhada da rua
     rua_id: string | null;
     ordem_na_rua: number | null;   // posição dentro da rua, derivada do GPS do cadastro
+    // Ruas que são o MESMO caminho no chão, partido entre quadras (a Rua 7 é
+    // divisa: um lado é da Quadra 1, o outro da 3). Compartilham esta chave e
+    // viram uma parada só.
+    rua_chave: string | null;
   };
 }
 
@@ -310,37 +314,61 @@ interface ServicoPend {
  * (lib/rota.ts). Só não participa mais da navegação do dia.
  */
 function ordenarPorEndereco(itens: ServicoPend[]): ServicoPend[] {
+  // A CHAVE DA PARADA.
+  //
+  // Normalmente é a rua dentro da quadra. Mas quando a rua tem `chave_fisica`
+  // ela é o MESMO caminho no chão partido entre duas quadras — a Rua 7 é a
+  // divisa, com um lado pertencendo à Quadra 1 e o outro à Quadra 3. Nesse
+  // caso os dois pedaços viram UMA parada só, e a Nina percorre a rua uma vez
+  // limpando os dois lados, que é como ela já faz na prática.
+  const chaveDe = (it: ServicoPend) =>
+    it.tumulo.rua_chave || it.tumulo.rua_id || "";
+
   const porRua = new Map<string, ServicoPend[]>();
   const semRua: ServicoPend[] = [];
 
   for (const it of itens) {
-    const chave = it.tumulo.rua_id;
-    if (!chave) { semRua.push(it); continue; }
-    const arr = porRua.get(chave) || [];
+    const k = chaveDe(it);
+    if (!k) { semRua.push(it); continue; }
+    const arr = porRua.get(k) || [];
     arr.push(it);
-    porRua.set(chave, arr);
+    porRua.set(k, arr);
   }
 
-  const ruasOrdenadas = [...porRua.keys()].sort((a, b) => {
-    const oa = porRua.get(a)![0].tumulo.rua_ordem ?? 9999;
-    const ob = porRua.get(b)![0].tumulo.rua_ordem ?? 9999;
-    return oa - ob;
-  });
+  // Onde cada parada entra na caminhada: a posição da metade que vem primeiro.
+  // A Rua 7 compartilhada é alcançada ao terminar as ruas da Quadra 1, então é
+  // a ordem dessa metade que manda — e não a da metade da Quadra 3.
+  const posicao = (grupo: ServicoPend[]) =>
+    grupo.reduce(
+      (menor, it) => {
+        const q = it.tumulo.quadra_ordem ?? 9999;
+        const r = it.tumulo.rua_ordem ?? 9999;
+        return q < menor.q || (q === menor.q && r < menor.r) ? { q, r } : menor;
+      },
+      { q: 9999, r: 9999 },
+    );
+
+  const paradas = [...porRua.keys()]
+    .map((k) => ({ k, pos: posicao(porRua.get(k)!) }))
+    .sort((a, b) => a.pos.q - b.pos.q || a.pos.r - b.pos.r);
 
   const rota: ServicoPend[] = [];
-  ruasOrdenadas.forEach((ruaId, i) => {
-    const daRua = porRua.get(ruaId)!.sort((a, b) => {
-      // sem posição definida, vai para o fim da PRÓPRIA rua — nunca para o
-      // fim do dia, como acontecia antes.
+  paradas.forEach(({ k }, i) => {
+    const daRua = porRua.get(k)!.sort((a, b) => {
+      // Sem posição definida, vai para o fim da PRÓPRIA rua — nunca para o
+      // fim do dia, como acontecia quando a ordem saía do GPS.
       const oa = a.tumulo.ordem_na_rua ?? Number.MAX_SAFE_INTEGER;
       const ob = b.tumulo.ordem_na_rua ?? Number.MAX_SAFE_INTEGER;
       return oa - ob;
     });
+
+    // SERPENTINA: ruas alternadas são percorridas ao contrário. Sem isso ela
+    // termina a rua no fundo e volta andando à toa até o começo da próxima.
     rota.push(...(i % 2 === 1 ? daRua.reverse() : daRua));
   });
 
-  // Túmulo ainda sem rua cadastrada fecha o dia, em ordem alfabética. É um
-  // aviso visível de cadastro incompleto, não um item perdido no meio.
+  // Túmulo ainda sem rua fecha o dia, em ordem alfabética. É um aviso visível
+  // de cadastro incompleto, não um item perdido no meio da lista.
   semRua.sort((a, b) => a.tumulo.identificacao.localeCompare(b.tumulo.identificacao));
   return [...rota, ...semRua];
 }
@@ -424,12 +452,12 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   // ---- pendentes (com o cemitério, quando a coluna existir) -----------------
   const SEL_NOVO =
     "id,data_prevista,data_desejada,prioridade,cemiterio_id," +
-    "tumulos(identificacao,lat,lng,cemiterio_id,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem,cemiterio_id))";
+    "tumulos(identificacao,lat,lng,cemiterio_id,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem,cemiterio_id))";
   const SEL_SEM_FIXADO =
     "id,data_prevista,data_desejada,prioridade," +
-    "tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem,cemiterio_id))";
+    "tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem,cemiterio_id))";
   const SEL_ANTIGO =
-    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem))";
+    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem))";
 
   // O que foi decidido por uma PESSOA não entra aqui (0041): remarcação manual
   // fica onde está, em vez de ser desfeita pelo alocador na madrugada seguinte.
@@ -475,6 +503,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       quadra_ordem: s.tumulos?.quadras?.ordem ?? 9999,
       rua_ordem: s.tumulos?.ruas?.ordem ?? null,
       rua_id: s.tumulos?.rua_id ?? null,
+      rua_chave: s.tumulos?.ruas?.chave_fisica ?? null,
       ordem_na_rua: s.tumulos?.ordem_na_rua ?? null,
     },
   }));
@@ -616,18 +645,16 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       if (!doDia.length) continue;
       diasComAlgo.add(dia);
 
-      // dentro do dia: agrupa por quadra e ordena por proximidade.
-      // Como cada grupo é UM cemitério, a ordem da quadra volta a significar
-      // "a sequência em que se anda por aquele cemitério".
-      const porQuadra = new Map<number, ServicoPend[]>();
-      for (const it of doDia) {
-        const arr = porQuadra.get(it.tumulo.quadra_ordem) || [];
-        arr.push(it);
-        porQuadra.set(it.tumulo.quadra_ordem, arr);
-      }
-      const quadrasOrdenadas = [...porQuadra.keys()].sort((a, b) => a - b);
-      const sequencia: ServicoPend[] = [];
-      for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorEndereco(porQuadra.get(q)!));
+      // Dentro do dia, a ordem sai do endereço. Como cada grupo é UM cemitério,
+      // a ordem da quadra volta a significar "a sequência em que se anda por
+      // aquele cemitério".
+      //
+      // A divisão por quadra NÃO acontece mais aqui, e sim dentro de
+      // `ordenarPorEndereco`. O motivo é a Rua 7: ela é a divisa, com um lado
+      // na Quadra 1 e o outro na Quadra 3. Partindo por quadra antes de
+      // ordenar, ela virava duas paradas e a Nina andava a mesma rua duas
+      // vezes no mesmo dia.
+      const sequencia: ServicoPend[] = ordenarPorEndereco(doDia);
 
       // reparte entre quem pode trabalhar aqui, em blocos contíguos, respeitando
       // o que cada uma JÁ recebeu neste dia (inclusive de outro cemitério)
