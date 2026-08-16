@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin, exigirLogado } from "@/lib/roles";
+import { encaixarPeloGps } from "@/lib/rota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,43 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   const r = Array.isArray(data) ? data[0] : data;
+
+  // REPOSICIONA O TÚMULO NA RUA.
+  //
+  // Os túmulos não têm número gravado na pedra: quem diz quem vem antes de
+  // quem é o GPS. Como a coordenada pode chegar DEPOIS do cadastro (a Nina
+  // salva a ficha e só então marca a localização), a posição precisa ser
+  // recalculada aqui — senão o túmulo ficaria no fim da rua para sempre.
+  //
+  // Só mexe NESTE túmulo. Os vizinhos mantêm a posição que já tinham, porque
+  // o código deles já foi para a ficha da família e para as fotos.
+  try {
+    const { data: t } = await auth.db
+      .from("tumulos").select("rua_id").eq("id", params.id).maybeSingle();
+    const ruaId = (t as any)?.rua_id;
+
+    if (ruaId && r?.lat != null && r?.lng != null) {
+      const { data: naRua } = await auth.db
+        .from("tumulos").select("id,ordem_na_rua,lat,lng")
+        .eq("rua_id", ruaId).neq("id", params.id).order("ordem_na_rua");
+
+      const vizinhos = (naRua || [])
+        .filter((v: any) => v.ordem_na_rua != null)
+        .map((v: any) => ({
+          tumuloId: v.id, ordem: Number(v.ordem_na_rua), lat: v.lat, lng: v.lng,
+        }));
+
+      const ordem = encaixarPeloGps(
+        { tumuloId: params.id, lat: Number(r.lat), lng: Number(r.lng) },
+        vizinhos,
+      );
+      await auth.db.from("tumulos").update({ ordem_na_rua: ordem }).eq("id", params.id);
+    }
+  } catch {
+    // Reposicionar é melhoria, não requisito: se falhar, o GPS já foi salvo e
+    // a Sureya pode arrastar o túmulo na lista. Não derruba o cadastro.
+  }
+
   return NextResponse.json({
     ok: true,
     lat: r?.lat,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin, exigirLogado } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { explicarErroJazigo, resolverCemiterio } from "@/lib/jazigo";
+import { encaixarPeloGps, gerarCodigo } from "@/lib/rota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,21 +103,62 @@ export async function POST(req: NextRequest) {
   }
   const cemId = rc.cemiterioId;
 
-  // quadra por código (cria se ainda não existe)
-  let { data: quad } = await db
+  // QUADRA: escolhida da lista, NUNCA criada por texto livre.
+  //
+  // Antes esta rota criava a quadra quando o código não existia. Parecia
+  // gentil e foi o que produziu treze quadras para um cemitério de quatro:
+  // "QD 1", "Q1", "Qd 1", "Q01" e "Quadra 1" eram o mesmo lugar do mundo real
+  // em cinco registros diferentes — e o roteiro do dia se perdia no meio.
+  //
+  // Agora a quadra tem de existir. Se não existe, a resposta diz quais são.
+  const { data: quad } = await db
     .from("quadras")
     .select("id")
     .eq("cemiterio_id", cemId)
     .eq("codigo", quadraCodigo)
     .maybeSingle();
+
   if (!quad) {
-    const { data: novaQ, error } = await db.from("quadras")
-      .insert({ org_id: org, cemiterio_id: cemId, codigo: quadraCodigo })
-      .select("id").single();
-    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-    quad = novaQ as any;
+    const { data: disponiveis } = await db
+      .from("quadras").select("codigo").eq("cemiterio_id", cemId).order("ordem");
+    return NextResponse.json({
+      ok: false,
+      erro: "quadra_nao_existe",
+      mensagem: "Escolha a quadra na lista. Digitar cria quadra repetida.",
+      quadras: (disponiveis || []).map((q: any) => q.codigo),
+    }, { status: 400 });
   }
   const quadraId = (quad as any).id;
+
+  // RUA: também da lista, e obrigatória — é dela que sai a ordem do dia.
+  // Sem rua, o túmulo fica fora do roteiro e a Nina só descobre andando.
+  const ruaNome = String(b?.rua || "").trim();
+  if (!ruaNome) {
+    const { data: ruasDisp } = await db
+      .from("ruas").select("nome").eq("quadra_id", quadraId).order("ordem");
+    return NextResponse.json({
+      ok: false,
+      erro: "rua_obrigatoria",
+      mensagem: "Escolha a rua. É ela que coloca o jazigo na ordem da caminhada.",
+      ruas: (ruasDisp || []).map((r: any) => r.nome),
+    }, { status: 400 });
+  }
+
+  const { data: ruaRow } = await db
+    .from("ruas").select("id,nome,seq_cadastro")
+    .eq("quadra_id", quadraId).eq("nome", ruaNome).maybeSingle();
+
+  if (!ruaRow) {
+    const { data: ruasDisp } = await db
+      .from("ruas").select("nome").eq("quadra_id", quadraId).order("ordem");
+    return NextResponse.json({
+      ok: false,
+      erro: "rua_nao_existe",
+      mensagem: `A rua "${ruaNome}" não existe nesta quadra.`,
+      ruas: (ruasDisp || []).map((r: any) => r.nome),
+    }, { status: 400 });
+  }
+  const ruaId = (ruaRow as any).id;
 
   // já existe esse jazigo nessa quadra? devolve ele (evita duplicar)
   // sem maybeSingle(): ele estoura se houver duplicata no banco, e o erro
@@ -233,7 +275,39 @@ export async function POST(req: NextRequest) {
       falecido_nome: b?.falecidoNome?.trim() || null,
       observacoes: b?.observacoes?.trim() || null,
     };
-  if (String(b?.rua || "").trim()) linha.rua = String(b.rua).trim();
+  linha.rua = ruaNome;          // texto, mantido para leitura humana
+  linha.rua_id = ruaId;         // o vínculo que vale para o roteiro
+
+  // POSIÇÃO NA RUA — os túmulos não têm número gravado na pedra, então quem
+  // diz quem vem antes de quem é o GPS capturado agora, no cadastro.
+  //
+  // O novo entra ENTRE os vizinhos certos e recebe o ponto médio entre eles.
+  // NENHUM VIZINHO É RENUMERADO: o código de um túmulo já foi para a ficha da
+  // família e para as fotos, e mudar isso apontaria o histórico para a pedra
+  // errada.
+  {
+    const { data: naRua } = await db
+      .from("tumulos").select("id,ordem_na_rua,lat,lng")
+      .eq("rua_id", ruaId).order("ordem_na_rua");
+
+    const vizinhos = (naRua || []).filter((t: any) => t.ordem_na_rua != null);
+    const lat = b?.lat ?? null;
+    const lng = b?.lng ?? null;
+
+    linha.ordem_na_rua = encaixarPeloGps(
+      { tumuloId: "novo", lat, lng },
+      vizinhos.map((t: any) => ({
+        tumuloId: t.id, ordem: Number(t.ordem_na_rua), lat: t.lat, lng: t.lng,
+      })),
+    );
+
+    // CÓDIGO — "Q1-R5-007". O número é a ordem de CADASTRO na rua, nunca a
+    // posição física: a posição muda quando entra um túmulo no meio, o código
+    // não pode mudar nunca. Buracos na numeração são normais e esperados.
+    const seq = Number((ruaRow as any).seq_cadastro || 0) + 1;
+    linha.codigo = gerarCodigo(quadraCodigo, ruaNome, seq);
+    await db.from("ruas").update({ seq_cadastro: seq }).eq("id", ruaId);
+  }
 
   let { data: tum, error } = await db.from("tumulos").insert(linha).select("id").single();
   if (error && /cemiterio_id/i.test(error.message || "")) {

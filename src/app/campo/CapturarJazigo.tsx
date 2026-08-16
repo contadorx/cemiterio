@@ -57,6 +57,11 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   const refEnqGal = useRef<HTMLInputElement>(null);
   const refRefGal = useRef<HTMLInputElement>(null);
 
+  // As ruas da quadra escolhida, para a lista. Digitar rua à mão criaria
+  // "RUA 5", "Rua 5" e "R5" como três ruas diferentes — foi assim que quatro
+  // quadras viraram treze antes.
+  const [ruasDaQuadra, setRuasDaQuadra] = useState<any[]>([]);
+
   useEffect(() => {
     fetch("/api/tumulos").then((x) => x.json()).then((j) => {
       if (j?.ok) {
@@ -67,7 +72,21 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   }, []);
 
   const cemAtual = cemiterios.find((c) => c.id === cemId);
-  const quadrasExistentes: string[] = (cemAtual?.quadras || []).map((q: any) => q.codigo);
+  const quadrasDoCem: any[] = cemAtual?.quadras || [];
+  const quadrasExistentes: string[] = quadrasDoCem.map((q: any) => q.codigo);
+  const quadraSelecionada = quadrasDoCem.find((q: any) => q.codigo === quadra);
+
+  // Trocou de quadra: recarrega as ruas e limpa a que estava escolhida, porque
+  // a "Rua 5" da Quadra 1 e a da Quadra 2 são trechos físicos diferentes.
+  useEffect(() => {
+    setRua("");
+    setRuasDaQuadra([]);
+    if (!quadraSelecionada?.id) return;
+    fetch(`/api/ruas?quadraId=${quadraSelecionada.id}`)
+      .then((x) => x.json())
+      .then((j) => { if (j?.ok) setRuasDaQuadra(j.ruas || []); })
+      .catch(() => {});
+  }, [quadraSelecionada?.id]);
 
   /**
    * escolha:
@@ -80,6 +99,9 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
     if (!quadra.trim()) return setErro("Diga a quadra (ex.: Q-12).");
     const numero = escolha === "outro" ? novoNumero.trim() : identificacao.trim();
     if (!numero) return setErro("Diga a identificação do jazigo (lote/número).");
+    // A rua deixou de ser opcional: é dela que sai a ordem da caminhada. Sem
+    // rua, o jazigo fica fora do roteiro e a Nina só descobre andando.
+    if (!rua.trim()) return setErro("Escolha a rua do jazigo.");
     setSalvando(true);
     const r = await fetch("/api/tumulos", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -87,7 +109,7 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
         cemiterioId: cemId || undefined,
         quadraCodigo: quadra.trim(),
         identificacao: numero,
-        rua: rua.trim() || undefined,
+        rua: rua.trim(),
         falecidoNome: falecido.trim() || undefined,
         observacoes: obs.trim() || undefined,
         confirmarExistente: escolha === "mesmo" || undefined,
@@ -236,11 +258,10 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
 
             <div>
               <div style={s.rotulo}>Quadra</div>
-              <input style={s.input} value={quadra} onChange={(e) => setQuadra(e.target.value)}
-                     list="quadras-existentes" placeholder="Ex.: Q-12 (escolha ou digite uma nova)" />
-              <datalist id="quadras-existentes">
-                {quadrasExistentes.map((c) => <option key={c} value={c} />)}
-              </datalist>
+              <select style={s.input} value={quadra} onChange={(e) => setQuadra(e.target.value)}>
+                <option value="">Escolha a quadra</option>
+                {quadrasExistentes.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
 
             <div>
@@ -250,11 +271,18 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
             </div>
 
             <div>
-              <div style={s.rotulo}>Rua / carreira (opcional, mas ajuda muito)</div>
-              <input style={s.input} value={rua} onChange={(e) => setRua(e.target.value)}
-                     placeholder="Ex.: 3 · fileira do meio" />
+              <div style={s.rotulo}>Rua</div>
+              <select style={s.input} value={rua} onChange={(e) => setRua(e.target.value)}
+                      disabled={!quadra || !ruasDaQuadra.length}>
+                <option value="">
+                  {!quadra ? "Escolha a quadra primeiro" : "Escolha a rua"}
+                </option>
+                {ruasDaQuadra.map((r: any) => (
+                  <option key={r.id} value={r.nome}>{r.nome}</option>
+                ))}
+              </select>
               <p style={{ ...s.dica, marginTop: 4 }}>
-                É a rua que separa dois túmulos com o mesmo número na mesma quadra.
+                A rua é o que coloca o jazigo na ordem da caminhada do dia.
               </p>
             </div>
 

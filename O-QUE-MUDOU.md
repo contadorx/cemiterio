@@ -166,6 +166,37 @@ novos saiu; o card de rascunhos aponta para a fila.
 
 ---
 
+## Cadastro em campo alinhado à estrutura nova (build mais recente)
+
+**Era a peça que faltava antes do recadastro.** O cadastro ainda criava quadra
+por texto livre — foi exatamente assim que quatro quadras viraram treze
+(`QD 1`, `Q1`, `Qd 1`, `Q01`, `Quadra 1` eram o mesmo lugar). E não preenchia
+`rua_id`, `ordem_na_rua` nem `codigo`, então o roteiro novo não funcionaria.
+
+### `src/app/api/tumulos/route.ts`
+- Quadra **escolhida da lista**, nunca criada por digitação. Se o código não
+  existe, a resposta devolve as quadras disponíveis.
+- Rua obrigatória e validada contra a tabela `ruas`.
+- `ordem_na_rua` calculada pelo GPS via `encaixarPeloGps` — o novo entra
+  **entre** os vizinhos certos, sem renumerar nenhum.
+- `codigo` gerado a partir do contador `ruas.seq_cadastro`.
+
+### `src/app/campo/CapturarJazigo.tsx`
+Quadra e rua viraram **listas suspensas**. Trocar de quadra recarrega as ruas
+e limpa a escolha, porque a "Rua 5" da Quadra 1 e a da Quadra 2 são trechos
+físicos diferentes.
+
+### `src/app/api/ruas/route.ts` (novo)
+Lista as ruas de uma quadra, na ordem de caminhada.
+
+### `src/app/api/tumulos/[id]/gps/route.ts`
+Recalcula a posição do túmulo quando a coordenada chega **depois** do
+cadastro. Sem isso, quem salva a ficha e só então marca o GPS ficaria no fim
+da rua para sempre. Se o recálculo falhar, o GPS continua salvo — é melhoria,
+não requisito.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada
