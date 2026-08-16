@@ -5,13 +5,28 @@ import { MARCA } from "@/lib/marca";
 import { useState, useEffect } from "react";
 import EstiloMobile from "./EstiloMobile";
 
+/**
+ * As cores agora vêm dos TOKENS (app/tema.css), e não de hex cravado.
+ *
+ * Por que reapontar em vez de reescrever as telas: cinco telas ainda usam
+ * estes objetos de estilo — Famílias, Agenda, Avulsos, Financeiro e Config,
+ * mais de 2.300 linhas somadas. Reescrever tudo à mão arriscaria perder
+ * função. Trocando a origem da cor aqui, todas passam a falar a mesma língua
+ * visual do resto do sistema, e o tema escuro alcança elas de graça.
+ *
+ * Conforme cada tela for reescrita com `pecas.tsx`, some daqui.
+ */
 export const cor = {
-  navy: "#0f172a",
-  teal: "#0f766e",
-  bg: "#f1f5f9",
-  card: "#ffffff",
-  linha: "#e2e8f0",
-  cinza: "#475569",   // mais escuro: o painel também é usado no sol
+  navy: "rgb(var(--zm-brand))",
+  teal: "rgb(var(--zm-positivo))",
+  bg: "rgb(var(--zm-fundo))",
+  card: "rgb(var(--zm-card))",
+  linha: "rgb(var(--zm-linha))",
+  cinza: "rgb(var(--zm-ink-muted))",
+  ouro: "rgb(var(--zm-ouro))",
+  aviso: "rgb(var(--zm-aviso))",
+  perigo: "rgb(var(--zm-perigo))",
+  sobre: "rgb(var(--zm-sobre))",
 };
 
 /**
@@ -95,13 +110,13 @@ function AvisoDisparos() {
 
   return (
     <div style={{
-      background: "#7f1d1d", color: "#fff", padding: "10px 16px",
+      background: "rgb(var(--zm-perigo))", color: "#fff", padding: "10px 16px",
       display: "flex", alignItems: "center", justifyContent: "center",
       gap: 12, flexWrap: "wrap", fontSize: 14, textAlign: "center",
     }}>
       <span>⏸ <strong>Disparos automáticos desligados</strong> — a IA não responde sozinha e os avisos automáticos não saem.</span>
       <Link href="/painel/config" style={{
-        color: "#7f1d1d", background: "#fff", fontWeight: 700, textDecoration: "none",
+        color: "rgb(var(--zm-perigo))", background: "#fff", fontWeight: 700, textDecoration: "none",
         padding: "5px 12px", borderRadius: 8, fontSize: 13, whiteSpace: "nowrap",
       }}>Ligar na Config</Link>
     </div>
@@ -136,26 +151,29 @@ const botaoBase: React.CSSProperties = {
 };
 
 export const painel: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: "100vh", background: cor.bg, fontFamily: "system-ui" },
-  conteudo: { maxWidth: 900, margin: "0 auto", padding: 16 },
-  h1: { fontSize: 23, color: cor.navy, margin: "8px 0 18px" },
-  card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: 14, padding: 16, marginBottom: 14 },
+  // O shell (painel/layout.tsx) já dá fundo, largura máxima e espaçamento.
+  // Estes dois viraram neutros para as telas antigas não desenharem uma
+  // segunda moldura por dentro da primeira.
+  wrap: {},
+  conteudo: {},
+  h1: { fontSize: 22, fontWeight: 600, color: "rgb(var(--zm-ink))", margin: "0 0 16px" },
+  card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: 14, padding: 16, marginBottom: 12, color: "rgb(var(--zm-ink))" },
 
   // ── Botões tamanho padrão (altura de toque confortável no celular, >= 48px) ──
-  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.teal, color: "#fff", minHeight: 48 },
-  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: `1px solid ${cor.linha}`, background: "#fff", color: cor.navy, minHeight: 48 },
-  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: "none", background: "#dc2626", color: "#fff", minHeight: 48 },
+  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 48 },
+  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 48 },
+  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 48 },
 
   // ── Botões compactos (linhas densas de ação: uma medida única, sem improviso) ──
   // Antes cada tela inventava um padding ("4px 10px", "6px 12px", "8px 14px"…);
   // agora é um só tamanho para todos os botões pequenos.
-  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.teal, color: "#fff", minHeight: 40 },
-  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: "#fff", color: cor.navy, minHeight: 40 },
-  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "#dc2626", color: "#fff", minHeight: 40 },
+  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 40 },
+  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 40 },
+  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 40 },
 
   // fontSize 16 evita o zoom automático do iOS ao focar o campo
-  input: { width: "100%", padding: 12, fontSize: 16, borderRadius: 10, border: `1px solid ${cor.linha}`, boxSizing: "border-box" },
-  rotulo: { fontSize: 14, fontWeight: 600, color: cor.cinza, marginBottom: 4, display: "block" },
+  input: { width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 8, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", boxSizing: "border-box" },
+  rotulo: { fontSize: 13, fontWeight: 500, color: cor.cinza, marginBottom: 4, display: "block" },
 };
 
 /**

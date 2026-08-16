@@ -52,7 +52,7 @@ export default function Entradas() {
 
   return (
     <>
-      <div style={{ ...painel.card, background: "#f8fafc" }}>
+      <div style={{ ...painel.card, background: "rgb(var(--zm-fundo))" }}>
         <p style={{ margin: 0, fontSize: 15, color: cor.cinza, lineHeight: 1.6 }}>
           Lance aqui o que você vê no extrato. O dinheiro entrou — só falta dizer de quem é.
           Enquanto não tiver dono, não entra na conta de ninguém.
@@ -62,7 +62,7 @@ export default function Entradas() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12, marginBottom: 14 }}>
         <Cartao titulo="Sem dono" valor={String(d.totais.pendentes)}
-                cor={d.totais.pendentes ? "#d97706" : cor.teal} destaque />
+                cor={d.totais.pendentes ? "rgb(var(--zm-aviso))" : cor.teal} destaque />
         <Cartao titulo="Valor sem dono" valor={money(d.totais.valorPendente)} cor={cor.navy} />
         <Cartao titulo="Já identificadas" valor={String(d.totais.identificadas)} cor={cor.teal} />
         <Cartao titulo="Entrou no período" valor={money(d.totais.recebidoPeriodo)} cor={cor.teal} />
@@ -221,7 +221,7 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
                      alignItems: "center", padding: "8px 0", borderTop: `1px solid ${cor.linha}` }}>
                 <div>
                   <b style={{ color: cor.navy }}>{c.nome}</b>
-                  <div style={{ fontSize: 14, color: c.atrasado ? "#dc2626" : cor.cinza }}>
+                  <div style={{ fontSize: 14, color: c.atrasado ? "rgb(var(--zm-perigo))" : cor.cinza }}>
                     {c.saldo < 0 ? `deve ${money(Math.abs(c.saldo))}` : c.saldo > 0 ? "adiantada" : "em dia"}
                   </div>
                 </div>
@@ -330,11 +330,11 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
 
         {cliente ? (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                        gap: 10, flexWrap: "wrap", background: "#f0fdfa", padding: 12,
+                        gap: 10, flexWrap: "wrap", background: "rgb(var(--zm-positivo) / 0.08)", padding: 12,
                         borderRadius: 10, border: `1px solid ${cor.teal}` }}>
             <div>
               <b style={{ color: cor.navy, fontSize: 16 }}>{cliente.nome}</b>
-              <div style={{ fontSize: 15, color: cliente.atrasado ? "#dc2626" : cor.cinza }}>
+              <div style={{ fontSize: 15, color: cliente.atrasado ? "rgb(var(--zm-perigo))" : cor.cinza }}>
                 {cliente.saldo < 0 ? `deve ${money(Math.abs(cliente.saldo))}`
                   : cliente.saldo > 0 ? `tem ${money(cliente.saldo)} de crédito` : "está em dia"}
               </div>
@@ -353,7 +353,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
                      alignItems: "center", padding: "10px 0", borderTop: `1px solid ${cor.linha}` }}>
                 <div>
                   <b style={{ color: cor.navy }}>{c.nome}</b>
-                  <div style={{ fontSize: 14, color: c.atrasado ? "#dc2626" : cor.cinza }}>
+                  <div style={{ fontSize: 14, color: c.atrasado ? "rgb(var(--zm-perigo))" : cor.cinza }}>
                     {c.saldo < 0 ? `deve ${money(Math.abs(c.saldo))}` : c.saldo > 0 ? "adiantada" : "em dia"}
                   </div>
                 </div>
@@ -398,7 +398,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
             <b style={{ color: cor.navy }}>{money(totalEscolhido)}</b>
           </div>
           {Number(f.valor) > 0 && Math.abs(Number(f.valor) - totalEscolhido) > 0.01 && (
-            <p style={{ fontSize: 14, color: "#92400e", background: "#fffbeb", padding: 10,
+            <p style={{ fontSize: 14, color: "rgb(var(--zm-aviso))", background: "rgb(var(--zm-aviso) / 0.08)", padding: 10,
                         borderRadius: 8, margin: "8px 0 0" }}>
               {Number(f.valor) > totalEscolhido
                 ? `Entrou ${money(Number(f.valor) - totalEscolhido)} a mais — vira crédito da família.`

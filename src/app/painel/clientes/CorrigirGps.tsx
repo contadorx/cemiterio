@@ -117,7 +117,7 @@ export default function CorrigirGps({ tumuloId, onMudou }: { tumuloId: string; o
 
       {carregando && <p style={{ color: cor.cinza, fontSize: 14 }}>Carregando…</p>}
       {erro && (
-        <p style={{ color: "#b91c1c", fontSize: 14, margin: "0 0 8px" }}>{erro}</p>
+        <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, margin: "0 0 8px" }}>{erro}</p>
       )}
 
       {!carregando && leituras.length === 0 && (
@@ -141,7 +141,7 @@ export default function CorrigirGps({ tumuloId, onMudou }: { tumuloId: string; o
                 {" · "}{l.origem || "campo"}
               </span>
               {l.distancia != null && (
-                <span style={{ color: longe ? "#b91c1c" : cor.cinza, fontWeight: longe ? 700 : 400 }}>
+                <span style={{ color: longe ? "rgb(var(--zm-perigo))" : cor.cinza, fontWeight: longe ? 700 : 400 }}>
                   {" · "}{metrosBr(l.distancia)} da posição atual
                 </span>
               )}

@@ -97,8 +97,10 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
   async function criarJazigo(escolha?: "mesmo" | "outro") {
     setErro("");
     if (!quadra.trim()) return setErro("Diga a quadra (ex.: Q-12).");
+    // Sem obrigar: o túmulo não tem número gravado, e exigir um valor que não
+    // existe no mundo faz a pessoa inventar. Quem identifica é o código
+    // gerado e a foto.
     const numero = escolha === "outro" ? novoNumero.trim() : identificacao.trim();
-    if (!numero) return setErro("Diga a identificação do jazigo (lote/número).");
     // A rua deixou de ser opcional: é dela que sai a ordem da caminhada. Sem
     // rua, o jazigo fica fora do roteiro e a Nina só descobre andando.
     if (!rua.trim()) return setErro("Escolha a rua do jazigo.");
@@ -265,9 +267,9 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
             </div>
 
             <div>
-              <div style={s.rotulo}>Identificação do jazigo (lote/número)</div>
+              <div style={s.rotulo}>Nome escrito na pedra (opcional)</div>
               <input style={s.input} value={identificacao} onChange={(e) => setIdentificacao(e.target.value)}
-                     placeholder="Ex.: 045 · lote 12" />
+                     placeholder="Ex.: Almeida" />
             </div>
 
             <div>

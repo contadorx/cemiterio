@@ -142,7 +142,7 @@ export function PainelFechamento() {
             {emAberto && (
               <span style={{ color: cor.cinza }}>
                 {emAberto.quantas} {emAberto.quantas === 1 ? "família" : "famílias"} ·{" "}
-                <b style={{ color: "#b45309" }}>{dinheiro(emAberto.totalEmAberto)}</b>
+                <b style={{ color: "rgb(var(--zm-aviso))" }}>{dinheiro(emAberto.totalEmAberto)}</b>
               </span>
             )}
           </div>
@@ -167,7 +167,7 @@ export function PainelFechamento() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <b style={{ color: "#b45309" }}>{dinheiro(f.saldo)}</b>
+                <b style={{ color: "rgb(var(--zm-aviso))" }}>{dinheiro(f.saldo)}</b>
                 <Link href={`/painel/clientes?familia=${f.familiaId}`} style={painel.botaoMiniSec}>
                   Abrir ficha
                 </Link>

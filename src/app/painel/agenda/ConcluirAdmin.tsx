@@ -135,7 +135,7 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
           </button>
         </div>
         {antes && <img src={antes.previa} alt="antes" style={s.previa} />}
-        {fotoErro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "8px 0 0" }}>{fotoErro}</p>}
+        {fotoErro && <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, margin: "8px 0 0" }}>{fotoErro}</p>}
 
         <div style={{ marginTop: 14 }}>
           <label style={painel.rotulo}>Tempo gasto (minutos, se souber)</label>
@@ -168,6 +168,6 @@ const s: Record<string, React.CSSProperties> = {
   fechar: { background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#64748b" },
   botaoFoto: { width: "100%", padding: 14, background: "#fff", color: "#12284b",
                border: "2px dashed #cbd5e1", borderRadius: 12, fontSize: 15, cursor: "pointer" },
-  botaoFotoOk: { borderStyle: "solid", borderColor: "#0f766e", color: "#0f766e", background: "#f0fdfa" },
+  botaoFotoOk: { borderStyle: "solid", borderColor: "#0f766e", color: "#0f766e", background: "rgb(var(--zm-positivo) / 0.08)" },
   previa: { width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10, marginTop: 8 },
 };

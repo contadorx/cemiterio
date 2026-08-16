@@ -217,7 +217,7 @@ export default function VincularLote({ onMudou }: { onMudou?: () => void }) {
       </div>
 
       {erro && (
-        <div style={{ ...painel.card, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>
+        <div style={{ ...painel.card, background: "rgb(var(--zm-perigo) / 0.08)", border: "1px solid #fecaca", color: "rgb(var(--zm-perigo))" }}>
           {erro}
         </div>
       )}
@@ -227,7 +227,7 @@ export default function VincularLote({ onMudou }: { onMudou?: () => void }) {
           <strong style={{ color: cor.navy }}>Resultado</strong>
           <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
             {relatorio.map((l, i) => (
-              <div key={i} style={{ fontSize: 14, color: l.ok ? "#166534" : "#b91c1c" }}>
+              <div key={i} style={{ fontSize: 14, color: l.ok ? "#166534" : "rgb(var(--zm-perigo))" }}>
                 {l.ok ? "✓" : "✕"} <strong>{l.ident}</strong> — {l.mensagem}
               </div>
             ))}
@@ -338,7 +338,7 @@ function AplicarEmLote({
   }, [q, familias]);
 
   return (
-    <div style={{ ...painel.card, background: "#f8fafc" }}>
+    <div style={{ ...painel.card, background: "rgb(var(--zm-fundo))" }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         <button style={painel.botaoMiniSec} onClick={onTodos}>Marcar todos</button>
         <button style={painel.botaoMiniSec} onClick={onNenhum}>Limpar marcação</button>
@@ -444,12 +444,12 @@ function Cartao({
                 📍 GPS{o.gpsPrecisao != null ? ` ±${Math.round(o.gpsPrecisao)}m` : ""}
               </a>
             ) : (
-              <span style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "4px 10px" }}>
+              <span style={{ fontSize: 12, color: "rgb(var(--zm-aviso))", background: "rgb(var(--zm-aviso) / 0.08)", border: "1px solid #fde68a", borderRadius: 8, padding: "4px 10px" }}>
                 sem GPS
               </span>
             )}
             {o.quadra === "S/Q" && (
-              <span style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "4px 10px" }}>
+              <span style={{ fontSize: 12, color: "rgb(var(--zm-aviso))", background: "rgb(var(--zm-aviso) / 0.08)", border: "1px solid #fde68a", borderRadius: 8, padding: "4px 10px" }}>
                 sem quadra — confira antes
               </span>
             )}
@@ -579,7 +579,7 @@ function Cartao({
           />
         </div>
         {atrib.freq >= 0 && ATALHOS_FREQUENCIA[atrib.freq]?.cadencia === "avulso" && (
-          <div style={{ fontSize: 13, color: "#92400e", marginTop: 6 }}>
+          <div style={{ fontSize: 13, color: "rgb(var(--zm-aviso))", marginTop: 6 }}>
             &quot;Só quando pedirem&quot; não cria plano — não há periodicidade nem vencimento
             a agendar. O jazigo entra na família do mesmo jeito.
           </div>

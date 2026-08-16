@@ -96,9 +96,9 @@ export default function AvulsosPage() {
         </div>
 
         {!temMigration && (
-          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-            <strong style={{ color: "#92400e" }}>A migration 0037 ainda não rodou</strong>
-            <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 0", lineHeight: 1.5 }}>
+          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>A migration 0037 ainda não rodou</strong>
+            <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "6px 0 0", lineHeight: 1.5 }}>
               A lista funciona, mas sem a coluna da data pedida ela só mostra o dia em que a
               agenda encaixou. Rode <code>0037_data_desejada.sql</code> no Supabase para as
               duas datas aparecerem lado a lado.
@@ -107,11 +107,11 @@ export default function AvulsosPage() {
         )}
 
         {atrasados > 0 && (
-          <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
-            <strong style={{ color: "#b91c1c" }}>
+          <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "rgb(var(--zm-perigo) / 0.08)" }}>
+            <strong style={{ color: "rgb(var(--zm-perigo))" }}>
               {atrasados} limpeza(s) não cabem até a data pedida
             </strong>
-            <p style={{ color: "#7f1d1d", fontSize: 15, margin: "6px 0 0", lineHeight: 1.5 }}>
+            <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 15, margin: "6px 0 0", lineHeight: 1.5 }}>
               A agenda tentou o dia pedido e os dias anteriores, e não havia vaga em nenhum.
               Ou você abre capacidade nesses dias, ou avisa a família antes — é melhor um
               telefonema hoje do que a limpeza chegando depois da data.
@@ -150,7 +150,7 @@ export default function AvulsosPage() {
                       key={s.id}
                       style={{
                         borderTop: `1px solid ${cor.linha}`,
-                        background: s.estourou ? "#fef2f2" : undefined,
+                        background: s.estourou ? "rgb(var(--zm-perigo) / 0.08)" : undefined,
                       }}
                     >
                       <td style={{ padding: "8px" }}>
@@ -166,13 +166,13 @@ export default function AvulsosPage() {
                         )}
                         <div style={{ color: cor.cinza }}>{s.tumulo}</div>
                         {s.observacao && (
-                          <div style={{ color: "#92400e", marginTop: 2 }}>💬 {s.observacao}</div>
+                          <div style={{ color: "rgb(var(--zm-aviso))", marginTop: 2 }}>💬 {s.observacao}</div>
                         )}
                       </td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                         {br(s.dataPedida)}
                         {s.dataPedida && s.diasAte !== null && situacao === "abertos" && (
-                          <div style={{ color: s.diasAte < 0 ? "#b91c1c" : cor.cinza }}>
+                          <div style={{ color: s.diasAte < 0 ? "rgb(var(--zm-perigo))" : cor.cinza }}>
                             {s.diasAte < 0
                               ? `${-s.diasAte} dia(s) atrás`
                               : s.diasAte === 0
@@ -186,11 +186,11 @@ export default function AvulsosPage() {
                           br(s.executadaEm)
                         ) : (
                           <>
-                            <span style={{ color: s.estourou ? "#b91c1c" : undefined, fontWeight: s.estourou ? 700 : 400 }}>
+                            <span style={{ color: s.estourou ? "rgb(var(--zm-perigo))" : undefined, fontWeight: s.estourou ? 700 : 400 }}>
                               {br(s.dataPrevista)}
                             </span>
                             {s.estourou && (
-                              <div style={{ color: "#b91c1c" }}>depois do pedido</div>
+                              <div style={{ color: "rgb(var(--zm-perigo))" }}>depois do pedido</div>
                             )}
                             {s.status === "pendente" && !s.dataPrevista && (
                               <div style={{ color: cor.cinza }}>sem dia — gere a agenda</div>
@@ -205,7 +205,7 @@ export default function AvulsosPage() {
                             lançada · {dinheiro(s.valorCobrado)}
                           </span>
                         ) : s.status === "executado" ? (
-                          <span style={{ color: "#b45309" }}>feita, sem lançamento</span>
+                          <span style={{ color: "rgb(var(--zm-aviso))" }}>feita, sem lançamento</span>
                         ) : (
                           <span style={{ color: cor.cinza }}>ao concluir</span>
                         )}
@@ -218,7 +218,7 @@ export default function AvulsosPage() {
           </div>
         )}
 
-        <div style={{ ...painel.card, background: "#f8fafc" }}>
+        <div style={{ ...painel.card, background: "rgb(var(--zm-fundo))" }}>
           <strong style={{ color: cor.navy }}>Como a cobrança acontece</strong>
           <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0", lineHeight: 1.6 }}>
             Não existe botão de cobrar limpeza por limpeza — e é de propósito. Quando a limpeza

@@ -20,7 +20,58 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // === "" e não `||`: "0" é um número de jazigo válido e não pode virar null
     if (body[c] !== undefined) patch[c] = body[c] === "" || body[c] === null ? null : body[c];
   }
-  // vincular/desvincular o jazigo a uma família (ex.: um jazigo capturado no campo)
+  // MUDOU DE RUA: o vínculo tem de mudar junto com o texto.
+  //
+  // `rua` é texto legível; `rua_id` é o que o roteiro usa para ordenar o dia.
+  // Gravar só o texto deixaria o túmulo apontando para a rua antiga — ele
+  // apareceria escrito "Rua 5" e continuaria sendo percorrido na Rua 2.
+  if (body.rua !== undefined && body.rua) {
+    const quadraAlvo = body.quadra_id || (
+      await db.from("tumulos").select("quadra_id").eq("id", params.id).maybeSingle()
+    ).data?.quadra_id;
+
+    if (quadraAlvo) {
+      const { data: r } = await db
+        .from("ruas").select("id")
+        .eq("quadra_id", quadraAlvo).eq("nome", body.rua).maybeSingle();
+
+      if (!r) {
+        const { data: disp } = await db
+          .from("ruas").select("nome").eq("quadra_id", quadraAlvo).order("ordem");
+        return NextResponse.json({
+          ok: false,
+          erro: "rua_nao_existe",
+          mensagem: `A rua "${body.rua}" não existe nesta quadra.`,
+          ruas: (disp || []).map((x: any) => x.nome),
+        }, { status: 400 });
+      }
+      patch.rua_id = (r as any).id;
+      // A posição vira nula: o túmulo entrou numa rua nova e não tem lugar
+      // definido nela. Vai para o fim até a Sureya arrastar — melhor do que
+      // herdar uma posição que pertencia a outra rua.
+      patch.ordem_na_rua = null;
+    }
+  }
+
+  // OS TRÊS ATRIBUTOS DO TÚMULO — independentes entre si.
+  //
+  //   valor_lavagem   quanto custa cada limpeza
+  //   periodicidade   de quanto em quanto tempo se limpa
+  //   freq_pagamento  de quanto em quanto tempo se cobra
+  //
+  // Não andam juntas: um túmulo pode ser limpo toda semana e pago por mês;
+  // outro, limpo por mês e pago no ano. Tratá-las como uma coisa só é o que
+  // faz serviço ser executado sem cobrança correspondente.
+  if (body.valor_lavagem !== undefined) {
+    const v = Number(String(body.valor_lavagem).replace(",", "."));
+    patch.valor_lavagem = isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
+  }
+  if (body.periodicidade !== undefined) patch.periodicidade = body.periodicidade || null;
+  if (body.freq_pagamento !== undefined) patch.freq_pagamento = body.freq_pagamento || null;
+  if (body.contratado !== undefined) patch.contratado = !!body.contratado;
+
+  // vincular/desvincular o jazigo a uma família
+  if (body.familia_id !== undefined) patch.familia_id = body.familia_id || null;
   if (body.cliente_id !== undefined) patch.cliente_id = body.cliente_id || null;
   if (body.falecido_nome !== undefined) patch.falecido_nome = body.falecido_nome || null;
 

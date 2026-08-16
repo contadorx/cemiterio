@@ -89,7 +89,15 @@ export async function POST(req: NextRequest) {
 
   const identificacao = String(b?.identificacao || "").trim();
   const quadraCodigo = String(b?.quadraCodigo || "").trim();
-  if (!identificacao) return NextResponse.json({ ok: false, erro: "identificacao_obrigatoria" }, { status: 400 });
+  // A IDENTIFICAÇÃO É OPCIONAL.
+  //
+  // Nasceu obrigatória supondo que o túmulo tivesse número gravado. Não tem —
+  // e um campo obrigatório sem resposta verdadeira produz resposta falsa: no
+  // primeiro cadastro apareceram "A", "A2", "A3"… só para conseguir salvar.
+  //
+  // Quem identifica o túmulo é o `codigo` (Q1-R5-007) e a foto de referência.
+  // Este campo passa a ser o que está ESCRITO NA PEDRA — o sobrenome, quase
+  // sempre —, que é útil para a Nina confirmar o lugar, mas não indispensável.
   if (!quadraCodigo) return NextResponse.json({ ok: false, erro: "quadra_obrigatoria" }, { status: 400 });
 
   // cemitério: o informado; com mais de um cadastrado e nenhum informado, RECUSA

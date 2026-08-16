@@ -783,6 +783,164 @@ lembretes e convite a cada N meses.
 
 ---
 
+## A FICHA DA FAMÍLIA REESCRITA
+
+**De 2.518 linhas para 450.** O peso da tela caiu de 20,1 kB para 5,19 kB.
+
+### A ordem, agora
+
+Cabeçalho com a situação → túmulos → conta corrente → limpezas.
+
+Primeiro quem é a família, depois o que ela contratou, depois o que foi feito,
+e só então se está pago. A ficha antiga fazia o contrário: pagamentos na
+quarta posição, túmulos na sexta — o dinheiro antes do que foi vendido.
+
+### Os campos que morreram
+
+O editor de túmulo/plano tinha 18 campos. Ficaram 7, e todos são usados toda
+semana. Saíram, com o motivo:
+
+| Campo | Por que sai |
+|---|---|
+| Número do jazigo | duplicava a identificação |
+| Nascimento e falecimento | eram gatilho de mensagem automática, desligada |
+| Tratamento | idem |
+| Régua de cobrança | automação de lembrete, desligada |
+| Dias entre lembretes · máx. de lembretes | idem |
+| Convite a cada N meses | campanha de ativação, desligada |
+| Lavagens no período · Dá por mês | derivados da periodicidade |
+| Pago até · Próxima cobrança | a conta corrente responde melhor |
+
+Os três atributos que sobram — **valor por limpeza**, **a Nina limpa** e **a
+família paga** — ficam lado a lado e visivelmente separados. É isso que impede
+o erro de tratar periodicidade e cobrança como a mesma coisa.
+
+Escrevi os rótulos em linguagem de conversa: "toda semana", "a cada quinze
+dias", "uma vez por ano" — e não `semanal`/`quinzenal`/`anual`.
+
+### `src/app/painel/pecas.tsx` (novo)
+
+Cartão, campo, entrada, seleção, botão e selo, num lugar só. Existem porque
+cada tela vinha desenhando o próprio cartão com estilo em linha, e por isso
+duas telas do mesmo sistema nunca ficavam iguais.
+
+O **selo carrega o significado no texto** ("em dia", "sem plano · avulso"),
+não só na cor: cor sozinha não atravessa daltonismo nem tela no sol.
+
+### `src/app/api/tumulos/[id]/route.ts`
+
+O PATCH não aceitava `valor_lavagem`, `periodicidade` nem `freq_pagamento` —
+sem isso a ficha nova não teria como salvar. Agora aceita, e também
+`familia_id`.
+
+### A ficha antiga
+
+Guardada em `_arquivo/ficha-antiga.tsx.txt`, **fora do `src/`** para o Next
+não tentar compilá-la. Nada foi perdido.
+
+`next build` executado: passou limpo.
+
+---
+
+## A IDENTIFICAÇÃO ERA OBRIGATÓRIA — e não devia
+
+**O erro foi meu.** O campo nasceu obrigatório supondo que o túmulo tivesse
+número gravado. Não tem. E campo obrigatório sem resposta verdadeira produz
+resposta falsa: no primeiro cadastro apareceram `A`, `A2`, `A3`… só para
+conseguir salvar.
+
+Olhando os 71 túmulos cadastrados, porém, **62 não eram lixo**: eram
+sobrenomes — Almeida, Barreta, Benedetti. Isso é o que está escrito na pedra,
+e ajuda a Nina a confirmar que chegou no lugar certo. Só 9 eram provisórios.
+
+### O que mudou *(banco já aplicado)*
+
+- `identificacao` deixou de ser obrigatória.
+- Os 9 provisórios viraram nulo — todos têm código, nada se perdeu.
+- Os 62 sobrenomes ficaram como estavam.
+- O rótulo virou **"Nome escrito na pedra (opcional)"**, no cadastro de campo
+  e na ficha.
+
+Quem identifica o túmulo continua sendo o `codigo` (Q1-R5-007) e a foto.
+
+### Editar o que já foi cadastrado
+
+A ficha agora edita **quadra, rua e nome na pedra** — é lá que o erro
+acontece, porque o cadastro é feito de pé, no cemitério.
+
+Ao trocar de rua, o PATCH atualiza o `rua_id` junto com o texto. Gravar só o
+texto deixaria o túmulo escrito "Rua 5" e ainda sendo percorrido na Rua 2. A
+posição vira nula: ele entrou numa rua nova e vai para o fim dela até a Sureya
+arrastar — melhor que herdar uma posição de outra rua.
+
+O código aparece discreto no cartão, para conferência.
+
+---
+
+## TELAS MIGRADAS PARA O VISUAL NOVO
+
+`O mês` e `Liberação` — as duas que a Sureya abre todo dia — foram reescritas
+com as peças de `pecas.tsx`.
+
+Na tela do mês, as duas colunas viraram **selos com texto**: "limpa", "falta
+limpar", "em dia", o valor. Cor sozinha não atravessa daltonismo nem tela no
+sol.
+
+Faltam `Famílias`, `Agenda`, `Avulsos`, `Financeiro` e `Config` — todas
+funcionam, só ainda usam o estilo antigo por dentro. O shell já as envolve,
+então a navegação é a mesma.
+
+`next build` executado: passou limpo.
+
+---
+
+## TODAS AS TELAS NO VISUAL NOVO
+
+Duas estratégias, conforme o risco de cada tela.
+
+### Reescritas com `pecas.tsx`
+
+`O mês` · `Liberação` · `Ficha da família`
+
+São as três que a Sureya abre todo dia. Ganharam cartões, selos e botões do
+sistema novo.
+
+### Reestilizadas pela raiz
+
+`Famílias` · `Agenda` · `Avulsos` · `Financeiro` · `Config`
+
+Somam mais de 2.300 linhas — só o Config tem 1.157. **Reescrever à mão
+arriscaria perder função**, e a de Famílias carrega o vínculo de jazigo órfão,
+que está em uso agora, no meio do recadastro.
+
+Em vez disso, reapontei a origem das cores no `ui.tsx`: `cor.navy`, `cor.card`
+e companhia deixaram de ser hex cravado e passaram a ler os tokens do
+`tema.css`. Todas as telas que usam esses objetos passaram a falar a mesma
+língua visual — e o tema escuro alcança elas de graça, sem uma linha nova.
+
+Também alinhei cartão, título, entrada e botão com o desenho das peças novas,
+e neutralizei `wrap`/`conteudo`: o shell já dá fundo, largura e espaçamento, e
+sem isso as telas antigas desenhavam uma segunda moldura dentro da primeira.
+
+### Cores soltas
+
+Havia **269 hexes cravados** nas telas. Mapeei os recorrentes com significado
+claro — vermelho de erro, âmbar de pendência, verde de "em dia", cinzas de
+superfície — para os tokens: **172 trocadas em 21 arquivos**.
+
+As 97 restantes estão quase todas em telas desligadas (leads, conversas,
+plaquetas, jazigos), onde não vale gastar risco.
+
+### O app da Nina não foi tocado
+
+`/campo` tem estilos e layout próprios, e o shell do painel não o envolve.
+Ele foi desenhado para uso de pé, no sol, com botão grande — misturar com o
+visual de escritório seria piorar.
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

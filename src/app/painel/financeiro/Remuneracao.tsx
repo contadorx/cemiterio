@@ -199,7 +199,7 @@ export default function Remuneracao() {
           </div>
 
           {/* A COMPARAÇÃO — o motivo desta tela existir */}
-          <div style={{ marginTop: 14, padding: 14, background: "#f8fafc",
+          <div style={{ marginTop: 14, padding: 14, background: "rgb(var(--zm-fundo))",
                         border: `1px solid ${cor.linha}`, borderRadius: 10 }}>
             <b style={{ fontSize: 14 }}>Com os números deste mês, quanto sairia cada jeito</b>
             <table style={tabela}>
@@ -326,7 +326,7 @@ function FormRegra({ titulo, ajuda, regra, membroId, onSalvo, onCancelar }: {
   const temJazigo = f.modo !== "mensal";
 
   return (
-    <div style={{ padding: 14, background: "#f8fafc", border: `1px solid ${cor.linha}`, borderRadius: 10 }}>
+    <div style={{ padding: 14, background: "rgb(var(--zm-fundo))", border: `1px solid ${cor.linha}`, borderRadius: 10 }}>
       <b>{titulo}</b>
       <p style={{ margin: "4px 0 12px", fontSize: 13, color: cor.cinza }}>{ajuda}</p>
 
@@ -417,12 +417,12 @@ function Num({ rot, val, sub, forte, alerta }: {
 }) {
   return (
     <div style={{
-      padding: 10, borderRadius: 8, background: forte ? "#ecfdf5" : "#f8fafc",
-      border: `1px solid ${alerta ? "#d97706" : cor.linha}`,
+      padding: 10, borderRadius: 8, background: forte ? "#ecfdf5" : "rgb(var(--zm-fundo))",
+      border: `1px solid ${alerta ? "rgb(var(--zm-aviso))" : cor.linha}`,
     }}>
       <div style={{ fontSize: 12, color: cor.cinza }}>{rot}</div>
       <div style={{ fontSize: 19, fontWeight: 700 }}>{val}</div>
-      {sub && <div style={{ fontSize: 12, color: alerta ? "#b45309" : cor.cinza }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: alerta ? "rgb(var(--zm-aviso))" : cor.cinza }}>{sub}</div>}
     </div>
   );
 }

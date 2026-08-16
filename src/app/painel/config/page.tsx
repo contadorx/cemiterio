@@ -69,8 +69,8 @@ function ChaveDisparos() {
   }
 
   const ligado = ativo === true;
-  const fundo = ativo === null ? "#f1f5f9" : ligado ? "#f0fdf4" : "#fef2f2";
-  const borda = ativo === null ? cor.linha : ligado ? "#16a34a" : "#dc2626";
+  const fundo = ativo === null ? "#f1f5f9" : ligado ? "#f0fdf4" : "rgb(var(--zm-perigo) / 0.08)";
+  const borda = ativo === null ? cor.linha : ligado ? "rgb(var(--zm-positivo))" : "rgb(var(--zm-perigo))";
 
   return (
     <div style={{ ...painel.card, background: fundo, borderLeft: `5px solid ${borda}` }}>
@@ -78,7 +78,7 @@ function ChaveDisparos() {
         <div style={{ minWidth: 220, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 12, height: 12, borderRadius: 999, display: "inline-block",
-              background: ativo === null ? "#94a3b8" : ligado ? "#16a34a" : "#dc2626" }} />
+              background: ativo === null ? "rgb(var(--zm-ink-soft))" : ligado ? "rgb(var(--zm-positivo))" : "rgb(var(--zm-perigo))" }} />
             <strong style={{ color: cor.navy, fontSize: 17 }}>
               Disparos automáticos: {ativo === null ? "…" : ligado ? "LIGADOS" : "DESLIGADOS"}
             </strong>
@@ -179,7 +179,7 @@ function Equipe() {
               <option value="admin">Administrador (acesso total)</option>
             </select>
           </div>
-          {erro && <p style={{ color: "#dc2626", fontSize: 14, marginTop: 8 }}>{erro}</p>}
+          {erro && <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, marginTop: 8 }}>{erro}</p>}
           <button style={{ ...painel.botao, marginTop: 12 }} onClick={criar} disabled={salvando}>
             {salvando ? "Criando..." : "Criar acesso"}
           </button>
@@ -316,7 +316,7 @@ function Agregados({ aba }: { aba: string }) {
       <>
         <div style={painel.card}>
           <div style={{ fontSize: 15, color: cor.cinza }}>Túmulos perdidos por imprevistos (registrados)</div>
-          <div style={{ fontSize: 30, fontWeight: 800, color: totalImpacto > 0 ? "#dc2626" : cor.teal }}>{totalImpacto}</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: totalImpacto > 0 ? "rgb(var(--zm-perigo))" : cor.teal }}>{totalImpacto}</div>
         </div>
 
         <Materiais />
@@ -339,7 +339,7 @@ function Agregados({ aba }: { aba: string }) {
           {(d.ocorrencias || []).map((o: any, i: number) => (
             <div key={i} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8, fontSize: 14 }}>
               <b>{rotulos[o.tipo] || o.tipo}</b>
-              {o.impacto > 0 && <span style={{ color: "#dc2626" }}> · −{o.impacto} túmulo(s)</span>}
+              {o.impacto > 0 && <span style={{ color: "rgb(var(--zm-perigo))" }}> · −{o.impacto} túmulo(s)</span>}
               {o.descricao && <div style={{ color: cor.cinza, marginTop: 2 }}>{o.descricao}</div>}
               <div style={{ fontSize: 14, color: cor.cinza }}>{new Date(o.created_at).toLocaleString("pt-BR")}</div>
             </div>
@@ -557,7 +557,7 @@ function Cemiterios() {
         <div key={c.id} style={painel.card}>
           <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
             <h3 style={{ margin: 0, fontSize: 19, color: cor.navy }}>{c.nome}</h3>
-            {!c.ativo && <span style={{ color: "#b45309", fontSize: 14 }}>· inativo</span>}
+            {!c.ativo && <span style={{ color: "rgb(var(--zm-aviso))", fontSize: 14 }}>· inativo</span>}
             <span style={{ marginLeft: "auto", fontSize: 14, color: cor.cinza }}>
               {c.jazigos} jazigo(s) · {c.familias} família(s) · {c.quadras} quadra(s)
             </span>
@@ -676,9 +676,9 @@ function Casa() {
   return (
     <>
       {semPix && (
-        <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "#fef2f2" }}>
+        <div style={{ ...painel.card, borderLeft: "4px solid #dc2626", background: "rgb(var(--zm-perigo) / 0.08)" }}>
           <strong style={{ color: "#991b1b" }}>A chave Pix não está cadastrada</strong>
-          <p style={{ color: "#7f1d1d", fontSize: 14, margin: "6px 0 0" }}>
+          <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, margin: "6px 0 0" }}>
             Sem ela, a IA não consegue mandar o Pix nas cobranças — e foi instruída a não inventar.
             É o primeiro campo abaixo.
           </p>
@@ -896,7 +896,7 @@ function Materiais() {
       )}
 
       {sugestao && (
-        <div style={{ ...painel.card, borderLeft: "4px solid #0f766e", background: "#f0fdfa", marginTop: 12 }}>
+        <div style={{ ...painel.card, borderLeft: "4px solid #0f766e", background: "rgb(var(--zm-positivo) / 0.08)", marginTop: 12 }}>
           <strong style={{ color: cor.navy }}>Revisar o gasto de {sugestao.material.nome}?</strong>
           <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0" }}>
             Desde a compra anterior foram <b>{sugestao.limpezas}</b> limpezas. Pelo que você comprou,
@@ -918,7 +918,7 @@ function Materiais() {
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                                    padding: "10px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 10 }}>
             <span style={{ flex: 1, minWidth: 140, textTransform: "capitalize",
-                           color: baixo ? "#dc2626" : cor.navy, fontWeight: baixo ? 700 : 400 }}>
+                           color: baixo ? "rgb(var(--zm-perigo))" : cor.navy, fontWeight: baixo ? 700 : 400 }}>
               {m.nome} {baixo && "· repor"}
             </span>
             <div>

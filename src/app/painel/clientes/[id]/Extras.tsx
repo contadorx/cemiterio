@@ -96,10 +96,10 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
       </div>
 
       {naEpoca.length > 0 && !aberto && (
-        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10,
+        <div style={{ background: "rgb(var(--zm-aviso) / 0.08)", border: "1px solid #fde68a", borderRadius: 10,
                       padding: 12, marginTop: 12 }}>
-          <b style={{ color: "#92400e" }}>É época de: {naEpoca.map((e) => e.nome).join(", ")}</b>
-          <div style={{ fontSize: 14, color: "#78350f", marginTop: 4 }}>
+          <b style={{ color: "rgb(var(--zm-aviso))" }}>É época de: {naEpoca.map((e) => e.nome).join(", ")}</b>
+          <div style={{ fontSize: 14, color: "rgb(var(--zm-aviso))", marginTop: 4 }}>
             Vale mencionar na próxima conversa com esta família.
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
                 </div>
                 <div>
                   <label style={painel.rotulo}>Total</label>
-                  <div style={{ ...painel.input, width: 120, background: "#f8fafc", fontWeight: 700 }}>
+                  <div style={{ ...painel.input, width: 120, background: "rgb(var(--zm-fundo))", fontWeight: 700 }}>
                     {money((Number(qtd) || 0) * (Number(preco) || 0))}
                   </div>
                 </div>

@@ -248,10 +248,10 @@ function Gestao() {
       {/* resultado do mês */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
         <CartaoGestao titulo="Entradas" valor={money(r.entradas)} cor={cor.teal} />
-        <CartaoGestao titulo="Saídas" valor={money(r.saidas)} cor="#dc2626" />
+        <CartaoGestao titulo="Saídas" valor={money(r.saidas)} cor="rgb(var(--zm-perigo))" />
         <CartaoGestao titulo="Resultado do mês"
                 valor={money(r.resultado)}
-                cor={r.resultado >= 0 ? cor.teal : "#dc2626"} destaque />
+                cor={r.resultado >= 0 ? cor.teal : "rgb(var(--zm-perigo))"} destaque />
         <CartaoGestao titulo={d.ia.medido ? "Custo de IA (medido)" : "Custo de IA (estimado)"}
                 valor={money(d.ia.custoMes)} cor="#7c3aed"
                 rodape={d.ia.medido
@@ -260,9 +260,9 @@ function Gestao() {
       </div>
 
       {r.naoLancado > 0 && (
-        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-          <strong style={{ color: "#92400e" }}>{money(r.naoLancado)} recebido das famílias sem lançamento aqui</strong>
-          <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 0" }}>
+        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+          <strong style={{ color: "rgb(var(--zm-aviso))" }}>{money(r.naoLancado)} recebido das famílias sem lançamento aqui</strong>
+          <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "6px 0 0" }}>
             As famílias pagaram {money(r.recebidoFamilias)} este mês, mas só {money(r.entradas)} está
             classificado no fluxo de caixa. Lance a diferença como entrada para o resultado ficar certo.
           </p>
@@ -322,7 +322,7 @@ function Gestao() {
           ))}
         </div>
         <div style={painel.card}>
-          <strong style={{ color: "#dc2626" }}>Saídas por categoria</strong>
+          <strong style={{ color: "rgb(var(--zm-perigo))" }}>Saídas por categoria</strong>
           {saidas.length === 0 && <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0" }}>Nada lançado.</p>}
           {saidas.map((x: any, i: number) => (
             <LinhaGestao key={i} nome={x.categoria} qtd={x.qtd} valor={money(x.total)}
@@ -351,7 +351,7 @@ function Gestao() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <b style={{ color: l.tipo === "entrada" ? cor.teal : "#dc2626" }}>
+              <b style={{ color: l.tipo === "entrada" ? cor.teal : "rgb(var(--zm-perigo))" }}>
                 {l.tipo === "entrada" ? "+" : "−"} {money(l.valor)}
               </b>
               {!l.automatico && (
@@ -378,10 +378,10 @@ function Gestao() {
         {rel && (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, margin: "12px 0" }}>
-              <CartaoGestao titulo="Recebido no mês" valor={money(rel.recebido)} cor="#16a34a" />
+              <CartaoGestao titulo="Recebido no mês" valor={money(rel.recebido)} cor="rgb(var(--zm-positivo))" />
               <CartaoGestao titulo="Serviço prestado" valor={money(rel.executado)} cor={cor.navy} />
-              <CartaoGestao titulo="A conferir" valor={money(rel.aConferir)} cor="#d97706" />
-              <CartaoGestao titulo="Total a receber" valor={money(rel.totalReceber)} cor="#dc2626" />
+              <CartaoGestao titulo="A conferir" valor={money(rel.aConferir)} cor="rgb(var(--zm-aviso))" />
+              <CartaoGestao titulo="Total a receber" valor={money(rel.totalReceber)} cor="rgb(var(--zm-perigo))" />
             </div>
 
             <div style={{ marginTop: 4 }}>
@@ -390,7 +390,7 @@ function Gestao() {
               {(rel.emAberto || []).map((x: any, i: number) => (
                 <div key={i} style={linha}>
                   <span>{x.cliente}</span>
-                  <span style={{ color: "#dc2626", fontWeight: 700 }}>{money(x.valor)}</span>
+                  <span style={{ color: "rgb(var(--zm-perigo))", fontWeight: 700 }}>{money(x.valor)}</span>
                 </div>
               ))}
             </div>
@@ -401,7 +401,7 @@ function Gestao() {
               {(rel.adiantados || []).map((x: any, i: number) => (
                 <div key={i} style={linha}>
                   <span>{x.cliente}</span>
-                  <span style={{ color: "#16a34a", fontWeight: 700 }}>{money(x.valor)}</span>
+                  <span style={{ color: "rgb(var(--zm-positivo))", fontWeight: 700 }}>{money(x.valor)}</span>
                 </div>
               ))}
             </div>
@@ -416,9 +416,9 @@ function CartaoGestao({ titulo, valor, cor: c, rodape, destaque }:
   { titulo: string; valor: string; cor: string; rodape?: string; destaque?: boolean }) {
   return (
     <div style={{ ...painel.card, marginBottom: 0, borderTop: `3px solid ${c}` }}>
-      <div style={{ fontSize: 14, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{titulo}</div>
+      <div style={{ fontSize: 14, color: "rgb(var(--zm-ink-soft))", textTransform: "uppercase", letterSpacing: 0.5 }}>{titulo}</div>
       <div style={{ fontSize: destaque ? 26 : 22, fontWeight: 700, color: c, marginTop: 4 }}>{valor}</div>
-      {rodape && <div style={{ fontSize: 14, color: "#6b7280", marginTop: 4 }}>{rodape}</div>}
+      {rodape && <div style={{ fontSize: 14, color: "rgb(var(--zm-ink-soft))", marginTop: 4 }}>{rodape}</div>}
     </div>
   );
 }
@@ -427,8 +427,8 @@ function LinhaGestao({ nome, qtd, valor, sub }: { nome: string; qtd: number; val
   return (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0",
                   borderTop: "1px solid #e2e8f0", marginTop: 8 }}>
-      <span>{nome} {sub && <span style={{ fontSize: 15, color: "#6b7280" }}>({sub})</span>}
-        <span style={{ color: "#6b7280", fontSize: 14 }}> · {qtd}x</span></span>
+      <span>{nome} {sub && <span style={{ fontSize: 15, color: "rgb(var(--zm-ink-soft))" }}>({sub})</span>}
+        <span style={{ color: "rgb(var(--zm-ink-soft))", fontSize: 14 }}> · {qtd}x</span></span>
       <b>{valor}</b>
     </div>
   );
@@ -463,17 +463,17 @@ function PorJazigo() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 14 }}>
         <CartaoGestao titulo="Receita" valor={money(d.totais.receita)} cor={cor.teal} />
-        <CartaoGestao titulo="Custo (mão de obra + material)" valor={money(d.totais.custo)} cor="#dc2626" />
+        <CartaoGestao titulo="Custo (mão de obra + material)" valor={money(d.totais.custo)} cor="rgb(var(--zm-perigo))" />
         <CartaoGestao titulo="Margem" valor={money(d.totais.margem)} destaque
-                cor={d.totais.margem >= 0 ? cor.teal : "#dc2626"} />
-        <CartaoGestao titulo="No prejuízo" valor={String(d.totais.noPrejuizo)} cor="#d97706"
+                cor={d.totais.margem >= 0 ? cor.teal : "rgb(var(--zm-perigo))"} />
+        <CartaoGestao titulo="No prejuízo" valor={String(d.totais.noPrejuizo)} cor="rgb(var(--zm-aviso))"
                 rodape="jazigos que custam mais do que rendem" />
       </div>
 
       {d.semMedicao > 0 && (
-        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-          <strong style={{ color: "#92400e" }}>{d.semMedicao} jazigo(s) sem tempo medido</strong>
-          <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 0" }}>
+        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+          <strong style={{ color: "rgb(var(--zm-aviso))" }}>{d.semMedicao} jazigo(s) sem tempo medido</strong>
+          <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "6px 0 0" }}>
             O custo de mão de obra só aparece quando a Nina usa &ldquo;Começar&rdquo; e
             &ldquo;Finalizar&rdquo; no app. Até lá, esses jazigos mostram margem cheia — que não é real.
           </p>
@@ -502,7 +502,7 @@ function PorJazigo() {
                 <div style={{ fontSize: 15, color: cor.cinza }}>
                   {money(j.receita)} − {money(j.custo_total)}
                 </div>
-                <b style={{ color: Number(j.margem) < 0 ? "#dc2626" : cor.teal, fontSize: 16 }}>
+                <b style={{ color: Number(j.margem) < 0 ? "rgb(var(--zm-perigo))" : cor.teal, fontSize: 16 }}>
                   {money(j.margem)}{j.margem_pct != null && ` (${j.margem_pct}%)`}
                 </b>
               </div>
@@ -554,7 +554,7 @@ function BaterComBanco() {
 
   return (
     <>
-      <div style={{ ...painel.card, background: "#f8fafc" }}>
+      <div style={{ ...painel.card, background: "rgb(var(--zm-fundo))" }}>
         <p style={{ margin: 0, fontSize: 15, color: cor.cinza, lineHeight: 1.6 }}>
           Estes valores entraram porque a família <b>disse</b> que pagou — sem comprovante.
           Foram lançados na conta dela para a cobrança parar. Abra o extrato do banco ao lado
@@ -565,11 +565,11 @@ function BaterComBanco() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12, marginBottom: 14 }}>
         <CartaoGestao titulo="Falta conferir" valor={String(d.totais.pendentes)}
-                cor={d.totais.pendentes ? "#d97706" : cor.teal} destaque />
+                cor={d.totais.pendentes ? "rgb(var(--zm-aviso))" : cor.teal} destaque />
         <CartaoGestao titulo="Valor em jogo" valor={money(d.totais.valorPendente)} cor={cor.navy} />
         <CartaoGestao titulo="Já conferidos" valor={String(d.totais.conferidos)} cor={cor.teal} />
         {d.totais.maisAntigo > 30 && (
-          <CartaoGestao titulo="Mais antigo" valor={`${d.totais.maisAntigo} dias`} cor="#b91c1c"
+          <CartaoGestao titulo="Mais antigo" valor={`${d.totais.maisAntigo} dias`} cor="rgb(var(--zm-perigo))"
                   rodape="esperando conferência" />
         )}
       </div>
@@ -613,7 +613,7 @@ function BaterComBanco() {
                 {new Date(x.data + "T12:00:00").toLocaleDateString("pt-BR")}
                 {" · "}{x.descricao || "pagamento informado"}
                 {!x.conferido && x.dias_esperando > 0 && (
-                  <span style={{ color: x.dias_esperando > 30 ? "#b91c1c" : "#92400e" }}>
+                  <span style={{ color: x.dias_esperando > 30 ? "rgb(var(--zm-perigo))" : "rgb(var(--zm-aviso))" }}>
                     {" · "}há {x.dias_esperando} dia{x.dias_esperando > 1 ? "s" : ""} esperando
                   </span>
                 )}

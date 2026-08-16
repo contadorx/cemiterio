@@ -92,12 +92,12 @@ export default function WhatsappPage() {
   }
 
   const bola: Record<string, { corFundo: string; rotulo: string }> = {
-    conectado: { corFundo: "#16a34a", rotulo: "Conectado — a IA está recebendo as mensagens" },
+    conectado: { corFundo: "rgb(var(--zm-positivo))", rotulo: "Conectado — a IA está recebendo as mensagens" },
     conectando: { corFundo: "#f59e0b", rotulo: "Aguardando leitura do QR no celular..." },
-    desconectado: { corFundo: "#dc2626", rotulo: "Desconectado" },
-    inexistente: { corFundo: "#94a3b8", rotulo: "Instância ainda não criada" },
-    erro: { corFundo: "#dc2626", rotulo: "Erro ao consultar" },
-    carregando: { corFundo: "#94a3b8", rotulo: "Consultando..." },
+    desconectado: { corFundo: "rgb(var(--zm-perigo))", rotulo: "Desconectado" },
+    inexistente: { corFundo: "rgb(var(--zm-ink-soft))", rotulo: "Instância ainda não criada" },
+    erro: { corFundo: "rgb(var(--zm-perigo))", rotulo: "Erro ao consultar" },
+    carregando: { corFundo: "rgb(var(--zm-ink-soft))", rotulo: "Consultando..." },
   };
   const b = bola[estado];
 
@@ -116,7 +116,7 @@ export default function WhatsappPage() {
             <p style={{ color: cor.cinza, fontSize: 15, margin: "8px 0 0" }}>Instância: {instancia}</p>
           )}
           {detalhe && (
-            <p style={{ color: "#b45309", fontSize: 15, margin: "8px 0 0" }}>{detalhe}</p>
+            <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "8px 0 0" }}>{detalhe}</p>
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>

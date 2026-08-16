@@ -26,7 +26,7 @@ interface Cand {
   faixa: "fria" | "morna" | "quente";
 }
 
-const CORES: Record<string, string> = { quente: "#dc2626", morna: "#d97706", fria: "#0f766e" };
+const CORES: Record<string, string> = { quente: "rgb(var(--zm-perigo))", morna: "rgb(var(--zm-aviso))", fria: "#0f766e" };
 
 export default function Reajustes() {
   const [itens, setItens] = useState<Cand[]>([]);

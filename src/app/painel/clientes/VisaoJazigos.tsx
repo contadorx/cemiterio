@@ -96,11 +96,11 @@ export default function VisaoJazigos() {
   for (const p of todos) (contagem as any)[bucket(p.proximaCobranca, hoje, sem, mes, p.ativo)]++;
 
   const baldes: { chave: string; rotulo: string; n: number; cor: string }[] = [
-    { chave: "vencido", rotulo: "Vencidos", n: contagem.vencido, cor: "#dc2626" },
-    { chave: "semana", rotulo: "Vencem em 7 dias", n: contagem.semana, cor: "#d97706" },
+    { chave: "vencido", rotulo: "Vencidos", n: contagem.vencido, cor: "rgb(var(--zm-perigo))" },
+    { chave: "semana", rotulo: "Vencem em 7 dias", n: contagem.semana, cor: "rgb(var(--zm-aviso))" },
     { chave: "mes", rotulo: "Vencem no mês", n: contagem.mes, cor: "#0f766e" },
-    { chave: "emdia", rotulo: "Em dia", n: contagem.emdia, cor: "#16a34a" },
-    { chave: "sem", rotulo: "Sem data", n: contagem.sem, cor: "#94a3b8" },
+    { chave: "emdia", rotulo: "Em dia", n: contagem.emdia, cor: "rgb(var(--zm-positivo))" },
+    { chave: "sem", rotulo: "Sem data", n: contagem.sem, cor: "rgb(var(--zm-ink-soft))" },
   ];
   // o cartão de inativos só aparece quando a situação escolhida traz inativos —
   // na visão "Ativos" ele seria sempre 0 e só ocuparia espaço.
@@ -224,7 +224,7 @@ export default function VisaoJazigos() {
             <span><b style={{ color: cor.navy }}>{tot.quantidade}</b> jazigos</span>
             <span><b style={{ color: cor.navy }}>{money(tot.mensal)}</b> por mês</span>
             {tot.faltaData > 0 && (
-              <span style={{ color: "#d97706" }}>
+              <span style={{ color: "rgb(var(--zm-aviso))" }}>
                 <b>{tot.faltaData}</b> sem data de lavagem ou cobrança
               </span>
             )}
@@ -395,7 +395,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
             {p.conferido && " · ✓"}
           </div>
           <div style={{ fontSize: 13, marginTop: 3,
-                        color: p.faltaData ? "#d97706" : cor.cinza }}>
+                        color: p.faltaData ? "rgb(var(--zm-aviso))" : cor.cinza }}>
             Pago até {dt(p.pagoAte)} · Lava em <b>{dt(p.proximaLavagem)}</b> · Cobra em <b>{dt(p.proximaCobranca)}</b>
             {p.faltaData && " ← falta preencher"}
           </div>
@@ -423,7 +423,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
             </div>
             <div>
               <label style={painel.rotulo}>Dá por mês</label>
-              <div style={{ ...painel.input, width: 120, background: "#f8fafc", fontWeight: 700 }}>
+              <div style={{ ...painel.input, width: 120, background: "rgb(var(--zm-fundo))", fontWeight: 700 }}>
                 {isFinite(mensalNumBruto) ? money(porMes) : "—"}
               </div>
             </div>

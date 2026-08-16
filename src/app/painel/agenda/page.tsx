@@ -150,8 +150,8 @@ export default function AgendaPage() {
   const statusCor: Record<string, string> = {
     agendado: cor.teal,
     alocado: cor.teal,
-    executado: "#16a34a",
-    pulado: "#b45309",
+    executado: "rgb(var(--zm-positivo))",
+    pulado: "rgb(var(--zm-aviso))",
   };
 
   return (
@@ -182,11 +182,11 @@ export default function AgendaPage() {
         </div>
 
         {fora > 0 && (
-          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-            <strong style={{ color: "#92400e" }}>
+          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>
               {fora} lavagem(ns) marcada(s) em dia que não se trabalha
             </strong>
-            <p style={{ color: "#78350f", fontSize: 15, margin: "6px 0 12px", lineHeight: 1.5 }}>
+            <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "6px 0 12px", lineHeight: 1.5 }}>
               Acontece quando você muda os dias da jornada: o que já estava marcado continua
               no dia antigo. Reorganizar move tudo para o próximo dia de trabalho e redistribui
               respeitando a capacidade.
@@ -239,7 +239,7 @@ export default function AgendaPage() {
 
           {diag && (
             <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
-                          background: diag.criados > 0 ? "#f0fdf4" : "#f8fafc",
+                          background: diag.criados > 0 ? "#f0fdf4" : "rgb(var(--zm-fundo))",
                           border: `1px solid ${diag.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
               <strong style={{ color: cor.navy }}>
                 {diag.criados > 0 ? `${diag.criados} limpeza(s) criada(s)` : "Nada novo a criar"}

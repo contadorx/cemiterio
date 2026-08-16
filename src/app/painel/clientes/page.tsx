@@ -77,7 +77,7 @@ export default function Carteira() {
                 onClick={() => trocar(a.chave)}
                 style={{
                   ...(ativa ? painel.botaoMini : painel.botaoMiniSec),
-                  ...(a.chave === "campo" && !ativa && n ? { borderColor: "#d97706", color: "#92400e" } : {}),
+                  ...(a.chave === "campo" && !ativa && n ? { borderColor: "rgb(var(--zm-aviso))", color: "rgb(var(--zm-aviso))" } : {}),
                 }}
               >
                 {a.rotulo}{n ? ` (${n})` : ""}
@@ -196,10 +196,10 @@ function VisaoFamilias() {
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 14, color: cor.cinza, fontSize: 14 }}>
             <span><b style={{ color: cor.navy }}>{d.totais.quantidade}</b> famílias</span>
             <span><b style={{ color: cor.navy }}>{money(d.totais.mensal)}</b> por mês</span>
-            <span><b style={{ color: d.totais.atrasados ? "#dc2626" : cor.teal }}>
+            <span><b style={{ color: d.totais.atrasados ? "rgb(var(--zm-perigo))" : cor.teal }}>
               {d.totais.atrasados}</b> em aberto ({money(d.totais.emAberto)})</span>
             {d.totais.faltaData > 0 && (
-              <span style={{ color: "#d97706" }}>
+              <span style={{ color: "rgb(var(--zm-aviso))" }}>
                 <b>{d.totais.faltaData}</b> sem data de lavagem ou cobrança
               </span>
             )}
@@ -231,11 +231,11 @@ function VisaoFamilias() {
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}
                     {c.envio_automatico === false && (
-                      <span style={{ color: "#b45309", fontWeight: 600 }}> · em revisão (não envia)</span>
+                      <span style={{ color: "rgb(var(--zm-aviso))", fontWeight: 600 }}> · em revisão (não envia)</span>
                     )}
                   </div>
                   <div style={{ fontSize: 15, marginTop: 3,
-                                color: c.faltaData ? "#d97706" : cor.cinza }}>
+                                color: c.faltaData ? "rgb(var(--zm-aviso))" : cor.cinza }}>
                     {c.proximaLavagem
                       ? `Lava em ${new Date(c.proximaLavagem + "T12:00:00").toLocaleDateString("pt-BR")}`
                       : "Sem data de lavagem"}
@@ -247,7 +247,7 @@ function VisaoFamilias() {
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <b style={{ color: c.atrasado ? "#dc2626" : c.saldo > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
+                  <b style={{ color: c.atrasado ? "rgb(var(--zm-perigo))" : c.saldo > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
                     {c.saldo === 0 ? "em dia" : money(Math.abs(c.saldo))}
                   </b>
                   <div style={{ fontSize: 14, color: cor.cinza }}>

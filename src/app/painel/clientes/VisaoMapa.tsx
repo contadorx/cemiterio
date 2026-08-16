@@ -19,8 +19,8 @@ import {
 } from "@/lib/planta";
 
 const CORES: Record<string, string> = {
-  vencido: "#dc2626", semana: "#d97706", mes: "#0f766e", emdia: "#16a34a",
-  sem: "#94a3b8", inativo: "#64748b",
+  vencido: "rgb(var(--zm-perigo))", semana: "rgb(var(--zm-aviso))", mes: "#0f766e", emdia: "rgb(var(--zm-positivo))",
+  sem: "rgb(var(--zm-ink-soft))", inativo: "#64748b",
 };
 const ROTULO: Record<string, string> = {
   vencido: "Vencido", semana: "Vence em 7 dias", mes: "Vence no mês", emdia: "Em dia",
@@ -286,7 +286,7 @@ export default function VisaoMapa() {
 
         {truncado && (
           <div style={{ ...painel.card, borderLeft: "4px solid #d97706", padding: 12, marginBottom: 12 }}>
-            <strong style={{ color: "#92400e" }}>Planta parcial.</strong>{" "}
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>Planta parcial.</strong>{" "}
             <span style={{ color: cor.cinza, fontSize: 14 }}>
               A carteira bateu o teto de leitura desta tela ({limite || 2000} jazigos), então há
               jazigos que não estão aqui. Os filtros trabalham sobre o que foi lido, ou seja
@@ -301,8 +301,8 @@ export default function VisaoMapa() {
           <Resumo titulo="No mapa" valor={`${pontos.length}`} sub={`${mapeado}% mapeado`} />
           <Resumo titulo="Fora do mapa" valor={String(semGps.length + distantes.length)}
                   sub={distantes.length ? `${semGps.length} sem GPS · ${distantes.length} suspeito${distantes.length === 1 ? "" : "s"}` : "sem GPS"}
-                  destaque={semGps.length + distantes.length > 0 ? "#d97706" : undefined} />
-          <Resumo titulo="Vencidos" valor={String(vencidos)} destaque={vencidos > 0 ? "#dc2626" : undefined} />
+                  destaque={semGps.length + distantes.length > 0 ? "rgb(var(--zm-aviso))" : undefined} />
+          <Resumo titulo="Vencidos" valor={String(vencidos)} destaque={vencidos > 0 ? "rgb(var(--zm-perigo))" : undefined} />
         </div>
 
         {/* controles */}
@@ -349,7 +349,7 @@ export default function VisaoMapa() {
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer",
                         border: `1px solid ${off ? cor.linha : CORES[s]}`, borderRadius: 999, padding: "6px 12px",
-                        background: off ? "#f8fafc" : "#fff", color: off ? "#94a3b8" : cor.navy,
+                        background: off ? "rgb(var(--zm-fundo))" : "#fff", color: off ? "rgb(var(--zm-ink-soft))" : cor.navy,
                         textDecoration: off ? "line-through" : "none", minHeight: 36,
                       }}>
                 <span style={{ width: 10, height: 10, borderRadius: 999, background: CORES[s], opacity: off ? 0.4 : 1 }} />
@@ -366,7 +366,7 @@ export default function VisaoMapa() {
 
         {!carregando && erro && (
           <div style={{ ...painel.card, borderLeft: "4px solid #dc2626" }}>
-            <strong style={{ color: "#dc2626" }}>Não deu para carregar o mapa.</strong>
+            <strong style={{ color: "rgb(var(--zm-perigo))" }}>Não deu para carregar o mapa.</strong>
             <p style={{ color: cor.cinza, fontSize: 14, margin: "4px 0 0" }}>
               {erro}. Recarregue a página; se insistir, é falha do servidor e não falta de GPS.
             </p>
@@ -389,7 +389,7 @@ export default function VisaoMapa() {
 
         {!carregando && !erro && vaoSuspeito && (
           <div style={{ ...painel.card, borderLeft: "4px solid #d97706" }}>
-            <strong style={{ color: "#92400e" }}>
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>
               Planta larga demais ({distanciaBr(vaoMetros)} entre os dois jazigos mais afastados)
             </strong>
             <p style={{ color: cor.cinza, fontSize: 14, margin: "4px 0 0" }}>
@@ -417,7 +417,7 @@ export default function VisaoMapa() {
 
         {distantesVisiveis.length > 0 && (
           <div style={{ ...painel.card, borderLeft: "4px solid #d97706" }}>
-            <strong style={{ color: "#92400e" }}>GPS suspeito ({distantesVisiveis.length})</strong>
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>GPS suspeito ({distantesVisiveis.length})</strong>
             <p style={{ color: cor.cinza, fontSize: 14, margin: "4px 0 10px" }}>
               {pontos.length === 0
                 ? "Neste cemitério não há maioria: as leituras se dividem em grupos afastados uns dos outros (pode ser 2 contra 2, e podem existir duas leituras vizinhas dentro de cada grupo), então não há como eleger qual grupo é o cemitério de verdade e nada é desenhado — sairia com quilômetros de largura. A coordenada existe; o que falta é confiança nela."
@@ -777,7 +777,7 @@ function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, r
           · caminhada de <b style={{ color: cor.navy }}>{Math.round(rota.metros)} m</b> (sem contar o trajeto até o cemitério).
           {rota.cortados > 0 && (
             <> Mostrando as {MAX_PARADAS} primeiras paradas —{" "}
-              <b style={{ color: "#92400e" }}>{rota.cortados} jazigo{rota.cortados === 1 ? "" : "s"} de fora</b>{" "}
+              <b style={{ color: "rgb(var(--zm-aviso))" }}>{rota.cortados} jazigo{rota.cortados === 1 ? "" : "s"} de fora</b>{" "}
               da rota. Filtre por quadra ou situação para cobrir o resto.</>
           )}
         </p>
@@ -785,7 +785,7 @@ function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, r
 
       <svg ref={refSvg} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
            onPointerDown={aoDescer} onPointerMove={aoMover} onPointerUp={aoSubir} onPointerCancel={aoCancelar}
-           style={{ width: "100%", aspectRatio: `${LARGURA} / ${ALTURA}`, background: "#f8fafc",
+           style={{ width: "100%", aspectRatio: `${LARGURA} / ${ALTURA}`, background: "rgb(var(--zm-fundo))",
                     border: `1px solid ${cor.linha}`, borderRadius: 12,
                     touchAction: modoArraste ? "none" : "pan-y", cursor: "grab",
                     display: "block" }}>
@@ -802,7 +802,7 @@ function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, r
             somem. Ele tira o contraste da imagem sem apagar a referência. */}
         {tiles.length > 0 && (
           <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h}
-                fill="#ffffff" fillOpacity={0.22} style={{ pointerEvents: "none" }} />
+                fill="rgb(var(--zm-card))" fillOpacity={0.22} style={{ pointerEvents: "none" }} />
         )}
 
         {/* caixas das quadras */}
@@ -881,12 +881,12 @@ function Planta({ pontos, centro, visiveis, selId, onEscolher, agruparQuadras, r
           </text>
         </g>
         <text x={vb.x + vb.w - 16 * upx} y={vb.y + 22 * upx} textAnchor="middle"
-              fontSize={fonte * 1.3} fontWeight={700} fill="#94a3b8"
+              fontSize={fonte * 1.3} fontWeight={700} fill="rgb(var(--zm-ink-soft))"
               style={{ pointerEvents: "none" }}>N ↑</text>
       </svg>
 
       {semImagem && (
-        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#92400e" }}>
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "rgb(var(--zm-aviso))" }}>
           Não consegui carregar a imagem aérea agora (serviço de fora, sem contrato). A planta
           continua valendo — desligue o satélite para ver o desenho limpo.
         </p>
@@ -933,7 +933,7 @@ function Detalhe({ j, onFechar, onMudou }: { j: Jazigo; onFechar: () => void; on
           <strong style={{ color: cor.navy, fontSize: 17 }}>{j.identificacao || "sem identificação"}</strong>
           <div style={{ color: cor.cinza, fontSize: 14 }}>{local || "sem local"}</div>
           <div style={{ marginTop: 6, fontSize: 15 }}>
-            {j.cliente ? <b>{j.cliente}</b> : <span style={{ color: "#d97706" }}>sem família vinculada</span>}
+            {j.cliente ? <b>{j.cliente}</b> : <span style={{ color: "rgb(var(--zm-aviso))" }}>sem família vinculada</span>}
           </div>
         </div>
         <button style={painel.botaoMiniSec} onClick={onFechar}>fechar</button>
@@ -971,12 +971,12 @@ function Detalhe({ j, onFechar, onMudou }: { j: Jazigo; onFechar: () => void; on
         <CorrigirGps tumuloId={j.id} onMudou={onMudou} />
       </div>
       {!j.temPlano && (
-        <p style={{ margin: "10px 0 0", fontSize: 14, color: "#92400e" }}>
+        <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgb(var(--zm-aviso))" }}>
           Este jazigo não tem plano. Na ficha da família, use “Criar plano” para definir a periodicidade.
         </p>
       )}
       {j.temPlano && j.ativo === false && (
-        <p style={{ margin: "10px 0 0", fontSize: 14, color: "#92400e" }}>
+        <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgb(var(--zm-aviso))" }}>
           O plano deste jazigo está inativo: não gera lavagem nem cobrança. Reative na ficha da família.
         </p>
       )}

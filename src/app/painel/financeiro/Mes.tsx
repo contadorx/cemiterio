@@ -80,7 +80,7 @@ export default function Mes() {
         <span style={{ marginLeft: "auto", color: cor.cinza, fontSize: 15, textTransform: "capitalize" }}>
           {nomeDoMes(mes)}
           {d && !d.fechado && (
-            <b style={{ color: "#b45309", textTransform: "none" }}> · parcial, o mês ainda não acabou</b>
+            <b style={{ color: "rgb(var(--zm-aviso))", textTransform: "none" }}> · parcial, o mês ainda não acabou</b>
           )}
         </span>
       </div>
@@ -150,15 +150,15 @@ export default function Mes() {
             || d.pendencias.semFoto.length > 0
             || d.pendencias.comprovantesAConferir > 0
             || (d.pendencias.entradasSemDono || 0) > 0) && (
-            <div style={{ ...painel.card, border: "2px solid #f59e0b", background: "#fffbeb" }}>
-              <b style={{ color: "#92400e", fontSize: 18 }}>O que ficou para trás</b>
+            <div style={{ ...painel.card, border: "2px solid #f59e0b", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+              <b style={{ color: "rgb(var(--zm-aviso))", fontSize: 18 }}>O que ficou para trás</b>
 
               {d.pendencias.semCobranca.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <b style={{ color: "#7f1d1d" }}>
+                  <b style={{ color: "rgb(var(--zm-perigo))" }}>
                     {d.pendencias.semCobranca.length} limpeza(s) feita(s) e NÃO cobrada(s)
                   </b>
-                  <p style={{ margin: "4px 0 6px", color: "#78350f", fontSize: 14, lineHeight: 1.5 }}>
+                  <p style={{ margin: "4px 0 6px", color: "rgb(var(--zm-aviso))", fontSize: 14, lineHeight: 1.5 }}>
                     O serviço saiu e nada entrou na conta da família. É dinheiro no chão — e era o
                     tipo de coisa que só aparecia meses depois, se alguém cruzasse as duas tabelas.
                   </p>
@@ -178,10 +178,10 @@ export default function Mes() {
 
               {d.pendencias.semFoto.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <b style={{ color: "#7f1d1d" }}>
+                  <b style={{ color: "rgb(var(--zm-perigo))" }}>
                     {d.pendencias.semFoto.length} limpeza(s) fechada(s) sem a foto do depois
                   </b>
-                  <p style={{ margin: "4px 0 0", color: "#78350f", fontSize: 14, lineHeight: 1.5 }}>
+                  <p style={{ margin: "4px 0 0", color: "rgb(var(--zm-aviso))", fontSize: 14, lineHeight: 1.5 }}>
                     A regra da casa é que sem a foto o serviço não fecha. Estas passaram por outro
                     caminho — vale conferir antes que a família pergunte.
                   </p>
@@ -208,7 +208,7 @@ export default function Mes() {
           <div style={painel.card}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <b style={{ fontSize: 18, color: cor.navy }}>Quem estava devendo no fim do mês</b>
-              <span style={{ marginLeft: "auto", fontWeight: 800, color: "#dc2626", fontSize: 20 }}>
+              <span style={{ marginLeft: "auto", fontWeight: 800, color: "rgb(var(--zm-perigo))", fontSize: 20 }}>
                 {money(d.familias.totalDevendo)}
               </span>
             </div>
@@ -238,7 +238,7 @@ export default function Mes() {
                           {f.nome}
                         </Link>
                       </td>
-                      <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#dc2626" }}>
+                      <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "rgb(var(--zm-perigo))" }}>
                         {money(f.valor)}
                       </td>
                       <td style={td}>
@@ -250,11 +250,11 @@ export default function Mes() {
                         {f.naoCobrar ? (
                           <span style={{ color: cor.cinza }}>não cobrar (escolha sua)</span>
                         ) : f.reguaQueimada ? (
-                          <span style={{ color: "#b91c1c", fontWeight: 700 }}>
+                          <span style={{ color: "rgb(var(--zm-perigo))", fontWeight: 700 }}>
                             régua no teto — a cobrança automática parou
                           </span>
                         ) : f.envioDesligado ? (
-                          <span style={{ color: "#b45309" }}>envio desligado</span>
+                          <span style={{ color: "rgb(var(--zm-aviso))" }}>envio desligado</span>
                         ) : (
                           <span style={{ color: cor.cinza }}>
                             {f.cobrancaNivel} de {f.maxLembretes} lembrete(s)
@@ -289,7 +289,7 @@ export default function Mes() {
                         {p.nome}
                       </Link>
                     </td>
-                    <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#16a34a" }}>
+                    <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "rgb(var(--zm-positivo))" }}>
                       {money(p.valor)}
                     </td>
                   </tr>
@@ -339,7 +339,7 @@ function Big({ rot, val, cor: c, sub }: { rot: string; val: string; cor: string;
     <div>
       <div style={{ fontSize: 26, fontWeight: 800, color: c }}>{val}</div>
       <div style={{ color: "#cbd5e1", fontSize: 14 }}>{rot}</div>
-      {sub && <div style={{ color: "#94a3b8", fontSize: 13 }}>{sub}</div>}
+      {sub && <div style={{ color: "rgb(var(--zm-ink-soft))", fontSize: 13 }}>{sub}</div>}
     </div>
   );
 }
@@ -349,9 +349,9 @@ function Aviso({ tom, children }: { tom: "neutro" | "atencao"; children: React.R
   return (
     <p style={{
       margin: "10px 0 0", padding: "10px 12px", borderRadius: 10, lineHeight: 1.5, fontSize: 14,
-      background: atencao ? "#fffbeb" : "#f8fafc",
+      background: atencao ? "rgb(var(--zm-aviso) / 0.08)" : "rgb(var(--zm-fundo))",
       border: `1px solid ${atencao ? "#fde68a" : cor.linha}`,
-      color: atencao ? "#78350f" : cor.cinza,
+      color: atencao ? "rgb(var(--zm-aviso))" : cor.cinza,
     }}>
       {children}
     </p>

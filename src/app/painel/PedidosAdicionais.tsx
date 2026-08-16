@@ -31,9 +31,9 @@ export interface Pedido {
 
 function corDoPrazo(dias: number | null): string {
   if (dias === null) return cor.cinza;
-  if (dias < 0) return "#b91c1c";
-  if (dias <= 3) return "#b91c1c";
-  if (dias <= 7) return "#b45309";
+  if (dias < 0) return "rgb(var(--zm-perigo))";
+  if (dias <= 3) return "rgb(var(--zm-perigo))";
+  if (dias <= 7) return "rgb(var(--zm-aviso))";
   return cor.cinza;
 }
 
@@ -75,7 +75,7 @@ export function PedidosAdicionais({
   if (semMigration) {
     return (
       <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
-        <strong style={{ color: "#92400e" }}>Falta rodar a migration 0035 no banco</strong>
+        <strong style={{ color: "rgb(var(--zm-aviso))" }}>Falta rodar a migration 0035 no banco</strong>
         <p style={{ color: cor.cinza, margin: "6px 0 0", fontSize: 14 }}>
           Até lá, os pedidos de serviço adicional continuam só dentro da conversa.
         </p>
@@ -88,7 +88,7 @@ export function PedidosAdicionais({
   return (
     <div style={{ ...painel.card, borderLeft: "4px solid #b45309", marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontSize: 18, color: "#92400e" }}>
+        <strong style={{ fontSize: 18, color: "rgb(var(--zm-aviso))" }}>
           {pedidos.length === 1 ? "1 pedido de serviço adicional" : `${pedidos.length} pedidos de serviço adicional`}
         </strong>
       </div>
@@ -214,7 +214,7 @@ function FormRegistrar({ pedido, aoPronto }: { pedido: Pedido; aoPronto: () => v
   return (
     <div style={{ marginTop: 12, borderTop: `1px solid ${cor.linha}`, paddingTop: 12 }}>
       {!pedido.clienteId && (
-        <p style={{ color: "#b45309", fontSize: 14, margin: "0 0 8px" }}>
+        <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 14, margin: "0 0 8px" }}>
           Este contato ainda não é uma família cadastrada. Vincule o lead a um cliente antes de registrar.
         </p>
       )}
@@ -253,7 +253,7 @@ function FormRegistrar({ pedido, aoPronto }: { pedido: Pedido; aoPronto: () => v
         antecipa se ele estiver cheio e nunca passa dele.
       </p>
 
-      {erro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, margin: "8px 0 0" }}>{erro}</p>}
 
       <button style={{ ...painel.botao, marginTop: 10 }} disabled={salvando || !tumuloId} onClick={salvar}>
         {salvando ? "registrando…" : "Registrar serviço"}
@@ -290,7 +290,7 @@ export function AnotarPedido({
 
   return (
     <div style={{ ...painel.card, borderLeft: "4px solid #b45309" }}>
-      <strong style={{ color: "#92400e" }}>Pedido de serviço adicional</strong>
+      <strong style={{ color: "rgb(var(--zm-aviso))" }}>Pedido de serviço adicional</strong>
       <p style={{ color: cor.cinza, fontSize: 14, margin: "4px 0 10px" }}>
         Para o que a família pediu aqui na conversa e ainda não virou trabalho.
       </p>
@@ -317,7 +317,7 @@ export function AnotarPedido({
         </div>
       </div>
 
-      {erro && <p style={{ color: "#b91c1c", fontSize: 14, margin: "8px 0 0" }}>{erro}</p>}
+      {erro && <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, margin: "8px 0 0" }}>{erro}</p>}
 
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <button

@@ -84,7 +84,7 @@ export default function Equipe() {
 
   return (
     <>
-      <div style={{ ...painel.card, background: "#f8fafc" }}>
+      <div style={{ ...painel.card, background: "rgb(var(--zm-fundo))" }}>
         <p style={{ margin: 0, fontSize: 15, color: cor.cinza, lineHeight: 1.6 }}>
           Quando a Nina compra material do próprio bolso, registre aqui: o material entra no
           estoque e o valor fica como dívida com ela até você pagar.
@@ -92,21 +92,21 @@ export default function Equipe() {
       </div>
 
       {(d.saldos || []).length > 0 && (
-        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "#fffbeb" }}>
-          <strong style={{ color: "#92400e" }}>A pagar</strong>
+        <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
+          <strong style={{ color: "rgb(var(--zm-aviso))" }}>A pagar</strong>
           {(d.saldos || []).map((s: any) => (
             <div key={s.membro_id} style={{ display: "flex", justifyContent: "space-between",
                    alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 0",
                    borderTop: "1px solid #fde68a" }}>
               <div>
                 <b style={{ color: cor.navy, fontSize: 16 }}>{s.nome}</b>
-                <div style={{ fontSize: 15, color: "#78350f" }}>
+                <div style={{ fontSize: 15, color: "rgb(var(--zm-aviso))" }}>
                   {s.itens} lançamento(s)
                   {s.mais_antigo && ` · o mais antigo é de ${new Date(s.mais_antigo + "T12:00:00").toLocaleDateString("pt-BR")}`}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <b style={{ color: "#92400e", fontSize: 19 }}>{money(s.a_receber)}</b>
+                <b style={{ color: "rgb(var(--zm-aviso))", fontSize: 19 }}>{money(s.a_receber)}</b>
                 <button style={painel.botao} disabled={ocupado}
                         onClick={() => pagar(s.membro_id, s.nome, Number(s.a_receber))}>
                   Pagar
@@ -120,7 +120,7 @@ export default function Equipe() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12, marginBottom: 14 }}>
         <Cartao titulo="Em aberto com a equipe" valor={money(d.totais.aPagar)}
-                cor={d.totais.aPagar ? "#d97706" : cor.teal} destaque />
+                cor={d.totais.aPagar ? "rgb(var(--zm-aviso))" : cor.teal} destaque />
         <Cartao titulo="Pago neste mês" valor={money(d.totais.pagoNoMes)} cor={cor.navy} />
       </div>
 
@@ -211,7 +211,7 @@ function Linha({ l, onRemover }: { l: any; onRemover?: () => void }) {
         </div>
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <b style={{ color: l.pago_em ? cor.cinza : "#92400e" }}>{money(l.valor)}</b>
+        <b style={{ color: l.pago_em ? cor.cinza : "rgb(var(--zm-aviso))" }}>{money(l.valor)}</b>
         {onRemover && (
           <button style={painel.botaoMiniSec}
                   onClick={onRemover}>remover</button>
