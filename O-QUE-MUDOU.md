@@ -941,6 +941,44 @@ visual de escritório seria piorar.
 
 ---
 
+## A FICHA VOLTOU A TER FUNÇÃO
+
+**Erro meu.** Ao enxugar de 2.518 para 450 linhas eu cortei função junto com o
+excesso. Sumiram, sem aviso: editar a família, pessoas, adicionar túmulo,
+registrar limpeza à mão, link do portal, exportar dados e excluir.
+
+Cortar cadastro morto é diferente de cortar o que se usa. Errei a mão.
+
+### O que voltou
+
+| Bloco | O que faz |
+|---|---|
+| **Dados da família** | editar nome, WhatsApp e observações — a coisa mais básica que se faz aqui |
+| **Pessoas da família** | o filho que paga, a neta que acompanha (só aparece com mais de uma) |
+| **Adicionar túmulo** | quadra e rua das listas, para não repetir a bagunça de digitação |
+| **Registrar limpeza** | nem toda limpeza passa pelo app da Nina — a Sureya faz uma de vez em quando |
+| **Link do portal** | gera e copia o link sem senha que a família abre |
+| **Exportar dados · Excluir** | dentro de "Ajustes", recolhido |
+
+### A conta corrente sempre esteve lá
+
+Fica **entre os túmulos e as limpezas**, com o extrato e os três botões:
+registrar pagamento, lançar avulso e situação inicial.
+
+Se ela não aparecia, é porque a família não tinha vínculo — nesse caso o
+cartão explica em vez de sumir. Vale conferir se o que está no ar já é esta
+versão: até publicar, o site mostra a ficha antiga.
+
+### O tamanho certo
+
+450 linhas era pouco demais; 2.518 era o inchaço antigo. Ficou em **903** — e
+a diferença para as 2.518 não é função, é o cadastro morto (datas de gatilho,
+tratamento, régua de cobrança, lembretes, ativação) mais os blocos da IA.
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

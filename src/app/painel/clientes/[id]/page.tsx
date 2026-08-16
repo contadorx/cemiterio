@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { MessageCircle, Plus, ChevronDown } from "lucide-react";
+import { MessageCircle, Plus, ChevronDown, Pencil, Link2, Trash2, Camera } from "lucide-react";
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
 
 /**
@@ -111,18 +111,38 @@ export default function Ficha() {
         )}
       </div>
 
-      <Tumulos tumulos={d.tumulos || []} aoMudar={carregar} />
+      <Identificacao c={c} aoMudar={carregar} />
+      <Pessoas familiaId={c.familia_id} atualId={id} />
+      <Tumulos tumulos={d.tumulos || []} clienteId={id} aoMudar={carregar} />
       <ContaCorrente familiaId={c.familia_id} aoMudar={carregar} />
-      <Limpezas clienteId={id} />
+      <Limpezas clienteId={id} tumulos={d.tumulos || []} aoMudar={carregar} />
+      <Ajustes clienteId={id} nome={c.nome} />
     </>
   );
 }
 
 /* ------------------------------------------------------------------ */
 
-function Tumulos({ tumulos, aoMudar }: { tumulos: any[]; aoMudar: () => void }) {
+function Tumulos({ tumulos, clienteId, aoMudar }: {
+  tumulos: any[]; clienteId: string; aoMudar: () => void;
+}) {
+  const [novo, setNovo] = useState(false);
   return (
-    <Cartao titulo={tumulos.length === 1 ? "Túmulo" : "Túmulos"}>
+    <Cartao
+      titulo={tumulos.length === 1 ? "Túmulo" : "Túmulos"}
+      acao={
+        <Botao onClick={() => setNovo((x) => !x)}>
+          <Plus size={16} /> Adicionar
+        </Botao>
+      }
+    >
+      {novo && (
+        <AdicionarTumulo
+          clienteId={clienteId}
+          aoPronto={() => { setNovo(false); aoMudar(); }}
+          aoCancelar={() => setNovo(false)}
+        />
+      )}
       {!tumulos.length && (
         <p className="text-[14px] text-ink-soft">
           Nenhum túmulo ligado a esta família ainda.
@@ -320,15 +340,64 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
             Tem plano — entra na cobrança do mês
           </label>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Botao tom="principal" onClick={salvar} disabled={salvando}>
               {salvando ? "Salvando…" : "Salvar"}
             </Botao>
             <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+            <Portal tumuloId={t.id} tokenAtual={t.qr_token} />
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * O LINK DO PORTAL — o que a família abre para ver o antes e o depois.
+ *
+ * Sem senha, de propósito: idoso não guarda senha. O link chega uma vez pelo
+ * WhatsApp e fica salvo no celular dele.
+ */
+function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string | null }) {
+  const [token, setToken] = useState<string | null>(tokenAtual);
+  const [copiado, setCopiado] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+
+  const link = token
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/familia/${token}`
+    : "";
+
+  async function emitir() {
+    setOcupado(true);
+    try {
+      const r = await fetch(`/api/tumulos/${tumuloId}/portal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "emitir" }),
+      }).then((x) => x.json());
+      if (r?.ok) setToken(r.token || r.qr_token || null);
+    } finally { setOcupado(false); }
+  }
+
+  if (!token) {
+    return (
+      <Botao onClick={emitir} disabled={ocupado}>
+        <Link2 size={16} /> {ocupado ? "Gerando…" : "Gerar link do portal"}
+      </Botao>
+    );
+  }
+
+  return (
+    <Botao
+      onClick={() => {
+        navigator.clipboard?.writeText(link);
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 1500);
+      }}
+    >
+      <Link2 size={16} /> {copiado ? "link copiado" : "Copiar link do portal"}
+    </Botao>
   );
 }
 
@@ -470,8 +539,40 @@ function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMud
 
 /* ------------------------------------------------------------------ */
 
-function Limpezas({ clienteId }: { clienteId: string }) {
+function Limpezas({ clienteId, tumulos, aoMudar }: {
+  clienteId: string; tumulos: any[]; aoMudar: () => void;
+}) {
   const [lista, setLista] = useState<any[]>([]);
+  const [lancando, setLancando] = useState(false);
+  const [tumuloId, setTumuloId] = useState("");
+  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [ocupado, setOcupado] = useState(false);
+
+  // LIMPEZA AVULSA — a que a Sureya registra à mão.
+  // Existe porque nem toda limpeza passa pelo app da Nina: a própria Sureya
+  // faz uma de vez em quando, e sem isto ela não teria como registrar.
+  async function registrar() {
+    if (!tumuloId) return;
+    setOcupado(true);
+    try {
+      await fetch("/api/servico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tumuloId, dataExecutada: data, avulso: true }),
+      });
+      setLancando(false);
+      setTumuloId("");
+      aoMudar();
+      recarregar();
+    } finally { setOcupado(false); }
+  }
+
+  function recarregar() {
+    fetch(`/api/servicos?clienteId=${clienteId}&situacao=todos&limite=100`)
+      .then((x) => x.json())
+      .then((r) => setLista((r?.servicos || []).filter((sv: any) => sv.data_executada)))
+      .catch(() => {});
+  }
 
   useEffect(() => {
     // Só as executadas: a ficha mostra o que FOI feito. O que está agendado
@@ -487,7 +588,42 @@ function Limpezas({ clienteId }: { clienteId: string }) {
   }, [clienteId]);
 
   return (
-    <Cartao titulo="Limpezas">
+    <Cartao
+      titulo="Limpezas"
+      acao={
+        tumulos.length ? (
+          <Botao onClick={() => setLancando((x) => !x)}>
+            <Plus size={16} /> Registrar
+          </Botao>
+        ) : undefined
+      }
+    >
+      {lancando && (
+        <div className="mb-3 rounded-lg bg-surface p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo rotulo="Qual túmulo">
+              <Selecao value={tumuloId} onChange={(e: any) => setTumuloId(e.target.value)}>
+                <option value="">escolha</option>
+                {tumulos.map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {[t.quadras?.codigo, t.ruas?.nome, t.identificacao].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </Selecao>
+            </Campo>
+            <Campo rotulo="Quando foi feita">
+              <Entrada type="date" value={data} onChange={(e: any) => setData(e.target.value)} />
+            </Campo>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Botao tom="principal" onClick={registrar} disabled={ocupado || !tumuloId}>
+              {ocupado ? "Registrando…" : "Registrar limpeza"}
+            </Botao>
+            <Botao onClick={() => setLancando(false)}>Cancelar</Botao>
+          </div>
+        </div>
+      )}
+
       {!lista.length && (
         <p className="text-[14px] text-ink-soft">Nenhuma limpeza registrada ainda.</p>
       )}
@@ -509,5 +645,259 @@ function Limpezas({ clienteId }: { clienteId: string }) {
         </div>
       ))}
     </Cartao>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * EDITAR A FAMÍLIA — nome, WhatsApp e observações.
+ *
+ * Sumiu na primeira versão da ficha nova, e era a coisa mais básica que se
+ * faz aqui: corrigir um telefone digitado errado. Cortar excesso não pode
+ * levar função junto.
+ */
+function Identificacao({ c, aoMudar }: { c: any; aoMudar: () => void }) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [f, setF] = useState({
+    nome: c.nome ?? "",
+    telefone: c.telefone ?? "",
+    observacoes: c.observacoes ?? "",
+  });
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await fetch(`/api/clientes/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(f),
+      });
+      setAbrindo(false);
+      aoMudar();
+    } finally { setSalvando(false); }
+  }
+
+  return (
+    <Cartao
+      titulo="Dados da família"
+      acao={
+        <Botao onClick={() => setAbrindo((x) => !x)}>
+          <Pencil size={16} /> Editar
+        </Botao>
+      }
+    >
+      {!abrindo ? (
+        <div className="text-[14px] text-ink-muted">
+          <p className="text-[15px] text-ink">{c.nome}</p>
+          <p>{c.telefone || "sem WhatsApp"}</p>
+          {c.observacoes && <p className="mt-1 text-[13px]">{c.observacoes}</p>}
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo rotulo="Nome">
+              <Entrada value={f.nome} onChange={(e: any) => setF({ ...f, nome: e.target.value })} />
+            </Campo>
+            <Campo rotulo="WhatsApp">
+              <Entrada value={f.telefone} inputMode="tel"
+                       onChange={(e: any) => setF({ ...f, telefone: e.target.value })}
+                       placeholder="11 99999-9999" />
+            </Campo>
+          </div>
+          <div className="mt-3">
+            <Campo rotulo="Observações" dica="o que ajuda a atender bem esta família">
+              <Entrada value={f.observacoes}
+                       onChange={(e: any) => setF({ ...f, observacoes: e.target.value })}
+                       placeholder="opcional" />
+            </Campo>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Botao tom="principal" onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Botao>
+            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+        </>
+      )}
+    </Cartao>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * AS PESSOAS DA FAMÍLIA.
+ *
+ * Uma família pode ter vários cadastros: o filho que paga, a neta que
+ * acompanha. Só aparece quando há mais de uma — com uma só, não ocupa espaço.
+ */
+function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
+  const [lista, setLista] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!familiaId) return;
+    fetch(`/api/clientes?familiaId=${familiaId}`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setLista(r.clientes || []); })
+      .catch(() => {});
+  }, [familiaId]);
+
+  if (!familiaId || lista.length <= 1) return null;
+
+  return (
+    <Cartao titulo="Pessoas da família">
+      {lista.map((p: any) => (
+        <div key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0">
+          <div className="min-w-0">
+            <p className="text-[15px] text-ink">
+              {p.nome}
+              {p.id === atualId && <span className="text-ink-soft"> · esta ficha</span>}
+            </p>
+            <p className="text-[13px] text-ink-soft">
+              {p.telefone}{p.parentesco ? ` · ${p.parentesco}` : ""}
+            </p>
+          </div>
+          <div className="flex flex-shrink-0 gap-1.5">
+            {p.responsavel_financeiro && <Selo tom="bom">paga</Selo>}
+            {p.recebe_fotos && <Selo tom="neutro">recebe fotos</Selo>}
+          </div>
+        </div>
+      ))}
+    </Cartao>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/** Liga um túmulo novo a esta família — escolhendo quadra e rua das listas. */
+function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
+  clienteId: string; aoPronto: () => void; aoCancelar: () => void;
+}) {
+  const [quadras, setQuadras] = useState<any[]>([]);
+  const [ruas, setRuas] = useState<any[]>([]);
+  const [f, setF] = useState({ quadraId: "", quadraCodigo: "", rua: "", identificacao: "", falecidoNome: "" });
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/quadras").then((x) => x.json())
+      .then((r) => { if (r?.ok) setQuadras(r.quadras || []); }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!f.quadraId) { setRuas([]); return; }
+    fetch(`/api/ruas?quadraId=${f.quadraId}`).then((x) => x.json())
+      .then((r) => { if (r?.ok) setRuas(r.ruas || []); }).catch(() => {});
+  }, [f.quadraId]);
+
+  async function criar() {
+    if (!f.quadraCodigo) return setErro("Escolha a quadra.");
+    if (!f.rua) return setErro("Escolha a rua — é ela que põe o jazigo no roteiro.");
+    setSalvando(true); setErro("");
+    try {
+      const r = await fetch(`/api/clientes/${clienteId}/tumulos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quadraCodigo: f.quadraCodigo,
+          rua: f.rua,
+          identificacao: f.identificacao || null,
+          falecidoNome: f.falecidoNome || null,
+        }),
+      }).then((x) => x.json());
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui adicionar."); return; }
+      aoPronto();
+    } finally { setSalvando(false); }
+  }
+
+  return (
+    <div className="mb-3 rounded-lg bg-surface p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo rotulo="Quadra">
+          <Selecao
+            value={f.quadraId}
+            onChange={(e: any) => {
+              const q = quadras.find((x: any) => x.id === e.target.value);
+              setF({ ...f, quadraId: e.target.value, quadraCodigo: q?.codigo || "", rua: "" });
+            }}
+          >
+            <option value="">escolha</option>
+            {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Rua">
+          <Selecao value={f.rua} disabled={!ruas.length}
+                   onChange={(e: any) => setF({ ...f, rua: e.target.value })}>
+            <option value="">{f.quadraId ? "escolha" : "escolha a quadra antes"}</option>
+            {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Nome escrito na pedra" dica="opcional">
+          <Entrada value={f.identificacao}
+                   onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
+                   placeholder="Ex.: Almeida" />
+        </Campo>
+        <Campo rotulo="Nome do falecido">
+          <Entrada value={f.falecidoNome}
+                   onChange={(e: any) => setF({ ...f, falecidoNome: e.target.value })}
+                   placeholder="opcional" />
+        </Campo>
+      </div>
+      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+      <div className="mt-3 flex gap-2">
+        <Botao tom="principal" onClick={criar} disabled={salvando}>
+          {salvando ? "Adicionando…" : "Adicionar"}
+        </Botao>
+        <Botao onClick={aoCancelar}>Cancelar</Botao>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * AJUSTES — recolhido por padrão.
+ *
+ * Coisas de fazer uma vez: exportar dados e excluir. Ficavam abertas
+ * competindo com o que se usa todo dia.
+ */
+function Ajustes({ clienteId, nome }: { clienteId: string; nome: string }) {
+  const [aberto, setAberto] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function excluir() {
+    if (!confirm(
+      `Excluir a ficha de ${nome}?\n\nOs túmulos ficam cadastrados e podem ser ligados a outra família. Esta ação não volta.`
+    )) return;
+    setOcupado(true);
+    const r = await fetch(`/api/clientes/${clienteId}`, { method: "DELETE" })
+      .then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) window.location.href = "/painel/clientes";
+    else alert(r?.mensagem || r?.erro || "Não consegui excluir.");
+  }
+
+  return (
+    <div className="mt-1">
+      <Botao className="w-full" onClick={() => setAberto((x) => !x)}>
+        {aberto ? "Fechar ajustes" : "Ajustes da família"}
+      </Botao>
+      {aberto && (
+        <Cartao className="mt-2">
+          <a
+            href={`/api/clientes/${clienteId}/lgpd`}
+            className="mb-3 block text-[14px] text-brand underline"
+          >
+            Exportar os dados desta família
+          </a>
+          <Botao tom="perigo" onClick={excluir} disabled={ocupado}>
+            <Trash2 size={16} /> Excluir ficha
+          </Botao>
+        </Cartao>
+      )}
+    </div>
   );
 }
