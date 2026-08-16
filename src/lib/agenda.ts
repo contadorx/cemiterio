@@ -274,33 +274,75 @@ interface ServicoPend {
   data_desejada?: string | null;   // a data que a família pediu (0037) — nunca reescrita
   prioridade?: number;
   cemiterio_id?: string | null;    // 0044 — a rota do dia é por cemitério
-  tumulo: { identificacao: string; lat: number | null; lng: number | null; quadra_ordem: number };
+  tumulo: {
+    identificacao: string;
+    lat: number | null;
+    lng: number | null;
+    quadra_ordem: number;
+    // ENDEREÇO (0047) — é daqui que sai a ordem do dia agora.
+    rua_ordem: number | null;      // sequência de caminhada da rua
+    rua_id: string | null;
+    ordem_na_rua: number | null;   // posição dentro da rua, derivada do GPS do cadastro
+  };
 }
 
-// vizinho-mais-próximo guloso dentro de uma quadra (coords ausentes vão ao fim)
-function ordenarPorProximidade(itens: ServicoPend[]): ServicoPend[] {
-  const comCoord = itens.filter((i) => i.tumulo.lat != null && i.tumulo.lng != null);
-  const semCoord = itens
-    .filter((i) => i.tumulo.lat == null || i.tumulo.lng == null)
-    .sort((a, b) => a.tumulo.identificacao.localeCompare(b.tumulo.identificacao));
+/**
+ * ORDEM DO DIA POR ENDEREÇO (0047) — substitui o vizinho-mais-próximo por GPS.
+ *
+ * O QUE HAVIA AQUI E POR QUE SAIU
+ * A versão anterior montava a rota por proximidade em lat/lng. Dois defeitos
+ * que custavam caro no chão do cemitério:
+ *
+ *   1. Túmulo sem coordenada ia para o FIM da fila, solto, fora de qualquer
+ *      rua — e a Nina descobria isso andando.
+ *   2. O GPS não conhece muro. Enxergava um túmulo do outro lado da divisa
+ *      como "logo ali" e mandava ela bater na parede.
+ *
+ * Agora a ordem é a que ela realmente caminha:
+ *
+ *      RUA (ordem cadastrada)  ->  POSIÇÃO NA RUA
+ *
+ * A SERPENTINA: ruas de posição par na sequência do dia são percorridas ao
+ * contrário. Sem isso ela termina a rua no fundo e volta andando à toa até o
+ * começo da próxima. Alternando, uma emenda na outra.
+ *
+ * O GPS não sumiu: ele é capturado no cadastro e alimenta `ordem_na_rua`
+ * (lib/rota.ts). Só não participa mais da navegação do dia.
+ */
+function ordenarPorEndereco(itens: ServicoPend[]): ServicoPend[] {
+  const porRua = new Map<string, ServicoPend[]>();
+  const semRua: ServicoPend[] = [];
 
-  if (comCoord.length <= 1) return [...comCoord, ...semCoord];
-
-  const restante = [...comCoord];
-  const rota: ServicoPend[] = [restante.shift()!];
-  while (restante.length) {
-    const atual = rota[rota.length - 1].tumulo;
-    let melhor = 0;
-    let melhorD = Infinity;
-    restante.forEach((cand, i) => {
-      const dx = (cand.tumulo.lat! - atual.lat!) ;
-      const dy = (cand.tumulo.lng! - atual.lng!);
-      const d = dx * dx + dy * dy; // euclidiano ao quadrado basta p/ ordenar
-      if (d < melhorD) { melhorD = d; melhor = i; }
-    });
-    rota.push(restante.splice(melhor, 1)[0]);
+  for (const it of itens) {
+    const chave = it.tumulo.rua_id;
+    if (!chave) { semRua.push(it); continue; }
+    const arr = porRua.get(chave) || [];
+    arr.push(it);
+    porRua.set(chave, arr);
   }
-  return [...rota, ...semCoord];
+
+  const ruasOrdenadas = [...porRua.keys()].sort((a, b) => {
+    const oa = porRua.get(a)![0].tumulo.rua_ordem ?? 9999;
+    const ob = porRua.get(b)![0].tumulo.rua_ordem ?? 9999;
+    return oa - ob;
+  });
+
+  const rota: ServicoPend[] = [];
+  ruasOrdenadas.forEach((ruaId, i) => {
+    const daRua = porRua.get(ruaId)!.sort((a, b) => {
+      // sem posição definida, vai para o fim da PRÓPRIA rua — nunca para o
+      // fim do dia, como acontecia antes.
+      const oa = a.tumulo.ordem_na_rua ?? Number.MAX_SAFE_INTEGER;
+      const ob = b.tumulo.ordem_na_rua ?? Number.MAX_SAFE_INTEGER;
+      return oa - ob;
+    });
+    rota.push(...(i % 2 === 1 ? daRua.reverse() : daRua));
+  });
+
+  // Túmulo ainda sem rua cadastrada fecha o dia, em ordem alfabética. É um
+  // aviso visível de cadastro incompleto, não um item perdido no meio.
+  semRua.sort((a, b) => a.tumulo.identificacao.localeCompare(b.tumulo.identificacao));
+  return [...rota, ...semRua];
 }
 
 export async function alocarAgenda(): Promise<{ agendados: number; dias: number }> {
@@ -382,12 +424,12 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   // ---- pendentes (com o cemitério, quando a coluna existir) -----------------
   const SEL_NOVO =
     "id,data_prevista,data_desejada,prioridade,cemiterio_id," +
-    "tumulos(identificacao,lat,lng,cemiterio_id,quadras(ordem,cemiterio_id))";
+    "tumulos(identificacao,lat,lng,cemiterio_id,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem,cemiterio_id))";
   const SEL_SEM_FIXADO =
     "id,data_prevista,data_desejada,prioridade," +
-    "tumulos(identificacao,lat,lng,quadras(ordem,cemiterio_id))";
+    "tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem,cemiterio_id))";
   const SEL_ANTIGO =
-    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,quadras(ordem))";
+    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem),quadras(ordem))";
 
   // O que foi decidido por uma PESSOA não entra aqui (0041): remarcação manual
   // fica onde está, em vez de ser desfeita pelo alocador na madrugada seguinte.
@@ -431,6 +473,9 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       lat: s.tumulos?.lat ?? null,
       lng: s.tumulos?.lng ?? null,
       quadra_ordem: s.tumulos?.quadras?.ordem ?? 9999,
+      rua_ordem: s.tumulos?.ruas?.ordem ?? null,
+      rua_id: s.tumulos?.rua_id ?? null,
+      ordem_na_rua: s.tumulos?.ordem_na_rua ?? null,
     },
   }));
 
@@ -582,7 +627,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       }
       const quadrasOrdenadas = [...porQuadra.keys()].sort((a, b) => a - b);
       const sequencia: ServicoPend[] = [];
-      for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorProximidade(porQuadra.get(q)!));
+      for (const q of quadrasOrdenadas) sequencia.push(...ordenarPorEndereco(porQuadra.get(q)!));
 
       // reparte entre quem pode trabalhar aqui, em blocos contíguos, respeitando
       // o que cada uma JÁ recebeu neste dia (inclusive de outro cemitério)
