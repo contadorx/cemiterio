@@ -15,18 +15,38 @@ export const cor = {
 };
 
 /**
- * O menu tem 12 itens — demais para uma lista corrida no celular.
- * Agrupado por o que se faz: o dia a dia primeiro, o resto depois.
+ * O MENU ENXUTO.
+ *
+ * O painel tinha 12 itens porque o sistema tentava ser um mini-ERP: CRM de
+ * leads, agente de IA no WhatsApp, plaquetas QR, mapa. Para uma operação de
+ * duas pessoas — a Sureya e a Nina — isso é tela demais para achar o que
+ * importa.
+ *
+ * Ficaram só os itens que servem ao ciclo real do mês: quem foi limpo e quem
+ * pagou.
+ *
+ * O QUE SAIU DAQUI (e por quê):
+ *   Atendimento e WhatsApp  · o agente de IA foi desligado; a Sureya atende
+ *                             pelo WhatsApp Business, com tom humano e custo
+ *                             zero. No lugar entrou a Liberação.
+ *   Plaquetas               · a plaquinha redonda de 4 cm aprovada não tem QR,
+ *                             por legibilidade. A tela perdeu a função.
+ *   Jazigos                 · não sumiu: virou um bloco dentro da ficha da
+ *                             família, junto do plano e do valor.
+ *
+ * NADA FOI APAGADO. As telas continuam no repositório e os dados no banco —
+ * só saíram do menu e as rotas devolvem 404 (ver src/middleware.ts). Religar
+ * é devolver a linha a esta lista.
  */
 const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
   {
     titulo: "Dia a dia",
     itens: [
       { href: "/painel", label: "Início" },
-      { href: "/painel/conversas", label: "Atendimento" },
       { href: "/painel/agenda", label: "Agenda" },
-      // A fila dos avulsos: toda tela de serviço filtra por data, então o que
-      // foi pedido para daqui a dez dias não aparecia em lugar nenhum.
+      // A fila de rascunhos que esperam a aprovação da Sureya. Nada é enviado
+      // sem ela olhar e decidir, uma mensagem por vez.
+      { href: "/painel/fila", label: "Liberação" },
       { href: "/painel/avulsos", label: "Avulsos" },
       { href: "/campo", label: "📍 Campo" },
     ],
@@ -34,20 +54,13 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
   {
     titulo: "Carteira",
     itens: [
-      // "Famílias" e "Gestão" eram a mesma carteira em duas portas: uma
-      // mostrava quem paga, a outra o que se cobra. Agora é uma tela com abas.
-      { href: "/painel/clientes", label: "Carteira" },
-      // O cemiterio inteiro numa lista so, com a FOTO ao lado da descricao.
-      // Sem isso nao havia como ver que dois tumulos viraram um registro.
-      { href: "/painel/jazigos", label: "Jazigos" },
+      { href: "/painel/clientes", label: "Famílias" },
       { href: "/painel/financeiro", label: "Financeiro" },
     ],
   },
   {
     titulo: "Ajustes",
     itens: [
-      { href: "/painel/whatsapp", label: "WhatsApp" },
-      { href: "/painel/plaquetas", label: "Plaquetas" },
       { href: "/painel/config", label: "Config" },
     ],
   },

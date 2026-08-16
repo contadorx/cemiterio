@@ -62,9 +62,12 @@ export default function Painel() {
           <div style={{ ...painel.card, background: cor.navy, marginBottom: 12 }}>
             <strong style={{ fontSize: 18, color: "#fff" }}>Hoje</strong>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginTop: 12 }}>
-              <Link href="/painel/conversas" style={{ textDecoration: "none" }}>
+              {/* Atendimento saiu do menu (o agente de IA foi desligado). O
+                  número que importa agora é o de mensagens esperando a
+                  liberação da Sureya. */}
+              <Link href="/painel/fila" style={{ textDecoration: "none" }}>
                 <div style={{ fontSize: 30, fontWeight: 800, color: hoje.aguardando ? "#fbbf24" : "#fff" }}>{hoje.aguardando}</div>
-                <div style={{ color: "#cbd5e1", fontSize: 14 }}>esperando resposta</div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>esperando liberação</div>
               </Link>
               <Link href="/painel/agenda" style={{ textDecoration: "none" }}>
                 <div style={{ fontSize: 30, fontWeight: 800, color: hoje.atrasadas ? "#fbbf24" : "#fff" }}>{hoje.limpezasAFazer}</div>
@@ -80,38 +83,14 @@ export default function Painel() {
           </div>
         )}
 
-        {/* LEAD DO SITE ESPERANDO.
-            O site promete resposta no mesmo dia. Este é o único lugar do painel
-            que mostra isso sem precisar abrir a aba certa — vem antes de tudo
-            porque é a única fila em que a demora custa um cliente novo. */}
-        {hoje?.leadsNovos > 0 && (
-          <Link
-            href="/painel/conversas?aba=leads"
-            style={{
-              ...painel.card, textDecoration: "none", display: "flex",
-              alignItems: "center", gap: 14, background: "#fffbeb",
-              border: "2px solid #f59e0b", marginBottom: 12,
-            }}
-          >
-            <span style={{ fontSize: 32 }}>🔔</span>
-            <span>
-              <b style={{ color: "#92400e", fontSize: 18 }}>
-                {hoje.leadsNovos === 1
-                  ? "1 pessoa nova esperando resposta"
-                  : `${hoje.leadsNovos} pessoas novas esperando resposta`}
-              </b>
-              <span style={{ display: "block", color: "#78350f", fontSize: 15, marginTop: 2 }}>
-                Chegaram pelo site ou pelo WhatsApp e ainda não foram atendidas.
-              </span>
-            </span>
-          </Link>
-        )}
+        {/* O aviso de leads novos saía daqui apontando para o CRM, que foi
+            desligado: a captação de vocês é indicação e plaquinha, não funil. */}
 
         {/* pedido de servico adicional: e a unica coisa aqui com prazo dado pela familia */}
         <PedidosAdicionais />
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
-          <Link href="/painel/conversas" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
+          <Link href="/painel/fila" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
             <div style={{ fontSize: 32, fontWeight: 800, color: rasc ? "#d97706" : cor.navy }}>{rasc}</div>
             <div style={{ color: cor.cinza }}>rascunhos p/ aprovar</div>
           </Link>

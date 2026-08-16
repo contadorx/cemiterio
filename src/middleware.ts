@@ -3,11 +3,55 @@ import { createServerClient } from "@supabase/ssr";
 
 const PROTEGIDAS = ["/campo", "/painel"];
 
+/**
+ * TELAS DESLIGADAS — escondidas, não apagadas.
+ *
+ * O sistema nasceu como um mini-ERP: CRM de leads, agente de IA no WhatsApp,
+ * campanhas, mapa com pinos, plaquetas QR, portal da família. Para uma
+ * operação de duas pessoas, isso é superfície demais: tela para manter, bug
+ * para caçar e caminho para se perder.
+ *
+ * Estas rotas devolvem 404. O CÓDIGO CONTINUA NO REPOSITÓRIO e OS DADOS
+ * CONTINUAM NO BANCO — nenhuma tabela foi apagada. Se um dia o negócio
+ * crescer e o CRM fizer falta, religar é tirar a linha desta lista.
+ *
+ * Por que 404 e não só sumir do menu: link antigo, favorito no celular e
+ * histórico do navegador continuam funcionando. Meio-desligado é pior que
+ * ligado, porque ninguém sabe o que está no ar.
+ */
+const DESLIGADAS = [
+  // CRM e captação — a captação de vocês é indicação e plaquinha, não funil
+  "/painel/leads",
+  "/painel/reajustes",       // reajuste é uma conversa por WhatsApp, uma vez ao ano
+  // Agente de IA — robô conversando com idoso quebra o que faz o cliente ficar
+  "/painel/agente",
+  "/painel/atendimento",
+  "/painel/conversas",
+  "/painel/whatsapp",
+  // Substituídos pela plaquinha física e pelo endereço
+  "/painel/mapa",
+  "/painel/plaquetas",
+  // Viraram blocos dentro da ficha da família
+  "/painel/jazigos",
+  "/painel/planos",
+  // Portal antigo e avaliações
+  "/familia",
+  "/avaliar",
+  "/indicar",
+  "/t/",
+];
+
 export async function middleware(req: NextRequest) {
   // A home virou o site publico do Zelo & Memoria. Sem esta saida antecipada,
   // TODA visita de familia dispararia uma checagem de sessao no Supabase antes
   // de a pagina aparecer: ida e volta de rede pura, num visitante que nunca vai
   // ter login. So /painel e /campo precisam saber quem esta logado.
+  // Corta antes de qualquer checagem de sessão: rota desligada não precisa
+  // saber quem está logado para responder 404.
+  if (DESLIGADAS.some((d) => req.nextUrl.pathname.startsWith(d))) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (!PROTEGIDAS.some((p) => req.nextUrl.pathname.startsWith(p))) {
     return NextResponse.next({ request: req });
   }
