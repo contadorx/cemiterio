@@ -108,97 +108,20 @@ function AvisoDisparos() {
   );
 }
 
-export function PainelNav({ atual }: { atual: string }) {
-  const [aberto, setAberto] = useState(false);
-  const atualLabel = ITENS.find((i) => i.href === atual)?.label || "Menu";
-
-  return (
-    <>
-    <EstiloMobile />
-    <nav style={nav.barra}>
-      <div style={nav.topo}>
-        <button
-          onClick={async () => {
-            if (!confirm("Sair do sistema?")) return;
-            await fetch("/api/sair", { method: "POST" });
-            location.href = "/login";
-          }}
-          style={nav.sair}
-          title="Sair"
-        >
-          Sair
-        </button>
-        <span style={nav.marca}>
-          {MARCA.nome}
-          <span style={nav.assinatura}>{MARCA.assinatura}</span>
-        </span>
-
-        {/* botão só aparece no celular (via CSS) */}
-        <button className="menuBotao" style={nav.botao} onClick={() => setAberto(!aberto)} aria-label="Menu">
-          <span style={{ fontSize: 14, marginRight: 8 }}>{atualLabel}</span>
-          {aberto ? "✕" : "☰"}
-        </button>
-      </div>
-
-      <div className={`navLinks ${aberto ? "aberto" : ""}`} style={nav.links}>
-        {GRUPOS.map((g) => (
-          <div key={g.titulo} className="navGrupo" style={nav.grupo}>
-            <span className="navGrupoTitulo" style={nav.grupoTitulo}>{g.titulo}</span>
-            {(g.itens || []).map((i) => (
-              <Link
-                key={i.href}
-                href={i.href}
-                onClick={() => setAberto(false)}
-                style={{ ...nav.link, ...(atual === i.href ? nav.ativo : {}) }}
-              >
-                {i.label}
-              </Link>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <style>{`
-        .menuBotao { display: none; }
-        @media (max-width: 820px) {
-          .menuBotao { display: flex !important; align-items: center; }
-          .navLinks { display: none !important; }
-          .navLinks.aberto { display: flex !important; flex-direction: column; align-items: stretch; width: 100%; margin-top: 10px; }
-          .navLinks.aberto a { padding: 15px 14px !important; font-size: 17px !important; min-height: 52px; display: flex; align-items: center; }
-          .navLinks.aberto .navGrupo { display: block !important; margin-bottom: 6px; }
-          .navLinks.aberto .navGrupoTitulo {
-            display: block !important; font-size: 12px; text-transform: uppercase;
-            letter-spacing: 1px; opacity: .6; padding: 12px 14px 4px;
-          }
-        }
-      `}</style>
-    </nav>
-    <AvisoDisparos />
-    </>
-  );
+/**
+ * A NAVEGAÇÃO ANTIGA — agora vazia, de propósito.
+ *
+ * O menu passou para a coluna do `AppShell` (painel/layout.tsx), que envolve
+ * todas as telas. As páginas continuam chamando `<PainelNav />` e isto não faz
+ * nada: assim a troca aconteceu sem editar quinze arquivos de uma vez, e sem
+ * risco de deixar uma tela sem menu no caminho.
+ *
+ * Conforme cada tela for reescrita no visual novo, a chamada sai junto.
+ */
+export function PainelNav(_: { atual?: string }) {
+  return null;
 }
 
-const nav: Record<string, React.CSSProperties> = {
-  barra: { display: "flex", flexDirection: "column", padding: "12px 16px", background: cor.navy, color: "#fff" },
-  topo: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%" },
-  assinatura: { display: "block", fontSize: 10, fontWeight: 400, opacity: 0.75, letterSpacing: 0.2, marginTop: 1 },
-  sair: { float: "right", background: "rgba(255,255,255,.12)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer" },
-  grupo: { display: "contents" },
-  grupoTitulo: { display: "none" },
-  marca: { fontWeight: 800, fontSize: 20 },
-  botao: { background: "rgba(255,255,255,.12)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 18, cursor: "pointer" },
-  links: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 },
-  link: { color: "#cbd5e1", textDecoration: "none", padding: "8px 12px", borderRadius: 8, fontSize: 15, display: "block" },
-  ativo: { background: "rgba(255,255,255,.15)", color: "#fff", fontWeight: 600 },
-};
-
-// Base comum a TODO botão: garante que <button>, <a> e <Link> estilizados como
-// botão fiquem com a MESMA altura e o texto centralizado.
-// - inline-flex + center: alinha o rótulo na vertical e faz o minHeight valer
-//   (num <a> inline o minHeight era ignorado — era a causa dos botões "de
-//   tamanhos distintos" quando um Link ficava ao lado de um <button>).
-// - boxSizing border-box: o padding não muda a altura final.
-// - textDecoration none: Link/<a> não vêm sublinhados.
 const botaoBase: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",

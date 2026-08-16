@@ -1,3 +1,4 @@
+import "./globals.css";
 import { MARCA } from "@/lib/marca";
 import RegistrarSW from "./_pwa/RegistrarSW";
 

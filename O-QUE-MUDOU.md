@@ -704,12 +704,82 @@ aparece uma vez, com os dois lados juntos, no lugar certo.
 
 `next build` executado: passou limpo.
 
-### Fica em aberto
+### As transversais também *(aplicado)*
 
-As **transversais têm a mesma natureza**: a Transversal 3 corre da Rua 1 à Rua
-13 e hoje está partida entre Quadra 1 e Quadra 3 (já com 11 e 1 túmulos). Se a
-Sureya também as percorre inteiras de uma vez, é só me dizer que eu aplico a
-mesma chave.
+Mesma natureza: cada transversal corre da Rua 1 à Rua 13, atravessando a
+divisa, e estava partida na altura da Rua 7. O caso já era real — a
+Transversal 3 tinha 11 túmulos numa metade e 1 na outra.
+
+As seis receberam a chave `transversal-N`. Os lados não se juntam entre si: a
+Principal passa no meio, e a Transversal 1 da direita não tem relação com a 4
+da esquerda.
+
+**Oito ruas físicas amarradas no total:** `rua7-direita`, `rua7-esquerda` e
+`transversal-1` a `transversal-6`.
+
+Registrado em `migrations/0051_ruas_fisicas_compartilhadas.sql` para o
+repositório reproduzir o produto.
+
+**Testado com o cenário real do banco:** cada rua física aparece uma vez só,
+como bloco contíguo. A Transversal 3 sai invertida (Quadra 3 → Quadra 1) pela
+serpentina, o que é o certo: a Nina termina a Rua 7 no lado de cima e desce
+limpando, em vez de voltar ao começo à toa.
+
+---
+
+## CARA DE SISTEMA — a fundação visual
+
+O painel não tinha esqueleto: cada tela desenhava a si mesma com objetos de
+estilo em linha, sem coluna de navegação, sem tokens, sem ícones. Por isso
+parecia um conjunto de páginas soltas, e não um sistema.
+
+### O que entrou
+
+**Tailwind + `src/app/tema.css`.** As cores viraram variáveis CSS num arquivo
+só. Um tema escuro — ou um contraste maior para a Sureya ler no sol do
+cemitério — passa a ser um bloco de CSS, não uma revisão de vinte telas. O
+tema escuro já está escrito.
+
+A marca saiu do logotipo: azul-marinho do escudo e dourado do raminho. O
+dourado é **acento** — filete, ícone, destaque —, nunca fundo de texto: em
+corpo pequeno ele não alcança contraste, e num serviço de memória o excesso
+de ouro vira ostentação.
+
+**`Sidebar.tsx` + `AppShell.tsx` + `painel/layout.tsx`.** Coluna escura fixa
+no desktop, gaveta no celular. A coluna é escura nos dois temas de propósito:
+é ela que separa "onde eu ando" de "o que eu estou fazendo".
+
+Os nove itens vieram em três grupos (Dia a dia · Carteira · Ajustes) porque
+lista corrida não tem hierarquia — a Sureya lia todos toda vez para achar um.
+
+O item ativo ganha **filete dourado** além da cor de fundo: cor sozinha não
+basta para quem não distingue bem tons sobre escuro.
+
+Vive num `layout.tsx`, e não em cada tela, para a navegação **não remontar** a
+cada troca de página. Era esse remonte que fazia cada tela parecer um site
+diferente.
+
+**`globals.css`.** Anel de foco na cor da marca (o padrão do navegador some
+sobre fundo escuro) e alvo de toque mínimo de 44px — a Nina usa de pé, no sol,
+às vezes de luva.
+
+### Como a troca foi feita sem quebrar nada
+
+O `PainelNav` das quinze telas passou a **não renderizar nada**, e o menu vive
+no shell. Assim a mudança aconteceu sem editar quinze arquivos de uma vez, e
+sem risco de deixar alguma tela sem navegação no caminho. Conforme cada tela
+for reescrita no visual novo, a chamada sai junto.
+
+`next build` executado: passou limpo.
+
+### O que vem a seguir
+
+A ficha da família reescrita neste visual, e a limpeza dos campos inúteis —
+levantei **18 campos no editor de túmulo/plano, dos quais cerca de 7
+importam**. Sobraram do sistema antigo: datas de nascimento e falecimento
+(eram gatilho de mensagem automática), número do jazigo (duplica a
+identificação), tratamento, régua de cobrança, dias entre lembretes, máximo de
+lembretes e convite a cada N meses.
 
 ---
 
