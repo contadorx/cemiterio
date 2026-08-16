@@ -1,251 +1,178 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "./ui";
 import InstalarApp from "../InstalarApp";
 import { PedidosAdicionais } from "./PedidosAdicionais";
 
+/**
+ * O MÊS — a tela inicial.
+ *
+ * Responde de cima para baixo a única pergunta que importa no dia a dia:
+ * QUEM FOI LIMPO E QUEM PAGOU.
+ *
+ * O que havia aqui antes: capacidade do dia, rascunhos da IA para aprovar,
+ * leads novos do site e indicadores de gestão. Números de um sistema que saiu
+ * de escopo — e nenhum deles dizia se o mês estava fechando.
+ *
+ * As pendências sobem: quem está devendo E sem limpeza aparece primeiro. Assim
+ * a tela serve sem precisar rolar.
+ */
+
+const MESES = ["janeiro","fevereiro","março","abril","maio","junho",
+               "julho","agosto","setembro","outubro","novembro","dezembro"];
+
+const dinheiro = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function competenciaAtual() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 export default function Painel() {
-  const [cap, setCap] = useState<any>(null);
-  const [rasc, setRasc] = useState(0);
-  const [comp, setComp] = useState(0);
-  const [ind, setInd] = useState<any>(null);
-  const [hoje, setHoje] = useState<any>(null);
-  const [gerando, setGerando] = useState(false);
-  const [horizonte, setHorizonte] = useState(90);
-  const [diag, setDiag] = useState<any>(null);
+  const [competencia, setCompetencia] = useState(competenciaAtual);
+  const [dados, setDados] = useState<any>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [filtro, setFiltro] = useState<"todas" | "pendentes">("pendentes");
 
-  async function carregar() {
-    const [c, r, cp, i, h] = await Promise.all([
-      fetch("/api/capacidade").then((x) => x.json()),
-      fetch("/api/rascunhos").then((x) => x.json()),
-      fetch("/api/comprovantes").then((x) => x.json()),
-      fetch("/api/indicadores").then((x) => x.json()),
-      fetch("/api/hoje").then((x) => x.json()),
-    ]);
-    if (c.ok) setCap(c);
-    if (r.ok) setRasc(r.rascunhos.length);
-    if (cp.ok) setComp(cp.comprovantes.length);
-    if (i.ok) setInd(i);
-    if (h.ok) setHoje(h);
-  }
-  useEffect(() => {
-    carregar();
-  }, []);
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const r = await fetch(`/api/mes?competencia=${competencia}`).then((x) => x.json());
+      if (r?.ok) setDados(r);
+    } finally {
+      setCarregando(false);
+    }
+  }, [competencia]);
 
-  async function gerarAgenda() {
-    setGerando(true);
-    setDiag(null);
-    const r = await fetch("/api/agenda/gerar", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ horizonteDias: horizonte }),
-    }).then((x) => x.json()).catch(() => null);
-    setGerando(false);
-    if (r?.ok) { setDiag(r); carregar(); }
-    else alert("Falha ao gerar a agenda.");
-  }
+  useEffect(() => { carregar(); }, [carregar]);
 
-  const util = cap ? Math.round(cap.utilizacao * 100) : 0;
-  const corUtil = util >= 90 ? "#dc2626" : util >= 70 ? "#d97706" : cor.teal;
+  const linhas = (dados?.linhas || []).filter((l: any) =>
+    filtro === "todas" ? true : !l.limpezaOk || !l.pagamentoOk
+  );
+
+  const r = dados?.resumo;
+  const mesNome = `${MESES[Number(competencia.slice(5, 7)) - 1]} de ${competencia.slice(0, 4)}`;
 
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel" />
       <div style={painel.conteudo}>
         <InstalarApp />
-        <h1 style={painel.h1}>Início</h1>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <h1 style={painel.h1}>O mês</h1>
+          <input
+            type="month"
+            style={{ ...painel.input, width: "auto" }}
+            value={competencia.slice(0, 7)}
+            onChange={(e) => setCompetencia(`${e.target.value}-01`)}
+          />
+        </div>
+
+        {/* O RESUMO EM UMA LINHA. Três números: o que falta fazer, o que falta
+            entrar, e quanto isso soma. Nada além disso no topo. */}
+        {r && (
+          <div style={{ ...painel.card, background: cor.navy, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 30, fontWeight: 800, color: r.faltaLimpar ? "#fbbf24" : "#4ade80" }}>
+                  {r.faltaLimpar}
+                </div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>falta limpar</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 30, fontWeight: 800, color: r.faltaPagar ? "#fbbf24" : "#4ade80" }}>
+                  {r.faltaPagar}
+                </div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>falta pagar</div>
+              </div>
+              <Link href="/painel/financeiro" style={{ textDecoration: "none" }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: "#fff" }}>
+                  {dinheiro(r.emAberto)}
+                </div>
+                <div style={{ color: "#cbd5e1", fontSize: 14 }}>em aberto &rarr;</div>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <PedidosAdicionais />
 
         <Rotinas />
 
-        {hoje && (
-          <div style={{ ...painel.card, background: cor.navy, marginBottom: 12 }}>
-            <strong style={{ fontSize: 18, color: "#fff" }}>Hoje</strong>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, marginTop: 12 }}>
-              {/* Atendimento saiu do menu (o agente de IA foi desligado). O
-                  número que importa agora é o de mensagens esperando a
-                  liberação da Sureya. */}
-              <Link href="/painel/fila" style={{ textDecoration: "none" }}>
-                <div style={{ fontSize: 30, fontWeight: 800, color: hoje.aguardando ? "#fbbf24" : "#fff" }}>{hoje.aguardando}</div>
-                <div style={{ color: "#cbd5e1", fontSize: 14 }}>esperando liberação</div>
-              </Link>
-              <Link href="/painel/agenda" style={{ textDecoration: "none" }}>
-                <div style={{ fontSize: 30, fontWeight: 800, color: hoje.atrasadas ? "#fbbf24" : "#fff" }}>{hoje.limpezasAFazer}</div>
-                <div style={{ color: "#cbd5e1", fontSize: 14 }}>
-                  limpezas a fazer{hoje.atrasadas ? ` · ${hoje.atrasadas} atrasada${hoje.atrasadas > 1 ? "s" : ""}` : ""}
-                </div>
-              </Link>
-              <Link href="/painel/financeiro" style={{ textDecoration: "none" }}>
-                <div style={{ fontSize: 30, fontWeight: 800, color: "#4ade80" }}>R$ {Number(hoje.entrouHoje).toFixed(0)}</div>
-                <div style={{ color: "#cbd5e1", fontSize: 14 }}>entrou hoje</div>
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* O aviso de leads novos saía daqui apontando para o CRM, que foi
-            desligado: a captação de vocês é indicação e plaquinha, não funil. */}
-
-        {/* pedido de servico adicional: e a unica coisa aqui com prazo dado pela familia */}
-        <PedidosAdicionais />
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 8 }}>
-          <Link href="/painel/fila" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: rasc ? "#d97706" : cor.navy }}>{rasc}</div>
-            <div style={{ color: cor.cinza }}>rascunhos p/ aprovar</div>
-          </Link>
-          <Link href="/painel/financeiro" style={{ ...painel.card, textDecoration: "none", display: "block" }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: comp ? "#d97706" : cor.navy }}>{comp}</div>
-            <div style={{ color: cor.cinza }}>comprovantes p/ conferir</div>
-          </Link>
+        <div style={{ display: "flex", gap: 8, margin: "4px 0 12px", flexWrap: "wrap" }}>
+          <button style={filtro === "pendentes" ? painel.botaoMini : painel.botaoMiniSec}
+                  onClick={() => setFiltro("pendentes")}>
+            Só as pendentes
+          </button>
+          <button style={filtro === "todas" ? painel.botaoMini : painel.botaoMiniSec}
+                  onClick={() => setFiltro("todas")}>
+            Todas as famílias
+          </button>
         </div>
 
-        {ind && (
-          <div style={painel.card}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 18, color: cor.navy }}>Este mês</strong>
-              {/* o fechamento inteiro numa tela só — inclusive a foto de meses
-                  passados, que aqui não dá para ver */}
-              <Link href="/painel/financeiro" style={{ ...painel.botaoMiniSec, marginLeft: "auto" }}>
-                Como foi o mês →
-              </Link>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginTop: 12 }}>
-              <Metrica titulo="Recebido" valor={`R$ ${ind.recebidoMes.toFixed(0)}`} cor="#16a34a" />
-              <Metrica titulo="A receber" valor={`R$ ${ind.aReceber.toFixed(0)}`} cor={ind.aReceber > 0 ? "#dc2626" : cor.navy} />
-              <Metrica titulo="Limpezas feitas" valor={String(ind.servExecutadosMes)} cor={cor.navy} />
-              <Metrica titulo="Clientes ativos" valor={String(ind.clientesAtivos)} cor={cor.navy} />
-              <Metrica titulo="Nota média" valor={ind.mediaAvaliacoes != null ? `${ind.mediaAvaliacoes.toFixed(1)}⭐` : "—"} cor="#d97706" />
-              <Metrica titulo="IA automática" valor={ind.pctAutomatico != null ? `${ind.pctAutomatico}%` : "—"} cor={cor.teal} />
-            </div>
-          </div>
-        )}
+        {carregando && <p style={{ color: cor.cinza }}>Carregando {mesNome}…</p>}
 
-        {cap && (
+        {!carregando && linhas.length === 0 && (
           <div style={painel.card}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <strong style={{ fontSize: 18, color: cor.navy }}>Carga × capacidade</strong>
-              <span style={{ fontWeight: 800, color: corUtil, fontSize: 20 }}>{util}%</span>
-            </div>
-            <div style={{ height: 10, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", margin: "10px 0" }}>
-              <div style={{ height: "100%", width: `${Math.min(100, util)}%`, background: corUtil }} />
-            </div>
-            <p style={{ color: cor.cinza, margin: "4px 0", fontSize: 15 }}>
-              A Nina dá conta de ~<b>{cap.capacidadeMensal}</b> limpezas/mês. Hoje os planos consomem{" "}
-              <b>{cap.cargaMensal}</b>. Sobra pra cerca de <b style={{ color: cor.teal }}>{cap.cabemTumulos} túmulos</b> novos
-              ({cap.folgaMensal} limpezas/mês).
-            </p>
-
-            {/* 0044 — com mais de um cemitério, o total esconde o gargalo: um
-                local atendido só às terças enche muito antes que a casa toda. */}
-            {(cap.porCemiterio || []).length > 1 && (
-              <div style={{ marginTop: 10, borderTop: `1px solid ${cor.linha}`, paddingTop: 10 }}>
-                {(cap.porCemiterio || []).map((c: any) => {
-                  const u = Math.round((c.utilizacao || 0) * 100);
-                  const cu = u >= 90 ? "#dc2626" : u >= 70 ? "#d97706" : cor.teal;
-                  return (
-                    <div key={c.cemiterioId} style={{ display: "flex", gap: 10, alignItems: "baseline",
-                                                      flexWrap: "wrap", marginTop: 6 }}>
-                      <b style={{ color: cor.navy, fontSize: 15 }}>{c.nome}</b>
-                      <span style={{ fontSize: 14, color: cor.cinza }}>
-                        {c.cargaMensal} de {c.capacidadeMensal} limpezas/mês
-                        {c.diasSemana ? ` · ${c.diasSemana.length} dia(s) por semana` : ""}
-                      </span>
-                      <b style={{ marginLeft: "auto", color: cu }}>{u}%</b>
-                    </div>
-                  );
-                })}
-              </div>
+            <strong style={{ color: "#16a34a", fontSize: 18 }}>
+              {filtro === "pendentes"
+                ? "Nenhuma pendência neste mês. 🌿"
+                : "Nenhuma família cadastrada ainda."}
+            </strong>
+            {filtro === "pendentes" && (
+              <p style={{ color: cor.cinza, marginTop: 6 }}>
+                Todas limpas e todas em dia em {mesNome}.
+              </p>
             )}
           </div>
         )}
 
-        <div style={painel.card}>
-          <strong style={{ fontSize: 18, color: cor.navy }}>Agenda da equipe</strong>
-          <p style={{ color: cor.cinza, fontSize: 14, margin: "6px 0 0", lineHeight: 1.6 }}>
-            Este botão faz duas coisas: <b>1)</b> cria as limpezas que os planos devem no período
-            escolhido — cada plano tem sua periodicidade e a data da próxima ida; <b>2)</b> distribui
-            essas limpezas pelos dias de trabalho, agrupando por quadra e rua para a rota render.
-            <br />
-            Pode clicar quantas vezes quiser: ele nunca duplica. Se não houver nada novo no período,
-            o resultado será zero — e isso é o esperado.
-          </p>
+        {linhas.map((l: any) => (
+          <Link
+            key={l.familiaId}
+            href={`/painel/clientes?familia=${l.familiaId}`}
+            style={{ ...painel.card, textDecoration: "none", display: "block", marginBottom: 8 }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ minWidth: 160, flex: 1 }}>
+                <div style={{ fontWeight: 700, color: cor.navy, fontSize: 17 }}>{l.nome}</div>
+                {l.local && <div style={{ fontSize: 13, color: cor.cinza }}>{l.local}</div>}
+              </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
-            <div>
-              <label style={painel.rotulo}>Olhar quantos dias à frente</label>
-              <select style={{ ...painel.input, width: 150 }} value={horizonte}
-                      onChange={(e) => setHorizonte(Number(e.target.value))}>
-                <option value={30}>30 dias</option>
-                <option value={60}>60 dias</option>
-                <option value={90}>90 dias</option>
-                <option value={180}>6 meses</option>
-                <option value={365}>1 ano</option>
-              </select>
+              {/* As duas colunas que dão nome à tela. Escritas por extenso: um
+                  ✓ e um ✗ sozinhos exigiriam decorar qual é qual. */}
+              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 12, color: cor.cinza }}>limpeza</div>
+                  <div style={{ fontWeight: 700, color: l.semPlano ? cor.cinza : l.limpezaOk ? "#16a34a" : "#b45309" }}>
+                    {l.semPlano
+                      ? "avulso"
+                      : l.limpezaOk
+                        ? "feita"
+                        : l.limpos > 0
+                          ? `${l.limpos} de ${l.contratados}`
+                          : "falta"}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", minWidth: 96 }}>
+                  <div style={{ fontSize: 12, color: cor.cinza }}>pagamento</div>
+                  <div style={{ fontWeight: 700, color: l.pagamentoOk ? "#16a34a" : "#b45309" }}>
+                    {l.pagamentoOk ? "em dia" : dinheiro(l.saldo)}
+                  </div>
+                </div>
+              </div>
             </div>
-            <button style={painel.botao} onClick={gerarAgenda} disabled={gerando}>
-              {gerando ? "Processando…" : "Gerar e distribuir"}
-            </button>
-          </div>
-
-          {diag && (
-            <div style={{ marginTop: 14, padding: 14, borderRadius: 10,
-                          background: diag.geracao.criados > 0 ? "#f0fdf4" : "#f8fafc",
-                          border: `1px solid ${diag.geracao.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
-              <strong style={{ color: cor.navy }}>
-                {diag.geracao.criados > 0
-                  ? `${diag.geracao.criados} limpeza(s) criada(s)`
-                  : "Nada novo a criar neste período"}
-              </strong>
-              <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: cor.cinza, fontSize: 14, lineHeight: 1.8 }}>
-                <li><b>{diag.geracao.planosAtivos}</b> planos recorrentes ativos</li>
-                <li><b>{diag.geracao.planosNoHorizonte}</b> com ida prevista nos próximos {diag.geracao.horizonteDias} dias</li>
-                {diag.geracao.foraDoHorizonte > 0 && (
-                  <li><b>{diag.geracao.foraDoHorizonte}</b> só voltam depois deste período
-                    {diag.geracao.proximaData && (
-                      <> — o próximo é em <b>{new Date(diag.geracao.proximaData + "T12:00:00").toLocaleDateString("pt-BR")}</b></>
-                    )}
-                  </li>
-                )}
-                {diag.geracao.jaExistiam > 0 && (
-                  <li><b>{diag.geracao.jaExistiam}</b> já tinham limpeza criada (não duplicou)</li>
-                )}
-                {diag.geracao.falhas > 0 && (
-                  <li style={{ color: "#b91c1c", fontWeight: 700 }}>
-                    <b>{diag.geracao.falhas}</b> plano(s) deram erro e ficaram sem limpeza criada —
-                    veja o motivo em Config → Diagnóstico. Eles não avançaram de data, então rodar
-                    de novo depois de corrigir resolve.
-                  </li>
-                )}
-                <li><b>{diag.alocacao.agendados}</b> limpeza(s) distribuída(s) em <b>{diag.alocacao.dias}</b> dia(s) de trabalho</li>
-              </ul>
-              {diag.geracao.criados === 0 && diag.geracao.foraDoHorizonte > 0 && (
-                <p style={{ color: cor.navy, fontSize: 15, margin: "10px 0 0" }}>
-                  Quer enxergar mais longe? Aumente o período acima para {diag.geracao.horizonteDias < 90 ? "90 dias" : "1 ano"} e gere de novo.
-                </p>
-              )}
-              <a href="/painel/agenda" style={{ ...painel.botaoSec, display: "inline-block",
-                 textDecoration: "none", marginTop: 12 }}>Ver a agenda</a>
-            </div>
-          )}
-        </div>
+          </Link>
+        ))}
       </div>
     </div>
   );
 }
 
-/**
- * AS ROTINAS ESTÃO RODANDO?
- *
- * Só aparece quando alguma parou — é aviso, não painel de controle. O modelo é
- * o da faixa de disparos desligados (painel/ui.tsx), que é o único mecanismo de
- * estado global que este sistema já resolvia bem.
- *
- * Antes disto não havia lugar nenhum que respondesse a pergunta. A tela de
- * Diagnóstico lia só a lista de ERROS e, vazia, escrevia "Nenhum erro
- * registrado ✓" — a mesma tela verde para "rodou perfeito" e para "não roda há
- * uma semana".
- */
 function Rotinas() {
   const [d, setD] = useState<any>(null);
 
@@ -299,11 +226,3 @@ function Rotinas() {
   );
 }
 
-function Metrica({ titulo, valor, cor: c }: { titulo: string; valor: string; cor: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: c }}>{valor}</div>
-      <div style={{ fontSize: 15, color: "#64748b" }}>{titulo}</div>
-    </div>
-  );
-}

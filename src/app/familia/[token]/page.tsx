@@ -15,6 +15,9 @@ interface Item {
   servico_id: string;
   data_executada: string;
   foto_depois_url: string;
+  // Pode faltar: a Nina consegue começar sem foto quando a câmera falha ou a
+  // mão está suja. Nesse caso a tela mostra só o depois.
+  foto_antes_url: string | null;
 }
 interface Irmao {
   token: string;
@@ -88,8 +91,26 @@ export default function PortalFamilia() {
             <div style={s.grade}>
               {hist.map((h) => (
                 <button key={h.servico_id} style={s.item} onClick={() => setFoto(h.foto_depois_url)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={h.foto_depois_url} alt="Limpeza realizada" style={s.thumb} />
+                  {/* O ANTES E O DEPOIS lado a lado. A pedra suja ao lado da
+                      pedra limpa conta a história que uma foto sozinha não
+                      conta — é o que a família quer ver. */}
+                  {h.foto_antes_url ? (
+                    <span style={s.par}>
+                      <span style={s.metade}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={h.foto_antes_url} alt="Antes da limpeza" style={s.thumbPar} />
+                        <span style={s.legenda}>antes</span>
+                      </span>
+                      <span style={s.metade}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={h.foto_depois_url} alt="Depois da limpeza" style={s.thumbPar} />
+                        <span style={s.legenda}>depois</span>
+                      </span>
+                    </span>
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={h.foto_depois_url} alt="Limpeza realizada" style={s.thumb} />
+                  )}
                   <span style={s.data}>
                     {new Date(h.data_executada).toLocaleDateString("pt-BR", {
                       day: "2-digit",
@@ -150,6 +171,12 @@ const s: Record<string, React.CSSProperties> = {
   grade: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 },
   item: { background: "#fff", border: `1px solid #e7e0cf`, borderRadius: 12, padding: 8, cursor: "pointer", textAlign: "center" },
   thumb: { width: "100%", height: 180, objectFit: "cover", borderRadius: 8, display: "block" },
+  par: { display: "flex", gap: 4 },
+  metade: { position: "relative", flex: 1, display: "block" },
+  thumbPar: { width: "100%", height: 180, objectFit: "cover", borderRadius: 8, display: "block" },
+  legenda: { position: "absolute", left: 6, bottom: 6, background: "rgba(0,0,0,.55)",
+             color: "#fff", fontSize: 11, padding: "2px 8px", borderRadius: 999,
+             letterSpacing: .5 },
   data: { display: "block", marginTop: 10, marginBottom: 4, fontSize: 14, color: NAVY },
   card: { background: "#fff", border: `1px solid #e7e0cf`, borderRadius: 12, padding: 28, textAlign: "center" },
   suave: { color: "#6b7280", fontSize: 15 },

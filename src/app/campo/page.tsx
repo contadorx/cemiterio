@@ -1,17 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { sincronizar, quantosPendentes, migrarFilaAntiga, iniciarOuEnfileirar } from "@/lib/offline-fila";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { sincronizar, quantosPendentes, migrarFilaAntiga, iniciarOuEnfileirar, concluirOuEnfileirar } from "@/lib/offline-fila";
+import { capturarGps } from "@/lib/gps";
+import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 import InstalarApp from "../InstalarApp";
 import Assistente from "./Assistente";
 import Materiais from "./Materiais";
-import ConfirmarJazigo from "./ConfirmarJazigo";
 import NaoDeu from "./NaoDeu";
-import Concluir from "./Concluir";
 import CapturarJazigo from "./CapturarJazigo";
 import ComoChegar from "./ComoChegar";
 
 interface Aviso { tipo: string; texto: string }
+
+/**
+ * A leitura de GPS que NÃO segura ninguém.
+ * Roda por fora, e se falhar não acontece nada: a coordenada é opcional e
+ * serve só para afinar a posição do túmulo na rua.
+ */
+function capturarGpsSilencioso(tumuloId: string) {
+  capturarGps({ alvoMetros: 10, timeoutMs: 8000 })
+    .then((l) => {
+      if (l && l.precisao <= 30) {
+        fetch(`/api/tumulos/${tumuloId}/gps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...l, origem: "conclusao" }),
+        }).catch(() => {});
+      }
+    })
+    .catch(() => {});
+}
 
 // Cache da rota do dia, para a tela nao ficar em branco quando a rede cai.
 const CACHE_DIA = "sureya_rota_do_dia";
@@ -50,8 +69,6 @@ export default function Campo() {
   const [online, setOnline] = useState(true);
   const [pendentes, setPendentes] = useState(0);
 
-  const [confirmando, setConfirmando] = useState<Item | null>(null);
-  const [finalizando, setFinalizando] = useState<Item | null>(null);
   const [naoDeu, setNaoDeu] = useState<Item | null>(null);
   const [pedirMaterial, setPedirMaterial] = useState(false);
   const [capturarJazigo, setCapturarJazigo] = useState(false);
@@ -157,6 +174,46 @@ export default function Campo() {
     else carregar();
   }
 
+  /**
+   * TERMINAR EM UM TOQUE.
+   *
+   * Antes, finalizar abria a tela `Concluir`: confirmar o jazigo, tirar a
+   * foto, revisar, enviar. Quatro passos, de pé, no sol, às vezes de luva.
+   * Agora o toque abre a câmera e o que volta dela já conclui o serviço.
+   *
+   * O GPS corre por fora e nunca segura o envio — ele é opcional, entra só
+   * numa média. Segurar a Nina parada esperando sinal era o pior negócio
+   * possível.
+   */
+  async function terminar(it: Item, foto: { b64: string; mt: string }) {
+    setIniciando(it.id);
+
+    capturarGpsSilencioso(it.tumuloId);
+
+    const modo = await concluirOuEnfileirar({
+      servicoId: it.id,
+      fotoDepoisBase64: foto.b64,
+      mimetype: foto.mt,
+    });
+    setIniciando(null);
+
+    if (modo === "perdido") {
+      alert(
+        "A memória do aparelho encheu e eu não consegui guardar esta foto.\n\n" +
+        "Procure um lugar com sinal e abra o app: o que já está guardado sobe e libera espaço."
+      );
+      return;
+    }
+
+    // Some da lista na hora, online ou offline: o cemitério tem sinal ruim e
+    // travar a tela esperando o servidor não ajuda ninguém.
+    setLista((atual) => atual.map((x) =>
+      x.id === it.id ? { ...x, status: "executado" } : x));
+
+    if (modo === "offline") setPendentes(await quantosPendentes());
+    else carregar();
+  }
+
   const pendentesLista = lista.filter((x) => x.status !== "executado");
   const feitos = lista.filter((x) => x.status === "executado").length;
   const total = lista.length;
@@ -200,10 +257,18 @@ export default function Campo() {
           </div>
         </div>
 
+        {/* PARA ONDE ANDAR — vem antes do número.
+            Ela lê isto no portão, de pé, antes de dar o primeiro passo. Saber
+            que "são 11 jazigos" não ajuda a se posicionar; saber que é a
+            "Quadra 1 — Ruas 3, 4 e 5" ajuda. */}
+        {pendentesLista.length > 0 && brief?.frase && (
+          <div style={s.ondeHoje}>Hoje: {brief.frase}</div>
+        )}
+
         <div style={s.resumo}>
           {pendentesLista.length === 0
             ? "Tudo feito por hoje. Obrigada! 🌿"
-            : <>Hoje são <b>{pendentesLista.length}</b> {pendentesLista.length === 1 ? "jazigo" : "jazigos"}.</>}
+            : <>São <b>{pendentesLista.length}</b> {pendentesLista.length === 1 ? "jazigo" : "jazigos"}.</>}
         </div>
 
         {brief?.precisamAtencao > 0 && (
@@ -244,8 +309,8 @@ export default function Campo() {
               it={it}
               ocupado={iniciando === it.id}
               onIndo={() => setIndo(it)}
-              onIniciar={() => setConfirmando(it)}
-              onFinalizar={() => setFinalizando(it)}
+              onIniciar={(foto) => iniciar(it, foto)}
+              onFinalizar={(foto) => terminar(it, foto)}
               onNaoDeu={() => setNaoDeu(it)}
             />
           ))}
@@ -258,31 +323,10 @@ export default function Campo() {
         </div>
       )}
 
-      {confirmando && (
-        <ConfirmarJazigo
-          servicoId={confirmando.id}
-          jazigo={confirmando.falecido || confirmando.tumulo}
-          tokenEsperado={confirmando.qrToken}
-          fotoReferencia={confirmando.fotoEnquadramento || confirmando.fotoReferencia}
-          lat={confirmando.lat}
-          lng={confirmando.lng}
-          gpsPrecisao={confirmando.gpsPrecisao}
-          onFechar={() => setConfirmando(null)}
-          onConfirmado={(foto) => { const it = confirmando; setConfirmando(null); if (it) iniciar(it, foto); }}
-        />
-      )}
-
-      {finalizando && (
-        <Concluir
-          item={finalizando}
-          onFechar={() => setFinalizando(null)}
-          onPronto={async (offline: boolean) => {
-            setFinalizando(null);
-            if (offline) setPendentes(await quantosPendentes());
-            else carregar();
-          }}
-        />
-      )}
+      {/* As telas ConfirmarJazigo e Concluir saíram do caminho: a câmera agora
+          vive dentro dos dois botões do cartão. Os arquivos continuam no
+          repositório — se um dia a confirmação por QR fizer falta, é só voltar
+          a chamá-los aqui. */}
 
       {naoDeu && (
         <NaoDeu it={naoDeu} onFechar={() => setNaoDeu(null)}
@@ -353,12 +397,59 @@ function Fotos({ it }: { it: Item }) {
   );
 }
 
+/**
+ * O CARTÃO DO TÚMULO — dois toques, e a câmera dentro de cada um.
+ *
+ * O fluxo antigo era: confirmar o jazigo, tirar a foto, começar, abrir a tela
+ * de conclusão, tirar a foto de novo, revisar, enviar. Cada etapa uma tela.
+ *
+ * Agora são dois botões, e cada um abre a câmera direto:
+ *      📷 TIRAR FOTO E COMEÇAR
+ *      📷 TIRAR FOTO E TERMINAR
+ *
+ * O texto do botão diz exatamente o que acontece ao tocar. A Nina não teve
+ * treinamento formal e usa isto de pé, no sol: se o botão precisa de
+ * explicação, o botão está errado.
+ */
 function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
   it: Item; ocupado: boolean;
-  onIndo: () => void; onIniciar: () => void; onFinalizar: () => void; onNaoDeu: () => void;
+  onIndo: () => void;
+  onIniciar: (foto: FotoPronta) => void;
+  onFinalizar: (foto: FotoPronta) => void;
+  onNaoDeu: () => void;
 }) {
   const emAndamento = !!it.iniciadoEm;
   const [agora, setAgora] = useState(() => Date.now());
+  const [preparando, setPreparando] = useState(false);
+  const [erroFoto, setErroFoto] = useState("");
+  const camera = useRef<HTMLInputElement | null>(null);
+  const pendente = useRef<"comecar" | "terminar" | null>(null);
+
+  function tocar(acao: "comecar" | "terminar") {
+    setErroFoto("");
+    pendente.current = acao;
+    camera.current?.click();
+  }
+
+  async function aoFotografar(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0];
+    e.target.value = "";            // deixa refotografar o mesmo arquivo
+    if (!arquivo || !pendente.current) return;
+
+    setPreparando(true);
+    try {
+      // Reduz ANTES de guardar: uma foto de 8 MB vira ~11 MB em base64 e o
+      // envio morre no limite do servidor.
+      const foto = await prepararFoto(arquivo);
+      if (pendente.current === "comecar") onIniciar(foto);
+      else onFinalizar(foto);
+    } catch (err) {
+      setErroFoto(motivoFalha(err) || "Não consegui usar essa foto. Tente de novo.");
+    } finally {
+      setPreparando(false);
+      pendente.current = null;
+    }
+  }
 
   useEffect(() => {
     if (!emAndamento) return;
@@ -403,15 +494,24 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu }: {
         </button>
       )}
 
+      {erroFoto && <div style={s.erroFoto}>{erroFoto}</div>}
+
+      <input ref={camera} type="file" accept="image/*" capture="environment"
+             onChange={aoFotografar} style={{ display: "none" }} />
+
       <div style={s.acoes}>
         {emAndamento ? (
-          <button style={s.botaoPrincipal} onClick={onFinalizar}>📸 Finalizar com a foto</button>
+          <button style={{ ...s.botaoPrincipal, ...s.botaoTerminar }}
+                  onClick={() => tocar("terminar")} disabled={ocupado || preparando}>
+            {preparando || ocupado ? "Salvando…" : "📷  TIRAR FOTO E TERMINAR"}
+          </button>
         ) : (
-          <button style={s.botaoPrincipal} onClick={onIniciar} disabled={ocupado}>
-            {ocupado ? "…" : "▶ Começar"}
+          <button style={s.botaoPrincipal}
+                  onClick={() => tocar("comecar")} disabled={ocupado || preparando}>
+            {preparando || ocupado ? "Salvando…" : "📷  TIRAR FOTO E COMEÇAR"}
           </button>
         )}
-        <button style={s.botaoNaoDeu} onClick={onNaoDeu}>Não deu</button>
+        <button style={s.botaoNaoDeu} onClick={onNaoDeu}>Não deu para fazer</button>
       </div>
     </div>
   );
@@ -469,6 +569,11 @@ const s: Record<string, React.CSSProperties> = {
   acoes: { display: "flex", gap: 12, marginTop: 16 },
   botaoPrincipal: { flex: 1, minHeight: 64, padding: "18px 20px", background: TEAL, color: "#fff",
                     border: "none", borderRadius: 14, fontSize: 18, fontWeight: 700, cursor: "pointer" },
+  ondeHoje: { fontSize: 21, fontWeight: 800, color: "#fff", margin: "10px 0 4px",
+              lineHeight: 1.3 },
+  erroFoto: { background: "#FDECEC", border: "1px solid #E9B4B4", borderRadius: 12,
+              padding: "12px 14px", margin: "12px 0 0", fontSize: 16, color: "#8B2020" },
+  botaoTerminar: { background: "#1565C0" },
   botaoNaoDeu: { minHeight: 64, padding: "18px 22px", background: "#fff", color: "#475569",
                  border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 16, cursor: "pointer" },
   feitosBox: { background: "#f0fdf4", color: "#166534", padding: 18, borderRadius: 14,

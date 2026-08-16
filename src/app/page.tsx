@@ -110,9 +110,9 @@ export default function Home() {
             <span>{MARCA.nome}</span>
           </Link>
           <nav style={s.menu}>
-            <Link href="/familia" style={s.topoLink}>
+            <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={s.topoLink}>
               Já sou cliente
-            </Link>
+            </a>
             <a href={linkWhats()} style={s.topoWhats} target="_blank" rel="noopener">
               WhatsApp
             </a>
@@ -189,9 +189,9 @@ export default function Home() {
             <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17 }}>
               Se preferir ver tudo junto, cada família tem uma página só dela com o
               histórico de todas as visitas.{" "}
-              <Link href="/familia" style={{ color: c.gold, fontWeight: 700 }}>
+              <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={{ color: c.gold, fontWeight: 700 }}>
                 Já é cliente? Pegue o seu link
-              </Link>
+              </a>
               .
             </p>
           </div>
@@ -415,9 +415,9 @@ export default function Home() {
             <a href="#contato" style={s.rodapeLink}>
               Pedir um orçamento
             </a>
-            <Link href="/familia" style={s.rodapeLink}>
+            <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={s.rodapeLink}>
               Já sou cliente — ver o acompanhamento
-            </Link>
+            </a>
           </div>
         </div>
 

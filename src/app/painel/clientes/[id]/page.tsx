@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { PainelNav, painel, cor, numeroBR, dinheiroBR } from "../../ui";
 import Extras from "./Extras";
 import { ATALHOS_FREQUENCIA, descreverFrequencia, intervaloEmDias, lavagensPorAno } from "@/lib/frequencia";
@@ -56,7 +56,6 @@ function usarPendencia(
 
 export default function FichaCliente() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
   const [d, setD] = useState<any>(null);
   const [pendencias, setPendencias] = useState<Record<string, Pendencia>>({});
@@ -113,81 +112,24 @@ export default function FichaCliente() {
     return () => window.removeEventListener("beforeunload", aviso);
   }, [pendencias]);
 
-  const [inst, setInst] = useState("");
-  const [modo, setModo] = useState("copiloto");
-  const [ativo, setAtivo] = useState(true);
-  const [salvando, setSalvando] = useState(false);
-  const [ok, setOk] = useState(false);
-  const [erroIa, setErroIa] = useState("");
-  const [hist, setHist] = useState("");
-  const [treinando, setTreinando] = useState(false);
+  // Os estados do agente de IA (instruções, modo copiloto, treino com
+  // histórico) saíram junto com o agente. Ver O-QUE-MUDOU.md.
 
-  async function abrirConversa() {
-    const r = await fetch(`/api/clientes/${id}/conversa`, { method: "POST" }).then((x) => x.json());
-    if (r.ok) router.push(`/painel/conversas/${r.conversaId}`);
-  }
-
-  async function treinar() {
-    if (!hist.trim()) return;
-    setTreinando(true);
-    const r = await fetch(`/api/clientes/${id}/treinar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ historico: hist }),
-    }).then((x) => x.json());
-    setTreinando(false);
-    if (r.ok) {
-      setHist("");
-      carregar();
-    }
-  }
-
-  // este bloco (Atendimento da IA) tem estado próprio no topo da página; o
-  // recarregamento só pode sobrescrever o que o usuário digitou se ele NÃO
-  // estiver com edição pendente — senão "Salvar tudo" apagaria o texto dele
-  const iaSujoRef = useRef(false);
+  // `abrirConversa` levava para /painel/conversas, tela desligada — o botão
+  // ficou quebrado quando o agente saiu. Agora a Sureya fala com a família
+  // pelo WhatsApp direto, pelo botão do cabeçalho.
 
   async function carregar() {
     const r = await fetch(`/api/clientes/${id}`).then((x) => x.json());
     if (r.ok) {
       setD(r);
-      if (!iaSujoRef.current) {
-        setInst(r.cliente.instrucoes_ia || "");
-        setModo(r.cliente.modo);
-        setAtivo(r.cliente.ativo_ia);
-      }
+
     }
   }
   useEffect(() => {
     if (id) carregar();
   }, [id]);
 
-  async function gravarIa(): Promise<boolean> {
-    setSalvando(true);
-    setOk(false);
-    setErroIa("");
-    const r = await fetch(`/api/clientes/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instrucoes_ia: inst, modo, ativo_ia: ativo }),
-    }).then((x) => x.json()).catch(() => null);
-    setSalvando(false);
-    if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); return true; }
-    setErroIa(String(r?.erro || "não consegui salvar"));
-    return false;
-  }
-
-  async function salvar() {
-    const deu = await gravarIa();
-    if (deu) carregar();
-  }
-
-  const cli = d?.cliente;
-  const iaSujo = !!cli && (
-    inst !== (cli.instrucoes_ia || "") || modo !== cli.modo || ativo !== cli.ativo_ia
-  );
-  iaSujoRef.current = iaSujo;
-  usarPendencia(registrar, "ia", "atendimento da IA", iaSujo, gravarIa);
 
   if (!d) {
     return (
@@ -201,8 +143,31 @@ export default function FichaCliente() {
   }
 
   const c = d.cliente;
-  const saldoTxt =
-    Math.abs(d.saldo) < 0.005 ? "em dia" : d.saldo > 0 ? `adiantado R$ ${d.saldo.toFixed(2)}` : `em aberto R$ ${Math.abs(d.saldo).toFixed(2)}`;
+
+  /**
+   * O SALDO EM PORTUGUÊS.
+   *
+   * A frase é escrita para ser dita ao telefone sem tradução. A Sureya lê e
+   * fala; ela não deveria ter que converter "saldo devedor" em algo que se
+   * diga a uma senhora de oitenta anos. E "inadimplente" não entra aqui de
+   * jeito nenhum.
+   *
+   * Sinal: positivo = a família deve. Negativo = crédito a favor dela.
+   */
+  const devendo = -d.saldo;    // a API devolve invertido em relação à conta corrente
+  const dinheiro = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const emDia = Math.abs(devendo) < 0.005;
+  const saldoTxt = emDia
+    ? "Em dia"
+    : devendo > 0
+      ? `Em aberto · ${dinheiro(devendo)}`
+      : `Pago adiantado · ${dinheiro(-devendo)} a favor`;
+  const corSaldo = emDia ? "#16a34a" : devendo > 0 ? "#b45309" : cor.teal;
+
+  // O WhatsApp da família, pronto para abrir. Substitui o "Abrir conversa",
+  // que apontava para uma tela desligada.
+  const fone = String(c.telefone || "").replace(/\D/g, "");
 
   return (
     <div style={painel.wrap}>
@@ -210,93 +175,36 @@ export default function FichaCliente() {
       <div style={painel.conteudo}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <Identificacao c={c} onSalvo={carregar} registrar={registrar} />
-          <button style={painel.botao} onClick={abrirConversa}>Abrir conversa</button>
+          {fone && (
+            <a href={`https://wa.me/55${fone}`} target="_blank" rel="noreferrer"
+               style={{ ...painel.botao, textDecoration: "none" }}>
+              WhatsApp
+            </a>
+          )}
         </div>
 
-        <ChaveEnvio clienteId={id} ligado={c.envio_automatico !== false} onSalvo={carregar} />
-
+        {/* A RESPOSTA EM TRÊS SEGUNDOS.
+            O saldo vem em corpo grande porque é a primeira coisa que se quer
+            saber ao abrir a ficha. Antes ele dividia espaço com o "score de
+            entendimento" — uma métrica do agente de IA, mostrada MAIOR que o
+            dinheiro. O score saiu junto com o agente. */}
         <div style={painel.card}>
-          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <div>
-              <div style={{ color: cor.cinza, fontSize: 14 }}>{c.telefone}</div>
-              <div style={{ marginTop: 6 }}>
-                Pagamento: <b>{saldoTxt}</b>
-                {d.aConferir > 0.005 && <span style={{ color: "#d97706" }}> (R$ {d.aConferir.toFixed(2)} a conferir)</span>}
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 15, color: cor.cinza }}>score de entendimento</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: cor.teal }}>{Math.round(c.score)}</div>
-            </div>
+          <div style={{ color: cor.cinza, fontSize: 14 }}>{c.telefone}</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: corSaldo, marginTop: 8, lineHeight: 1.2 }}>
+            {saldoTxt}
           </div>
-        </div>
-
-        {d.pagamentos && d.pagamentos.length > 0 && (
-          <div style={painel.card}>
-            <strong style={{ color: cor.navy }}>Pagamentos recebidos</strong>
-            {(d.pagamentos || []).map((p: any) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8 }}>
-                <span>
-                  {new Date(p.data + "T12:00:00").toLocaleDateString("pt-BR")} · <b style={{ color: "#16a34a" }}>R$ {Number(p.valor).toFixed(2)}</b>
-                </span>
-                <a href={`/painel/recibo/${p.id}`} target="_blank" rel="noreferrer" style={painel.botaoMiniSec}>
-                  Recibo
-                </a>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={painel.card}>
-          <strong style={{ color: cor.navy }}>Atendimento da IA</strong>
-          <div style={{ display: "flex", gap: 16, margin: "12px 0", flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
-              IA ativa neste contato
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              Modo:
-              <select style={{ ...painel.input, width: "auto", padding: 8 }} value={modo} onChange={(e) => setModo(e.target.value)}>
-                <option value="copiloto">copiloto (rascunho)</option>
-                <option value="automatico">automático</option>
-              </select>
-            </label>
-          </div>
-          <label style={painel.rotulo}>Instruções da IA para este contato (treino manual — têm prioridade)</label>
-          <textarea
-            style={{ ...painel.input, minHeight: 90, resize: "vertical", fontFamily: "inherit" }}
-            value={inst}
-            onChange={(e) => setInst(e.target.value)}
-            placeholder="Ex.: sempre confirmar a data antes de cobrar; ele costuma pagar dia 5; tratar com Sr."
-          />
-          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-            <button style={iaSujo ? painel.botao : painel.botaoSec} onClick={salvar}
-                    disabled={salvando || !iaSujo}>
-              {salvando ? "Salvando…" : iaSujo ? "Salvar" : "Sem alterações"}
-            </button>
-            {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
-            {erroIa && <span style={{ color: "#dc2626", fontSize: 14 }}>{erroIa}</span>}
-          </div>
-          {c.perfil_ia && (
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
-              <div style={painel.rotulo}>Memória (destilada do histórico)</div>
-              <p style={{ color: cor.cinza, fontSize: 14, whiteSpace: "pre-wrap" }}>{c.perfil_ia}</p>
+          {d.aConferir > 0.005 && (
+            <div style={{ color: "#d97706", marginTop: 6 }}>
+              {dinheiro(d.aConferir)} aguardando conferência
             </div>
           )}
-
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${cor.linha}` }}>
-            <label style={painel.rotulo}>Treinar com histórico — cole a conversa antiga do WhatsApp e a IA destila no perfil</label>
-            <textarea
-              style={{ ...painel.input, minHeight: 90, resize: "vertical", fontFamily: "inherit" }}
-              value={hist}
-              onChange={(e) => setHist(e.target.value)}
-              placeholder="Cole aqui as mensagens antigas deste cliente…"
-            />
-            <button style={{ ...painel.botaoSec, marginTop: 8 }} onClick={treinar} disabled={treinando}>
-              {treinando ? "Destilando…" : "Treinar com este histórico"}
-            </button>
-          </div>
         </div>
+
+        <Pessoas familiaId={c.familia_id} atualId={id} />
+
+        {/* O EXTRATO fica DEPOIS dos túmulos: primeiro o que foi contratado,
+            depois o que isso gerou de dívida. Antes os pagamentos vinham antes
+            dos túmulos — mostrava o dinheiro sem mostrar o que foi vendido. */}
 
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Túmulos e planos</strong>
@@ -323,19 +231,7 @@ export default function FichaCliente() {
           <AdicionarTumulo clienteId={id} vazio={d.tumulos.length === 0} onMudou={carregar} />
         </div>
 
-        <div style={painel.card}>
-          <strong style={{ color: cor.navy }}>Últimas mensagens</strong>
-          <div style={{ marginTop: 10 }}>
-            {d.mensagens.length === 0 && <p style={{ color: cor.cinza }}>Sem histórico ainda.</p>}
-            {(d.mensagens || []).map((m: any, i: number) => (
-              <div key={i} style={{ margin: "6px 0", textAlign: m.autor === "cliente" ? "left" : "right" }}>
-                <span style={{ display: "inline-block", maxWidth: "80%", padding: "8px 12px", borderRadius: 12, background: m.autor === "cliente" ? "#e2e8f0" : cor.teal, color: m.autor === "cliente" ? cor.navy : "#fff", fontSize: 14 }}>
-                  {m.texto}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ContaCorrente familiaId={c.familia_id} nome={c.nome} onMudou={carregar} />
 
         <BarraSalvar pendencias={pendencias} salvando={salvandoTudo} onSalvarTudo={salvarTudo} />
 
@@ -348,15 +244,18 @@ export default function FichaCliente() {
 
         <Extras clienteId={id} tumulos={d.tumulos || []} onMudou={carregar} />
 
-        <RegistrarPagamento clienteId={id} nome={c.nome} onSalvo={carregar} />
-
-        <SaldoAbertura clienteId={id} saldoAtual={d.saldo} onSalvo={carregar} />
-
-        <ReguaCobranca cliente={c} onSalvo={carregar} registrar={registrar} />
-
-        <ExcluirCliente clienteId={id} nome={c.nome} />
-
-        <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
+        {/* AJUSTES — recolhidos por padrão.
+            São coisas de configurar uma vez: régua de cobrança, saldo de
+            abertura, privacidade, excluir. Ficavam abertas competindo com o
+            que se usa todo dia, e a ficha terminava com quatro blocos que
+            ninguém abre num mês inteiro. */}
+        <Ajustes>
+          <RegistrarPagamento clienteId={id} nome={c.nome} onSalvo={carregar} />
+          <SaldoAbertura clienteId={id} saldoAtual={d.saldo} onSalvo={carregar} />
+          <ReguaCobranca cliente={c} onSalvo={carregar} registrar={registrar} />
+          <PrivacidadeIndicacao clienteId={id} consentimentoEm={c.consentimento_em} codigo={c.codigo_indicacao} />
+          <ExcluirCliente clienteId={id} nome={c.nome} />
+        </Ajustes>
       </div>
     </div>
   );
@@ -371,6 +270,12 @@ export default function FichaCliente() {
  * pesquisa. Responder manualmente na conversa continua funcionando normalmente.
  * O padrao de toda familia e LIGADO; ele desliga as que ainda estao em revisao.
  */
+/**
+ * DESLIGADO — o envio automático pertencia ao agente de IA.
+ * O componente fica no arquivo porque a lógica de ligar/desligar por contato
+ * volta a servir se um dia existir envio programado. Não é renderizado.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ChaveEnvio({ clienteId, ligado, onSalvo }: {
   clienteId: string;
   ligado: boolean;
@@ -2216,6 +2121,245 @@ function LimpezaAvulsa({ tumulos, onCriado }:
  * de cada uma e se o débito foi lançado. É o controle que faltava: "em que
  * meses eu realizei e em que meses eu cobrei".
  * ------------------------------------------------------------------------- */
+/**
+ * A CONTA CORRENTE DA FAMÍLIA.
+ *
+ * Substitui o par "saldo + lista de pagamentos recebidos", que mostrava o que
+ * entrou mas não o que era devido — e por isso não respondia a pergunta que a
+ * Sureya faz ao telefone: *esta lavagem de março já foi cobrada?*
+ *
+ * Aqui débito e crédito aparecem lado a lado, cada débito com a sua
+ * competência e o seu túmulo. A resposta está na tela.
+ */
+/** Gaveta dos ajustes: fechada por padrão, para não competir com o dia a dia. */
+function Ajustes({ children }: { children: React.ReactNode }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        style={{ ...painel.botaoSec, width: "100%", justifyContent: "center" }}
+        onClick={() => setAberto((x) => !x)}
+      >
+        {aberto ? "Fechar ajustes" : "Ajustes da família ▸"}
+      </button>
+      {aberto && <div style={{ marginTop: 8 }}>{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * AS PESSOAS DA FAMÍLIA.
+ *
+ * Uma família pode ter vários cadastros: o filho que paga, a neta que
+ * acompanha. Uma delas é o responsável financeiro — a cobrança vai só para
+ * ela; as fotos de carinho podem ir para todas.
+ *
+ * A ficha tratava família e pessoa como a mesma coisa. O banco já não trata
+ * (ver migration 0049), e é por isso que este bloco existe.
+ */
+function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
+  const [lista, setLista] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!familiaId) return;
+    fetch(`/api/clientes?familiaId=${familiaId}`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setLista(r.clientes || []); })
+      .catch(() => {});
+  }, [familiaId]);
+
+  if (!familiaId || lista.length <= 1) return null;   // sem gente a mais, não ocupa espaço
+
+  return (
+    <div style={painel.card}>
+      <strong style={{ color: cor.navy }}>Pessoas da família</strong>
+      {lista.map((p: any) => (
+        <div key={p.id} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          gap: 10, padding: "10px 0", borderTop: `1px solid ${cor.linha}`, flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{ fontWeight: p.id === atualId ? 700 : 500, color: cor.navy }}>
+              {p.nome} {p.id === atualId && <span style={{ color: cor.cinza, fontWeight: 400 }}>(esta ficha)</span>}
+            </div>
+            <div style={{ fontSize: 13, color: cor.cinza }}>
+              {p.telefone}{p.parentesco ? ` · ${p.parentesco}` : ""}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {p.responsavel_financeiro && (
+              <span style={{ background: "#ecfdf5", color: "#166534", borderRadius: 999,
+                             padding: "4px 10px", fontSize: 13 }}>paga</span>
+            )}
+            {p.recebe_fotos && (
+              <span style={{ background: "#eff6ff", color: "#1e40af", borderRadius: 999,
+                             padding: "4px 10px", fontSize: 13 }}>recebe fotos</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContaCorrente({ familiaId, nome, onMudou }: {
+  familiaId: string | null; nome: string; onMudou: () => void;
+}) {
+  const [dados, setDados] = useState<any>(null);
+  const [abrindo, setAbrindo] = useState<"pagamento" | "avulso" | "abertura" | null>(null);
+  const [valor, setValor] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(() => {
+    if (!familiaId) return;
+    fetch(`/api/conta-corrente?familiaId=${familiaId}`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setDados(r); })
+      .catch(() => {});
+  }, [familiaId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function lancar() {
+    const n = Number(String(valor).replace(",", "."));
+    // Na abertura o negativo é legítimo: significa crédito a favor da família.
+    if (!isFinite(n) || (abrindo !== "abertura" && n <= 0)) {
+      setErro(abrindo === "abertura"
+        ? "Informe o valor da situação atual."
+        : "Informe um valor maior que zero.");
+      return;
+    }
+    setOcupado(true);
+    setErro("");
+    try {
+      const r = await fetch("/api/conta-corrente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao }),
+      }).then((x) => x.json());
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui lançar."); return; }
+      setAbrindo(null); setValor(""); setDescricao("");
+      carregar();
+      onMudou();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  if (!familiaId) {
+    return (
+      <div style={painel.card}>
+        <strong style={{ color: cor.navy }}>Conta corrente</strong>
+        <p style={{ color: cor.cinza, marginTop: 8 }}>
+          Esta família ainda não está vinculada — a conta aparece assim que o
+          vínculo existir.
+        </p>
+      </div>
+    );
+  }
+
+  const dinheiro = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const temAbertura = (dados?.linhas || []).some((l: any) => l.origem === "abertura");
+
+  const MESES = ["janeiro","fevereiro","março","abril","maio","junho",
+                 "julho","agosto","setembro","outubro","novembro","dezembro"];
+  const periodo = (comp: string) =>
+    `${MESES[Number(comp.slice(5, 7)) - 1]}/${comp.slice(2, 4)}`;
+
+  return (
+    <div style={painel.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <strong style={{ color: cor.navy }}>Conta corrente</strong>
+        {dados && (
+          <b style={{ color: dados.emDia ? "#16a34a" : "#b45309" }}>{dados.frase}</b>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <button style={painel.botaoMini} onClick={() => { setAbrindo("pagamento"); setErro(""); }}>
+          Registrar pagamento
+        </button>
+        <button style={painel.botaoMiniSec} onClick={() => { setAbrindo("avulso"); setErro(""); }}>
+          Lançar avulso
+        </button>
+        {/* A situação inicial só aparece enquanto não existe: é lançada uma
+            única vez por família, e o banco recusa a segunda. */}
+        {dados && !temAbertura && (
+          <button style={painel.botaoMiniSec} onClick={() => { setAbrindo("abertura"); setErro(""); }}>
+            Situação inicial
+          </button>
+        )}
+      </div>
+
+      {abrindo && (
+        <div style={{ marginTop: 12, padding: 12, background: "#f8fafc", borderRadius: 12 }}>
+          <div style={painel.rotulo}>
+            {abrindo === "pagamento" ? "Valor recebido"
+              : abrindo === "avulso" ? "Valor do serviço avulso"
+              : "Como esta família está hoje"}
+          </div>
+          {abrindo === "abertura" && (
+            <p style={{ fontSize: 14, color: cor.cinza, margin: "0 0 8px", lineHeight: 1.5 }}>
+              Se ela <b>deve</b>, escreva o valor normal (ex.: 240). Se ela está{" "}
+              <b>adiantada</b>, escreva com o sinal de menos (ex.: -80). Isso é
+              lançado uma vez só, para o extrato começar contando a verdade.
+            </p>
+          )}
+          <input style={painel.input} inputMode="decimal" value={valor}
+                 onChange={(e) => setValor(e.target.value)}
+                 placeholder={abrindo === "abertura" ? "Ex.: 240 ou -80" : "Ex.: 160,00"} />
+          <div style={{ ...painel.rotulo, marginTop: 10 }}>Descrição (opcional)</div>
+          <input style={painel.input} value={descricao}
+                 onChange={(e) => setDescricao(e.target.value)}
+                 placeholder={abrindo === "avulso" ? "Ex.: limpeza extra de Finados" : "Ex.: Pix de 12/03"} />
+          {erro && <p style={{ color: "#dc2626", fontSize: 14, marginTop: 8 }}>{erro}</p>}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button style={painel.botao} onClick={lancar} disabled={ocupado}>
+              {ocupado ? "Lançando…" : "Lançar"}
+            </button>
+            <button style={painel.botaoSec} onClick={() => setAbrindo(null)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {dados?.linhas?.length === 0 && (
+        <p style={{ color: cor.cinza, marginTop: 12 }}>Nenhum lançamento ainda.</p>
+      )}
+
+      {(dados?.linhas || []).map((l: any) => (
+        <div key={l.id} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          gap: 10, padding: "10px 0", borderTop: `1px solid ${cor.linha}`, flexWrap: "wrap",
+        }}>
+          <div style={{ minWidth: 180, flex: 1 }}>
+            <div style={{ fontSize: 15 }}>{l.descricao}</div>
+            <div style={{ fontSize: 13, color: cor.cinza }}>
+              {new Date(l.data + "T12:00:00").toLocaleDateString("pt-BR")}
+              {l.competencia && ` · ${periodo(l.competencia)}`}
+              {l.local && ` · ${l.local}`}
+            </div>
+          </div>
+          {/* A lavagem é REGISTRO, não dinheiro: mostrar "+ R$ 0,00" faria
+              parecer cobrança de valor zero. Aparece como um marcador. */}
+          {l.origem === "lavagem" ? (
+            <span style={{ color: cor.cinza, fontSize: 13, whiteSpace: "nowrap" }}>
+              ✓ serviço feito
+            </span>
+          ) : (
+            <b style={{ color: l.tipo === "debito" ? "#b45309" : "#16a34a", whiteSpace: "nowrap" }}>
+              {l.tipo === "debito" ? "+" : "−"} {dinheiro(l.valor)}
+            </b>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Limpezas({ clienteId, recarga }: { clienteId: string; recarga: number }) {
   const [lista, setLista] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);

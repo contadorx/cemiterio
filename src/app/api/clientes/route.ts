@@ -15,11 +15,20 @@ export async function GET(req: NextRequest) {
   const db = auth.db;
   const q = req.nextUrl.searchParams;
 
-  const { data: clientes } = await db
+  // Filtro por família: usado pelo bloco "Pessoas da família" na ficha, que
+  // lista o filho que paga e a neta que acompanha. Sem o filtro, ele teria de
+  // baixar as 400 pessoas e peneirar no navegador.
+  const familiaId = q.get("familiaId");
+
+  let consulta = db
     .from("clientes")
-    .select("id,nome,telefone,modo,score,ativo_ia,envio_automatico,regua_cobranca,cobranca_nivel,anonimizado_em,observacoes")
+    .select("id,nome,telefone,familia_id,responsavel_financeiro,parentesco,recebe_fotos,modo,score,ativo_ia,envio_automatico,regua_cobranca,cobranca_nivel,anonimizado_em,observacoes")
     .order("nome")
     .limit(400);
+
+  if (familiaId) consulta = consulta.eq("familia_id", familiaId);
+
+  const { data: clientes } = await consulta;
 
   const ids = (clientes || []).map((c: any) => c.id);
 

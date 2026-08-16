@@ -27,18 +27,23 @@ const DESLIGADAS = [
   "/painel/agente",
   "/painel/atendimento",
   "/painel/conversas",
-  "/painel/whatsapp",
+  // ATENÇÃO: /painel/whatsapp NÃO entra nesta lista.
+  // Ela foi desligada junto com o agente de IA, mas é a única tela onde se
+  // reconecta a instância da Evolution — e a Evolution voltou a ser essencial:
+  // é ela que entrega as FOTOS do antes e depois quando a Sureya aprova na
+  // fila. Sem esta tela, um WhatsApp caído vira um beco sem saída.
   // Substituídos pela plaquinha física e pelo endereço
   "/painel/mapa",
   "/painel/plaquetas",
   // Viraram blocos dentro da ficha da família
   "/painel/jazigos",
   "/painel/planos",
-  // Portal antigo e avaliações
-  "/familia",
+  // ATENÇÃO: "/familia" e "/t/" NÃO entram nesta lista.
+  // O portal voltou a ter função: mostra o ANTES E O DEPOIS de cada limpeza
+  // por link sem senha (idoso não guarda senha), e tira peso da Sureya —
+  // quem quiser conferir, confere sozinho. O "/t/" resolve o token do portal.
   "/avaliar",
   "/indicar",
-  "/t/",
 ];
 
 export async function middleware(req: NextRequest) {

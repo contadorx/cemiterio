@@ -105,7 +105,7 @@ export default function PaginaCemiterio({ params }: { params: { slug: string } }
             <span>{MARCA.nome}</span>
           </Link>
           <nav style={s.menu}>
-            <Link href="/familia" style={s.topoLink}>Já sou cliente</Link>
+            <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={s.topoLink}>Já sou cliente</a>
             <a href={zap} style={s.topoWhats} target="_blank" rel="noopener">WhatsApp</a>
           </nav>
         </div>

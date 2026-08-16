@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
+import { PainelFechamento } from "../fechamento/page";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
@@ -23,22 +24,30 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
+type AbaFin = "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
   // "O mês" é a primeira e a padrão: é a pergunta que se faz primeiro, e era a
   // que exigia cruzar nove telas para responder.
+  // AS ABAS ENXUTAS.
+  //
+  // Eram sete, e quatro serviam ao sistema que saiu de escopo: gestão por
+  // categoria contábil, conta da equipe, pagamento da equipe e reajustes
+  // (que voltou a ser uma conversa por WhatsApp, uma vez ao ano).
+  //
+  // "Fechar o mês" vem PRIMEIRO porque é o que se faz de verdade uma vez por
+  // mês: gerar a cobrança e ver quem está em aberto. Antes ela era uma tela
+  // separada no menu — duas portas para dinheiro, e ninguém sabia qual abrir.
+  //
+  // As abas removidas continuam no arquivo; voltam tirando o comentário.
+  ["fechar", "Fechar o mês"],
   ["mes", "O mês"],
-  ["gestao", "Gestão do negócio"],
   ["conferir", "Conferir entradas"],
-  ["equipe", "Conta da equipe"],
-  ["pagamento", "Pagamento da equipe"],
   ["jazigos", "Resultado por jazigo"],
-  ["reajustes", "Reajustes"],
 ];
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<AbaFin>("mes");
+  const [aba, setAba] = useState<AbaFin>("fechar");
 
   // a aba escolhida entra no endereco: da para mandar o link certo e o F5 nao
   // devolve a pessoa para a primeira aba. Lido no window dentro do useEffect e
@@ -50,7 +59,7 @@ export default function Financeiro() {
 
   function trocar(v: AbaFin) {
     setAba(v);
-    const url = v === "mes" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
+    const url = v === "fechar" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
     window.history.replaceState(null, "", url);
   }
 
@@ -68,6 +77,7 @@ export default function Financeiro() {
           ))}
         </div>
 
+        {aba === "fechar" && <PainelFechamento />}
         {aba === "mes" && <Mes />}
         {aba === "gestao" && <Gestao />}
         {aba === "conferir" && <Conferir />}

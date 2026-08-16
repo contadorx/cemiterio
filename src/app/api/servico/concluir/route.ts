@@ -5,6 +5,7 @@ import { consumirMaterial } from "@/lib/consumo";
 import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
 import { diaOperacao } from "@/lib/vencimento";
 import { registrarErro } from "@/lib/monitor";
+import { rascunhoDaLavagem } from "@/lib/mensagens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,6 +96,116 @@ export async function POST(req: NextRequest) {
 
   const orgId = (serv as any).org_id as string;
   const clienteId = (serv as any).cliente_id as string | null;
+
+  // ------------------------------------------------------------------
+  // REGISTRO DA LAVAGEM NO EXTRATO — valor ZERO, de propósito.
+  //
+  // A lavagem aparece na conta corrente para a Sureya acompanhar numa lista
+  // só: "limpou dia 15, limpou dia 22, cobrou no fim do mês". É histórico
+  // dentro do extrato financeiro.
+  //
+  // MAS NÃO MEXE NO SALDO. Quem gera a dívida é a competência. Se a lavagem
+  // também lançasse valor, a família seria cobrada duas vezes pelo mesmo
+  // serviço — uma pela execução e outra pelo fechamento do mês.
+  //
+  // Falhar aqui não pode derrubar a conclusão: a Nina já fez o trabalho.
+  // ------------------------------------------------------------------
+  try {
+    const tumuloRegistro = (serv as any).tumulo_id as string | null;
+    const { data: tReg } = await db
+      .from("tumulos").select("familia_id,codigo").eq("id", tumuloRegistro).maybeSingle();
+    const famReg = (tReg as any)?.familia_id as string | null;
+
+    if (famReg) {
+      const hoje = agoraIso.slice(0, 10);
+      const onde = (tReg as any)?.codigo ? ` · ${(tReg as any).codigo}` : "";
+      await db.from("conta_corrente").insert({
+        org_id: orgId,
+        familia_id: famReg,
+        tumulo_id: tumuloRegistro,
+        tipo: "debito",           // lado irrelevante: o valor é 0
+        origem: "lavagem",
+        competencia: null,
+        valor: 0,
+        descricao: `Limpeza realizada${onde}`,
+        data: hoje,
+      });
+    }
+  } catch {
+    // Índice único barrou (reprocessamento) ou algo falhou: é só o registro
+    // visual do extrato. A lavagem está gravada em `servicos`, que é a prova.
+  }
+
+  // ------------------------------------------------------------------
+  // RASCUNHO PARA A FILA DE LIBERAÇÃO
+  //
+  // A lavagem acabou de ser concluída, então esta é a hora de preparar a
+  // mensagem com as fotos. Mas NADA É ENVIADO AQUI: o rascunho entra na fila
+  // como 'aguardando' e fica parado até a Sureya olhar e aprovar, uma
+  // mensagem por vez.
+  //
+  // Isso é deliberado. O que faz a família ficar é receber a foto do túmulo
+  // limpo com uma palavra de gente — mensagem automática de robô quebra
+  // exatamente esse encanto, ainda mais com público idoso. O sistema tira o
+  // trabalho repetitivo (baixar foto, achar o contato, digitar o texto) e
+  // devolve a decisão para ela.
+  //
+  // Falhar aqui não pode derrubar a conclusão da lavagem: a Nina já fez o
+  // serviço e a foto já subiu. Por isso todo o bloco vai em try/catch mudo.
+  // ------------------------------------------------------------------
+  try {
+    const tumuloId = (serv as any).tumulo_id as string | null;
+
+    const { data: tum } = await db
+      .from("tumulos")
+      .select("familia_id,foto_antes_url")
+      .eq("id", tumuloId)
+      .maybeSingle();
+
+    const familiaId = (tum as any)?.familia_id as string | null;
+
+    if (familiaId) {
+      // Para quem vai: quem recebe as fotos de carinho, não necessariamente
+      // quem paga. É o filho que acerta a conta, mas às vezes é a neta que
+      // acompanha o cuidado.
+      const { data: pessoas } = await db
+        .from("clientes")
+        .select("id,nome,recebe_fotos,responsavel_financeiro")
+        .eq("familia_id", familiaId);
+
+      const lista = (pessoas || []) as any[];
+      const destino =
+        lista.find((p) => p.recebe_fotos) ||
+        lista.find((p) => p.responsavel_financeiro) ||
+        lista[0];
+
+      if (destino) {
+        const rascunho = rascunhoDaLavagem({
+          familiaId,
+          clienteId: destino.id,
+          tumuloId: tumuloId!,
+          servicoId,
+          nome: destino.nome || "",
+          fotoAntes: (tum as any)?.foto_antes_url || urlAntes || null,
+          fotoDepois: urlDepois || null,
+        });
+
+        await db.from("fila_liberacao").insert({
+          org_id: orgId,
+          familia_id: rascunho.familiaId,
+          cliente_id: rascunho.clienteId,
+          tumulo_id: rascunho.tumuloId,
+          servico_id: rascunho.servicoId,
+          tipo: rascunho.tipo,
+          texto: rascunho.texto,
+          fotos: rascunho.fotos,
+        });
+      }
+    }
+  } catch {
+    // Silêncio proposital: a lavagem está registrada e a foto salva. Se o
+    // rascunho não nasceu, a Sureya manda a mensagem à mão, como sempre fez.
+  }
 
   // O QUE ESTA LAVAGEM VALEU, resolvido uma vez e usado por todos daqui pra
   // baixo: o debito, o carimbo da remuneracao e o proprio servico.

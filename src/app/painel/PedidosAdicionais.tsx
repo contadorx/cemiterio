@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { painel, cor } from "./ui";
 
 /**
@@ -134,11 +133,9 @@ export function PedidosAdicionais({
               >
                 {abertoId === p.id ? "fechar" : "Registrar como serviço"}
               </button>
-              {p.conversaId && (
-                <Link href={`/painel/conversas/${p.conversaId}`} style={{ ...painel.botaoMiniSec, textDecoration: "none" }}>
-                  abrir conversa
-                </Link>
-              )}
+              {/* O link "abrir conversa" saiu: /painel/conversas foi desligada
+                  junto com o agente de IA e passou a devolver 404. Deixar um
+                  botão que leva a lugar nenhum é pior que não ter botão. */}
               <button
                 style={painel.botaoMiniSec}
                 onClick={async () => {

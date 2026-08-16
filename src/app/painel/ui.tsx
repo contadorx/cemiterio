@@ -55,12 +55,20 @@ const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
     titulo: "Carteira",
     itens: [
       { href: "/painel/clientes", label: "Famílias" },
+      // DINHEIRO TEM UMA PORTA SÓ.
+      // "Fechamento" era um item separado, e o Financeiro tinha uma aba "O
+      // mês": duas entradas para a mesma coisa, e ninguém sabia qual abrir.
+      // Agora fechar o mês é a primeira aba daqui.
       { href: "/painel/financeiro", label: "Financeiro" },
     ],
   },
   {
     titulo: "Ajustes",
     itens: [
+      // Onde se reconecta o WhatsApp. Voltou ao menu porque a entrega das
+      // fotos aprovadas na fila depende da instância estar de pé — sem esta
+      // tela, um WhatsApp caído não tem como ser religado.
+      { href: "/painel/whatsapp", label: "WhatsApp" },
       { href: "/painel/config", label: "Config" },
     ],
   },

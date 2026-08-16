@@ -6,7 +6,6 @@ import { PainelNav, painel, cor, numeroBR } from "../ui";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
-import VisaoMapa from "./VisaoMapa";
 
 /**
  * CARTEIRA — familia, jazigo e servico na MESMA tela.
@@ -19,7 +18,6 @@ import VisaoMapa from "./VisaoMapa";
  *   Familias        · quem paga, quanto deve, quando lava (a lista de sempre)
  *   Jazigos e planos· cada jazigo com valor, periodicidade e vencimento (a
  *                     antiga "Gestao", em VisaoJazigos.tsx)
- *   Mapa            · a planta em escala real, mesma regua de cor (VisaoMapa)
  *   Do campo (n)    · os jazigos capturados no cemiterio esperando familia
  *
  * A aba fica no endereco (?aba=jazigos): dá para mandar o link certo para
@@ -27,12 +25,14 @@ import VisaoMapa from "./VisaoMapa";
  * feita no window (dentro do useEffect), NAO com useSearchParams — que no
  * Next 14 obriga um <Suspense> em volta da pagina inteira so por causa disso.
  */
-type Aba = "familias" | "jazigos" | "mapa" | "campo";
+type Aba = "familias" | "jazigos" | "campo";
 
 const ABAS: { chave: Aba; rotulo: string }[] = [
   { chave: "familias", rotulo: "Famílias" },
   { chave: "jazigos", rotulo: "Jazigos e planos" },
-  { chave: "mapa", rotulo: "Mapa" },
+  // A aba "Mapa" saiu: a navegação da Nina é a plaquinha na pedra mais o
+  // endereço (quadra + rua), e o mapa com pinos foi desligado. Mantê-la aqui
+  // deixava a tela desligada acessível por uma porta lateral.
   { chave: "campo", rotulo: "Do campo" },
 ];
 
@@ -65,7 +65,7 @@ export default function Carteira() {
     <div style={painel.wrap}>
       <PainelNav atual="/painel/clientes" />
       <div style={painel.conteudo}>
-        <h1 style={{ ...painel.h1, marginBottom: 10 }}>Carteira</h1>
+        <h1 style={{ ...painel.h1, marginBottom: 10 }}>Famílias</h1>
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {ABAS.map((a) => {
@@ -88,7 +88,6 @@ export default function Carteira() {
 
         {aba === "familias" && <VisaoFamilias />}
         {aba === "jazigos" && <VisaoJazigos />}
-        {aba === "mapa" && <VisaoMapa />}
         {aba === "campo" && <VincularLote onMudou={contarOrfaos} />}
       </div>
     </div>

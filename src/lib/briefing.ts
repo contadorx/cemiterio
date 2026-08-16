@@ -15,6 +15,12 @@ export interface Briefing {
   totalHoje: number;
   feitos: number;
   quadras: string[];
+  // AS RUAS DO DIA — o que faltava para a frase do portão fazer sentido.
+  // "Quadra 1" sozinho não diz para onde andar; "Quadra 1 — Ruas 3, 4 e 5"
+  // diz, e ela se posiciona antes de dar o primeiro passo.
+  ruas: string[];
+  frase: string;              // "Quadra 1 — Ruas 3, 4 e 5"
+  porRua: { rua: string; quantos: number }[];
   precisamAtencao: number;      // só o NÚMERO; o detalhe vai no card
   materiaisAcabando: number;
   materiais: string[];
@@ -73,7 +79,7 @@ export async function montarBriefing(executoraId: string | null, nome: string): 
 
   let q = db
     .from("servicos")
-    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,rua,foto_referencia_url,lat,quadras(codigo,cemiterios(nome)))")
+    .select("id,status,adiado_vezes,tumulos(identificacao,falecido_nome,datas_gatilho,rua,foto_referencia_url,lat,ruas(nome,ordem),quadras(codigo,cemiterios(nome)))")
     .eq("org_id", org)
     .eq("data_prevista", hoje);
   if (executoraId) q = q.or(`executora_id.eq.${executoraId},executora_id.is.null`);
@@ -94,6 +100,40 @@ export async function montarBriefing(executoraId: string | null, nome: string): 
       return cems.length > 1 && c ? `${c} · ${q}` : q;
     }).filter(Boolean),
   )].sort();
+  // AS RUAS, na ordem em que se caminha — não na ordem do nome. A Rua 7 pode
+  // ser a terceira a ser percorrida; quem manda é `ruas.ordem`, cadastrada uma
+  // vez conforme o terreno.
+  const ruasComOrdem = new Map<string, number>();
+  const contagem = new Map<string, number>();
+  for (const sv of pendentes) {
+    const nome = (sv as any).tumulos?.ruas?.nome;
+    if (!nome) continue;
+    const ord = Number((sv as any).tumulos?.ruas?.ordem ?? 9999);
+    if (!ruasComOrdem.has(nome)) ruasComOrdem.set(nome, ord);
+    contagem.set(nome, (contagem.get(nome) || 0) + 1);
+  }
+  const ruas = [...ruasComOrdem.keys()].sort(
+    (a, b) => (ruasComOrdem.get(a) || 0) - (ruasComOrdem.get(b) || 0),
+  );
+  const porRua = ruas.map((r) => ({ rua: r, quantos: contagem.get(r) || 0 }));
+
+  // "Quadra 1 — Ruas 3, 4 e 5". Escrito para ser lido de pé, no portão, com o
+  // celular numa mão: uma frase, sem lista para percorrer.
+  const juntar = (itens: string[]) =>
+    itens.length <= 1
+      ? itens[0] || ""
+      : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
+  // Só abrevia para "Ruas 3, 4 e 5" quando TODAS são ruas numeradas. Com uma
+  // transversal no meio, "Ruas 8 e Transversal 3" sairia torto — aí vale o
+  // nome inteiro de cada uma.
+  const soRuas = ruas.every((r) => /^Rua\s*\d+$/i.test(r));
+  const trecho = !ruas.length
+    ? ""
+    : soRuas
+      ? `${ruas.length > 1 ? "Ruas" : "Rua"} ${juntar(ruas.map((r) => r.replace(/^Rua\s*/i, "")))}`
+      : juntar(ruas);
+  const frase = [juntar(quadras as string[]), trecho].filter(Boolean).join(" — ");
+
   const precisamAtencao = pendentes.filter((s) => avisosDoJazigo(s).length > 0).length;
 
   const { data: mats } = await db
@@ -109,6 +149,9 @@ export async function montarBriefing(executoraId: string | null, nome: string): 
     totalHoje: pendentes.length,
     feitos,
     quadras,
+    ruas,
+    frase,
+    porRua,
     precisamAtencao,
     materiaisAcabando: materiais.length,
     materiais,
