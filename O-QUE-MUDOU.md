@@ -1,7 +1,35 @@
 # O que mudou — Zelo & Memória
 
-Pacote no mesmo formato do `src.zip` original: a pasta `src/` completa, pronta
-para substituir a sua, mais as `migrations/`.
+**Este zip é o projeto inteiro, com a MESMA estrutura de raiz do `src.zip` que
+você enviou** — `src/`, `migrations/`, `package.json`, `public/` e o resto no
+mesmo lugar.
+
+O pacote anterior estava embrulhado numa pasta `src-atualizado/`, e por isso
+não sobrescreveu nada: ao descompactar, ele criava uma pasta nova ao lado da
+sua em vez de substituir os arquivos. Se aquele pacote foi extraído no
+repositório, **apague a pasta `src-atualizado/`** antes de usar este.
+
+## Como aplicar
+
+Descompacte por cima da raiz do repositório, aceitando substituir. Depois
+`npm run build` e deploy.
+
+## Exatamente o que muda
+
+**4 arquivos alterados**
+- `src/lib/agenda.ts` — a rota do dia passa a sair do endereço, não do GPS
+- `src/middleware.ts` — as telas desligadas devolvem 404
+- `src/app/painel/ui.tsx` — menu de 12 para 8 itens
+- `src/app/painel/page.tsx` — links órfãos removidos
+
+**6 arquivos/pastas novos**
+- `src/lib/rota.ts` · `src/lib/conta-corrente.ts` · `src/lib/mensagens.ts`
+- `src/app/campo/CardTumulo.tsx`
+- `src/app/painel/fila/` · `src/app/api/fila/`
+
+**4 migrations novas** em `migrations/` (todas já aplicadas no Supabase)
+
+Nenhum outro arquivo do projeto foi tocado.
 
 ---
 
@@ -107,11 +135,43 @@ reenviando a mesma mensagem para a família.
 
 ---
 
+## Telas desligadas (novo)
+
+### `src/app/painel/ui.tsx` — menu de 12 para 8 itens
+
+Ficaram: **Início · Agenda · Liberação · Avulsos · Campo · Famílias ·
+Financeiro · Config**.
+
+Saíram do menu: Atendimento e WhatsApp (o agente de IA foi desligado — no
+lugar entrou a Liberação), Plaquetas (a plaquinha de 4 cm aprovada não tem QR)
+e Jazigos (virou um bloco dentro da ficha da família, não sumiu).
+
+### `src/middleware.ts` — as rotas desligadas devolvem 404
+
+CRM de leads, reajustes, agente, atendimento, conversas, WhatsApp, mapa,
+plaquetas, jazigos, planos, portal antigo, avaliações, indicações e o
+resolvedor de QR.
+
+**Por que 404 e não apenas sumir do menu:** link antigo, favorito no celular e
+histórico do navegador continuam funcionando. Meio-desligado é pior que
+ligado, porque ninguém sabe o que está no ar.
+
+**Nada foi apagado.** O código continua no repositório, os dados continuam no
+banco. Religar é tirar a linha da lista `DESLIGADAS`.
+
+### `src/app/painel/page.tsx` — links órfãos removidos
+
+O card "esperando resposta" agora aponta para a Liberação; o aviso de leads
+novos saiu; o card de rascunhos aponta para a fila.
+
+---
+
 ## Falta ligar
 
+0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada
+   deste pacote aparece antes do deploy.
 1. **`CardTumulo` no `campo/page.tsx`** — o componente está pronto, mas a
    página ainda usa `ConfirmarJazigo` + `Concluir`. Trocar os dois pelo card.
-2. **Link da fila no menu do painel** — a tela existe em `/painel/fila`.
 3. **Quem cria o rascunho** — chamar `rascunhoDaLavagem` (de `mensagens.ts`)
    quando o serviço é concluído, inserindo em `fila_liberacao`.
 4. **Cron da competência** — chamar `gerarCompetenciaDoMes` no dia 1. A trava
