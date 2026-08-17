@@ -71,9 +71,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.freq_pagamento !== undefined) patch.freq_pagamento = body.freq_pagamento || null;
   if (body.contratado !== undefined) patch.contratado = !!body.contratado;
 
+  // A PARTIR DE QUANDO COBRAR. Sempre o dia 1: competência é mês, não dia, e
+  // guardar "15/03" faria a comparação com "2026-03-01" falhar em silêncio.
+  if (body.inicio_cobranca !== undefined) {
+    const v = String(body.inicio_cobranca || "");
+    patch.inicio_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
+  }
+
   // vincular/desvincular o jazigo a uma família
   if (body.familia_id !== undefined) patch.familia_id = body.familia_id || null;
-  if (body.cliente_id !== undefined) patch.cliente_id = body.cliente_id || null;
+
+  // A FAMÍLIA ACOMPANHA A PESSOA.
+  //
+  // A tela Jazigos troca a família escolhendo o cliente, e mandava só
+  // `cliente_id`. O túmulo ficava com `familia_id` nulo — e como a conta
+  // corrente e a tela do mês penduram na FAMÍLIA, ele sumia de novo. É o mesmo
+  // erro que já corrigi no vínculo pela ficha, chegando por outra porta.
+  //
+  // Derivar aqui fecha as duas portas de uma vez: qualquer caminho que mude o
+  // dono acerta a família junto.
+  if (body.cliente_id !== undefined) {
+    patch.cliente_id = body.cliente_id || null;
+    if (body.cliente_id && body.familia_id === undefined) {
+      const { data: pessoa } = await db
+        .from("clientes").select("familia_id").eq("id", body.cliente_id).maybeSingle();
+      patch.familia_id = (pessoa as any)?.familia_id ?? null;
+    } else if (!body.cliente_id && body.familia_id === undefined) {
+      // desvinculou a pessoa: o túmulo volta a ser órfão de verdade, e não
+      // meio-órfão com família de um dono que já saiu.
+      patch.familia_id = null;
+    }
+  }
   if (body.falecido_nome !== undefined) patch.falecido_nome = body.falecido_nome || null;
 
   if (body.data_falecimento !== undefined || body.data_nascimento !== undefined) {

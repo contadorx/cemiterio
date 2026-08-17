@@ -31,6 +31,9 @@ import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pe
  * Sobraram sete campos por túmulo, e todos são usados toda semana.
  */
 
+const MES_CURTO = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const mesCurto = (d: string) => `${MES_CURTO[Number(d.slice(5, 7)) - 1]}/${d.slice(2, 4)}`;
+
 /** Quantas limpezas cabem num mês, para mostrar o total antes de salvar. */
 const POR_MES: Record<string, number> = {
   semanal: 4, quinzenal: 2, mensal: 1, bimestral: 0.5, trimestral: 1 / 3,
@@ -172,6 +175,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
   const [f, setF] = useState({
     valor_lavagem: t.valor_lavagem ?? "",
     valor_base: t.valor_base ?? "mes",
+    inicio_cobranca: (t.inicio_cobranca ?? "").slice(0, 7),
     periodicidade: t.periodicidade ?? "",
     freq_pagamento: t.freq_pagamento ?? "",
     contratado: !!t.contratado,
@@ -254,6 +258,9 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 </Selo>
                 <Selo tom="neutro">limpeza {t.periodicidade || "—"}</Selo>
                 <Selo tom="neutro">paga {t.freq_pagamento || "—"}</Selo>
+                {t.inicio_cobranca && (
+                  <Selo tom="neutro">desde {mesCurto(t.inicio_cobranca)}</Selo>
+                )}
               </>
             ) : (
               <Selo tom="atencao">sem plano · avulso</Selo>
@@ -349,6 +356,16 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 <option value="">escolha</option>
                 {PERIODICIDADES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
               </Selecao>
+            </Campo>
+            {/* A PARTIR DE QUANDO. Antes o sistema usava a data em que o
+                túmulo foi digitado — acidente do cadastro. Um plano assinado
+                em março e digitado em agosto cobrava em agosto. */}
+            <Campo rotulo="Começar a cobrar a partir de" dica="o mês em que o serviço começou">
+              <Entrada
+                type="month"
+                value={f.inicio_cobranca}
+                onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })}
+              />
             </Campo>
             <Campo rotulo="A família paga" dica="de quanto em quanto tempo">
               <Selecao
@@ -748,7 +765,7 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
       await fetch("/api/servico", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tumuloId, dataExecutada: data, avulso: true }),
+        body: JSON.stringify({ tumuloId, dataExecutada: data }),
       });
       setLancando(false);
       setTumuloId("");

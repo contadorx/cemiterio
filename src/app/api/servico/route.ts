@@ -37,7 +37,17 @@ export async function POST(req: NextRequest) {
 
   const b = await req.json().catch(() => ({}));
   const tumuloId = b?.tumuloId;
-  const data = String(b?.dataPrevista || "");
+
+  // DUAS SITUAÇÕES DIFERENTES, e confundi-las gerava serviço fantasma:
+  //
+  //   dataPrevista  -> agendar algo que AINDA VAI ser feito (nasce pendente)
+  //   dataExecutada -> registrar algo que JÁ FOI feito (nasce executado)
+  //
+  // A ficha da família usa a segunda: a Sureya limpou um túmulo ela mesma e
+  // está anotando depois. Antes só existia a primeira, então o registro caía
+  // como "pendente" e a limpeza aparecia na agenda como se faltasse fazer.
+  const jaFeita = !!b?.dataExecutada;
+  const data = String(b?.dataExecutada || b?.dataPrevista || "");
 
   if (!tumuloId) {
     return NextResponse.json(
@@ -47,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return NextResponse.json(
-      { ok: false, erro: "sem_data", mensagem: "Escolha a data em que a limpeza precisa estar feita." },
+      { ok: false, erro: "sem_data", mensagem: jaFeita ? "Escolha o dia em que a limpeza foi feita." : "Escolha a data em que a limpeza precisa estar feita." },
       { status: 400 },
     );
   }
@@ -89,7 +99,8 @@ export async function POST(req: NextRequest) {
     plano_id: null,                 // avulso: não pertence a nenhum plano
     cliente_id: (tum as any).cliente_id,
     data_prevista: data,
-    status: "pendente",
+    status: jaFeita ? "executado" : "pendente",
+    ...(jaFeita ? { data_executada: new Date(`${data}T12:00:00`).toISOString() } : {}),
     valor,
     // pedido com data pedida pela família entra na frente da fila do dia
     prioridade: Number.isFinite(Number(b?.prioridade)) ? Number(b.prioridade) : 5,
@@ -122,6 +133,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     servicoId: (srv as any)?.id,
+    jaFeita,
     dataPrevista: data,
     semMigration: semColuna,
   });

@@ -1231,6 +1231,51 @@ depois.
 
 ---
 
+## "COMEÇAR A COBRAR A PARTIR DE"
+
+### O que estava errado
+
+O ciclo era ancorado no `created_at` do túmulo — a data em que ele foi
+**digitado** no sistema. Isso é acidente do cadastro, não fato do contrato.
+
+Duas consequências:
+
+1. **Cobrança retroativa.** Uma família cadastrada hoje, com o fechamento
+   rodado para um mês passado, receberia débito de um período em que ainda não
+   era cliente.
+2. **Ciclo errado.** Um plano anual assinado em março, mas digitado em agosto,
+   passaria a cobrar em agosto — e a família reclamaria com razão.
+
+### O campo
+
+**"Começar a cobrar a partir de"**, no bloco do túmulo, ao lado da
+periodicidade. É um seletor de mês, porque competência é mês e não dia —
+guardar "15/03" faria a comparação com "2026-03-01" falhar em silêncio, então
+a API normaliza sempre para o dia 1.
+
+Ele faz duas coisas: **barra qualquer competência anterior** e **ancora o
+ciclo**.
+
+No cartão aparece um selo "desde mar/26", para não precisar abrir a gaveta.
+
+### Nada muda para quem já está cadastrado
+
+Os túmulos existentes receberam o mês do próprio cadastro — exatamente o que o
+gerador já usava. Ninguém muda de situação por causa desta migration.
+
+### Testado
+
+| Caso | Resultado |
+|---|---|
+| Mensal começando em set/26 | não cobra jul e ago; cobra set e out |
+| Anual assinado em mar/26, digitado em ago | cobra mar/26 e mar/27; **não** cobra ago |
+| Trimestral começando em mai/26 | cobra mai, ago e nov; não cobra abr nem jun |
+| Registro antigo, sem início | segue como antes |
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

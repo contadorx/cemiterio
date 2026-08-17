@@ -43,6 +43,14 @@ export interface TumuloCobranca {
   valorBase?: BaseValor;
   periodicidade: Periodicidade | null;
   freqPagamento: FreqPagamento | null;
+  /**
+   * A PARTIR DE QUANDO COBRAR — "2026-03-01".
+   *
+   * Ancora o ciclo e barra competência anterior. Antes o sistema usava a data
+   * em que o túmulo foi DIGITADO, que é acidente do cadastro: um plano anual
+   * assinado em março e digitado em agosto passava a cobrar em agosto.
+   */
+  inicioCobranca?: string | null;
 }
 
 export interface Lancamento {
@@ -108,12 +116,24 @@ export function debitoDaCompetencia(
 ): Lancamento | null {
   if (!t.contratado || !t.periodicidade || !t.freqPagamento) return null;
 
+  // ANTES DO INÍCIO NÃO SE COBRA.
+  //
+  // Sem esta trava, rodar o fechamento de um mês passado geraria débito para
+  // uma família que ainda nem era cliente — e ela receberia uma cobrança de
+  // um período em que não contratou nada.
+  if (t.inicioCobranca && competencia < t.inicioCobranca.slice(0, 10)) return null;
+
   const mes = Number(competencia.slice(5, 7));
   const passo = MESES_DO_CICLO[t.freqPagamento];
 
-  // O ciclo fecha a cada `passo` meses, contados a partir do mês inicial do
-  // contrato. Um plano anual assinado em março cobra em março, não em janeiro.
-  const desde = (mes - mesInicial + 12) % 12;
+  // O ciclo fecha a cada `passo` meses, contados do mês em que a cobrança
+  // começou. Um plano anual que começa em março cobra em março, não em
+  // janeiro — e não no mês em que alguém digitou o cadastro.
+  const ancora = t.inicioCobranca
+    ? Number(t.inicioCobranca.slice(5, 7))
+    : mesInicial;
+
+  const desde = (mes - ancora + 12) % 12;
   if (desde % passo !== 0) return null;
 
   const valor = centavos(valorMensal(t) * passo);
