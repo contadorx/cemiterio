@@ -31,17 +31,25 @@ export async function GET() {
   }));
 
   // jazigos ainda SEM família (ex.: capturados no campo) — para vincular no cadastro
+  // A FOTO VAI JUNTO.
+  //
+  // São dezenas de jazigos capturados no campo, quase todos sem nome na pedra.
+  // Distinguir "Quadra 1 · Rua 2" de outro "Quadra 1 · Rua 2" por texto é
+  // impossível — a foto é o que a Sureya realmente reconhece.
   const { data: orfaos } = await db
     .from("tumulos")
-    .select("id,identificacao,rua,quadras(codigo)")
+    .select("id,identificacao,codigo,rua,falecido_nome,foto_referencia_url,ruas(nome),quadras(codigo)")
     .is("cliente_id", null)
-    .order("identificacao")
-    .limit(300);
+    .order("codigo")
+    .limit(500);
   const semDono = (orfaos || []).map((t: any) => ({
     id: t.id,
     identificacao: t.identificacao,
-    rua: t.rua || null,
+    codigo: t.codigo || null,
+    rua: t.ruas?.nome || t.rua || null,
     quadra: t.quadras?.codigo || null,
+    falecido: t.falecido_nome || null,
+    foto: t.foto_referencia_url || null,
   }));
 
   return NextResponse.json({ ok: true, cemiterios, semDono });

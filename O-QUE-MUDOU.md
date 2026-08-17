@@ -1460,27 +1460,89 @@ quem gera a dívida é a competência.
 
 ---
 
-## Falta ligar
+## ESCOLHER O JAZIGO DO CAMPO — com foto e vários de uma vez
 
-0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada
-   deste pacote aparece antes do deploy.
-1. **`CardTumulo` no `campo/page.tsx`** — o componente está pronto, mas a
-   página ainda usa `ConfirmarJazigo` + `Concluir`. Trocar os dois pelo card.
-3. **Quem cria o rascunho** — chamar `rascunhoDaLavagem` (de `mensagens.ts`)
-   quando o serviço é concluído, inserindo em `fila_liberacao`.
-4. **Cron da competência** — chamar `gerarCompetenciaDoMes` no dia 1. A trava
-   contra cobrança dupla já está no banco.
-5. **Esconder as telas que saem** (CRM, IA, mapa, plaquetas QR, portal antigo).
+São **68 jazigos** esperando família, e a lista era de texto: uma linha por
+jazigo, com quadra e rua. Só que "Quadra 1 · Rua 2" se repete dezenas de vezes
+e nove deles nem têm nome na pedra — escolher assim é adivinhar.
+
+**67 dos 68 têm foto de referência.** É ela que a Sureya reconhece.
+
+### O que mudou
+
+**Grade com foto.** Cada jazigo vira um cartão com a imagem, o endereço e o
+nome na pedra por baixo. Toca para marcar; o escolhido ganha borda e um ✓ no
+canto.
+
+**Busca por qualquer coisa.** Código, nome na pedra, falecido, quadra, rua. E
+todos os termos precisam bater: *"rua 5 almeida"* é mais específico que *"rua
+5"* — é assim que se estreita uma lista grande.
+
+**Vários de uma vez.** Marque quantos quiser e ligue todos num toque. Uma
+família costuma ficar com dois ou três jazigos, e abrir e fechar o formulário
+a cada pedra era o trabalho que a tela deveria poupar.
+
+**"Marcar estes"** marca só o que está **filtrado**. Com a lista estreitada
+por busca, marcar os 68 seria o oposto do que ela quer.
+
+### No servidor
+
+O vínculo em lote roda **um a um por dentro**, de propósito: se o terceiro
+falhar, os dois primeiros já entraram e a resposta diz qual não foi. Em lote
+verdadeiro, um erro derrubaria todos e a Sureya não saberia onde parou.
+
+Falha parcial mostra o aviso e segue com o que entrou — esconder isso faria
+ela ligar de novo o que já estava ligado.
+
+`next build` executado: passou limpo.
 
 ---
 
-## Testado
+## LIMPEZA DOS RESÍDUOS DA MUDANÇA
 
-Os três módulos de `lib/` passam no `tsc --strict` sem erro. A lógica foi
-executada: serpentina, encaixe sem renumerar vizinhos, ciclos de cobrança
-diferentes na mesma família, avulso somando na conta, pagamento a maior
-virando crédito, e os textos preenchidos.
+Depois de mover o contrato para a família, sobraram três pontas que
+recriariam a duplicação se ficassem.
 
-O `agenda.ts` foi conferido por inspeção — nenhuma referência à função antiga
-sobrou, e as chaves fecham. Como ele depende de dezenas de módulos do projeto,
-rode `npm run build` no seu ambiente para a checagem completa.
+**O PATCH do túmulo ainda aceitava `valor_lavagem`, `valor_base`,
+`freq_pagamento` e `inicio_cobranca`.** Se alguém gravasse um valor ali, nada
+seria cobrado — a cobrança lê a família — e o número ficaria na tela mentindo.
+Agora o PATCH recusa esses campos. As colunas continuam no banco como
+histórico.
+
+**A agenda gravava valor no serviço.** O dinheiro vem da competência da
+família; um valor no serviço seria um segundo número para a mesma coisa, e
+seria ele que apareceria nos relatórios, divergindo do que a família deve.
+Agora nasce nulo.
+
+**A ficha tinha um cálculo órfão** (`porMes`) e a API do cliente carregava
+sete colunas que ninguém mais lê. Removidos.
+
+Varredura final: `valor_lavagem` não aparece em nenhum caminho ativo — só no
+comentário que explica por que ele não é mais aceito.
+
+---
+
+## O QUE FALTA
+
+### Depende de você
+
+1. **Publicar no Vercel.** Nada deste pacote aparece antes do deploy — e é a
+   explicação mais provável para "não consigo editar o jazigo".
+2. **A planilha de suporte**, para eu montar a importação das situações
+   iniciais das 66 famílias em lote.
+3. **Reconectar o WhatsApp** em Config → WhatsApp, quando for conveniente. A
+   fila enche normalmente sem ele; só o envio espera.
+
+### Depende de uso
+
+4. **Rodar um mês inteiro** e anotar o que fez falta. Só depois disso vale
+   arquivar o código das áreas desligadas.
+
+### O que já está pronto e testado
+
+Roteiro por endereço com ruas físicas compartilhadas · campo de dois toques ·
+fila de liberação com envio de fotos pela Evolution · conta corrente por
+família com competência, avulso, abertura e correção de lançamento ·
+comprovante anexado à mão · fechamento automático no dia 1 · tela "O Mês" ·
+portal com antes e depois · ficha reescrita · visual de sistema com coluna
+escura e tema escuro pronto.

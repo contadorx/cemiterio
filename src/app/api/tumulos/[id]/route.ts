@@ -53,39 +53,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  // OS TRÊS ATRIBUTOS DO TÚMULO — independentes entre si.
+  // O QUE É DO TÚMULO: o trabalho. O contrato é da família.
   //
-  //   valor_lavagem   quanto custa cada limpeza
-  //   periodicidade   de quanto em quanto tempo se limpa
-  //   freq_pagamento  de quanto em quanto tempo se cobra
+  // `valor_lavagem`, `valor_base`, `freq_pagamento` e `inicio_cobranca` ainda
+  // existem como colunas — são o histórico de quando o plano morava aqui —,
+  // mas o PATCH NÃO os aceita mais.
   //
-  // Não andam juntas: um túmulo pode ser limpo toda semana e pago por mês;
-  // outro, limpo por mês e pago no ano. Tratá-las como uma coisa só é o que
-  // faz serviço ser executado sem cobrança correspondente.
-  if (body.valor_lavagem !== undefined) {
-    const v = Number(String(body.valor_lavagem).replace(",", "."));
-    patch.valor_lavagem = isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
-  }
-  if (body.valor_base !== undefined) patch.valor_base = body.valor_base || "mes";
+  // Se aceitasse, a duplicação voltaria pela porta dos fundos: alguém gravaria
+  // um valor no túmulo, nada seria cobrado (a cobrança lê a família) e o
+  // número ficaria na tela mentindo. Melhor recusar em silêncio que guardar
+  // um dado que ninguém lê.
   if (body.periodicidade !== undefined) {
     patch.periodicidade = body.periodicidade || null;
-    // Mudou o ritmo: o ponteiro da agenda volta para hoje (ou para o início da
-    // cobrança, se ainda estiver à frente). Sem isso, trocar de mensal para
-    // semanal não mudaria nada até o ponteiro antigo vencer — a Sureya faria a
-    // troca e não veria efeito nenhum por semanas.
-    const hoje = new Date().toISOString().slice(0, 10);
-    const inicio = String(body.inicio_cobranca || "").slice(0, 10);
-    patch.proximo_servico = inicio && inicio > hoje ? `${inicio.slice(0, 7)}-01` : hoje;
+    // Mudou o ritmo: o ponteiro da agenda volta para hoje. Sem isso, trocar de
+    // mensal para semanal não teria efeito até o ponteiro antigo vencer — a
+    // Sureya faria a troca e não veria diferença por semanas.
+    patch.proximo_servico = new Date().toISOString().slice(0, 10);
   }
-  if (body.freq_pagamento !== undefined) patch.freq_pagamento = body.freq_pagamento || null;
   if (body.contratado !== undefined) patch.contratado = !!body.contratado;
-
-  // A PARTIR DE QUANDO COBRAR. Sempre o dia 1: competência é mês, não dia, e
-  // guardar "15/03" faria a comparação com "2026-03-01" falhar em silêncio.
-  if (body.inicio_cobranca !== undefined) {
-    const v = String(body.inicio_cobranca || "");
-    patch.inicio_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
-  }
 
   // vincular/desvincular o jazigo a uma família
   if (body.familia_id !== undefined) patch.familia_id = body.familia_id || null;

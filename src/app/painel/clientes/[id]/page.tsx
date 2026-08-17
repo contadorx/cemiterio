@@ -46,18 +46,6 @@ function valorDaCobranca(f: any) {
 const MES_CURTO = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const mesCurto = (d: string) => `${MES_CURTO[Number(d.slice(5, 7)) - 1]}/${d.slice(2, 4)}`;
 
-/** Quantas limpezas cabem num mês, para mostrar o total antes de salvar. */
-const POR_MES: Record<string, number> = {
-  semanal: 4, quinzenal: 2, mensal: 1, bimestral: 0.5, trimestral: 1 / 3,
-};
-
-function porMes(f: { valor_lavagem: any; valor_base: string; periodicidade: string }) {
-  const v = Number(String(f.valor_lavagem).replace(",", "."));
-  if (!isFinite(v)) return 0;
-  if (f.valor_base === "mes") return Math.round(v * 100) / 100;
-  return Math.round(v * (POR_MES[f.periodicidade] ?? 1) * 100) / 100;
-}
-
 const PERIODICIDADES = [
   ["semanal", "toda semana"],
   ["quinzenal", "a cada quinze dias"],
@@ -1180,6 +1168,7 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   const [porta, setPorta] = useState<"campo" | "novo">("campo");
   const [orfaos, setOrfaos] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
+  const [marcados, setMarcados] = useState<string[]>([]);
   const [quadras, setQuadras] = useState<any[]>([]);
   const [ruas, setRuas] = useState<any[]>([]);
   const [f, setF] = useState({ quadraId: "", quadraCodigo: "", rua: "", identificacao: "", falecidoNome: "" });
@@ -1213,13 +1202,26 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
         body: JSON.stringify(corpo),
       }).then((x) => x.json());
       if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui ligar."); return; }
+      // Falha parcial ainda é sucesso parcial: mostra o que não deu, mas segue
+      // com o que entrou — esconder isso faria a Sureya ligar de novo o que já
+      // estava ligado.
+      if (r?.mensagem) alert(r.mensagem);
+      setMarcados([]);
       aoPronto();
     } finally { setSalvando(false); }
   }
 
+  // A busca varre tudo que identifica a pedra: código, nome escrito nela,
+  // falecido, quadra e rua. Com dezenas de jazigos quase iguais, procurar só
+  // por um campo não acha nada.
+  const termos = busca.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const filtrados = orfaos.filter((t: any) => {
-    const alvo = [t.identificacao, t.quadra, t.rua].filter(Boolean).join(" ").toLowerCase();
-    return alvo.includes(busca.toLowerCase());
+    if (!termos.length) return true;
+    const alvo = [t.codigo, t.identificacao, t.falecido, t.quadra, t.rua]
+      .filter(Boolean).join(" ").toLowerCase();
+    // TODOS os termos precisam bater: "rua 5 almeida" é mais específico que
+    // "rua 5", e é assim que se estreita uma lista grande.
+    return termos.every((x) => alvo.includes(x));
   });
 
   return (
@@ -1250,30 +1252,79 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
               <Entrada
                 value={busca}
                 onChange={(e: any) => setBusca(e.target.value)}
-                placeholder="Buscar por nome na pedra, quadra ou rua"
+                placeholder="Buscar por código, nome na pedra, falecido, quadra ou rua"
               />
-              <div className="mt-2 max-h-72 overflow-y-auto">
-                {filtrados.map((t: any) => (
+
+              <div className="mt-2 flex items-center justify-between gap-2 text-[13px] text-ink-soft">
+                <span>
+                  {filtrados.length} de {orfaos.length}
+                  {marcados.length > 0 && ` · ${marcados.length} selecionado(s)`}
+                </span>
+                {filtrados.length > 0 && (
                   <button
-                    key={t.id}
-                    disabled={salvando}
-                    onClick={() => enviar({ vincularTumuloId: t.id })}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-card px-3 py-2.5 text-left hover:bg-surface disabled:opacity-50"
-                    style={{ marginBottom: 6 }}
+                    className="underline"
+                    onClick={() => {
+                      const ids = filtrados.map((t: any) => t.id);
+                      const todosMarcados = ids.every((x) => marcados.includes(x));
+                      // Marca/desmarca só o que está FILTRADO: com a lista
+                      // estreitada por busca, marcar os 68 seria o oposto do
+                      // que ela quer.
+                      setMarcados(todosMarcados
+                        ? marcados.filter((x) => !ids.includes(x))
+                        : [...new Set([...marcados, ...ids])]);
+                    }}
                   >
-                    <span className="min-w-0">
-                      <span className="block text-[15px] text-ink">
-                        {[t.quadra, t.rua].filter(Boolean).join(" · ") || "sem endereço"}
-                      </span>
-                      {t.identificacao && (
-                        <span className="block text-[13px] text-ink-soft">{t.identificacao}</span>
-                      )}
-                    </span>
-                    <Link2 size={16} className="flex-shrink-0 text-ink-soft" />
+                    {filtrados.every((t: any) => marcados.includes(t.id))
+                      ? "desmarcar estes" : "marcar estes"}
                   </button>
-                ))}
+                )}
+              </div>
+
+              {/* A FOTO É O QUE ELA RECONHECE.
+                  Quase nenhum jazigo do campo tem nome na pedra, e "Quadra 1 ·
+                  Rua 2" se repete dezenas de vezes. Sem a foto, escolher é
+                  adivinhar. */}
+              <div className="mt-2 grid max-h-80 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+                {filtrados.map((t: any) => {
+                  const escolhido = marcados.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setMarcados(escolhido
+                        ? marcados.filter((x) => x !== t.id)
+                        : [...marcados, t.id])}
+                      className={`overflow-hidden rounded-lg border text-left transition-colors ${
+                        escolhido ? "border-brand bg-brand-light" : "border-line bg-card hover:bg-surface"
+                      }`}
+                    >
+                      <span className="relative block">
+                        {t.foto ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={t.foto} alt="" className="h-24 w-full object-cover" />
+                        ) : (
+                          <span className="flex h-24 w-full items-center justify-center bg-surface text-[11px] text-ink-soft">
+                            sem foto
+                          </span>
+                        )}
+                        <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
+                          escolhido ? "border-brand bg-brand text-sobre" : "border-line bg-card text-transparent"
+                        }`}>✓</span>
+                      </span>
+                      <span className="block px-2 py-1.5">
+                        <span className="block truncate text-[13px] font-medium text-ink">
+                          {[t.quadra, t.rua].filter(Boolean).join(" · ") || "sem endereço"}
+                        </span>
+                        <span className="block truncate text-[11px] text-ink-soft">
+                          {t.identificacao || t.falecido || t.codigo || "—"}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
                 {!filtrados.length && (
-                  <p className="py-2 text-[14px] text-ink-soft">Nada com esse termo.</p>
+                  <p className="col-span-full py-2 text-[14px] text-ink-soft">
+                    Nada com esse termo.
+                  </p>
                 )}
               </div>
             </>
@@ -1315,7 +1366,18 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
 
       {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
+        {porta === "campo" && marcados.length > 0 && (
+          <Botao
+            tom="principal"
+            disabled={salvando}
+            onClick={() => enviar({ vincularTumuloIds: marcados })}
+          >
+            {salvando
+              ? "Ligando…"
+              : `Ligar ${marcados.length} ${marcados.length === 1 ? "jazigo" : "jazigos"}`}
+          </Botao>
+        )}
         {porta === "novo" && (
           <Botao
             tom="principal"

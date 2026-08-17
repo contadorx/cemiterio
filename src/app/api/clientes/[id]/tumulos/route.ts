@@ -42,6 +42,36 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const b = await req.json().catch(() => ({}));
 
+  // VÁRIOS DE UMA VEZ.
+  //
+  // São dezenas de jazigos do campo esperando família, e uma família costuma
+  // ficar com dois ou três. Ligar um por vez significaria abrir e fechar o
+  // formulário a cada pedra.
+  //
+  // Um a um por dentro, de propósito: se o terceiro falhar, os dois primeiros
+  // já entraram e a resposta diz exatamente qual não foi — em lote, um erro
+  // derrubaria todos e a Sureya não saberia onde parou.
+  const varios: string[] = Array.isArray(b?.vincularTumuloIds) ? b.vincularTumuloIds : [];
+  if (varios.length) {
+    const ligados: string[] = [];
+    const falhas: { id: string; mensagem: string }[] = [];
+
+    for (const id of varios) {
+      const r1 = await anexarJazigo(db, org, clienteId, { vincularTumuloId: id });
+      if (r1.ok) ligados.push(id);
+      else falhas.push({ id, mensagem: explicarErroJazigo(r1.erro, r1.detalhe) });
+    }
+
+    return NextResponse.json({
+      ok: ligados.length > 0,
+      ligados: ligados.length,
+      falhas,
+      mensagem: falhas.length
+        ? `${ligados.length} ligado(s). ${falhas.length} não deu: ${falhas[0].mensagem}`
+        : undefined,
+    });
+  }
+
   const r = await anexarJazigo(db, org, clienteId, {
     vincularTumuloId: b?.vincularTumuloId ?? null,
     identificacao: b?.identificacao ?? null,

@@ -204,7 +204,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
   // Agora as duas metades do sistema leem a mesma fonte.
   const { data: planos } = await db
     .from("tumulos")
-    .select("id,cliente_id,periodicidade,valor_lavagem,valor_base,proximo_servico,inicio_cobranca")
+    .select("id,cliente_id,familia_id,periodicidade,proximo_servico")
     .eq("org_id", org)
     .eq("contratado", true)
     .in("periodicidade", Object.keys(DIAS_CICLO));
@@ -221,14 +221,9 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     // por ciclo" para dividir. "Semanal" é a cada 7 dias, e ponto.
     const passo = DIAS_CICLO[(p as any).periodicidade];
 
-    // Nunca antes do início da cobrança: gerar agenda retroativa encheria a
-    // lista da Nina com dias que já passaram.
-    const piso = (p as any).inicio_cobranca
-      ? (String((p as any).inicio_cobranca).slice(0, 10) > isoHoje()
-          ? String((p as any).inicio_cobranca).slice(0, 10)
-          : isoHoje())
-      : isoHoje();
-    let prox: string = (p as any).proximo_servico || piso;
+    // Nunca antes de hoje: gerar agenda retroativa encheria a lista da Nina
+    // com dias que já passaram.
+    let prox: string = (p as any).proximo_servico || isoHoje();
     let guarda = 0;      // trava anti-loop
     let falhou = false;  // erro inesperado neste plano: nao avanca o ponteiro
 
@@ -257,10 +252,13 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
           cliente_id: (p as any).cliente_id,
           data_prevista: prox,
           status: "pendente",
-          // O valor do SERVIÇO é o de uma limpeza. Quando o contrato é por
-          // mês, dividir pelo número de limpeza daria centavos quebrados sem
-          // servir para nada: o dinheiro vem da competência, não daqui.
-          valor: (p as any).valor_base === "lavagem" ? (p as any).valor_lavagem : null,
+          // O SERVIÇO NÃO CARREGA VALOR.
+          //
+          // O dinheiro vem da competência da família, não da limpeza. Gravar
+          // um valor aqui criaria um segundo número para a mesma coisa — e
+          // seria ele que apareceria nos relatórios, divergindo do que a
+          // família realmente deve.
+          valor: null,
         };
         if (comColuna) linha.data_plano = prox;
 
