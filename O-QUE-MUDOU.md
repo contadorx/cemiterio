@@ -1027,50 +1027,6 @@ A visão de todas as famílias em aberto fica em **Financeiro → Fechar o mês*
 
 ---
 
-## OS TÚMULOS DO CAMPO PRECISAM CHEGAR NA FAMÍLIA
-
-### O que o banco mostrou
-
-**Os 71 túmulos cadastrados no campo estão todos órfãos** — nenhum com
-família. Como a conta corrente e a tela do mês penduram na FAMÍLIA, o trabalho
-da Nina existia no banco e era invisível no sistema. É por isso que as fichas
-apareciam vazias.
-
-### `src/lib/jazigo.ts` — o vínculo gravava só metade
-
-Ao ligar um jazigo a uma família, o código gravava `cliente_id` e **não**
-`familia_id`. Mesmo vinculando à mão, o túmulo continuaria fora da conta
-corrente.
-
-Corrigido nos dois caminhos: ao vincular um órfão e ao criar um jazigo novo.
-
-### Adicionar túmulo agora abre nos do campo
-
-Duas portas, e **a ordem importa**:
-
-1. **Cadastrados no campo** — a lista dos órfãos, com busca por nome na pedra,
-   quadra ou rua. Um toque liga à família.
-2. **Criar novo** — o formulário, para o que não foi cadastrado ainda.
-
-Abre na primeira, com o contador ao lado. Se abrisse no formulário, a Sureya
-cadastraria de novo o que já existe — e o cemitério acabaria com dois
-registros para a mesma pedra, cada um com metade da história.
-
-Quando não há nenhum órfão esperando, abre direto em "Criar novo": lista vazia
-não ajuda ninguém.
-
-### Mais de um túmulo por família
-
-Já funcionava e continua: a ficha lista todos, cada um com sua foto, seu
-endereço e seus três valores. O botão "Adicionar" não tem limite.
-
-**Testado no banco:** o vínculo preenche cliente e família juntos. O teste foi
-desfeito.
-
-`next build` executado: passou limpo.
-
----
-
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

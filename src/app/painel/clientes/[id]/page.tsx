@@ -837,23 +837,9 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
 /* ------------------------------------------------------------------ */
 
 /** Liga um túmulo novo a esta família — escolhendo quadra e rua das listas. */
-/**
- * LIGAR UM TÚMULO À FAMÍLIA.
- *
- * Duas portas, e a ordem importa: **primeiro os que a Nina já cadastrou no
- * campo**, depois criar do zero.
- *
- * O motivo é o estado real do cadastro: os 71 túmulos capturados no cemitério
- * estavam todos sem família. Se esta tela abrisse no formulário de criar,
- * a Sureya cadastraria de novo o que já existe — e o cemitério acabaria com
- * dois registros para a mesma pedra, cada um com metade da história.
- */
 function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   clienteId: string; aoPronto: () => void; aoCancelar: () => void;
 }) {
-  const [porta, setPorta] = useState<"campo" | "novo">("campo");
-  const [orfaos, setOrfaos] = useState<any[]>([]);
-  const [busca, setBusca] = useState("");
   const [quadras, setQuadras] = useState<any[]>([]);
   const [ruas, setRuas] = useState<any[]>([]);
   const [f, setF] = useState({ quadraId: "", quadraCodigo: "", rua: "", identificacao: "", falecidoNome: "" });
@@ -861,15 +847,8 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    fetch("/api/tumulos").then((x) => x.json())
-      .then((r) => {
-        if (!r?.ok) return;
-        setOrfaos(r.semDono || []);
-        // Sem nenhum órfão esperando, a porta do campo não serve — abre direto
-        // no formulário em vez de mostrar uma lista vazia.
-        if (!(r.semDono || []).length) setPorta("novo");
-        setQuadras(r.cemiterios?.[0]?.quadras || []);
-      }).catch(() => {});
+    fetch("/api/quadras").then((x) => x.json())
+      .then((r) => { if (r?.ok) setQuadras(r.quadras || []); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -878,135 +857,64 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
       .then((r) => { if (r?.ok) setRuas(r.ruas || []); }).catch(() => {});
   }, [f.quadraId]);
 
-  async function enviar(corpo: any) {
+  async function criar() {
+    if (!f.quadraCodigo) return setErro("Escolha a quadra.");
+    if (!f.rua) return setErro("Escolha a rua — é ela que põe o jazigo no roteiro.");
     setSalvando(true); setErro("");
     try {
       const r = await fetch(`/api/clientes/${clienteId}/tumulos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(corpo),
+        body: JSON.stringify({
+          quadraCodigo: f.quadraCodigo,
+          rua: f.rua,
+          identificacao: f.identificacao || null,
+          falecidoNome: f.falecidoNome || null,
+        }),
       }).then((x) => x.json());
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui ligar."); return; }
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui adicionar."); return; }
       aoPronto();
     } finally { setSalvando(false); }
   }
 
-  const filtrados = orfaos.filter((t: any) => {
-    const alvo = [t.identificacao, t.quadra, t.rua].filter(Boolean).join(" ").toLowerCase();
-    return alvo.includes(busca.toLowerCase());
-  });
-
   return (
     <div className="mb-3 rounded-lg bg-surface p-3">
-      <div className="mb-3 flex gap-2">
-        <Botao
-          tom={porta === "campo" ? "principal" : "secundario"}
-          onClick={() => setPorta("campo")}
-        >
-          Cadastrados no campo{orfaos.length ? ` (${orfaos.length})` : ""}
-        </Botao>
-        <Botao
-          tom={porta === "novo" ? "principal" : "secundario"}
-          onClick={() => setPorta("novo")}
-        >
-          Criar novo
-        </Botao>
-      </div>
-
-      {porta === "campo" ? (
-        <>
-          {!orfaos.length ? (
-            <p className="text-[14px] text-ink-soft">
-              Nenhum túmulo do campo esperando família. Use &ldquo;Criar novo&rdquo;.
-            </p>
-          ) : (
-            <>
-              <Entrada
-                value={busca}
-                onChange={(e: any) => setBusca(e.target.value)}
-                placeholder="Buscar por nome na pedra, quadra ou rua"
-              />
-              <div className="mt-2 max-h-72 overflow-y-auto">
-                {filtrados.map((t: any) => (
-                  <button
-                    key={t.id}
-                    disabled={salvando}
-                    onClick={() => enviar({ vincularTumuloId: t.id })}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-card px-3 py-2.5 text-left hover:bg-surface disabled:opacity-50"
-                    style={{ marginBottom: 6 }}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[15px] text-ink">
-                        {[t.quadra, t.rua].filter(Boolean).join(" · ") || "sem endereço"}
-                      </span>
-                      {t.identificacao && (
-                        <span className="block text-[13px] text-ink-soft">{t.identificacao}</span>
-                      )}
-                    </span>
-                    <Link2 size={16} className="flex-shrink-0 text-ink-soft" />
-                  </button>
-                ))}
-                {!filtrados.length && (
-                  <p className="py-2 text-[14px] text-ink-soft">Nada com esse termo.</p>
-                )}
-              </div>
-            </>
-          )}
-        </>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Campo rotulo="Quadra">
-            <Selecao
-              value={f.quadraId}
-              onChange={(e: any) => {
-                const q = quadras.find((x: any) => x.id === e.target.value);
-                setF({ ...f, quadraId: e.target.value, quadraCodigo: q?.codigo || "", rua: "" });
-              }}
-            >
-              <option value="">escolha</option>
-              {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
-            </Selecao>
-          </Campo>
-          <Campo rotulo="Rua">
-            <Selecao value={f.rua} disabled={!ruas.length}
-                     onChange={(e: any) => setF({ ...f, rua: e.target.value })}>
-              <option value="">{f.quadraId ? "escolha" : "escolha a quadra antes"}</option>
-              {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
-            </Selecao>
-          </Campo>
-          <Campo rotulo="Nome escrito na pedra" dica="opcional">
-            <Entrada value={f.identificacao}
-                     onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
-                     placeholder="Ex.: Almeida" />
-          </Campo>
-          <Campo rotulo="Nome do falecido">
-            <Entrada value={f.falecidoNome}
-                     onChange={(e: any) => setF({ ...f, falecidoNome: e.target.value })}
-                     placeholder="opcional" />
-          </Campo>
-        </div>
-      )}
-
-      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
-
-      <div className="mt-3 flex gap-2">
-        {porta === "novo" && (
-          <Botao
-            tom="principal"
-            disabled={salvando}
-            onClick={() => {
-              if (!f.quadraCodigo) return setErro("Escolha a quadra.");
-              if (!f.rua) return setErro("Escolha a rua — é ela que põe o jazigo no roteiro.");
-              enviar({
-                quadraCodigo: f.quadraCodigo, rua: f.rua,
-                identificacao: f.identificacao || null,
-                falecidoNome: f.falecidoNome || null,
-              });
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo rotulo="Quadra">
+          <Selecao
+            value={f.quadraId}
+            onChange={(e: any) => {
+              const q = quadras.find((x: any) => x.id === e.target.value);
+              setF({ ...f, quadraId: e.target.value, quadraCodigo: q?.codigo || "", rua: "" });
             }}
           >
-            {salvando ? "Criando…" : "Criar e ligar"}
-          </Botao>
-        )}
+            <option value="">escolha</option>
+            {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Rua">
+          <Selecao value={f.rua} disabled={!ruas.length}
+                   onChange={(e: any) => setF({ ...f, rua: e.target.value })}>
+            <option value="">{f.quadraId ? "escolha" : "escolha a quadra antes"}</option>
+            {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
+          </Selecao>
+        </Campo>
+        <Campo rotulo="Nome escrito na pedra" dica="opcional">
+          <Entrada value={f.identificacao}
+                   onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
+                   placeholder="Ex.: Almeida" />
+        </Campo>
+        <Campo rotulo="Nome do falecido">
+          <Entrada value={f.falecidoNome}
+                   onChange={(e: any) => setF({ ...f, falecidoNome: e.target.value })}
+                   placeholder="opcional" />
+        </Campo>
+      </div>
+      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+      <div className="mt-3 flex gap-2">
+        <Botao tom="principal" onClick={criar} disabled={salvando}>
+          {salvando ? "Adicionando…" : "Adicionar"}
+        </Botao>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
       </div>
     </div>
