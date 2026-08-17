@@ -979,6 +979,98 @@ tratamento, régua de cobrança, lembretes, ativação) mais os blocos da IA.
 
 ---
 
+## O COMPROVANTE SEM WHATSAPP — lacuna fechada
+
+### O problema, que era grave
+
+O comprovante só entrava por **um** caminho: a família mandava a foto do Pix
+no WhatsApp e o agente de IA lia (`lib/atendimento.ts`). Os dois lados desse
+caminho estão desligados — o agente por decisão nossa, e a instância pode cair
+a qualquer momento, como está agora.
+
+Ou seja: **não havia como registrar um comprovante.** O dinheiro entrava na
+conta da Sureya e o sistema não sabia.
+
+### `src/app/api/comprovantes/anexar/route.ts` (novo)
+
+Ela tira uma foto da tela — ou escolhe o print que a família mandou no
+WhatsApp pessoal dela — e anexa. Funciona com a instância de pé ou caída, sem
+depender de nenhuma automação.
+
+O status nasce **`confirmado`**, e não `a_conferir`: quem anexou foi a própria
+Sureya, olhando. O `a_conferir` existia para o que o robô lia sozinho e podia
+errar.
+
+### Na ficha
+
+O botão **"Anexar comprovante"** aparece dentro do formulário de pagamento —
+no mesmo gesto, e não num fluxo à parte. Anexar depois é o tipo de tarefa que
+ninguém volta para fazer.
+
+A imagem sobe **antes** do lançamento. Se ela falhar, nada é gravado e a
+Sureya tenta de novo; na ordem inversa, ela ficaria com um pagamento
+registrado sem prova e sem saber.
+
+No extrato, cada lançamento com comprovante ganha **"ver comprovante"**. A URL
+vai junto na resposta da API — mostrar "tem comprovante" sem poder abrir seria
+pior que não mostrar nada.
+
+### Onde fica a conta corrente
+
+**Dentro da ficha da família**, entre os túmulos e as limpezas. É lá que a
+pergunta nasce ("esta família está em dia?"), então é lá que a resposta tem de
+estar.
+
+A visão de todas as famílias em aberto fica em **Financeiro → Fechar o mês**.
+
+`next build` executado: passou limpo.
+
+---
+
+## OS TÚMULOS DO CAMPO PRECISAM CHEGAR NA FAMÍLIA
+
+### O que o banco mostrou
+
+**Os 71 túmulos cadastrados no campo estão todos órfãos** — nenhum com
+família. Como a conta corrente e a tela do mês penduram na FAMÍLIA, o trabalho
+da Nina existia no banco e era invisível no sistema. É por isso que as fichas
+apareciam vazias.
+
+### `src/lib/jazigo.ts` — o vínculo gravava só metade
+
+Ao ligar um jazigo a uma família, o código gravava `cliente_id` e **não**
+`familia_id`. Mesmo vinculando à mão, o túmulo continuaria fora da conta
+corrente.
+
+Corrigido nos dois caminhos: ao vincular um órfão e ao criar um jazigo novo.
+
+### Adicionar túmulo agora abre nos do campo
+
+Duas portas, e **a ordem importa**:
+
+1. **Cadastrados no campo** — a lista dos órfãos, com busca por nome na pedra,
+   quadra ou rua. Um toque liga à família.
+2. **Criar novo** — o formulário, para o que não foi cadastrado ainda.
+
+Abre na primeira, com o contador ao lado. Se abrisse no formulário, a Sureya
+cadastraria de novo o que já existe — e o cemitério acabaria com dois
+registros para a mesma pedra, cada um com metade da história.
+
+Quando não há nenhum órfão esperando, abre direto em "Criar novo": lista vazia
+não ajuda ninguém.
+
+### Mais de um túmulo por família
+
+Já funcionava e continua: a ficha lista todos, cada um com sua foto, seu
+endereço e seus três valores. O botão "Adicionar" não tem limite.
+
+**Testado no banco:** o vínculo preenche cliente e família juntos. O teste foi
+desfeito.
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

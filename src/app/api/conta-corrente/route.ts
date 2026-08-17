@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await db
     .from("conta_corrente")
     .select("id,tipo,origem,competencia,valor,descricao,data,comprovante_id," +
-            "tumulos(codigo,ruas(nome),quadras(codigo))")
+            "comprovantes(imagem_url),tumulos(codigo,ruas(nome),quadras(codigo))")
     .eq("familia_id", familiaId)
     .order("data", { ascending: false })
     .order("created_at", { ascending: false })
@@ -57,6 +57,9 @@ export async function GET(req: NextRequest) {
     descricao: l.descricao,
     data: l.data,
     temComprovante: !!l.comprovante_id,
+    // A URL vai junto: sem ela a Sureya veria "tem comprovante" e não teria
+    // como abrir — pior que não mostrar nada.
+    comprovanteUrl: l.comprovantes?.imagem_url ?? null,
     local: l.tumulos
       ? [l.tumulos.quadras?.codigo, l.tumulos.ruas?.nome].filter(Boolean).join(" · ")
       : null,

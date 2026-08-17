@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle, Plus, ChevronDown, Pencil, Link2, Trash2, Camera } from "lucide-react";
@@ -114,7 +114,7 @@ export default function Ficha() {
       <Identificacao c={c} aoMudar={carregar} />
       <Pessoas familiaId={c.familia_id} atualId={id} />
       <Tumulos tumulos={d.tumulos || []} clienteId={id} aoMudar={carregar} />
-      <ContaCorrente familiaId={c.familia_id} aoMudar={carregar} />
+      <ContaCorrente familiaId={c.familia_id} clienteId={id} aoMudar={carregar} />
       <Limpezas clienteId={id} tumulos={d.tumulos || []} aoMudar={carregar} />
       <Ajustes clienteId={id} nome={c.nome} />
     </>
@@ -403,8 +403,14 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
 
 /* ------------------------------------------------------------------ */
 
-function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: () => void }) {
+function ContaCorrente({ familiaId, clienteId, aoMudar }: {
+  familiaId: string | null; clienteId: string; aoMudar: () => void;
+}) {
   const [dados, setDados] = useState<any>(null);
+  // O comprovante entra AQUI, junto com o pagamento — e não num fluxo à
+  // parte. Anexar depois é o tipo de tarefa que ninguém volta para fazer.
+  const [comprovante, setComprovante] = useState<{ b64: string; mt: string } | null>(null);
+  const camera = useRef<HTMLInputElement | null>(null);
   const [abrindo, setAbrindo] = useState<"pagamento" | "avulso" | "abertura" | null>(null);
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -433,6 +439,17 @@ function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMud
 
   const temAbertura = (dados?.linhas || []).some((l: any) => l.origem === "abertura");
 
+  function escolherComprovante(e: any) {
+    const arquivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!arquivo) return;
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      setComprovante({ b64: String(leitor.result || ""), mt: arquivo.type || "image/jpeg" });
+    };
+    leitor.readAsDataURL(arquivo);
+  }
+
   async function lancar() {
     const n = Number(String(valor).replace(",", "."));
     if (!isFinite(n) || (abrindo !== "abertura" && n <= 0)) {
@@ -442,13 +459,29 @@ function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMud
     setOcupado(true);
     setErro("");
     try {
+      // Sobe o comprovante ANTES do lançamento: se a imagem falhar, nada é
+      // gravado e a Sureya tenta de novo. Ao contrário, ela ficaria com um
+      // pagamento registrado sem prova e sem saber.
+      let comprovanteId: string | null = null;
+      if (comprovante) {
+        const up = await fetch("/api/comprovantes/anexar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clienteId, imagemBase64: comprovante.b64, mimetype: comprovante.mt, valor: n,
+          }),
+        }).then((x) => x.json());
+        if (!up?.ok) { setErro(up?.mensagem || "Não consegui salvar o comprovante."); return; }
+        comprovanteId = up.id;
+      }
+
       const r = await fetch("/api/conta-corrente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao }),
+        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao, comprovanteId }),
       }).then((x) => x.json());
       if (!r?.ok) { setErro(r?.mensagem || "Não consegui lançar."); return; }
-      setAbrindo(null); setValor(""); setDescricao("");
+      setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null);
       carregar(); aoMudar();
     } finally {
       setOcupado(false);
@@ -497,12 +530,37 @@ function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMud
                        placeholder="opcional" />
             </Campo>
           </div>
+          {/* O COMPROVANTE, sem depender do WhatsApp.
+              Ela tira foto da tela ou escolhe o print que a família mandou no
+              WhatsApp pessoal. Funciona com a instância de pé ou caída. */}
+          {abrindo === "pagamento" && (
+            <div className="mt-3">
+              <input ref={camera} type="file" accept="image/*" capture="environment"
+                     onChange={escolherComprovante} className="hidden" />
+              {comprovante ? (
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={comprovante.b64} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                  <span className="text-[14px] text-positivo">comprovante anexado</span>
+                  <button onClick={() => setComprovante(null)}
+                          className="text-[13px] text-ink-soft underline">
+                    trocar
+                  </button>
+                </div>
+              ) : (
+                <Botao onClick={() => camera.current?.click()}>
+                  <Camera size={16} /> Anexar comprovante
+                </Botao>
+              )}
+            </div>
+          )}
+
           {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
           <div className="mt-3 flex gap-2">
             <Botao tom="principal" onClick={lancar} disabled={ocupado}>
               {ocupado ? "Lançando…" : "Lançar"}
             </Botao>
-            <Botao onClick={() => setAbrindo(null)}>Cancelar</Botao>
+            <Botao onClick={() => { setAbrindo(null); setComprovante(null); }}>Cancelar</Botao>
           </div>
         </div>
       )}
@@ -519,6 +577,13 @@ function ContaCorrente({ familiaId, aoMudar }: { familiaId: string | null; aoMud
               {new Date(l.data + "T12:00:00").toLocaleDateString("pt-BR")}
               {l.competencia && ` · ${periodo(l.competencia)}`}
               {l.local && ` · ${l.local}`}
+              {l.comprovanteUrl && (
+                <>
+                  {" · "}
+                  <a href={l.comprovanteUrl} target="_blank" rel="noreferrer"
+                     className="text-brand underline">ver comprovante</a>
+                </>
+              )}
             </p>
           </div>
           {/* A lavagem é REGISTRO, não dinheiro: "+ R$ 0,00" pareceria uma
@@ -772,9 +837,23 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
 /* ------------------------------------------------------------------ */
 
 /** Liga um túmulo novo a esta família — escolhendo quadra e rua das listas. */
+/**
+ * LIGAR UM TÚMULO À FAMÍLIA.
+ *
+ * Duas portas, e a ordem importa: **primeiro os que a Nina já cadastrou no
+ * campo**, depois criar do zero.
+ *
+ * O motivo é o estado real do cadastro: os 71 túmulos capturados no cemitério
+ * estavam todos sem família. Se esta tela abrisse no formulário de criar,
+ * a Sureya cadastraria de novo o que já existe — e o cemitério acabaria com
+ * dois registros para a mesma pedra, cada um com metade da história.
+ */
 function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   clienteId: string; aoPronto: () => void; aoCancelar: () => void;
 }) {
+  const [porta, setPorta] = useState<"campo" | "novo">("campo");
+  const [orfaos, setOrfaos] = useState<any[]>([]);
+  const [busca, setBusca] = useState("");
   const [quadras, setQuadras] = useState<any[]>([]);
   const [ruas, setRuas] = useState<any[]>([]);
   const [f, setF] = useState({ quadraId: "", quadraCodigo: "", rua: "", identificacao: "", falecidoNome: "" });
@@ -782,8 +861,15 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    fetch("/api/quadras").then((x) => x.json())
-      .then((r) => { if (r?.ok) setQuadras(r.quadras || []); }).catch(() => {});
+    fetch("/api/tumulos").then((x) => x.json())
+      .then((r) => {
+        if (!r?.ok) return;
+        setOrfaos(r.semDono || []);
+        // Sem nenhum órfão esperando, a porta do campo não serve — abre direto
+        // no formulário em vez de mostrar uma lista vazia.
+        if (!(r.semDono || []).length) setPorta("novo");
+        setQuadras(r.cemiterios?.[0]?.quadras || []);
+      }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -792,64 +878,135 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
       .then((r) => { if (r?.ok) setRuas(r.ruas || []); }).catch(() => {});
   }, [f.quadraId]);
 
-  async function criar() {
-    if (!f.quadraCodigo) return setErro("Escolha a quadra.");
-    if (!f.rua) return setErro("Escolha a rua — é ela que põe o jazigo no roteiro.");
+  async function enviar(corpo: any) {
     setSalvando(true); setErro("");
     try {
       const r = await fetch(`/api/clientes/${clienteId}/tumulos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quadraCodigo: f.quadraCodigo,
-          rua: f.rua,
-          identificacao: f.identificacao || null,
-          falecidoNome: f.falecidoNome || null,
-        }),
+        body: JSON.stringify(corpo),
       }).then((x) => x.json());
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui adicionar."); return; }
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui ligar."); return; }
       aoPronto();
     } finally { setSalvando(false); }
   }
 
+  const filtrados = orfaos.filter((t: any) => {
+    const alvo = [t.identificacao, t.quadra, t.rua].filter(Boolean).join(" ").toLowerCase();
+    return alvo.includes(busca.toLowerCase());
+  });
+
   return (
     <div className="mb-3 rounded-lg bg-surface p-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Quadra">
-          <Selecao
-            value={f.quadraId}
-            onChange={(e: any) => {
-              const q = quadras.find((x: any) => x.id === e.target.value);
-              setF({ ...f, quadraId: e.target.value, quadraCodigo: q?.codigo || "", rua: "" });
+      <div className="mb-3 flex gap-2">
+        <Botao
+          tom={porta === "campo" ? "principal" : "secundario"}
+          onClick={() => setPorta("campo")}
+        >
+          Cadastrados no campo{orfaos.length ? ` (${orfaos.length})` : ""}
+        </Botao>
+        <Botao
+          tom={porta === "novo" ? "principal" : "secundario"}
+          onClick={() => setPorta("novo")}
+        >
+          Criar novo
+        </Botao>
+      </div>
+
+      {porta === "campo" ? (
+        <>
+          {!orfaos.length ? (
+            <p className="text-[14px] text-ink-soft">
+              Nenhum túmulo do campo esperando família. Use &ldquo;Criar novo&rdquo;.
+            </p>
+          ) : (
+            <>
+              <Entrada
+                value={busca}
+                onChange={(e: any) => setBusca(e.target.value)}
+                placeholder="Buscar por nome na pedra, quadra ou rua"
+              />
+              <div className="mt-2 max-h-72 overflow-y-auto">
+                {filtrados.map((t: any) => (
+                  <button
+                    key={t.id}
+                    disabled={salvando}
+                    onClick={() => enviar({ vincularTumuloId: t.id })}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-card px-3 py-2.5 text-left hover:bg-surface disabled:opacity-50"
+                    style={{ marginBottom: 6 }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[15px] text-ink">
+                        {[t.quadra, t.rua].filter(Boolean).join(" · ") || "sem endereço"}
+                      </span>
+                      {t.identificacao && (
+                        <span className="block text-[13px] text-ink-soft">{t.identificacao}</span>
+                      )}
+                    </span>
+                    <Link2 size={16} className="flex-shrink-0 text-ink-soft" />
+                  </button>
+                ))}
+                {!filtrados.length && (
+                  <p className="py-2 text-[14px] text-ink-soft">Nada com esse termo.</p>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo rotulo="Quadra">
+            <Selecao
+              value={f.quadraId}
+              onChange={(e: any) => {
+                const q = quadras.find((x: any) => x.id === e.target.value);
+                setF({ ...f, quadraId: e.target.value, quadraCodigo: q?.codigo || "", rua: "" });
+              }}
+            >
+              <option value="">escolha</option>
+              {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
+            </Selecao>
+          </Campo>
+          <Campo rotulo="Rua">
+            <Selecao value={f.rua} disabled={!ruas.length}
+                     onChange={(e: any) => setF({ ...f, rua: e.target.value })}>
+              <option value="">{f.quadraId ? "escolha" : "escolha a quadra antes"}</option>
+              {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
+            </Selecao>
+          </Campo>
+          <Campo rotulo="Nome escrito na pedra" dica="opcional">
+            <Entrada value={f.identificacao}
+                     onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
+                     placeholder="Ex.: Almeida" />
+          </Campo>
+          <Campo rotulo="Nome do falecido">
+            <Entrada value={f.falecidoNome}
+                     onChange={(e: any) => setF({ ...f, falecidoNome: e.target.value })}
+                     placeholder="opcional" />
+          </Campo>
+        </div>
+      )}
+
+      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+
+      <div className="mt-3 flex gap-2">
+        {porta === "novo" && (
+          <Botao
+            tom="principal"
+            disabled={salvando}
+            onClick={() => {
+              if (!f.quadraCodigo) return setErro("Escolha a quadra.");
+              if (!f.rua) return setErro("Escolha a rua — é ela que põe o jazigo no roteiro.");
+              enviar({
+                quadraCodigo: f.quadraCodigo, rua: f.rua,
+                identificacao: f.identificacao || null,
+                falecidoNome: f.falecidoNome || null,
+              });
             }}
           >
-            <option value="">escolha</option>
-            {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
-          </Selecao>
-        </Campo>
-        <Campo rotulo="Rua">
-          <Selecao value={f.rua} disabled={!ruas.length}
-                   onChange={(e: any) => setF({ ...f, rua: e.target.value })}>
-            <option value="">{f.quadraId ? "escolha" : "escolha a quadra antes"}</option>
-            {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
-          </Selecao>
-        </Campo>
-        <Campo rotulo="Nome escrito na pedra" dica="opcional">
-          <Entrada value={f.identificacao}
-                   onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
-                   placeholder="Ex.: Almeida" />
-        </Campo>
-        <Campo rotulo="Nome do falecido">
-          <Entrada value={f.falecidoNome}
-                   onChange={(e: any) => setF({ ...f, falecidoNome: e.target.value })}
-                   placeholder="opcional" />
-        </Campo>
-      </div>
-      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
-      <div className="mt-3 flex gap-2">
-        <Botao tom="principal" onClick={criar} disabled={salvando}>
-          {salvando ? "Adicionando…" : "Adicionar"}
-        </Botao>
+            {salvando ? "Criando…" : "Criar e ligar"}
+          </Botao>
+        )}
         <Botao onClick={aoCancelar}>Cancelar</Botao>
       </div>
     </div>

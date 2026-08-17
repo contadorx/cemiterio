@@ -134,6 +134,17 @@ export async function anexarJazigo(
     }
 
     const patch: Record<string, any> = { cliente_id: clienteId };
+
+    // A FAMÍLIA VAI JUNTO.
+    //
+    // O vínculo gravava só `cliente_id`, e os 71 túmulos cadastrados no campo
+    // ficaram com `familia_id` nulo. Como a conta corrente e a tela do mês
+    // penduram na FAMÍLIA, eles não apareciam em lugar nenhum — o trabalho da
+    // Nina existia no banco e era invisível no sistema.
+    const { data: pessoa } = await db
+      .from("clientes").select("familia_id").eq("id", clienteId).maybeSingle();
+    if ((pessoa as any)?.familia_id) patch.familia_id = (pessoa as any).familia_id;
+
     if (txt(jz.rua)) patch.rua = txt(jz.rua);
     if (txt(jz.numero)) patch.numero = txt(jz.numero);
     if (txt(jz.falecidoNome)) patch.falecido_nome = txt(jz.falecidoNome);
@@ -246,8 +257,14 @@ export async function anexarJazigo(
     return { ok: true, tumuloId: (existente as any).id, reaproveitado: dono === clienteId };
   }
 
+  // A família do jazigo novo, pelo mesmo motivo do caminho 1: a conta corrente
+  // e a tela do mês penduram na FAMÍLIA, não na pessoa.
+  const { data: dono2 } = await db
+    .from("clientes").select("familia_id").eq("id", clienteId).maybeSingle();
+  const familiaId = (dono2 as any)?.familia_id ?? null;
+
   const { data: tum, error } = await db.from("tumulos").insert({
-    org_id: org, quadra_id: quadraId, cliente_id: clienteId,
+    org_id: org, quadra_id: quadraId, cliente_id: clienteId, familia_id: familiaId,
     identificacao: ident, rua, numero, falecido_nome: falecido,
     // 0044: o cemitério fica no próprio túmulo, para consulta e rota não
     // dependerem de um join triplo (o gatilho do banco é a rede de segurança)
