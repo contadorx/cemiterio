@@ -66,6 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const v = Number(String(body.valor_lavagem).replace(",", "."));
     patch.valor_lavagem = isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
   }
+  if (body.valor_base !== undefined) patch.valor_base = body.valor_base || "mes";
   if (body.periodicidade !== undefined) patch.periodicidade = body.periodicidade || null;
   if (body.freq_pagamento !== undefined) patch.freq_pagamento = body.freq_pagamento || null;
   if (body.contratado !== undefined) patch.contratado = !!body.contratado;

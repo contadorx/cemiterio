@@ -22,11 +22,25 @@ export type Periodicidade =
 
 export type FreqPagamento = "mensal" | "trimestral" | "semestral" | "anual";
 
+export type BaseValor = "mes" | "lavagem";
+
 export interface TumuloCobranca {
   tumuloId: string;
   familiaId: string;
   contratado: boolean;
   valorLavagem: number;
+  /**
+   * O QUE O VALOR SIGNIFICA.
+   *
+   *   "mes"      -> é o valor do MÊS, não importa quantas limpezas cabem nele.
+   *                 É como a Sureya vende: "R$ 40 por mês, e eu vou toda semana".
+   *   "lavagem"  -> é o preço de CADA limpeza; o mês é ele vezes a periodicidade.
+   *
+   * Sem este campo o sistema supunha "lavagem" e multiplicava: um contrato de
+   * R$ 40 por mês com limpeza semanal virava R$ 160. Quatro vezes o combinado,
+   * numa cobrança que a família não reconheceria.
+   */
+  valorBase?: BaseValor;
   periodicidade: Periodicidade | null;
   freqPagamento: FreqPagamento | null;
 }
@@ -72,6 +86,9 @@ const centavos = (v: number) => Math.round(v * 100) / 100;
  */
 export function valorMensal(t: TumuloCobranca): number {
   if (!t.contratado || !t.periodicidade) return 0;
+  // O padrão é "mes" porque é assim que o contrato é fechado. Supor
+  // "lavagem" multiplicaria um valor que já é mensal.
+  if ((t.valorBase ?? "mes") === "mes") return centavos(t.valorLavagem);
   return centavos(t.valorLavagem * LAVAGENS_POR_MES[t.periodicidade]);
 }
 
@@ -105,6 +122,7 @@ export function debitoDaCompetencia(
   const rotulo: Record<FreqPagamento, string> = {
     mensal: "1 mês", trimestral: "3 meses", semestral: "6 meses", anual: "12 meses",
   };
+
 
   return {
     familiaId: t.familiaId,

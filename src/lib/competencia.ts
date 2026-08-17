@@ -28,7 +28,7 @@ async function planosDoMes(org: string, competencia: string) {
 
   const { data, error } = await db
     .from("tumulos")
-    .select("id,familia_id,valor_lavagem,periodicidade,freq_pagamento,contratado,created_at")
+    .select("id,familia_id,valor_lavagem,valor_base,periodicidade,freq_pagamento,contratado,created_at")
     .eq("org_id", org)
     .eq("contratado", true)
     .not("familia_id", "is", null);
@@ -40,6 +40,7 @@ async function planosDoMes(org: string, competencia: string) {
     familiaId: t.familia_id,
     contratado: true,
     valorLavagem: Number(t.valor_lavagem || 0),
+    valorBase: t.valor_base ?? "mes",
     periodicidade: t.periodicidade,
     freqPagamento: t.freq_pagamento,
   }));

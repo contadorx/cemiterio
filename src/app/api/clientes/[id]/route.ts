@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
 
   const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
-    db.from("tumulos").select("id,identificacao,numero,falecido_nome,datas_gatilho,qr_token,rua,rua_id,codigo,ordem_na_rua,valor_lavagem,periodicidade,freq_pagamento,contratado,quadra_id,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,foto_enquadramento_url,familia_id,ruas(nome),quadras(codigo)").eq("cliente_id", id),
+    db.from("tumulos").select("id,identificacao,numero,falecido_nome,datas_gatilho,qr_token,rua,rua_id,codigo,ordem_na_rua,valor_lavagem,valor_base,periodicidade,freq_pagamento,contratado,quadra_id,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,foto_enquadramento_url,familia_id,ruas(nome),quadras(codigo)").eq("cliente_id", id),
     db.from("planos").select("id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate,proxima_cobranca,proximo_servico,migrado_em,momento_cobranca").eq("cliente_id", id),
     db.from("movimentos").select("id,tipo,valor,status_conc,data,descricao").eq("cliente_id", id).order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),

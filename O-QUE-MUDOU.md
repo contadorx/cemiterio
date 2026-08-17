@@ -1109,6 +1109,128 @@ reposiciona o jazigo no roteiro do dia.
 
 ---
 
+## O BOTÃO DE SALVAR — dois erros meus
+
+### 1. Na ficha, a edição estava atrás de um chevron mudo
+
+O cartão do túmulo tinha só uma setinha `⌄` no canto, com rótulo invisível
+para leitor de tela e nada escrito. Quem olha vê um enfeite, não um botão — e
+sem abrir a gaveta, não existe formulário nem botão de salvar.
+
+Agora é um botão com a palavra: **Editar** / **Fechar**, com o ícone só
+acompanhando.
+
+### 2. Na tela Jazigos, eu criei um bloco duplicado
+
+O cartão **já tinha** o formulário completo — quadra, número, rua, falecido,
+família e observações — com botão de salvar. Eu adicionei um segundo bloco
+"Corrigir endereço" por cima, sem ver o que já existia. Removido.
+
+O que ficou é melhor que o meu: tem também o seletor de **família**, que
+resolve o vínculo dos órfãos ali mesmo, sem precisar abrir a ficha.
+
+### 3. O botão apagado parecia ausente
+
+Ele fica desabilitado até algo mudar, e nesse estado usa o estilo secundário —
+cinza-claro, escrito só "Salvar". Um botão cinza sem explicação lê-se como
+"não tem botão".
+
+Agora o texto diz o estado: **"Salvar (nada mudou ainda)"** → **"Salvar
+alterações"** → **"Salvando…"**.
+
+Varri as duas telas: nenhum botão restou só com ícone.
+
+`next build` executado: passou limpo.
+
+---
+
+## DOIS ERROS QUE A TELA DA "PERRELA" REVELOU
+
+### 1. A conta corrente sumia em cliente novo
+
+Eu criei famílias para os 65 clientes que existiam — e não para os que
+viessem depois. O primeiro cadastro novo nasceu sem família, e a conta
+corrente pendura na FAMÍLIA: por isso o cartão dizia "ainda não está
+vinculada".
+
+**A correção foi um gatilho no banco**, não um remendo no código. Cliente é
+criado por vários caminhos — painel, campo, importação — e consertar um
+deixaria os outros quebrados, com o erro voltando em silêncio meses depois.
+Agora toda pessoa nasce com família, venha de onde vier, e a primeira da casa
+já entra como responsável financeiro.
+
+Os 66 clientes atuais estão com família, e os túmulos deles também.
+
+### 2. O valor estava sendo multiplicado
+
+Eu modelei só "valor por lavagem", e o sistema multiplicava pela
+periodicidade. Mas a Sureya contrata **pelo mês**: *"R$ 40 por mês, e eu vou
+lá toda semana"*.
+
+No modelo antigo esse contrato virava **R$ 160** — quatro vezes o combinado,
+numa cobrança que a família não reconheceria. Erro caro e silencioso.
+
+Agora o campo pergunta a base, porque os dois modos existem no mundo:
+
+- **por mês, não importa quantas limpezas** *(padrão — é como ela vende)*
+- **o preço de cada limpeza**
+
+E, antes de salvar, a ficha escreve o resultado: *"Dá R$ 40,00 por mês"*. É a
+única forma de perceber na hora que se combinou uma coisa e o sistema entendeu
+outra.
+
+Registros antigos, sem a base definida, são lidos como **mês** — o mais
+conservador: cobra a menos, nunca a mais.
+
+**Testado:** R$ 40/mês com limpeza semanal cobra R$ 40; R$ 40/lavagem com
+limpeza semanal cobra R$ 160; R$ 60/mês pago no ano cobra R$ 720.
+
+`next build` executado: passou limpo.
+
+---
+
+## A DATA DO PAGAMENTO
+
+### O que faltava
+
+O formulário não tinha campo de data — gravava sempre o dia do lançamento. O
+Pix costuma cair antes de a Sureya sentar para registrar, então o extrato
+guardava a data errada, e a conferência com o banco não batia.
+
+A API já aceitava `data`; o formulário é que nunca enviava.
+
+### O campo
+
+**"Quando o dinheiro entrou"**, com a dica *"a data do Pix, não a de hoje"*.
+Nasce preenchido com hoje, que é o caso comum, e a data do comprovante
+acompanha a do pagamento.
+
+### E se errar mesmo assim
+
+Não dava para corrigir nem apagar um lançamento — o único conserto seria mexer
+no banco. Uma pessoa que não pode corrigir o próprio erro passa a evitar
+registrar, e aí o extrato deixa de valer.
+
+Agora **cada valor do extrato é clicável** e abre data, valor e descrição, com
+o botão de apagar ao lado.
+
+Duas coisas ficam protegidas, de propósito:
+
+- **`tipo` e `origem` não se editam.** Transformar um débito em crédito mudaria
+  o saldo sem deixar rastro; para isso, apaga-se e lança de novo.
+- **O valor de uma mensalidade não se edita ali.** Ele vem do plano do túmulo,
+  e mudar só o lançamento criaria divergência entre o que o plano diz e o que
+  a família deve. A mensagem manda ajustar o plano na ficha.
+- **O registro de lavagem não é clicável**: é o espelho do serviço executado,
+  não um lançamento de dinheiro.
+
+**Testado no banco:** lançamento criado, data e valor corrigidos, apagado
+depois.
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

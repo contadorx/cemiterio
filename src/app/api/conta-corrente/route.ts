@@ -180,3 +180,74 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * CORRIGIR UM LANÇAMENTO — data, valor ou descrição.
+ *
+ * Errar a data de um Pix é banal, e sem isto o único conserto seria mexer no
+ * banco. Uma pessoa que não pode corrigir o próprio erro passa a evitar
+ * registrar — e aí o extrato deixa de valer.
+ *
+ * O que NÃO se edita aqui: `tipo` e `origem`. Transformar um débito em crédito
+ * mudaria o saldo sem deixar rastro do que aconteceu; para isso, apaga-se e
+ * lança de novo.
+ */
+export async function PATCH(req: NextRequest) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+  const db = auth.db;
+
+  const b = await req.json().catch(() => ({}));
+  const id = String(b?.id || "");
+  if (!id) return NextResponse.json({ ok: false, erro: "id_obrigatorio" }, { status: 400 });
+
+  const patch: Record<string, any> = {};
+
+  if (b?.data !== undefined) patch.data = b.data || null;
+  if (b?.descricao !== undefined) patch.descricao = String(b.descricao || "").trim() || null;
+  if (b?.valor !== undefined) {
+    const v = Number(String(b.valor).replace(",", "."));
+    if (!isFinite(v) || v <= 0) {
+      return NextResponse.json(
+        { ok: false, erro: "valor_invalido", mensagem: "Informe um valor maior que zero." },
+        { status: 400 },
+      );
+    }
+    patch.valor = Math.round(v * 100) / 100;
+  }
+
+  if (!Object.keys(patch).length) {
+    return NextResponse.json({ ok: false, erro: "nada_para_mudar" }, { status: 400 });
+  }
+
+  // A competência é gerada pelo fechamento do mês e protegida por índice
+  // único. Deixar editar valor de um débito de competência criaria divergência
+  // entre o que o plano diz e o que a família deve.
+  const { data: atual } = await db
+    .from("conta_corrente").select("origem").eq("id", id).maybeSingle();
+
+  if ((atual as any)?.origem === "competencia" && patch.valor !== undefined) {
+    return NextResponse.json({
+      ok: false,
+      erro: "competencia_nao_edita_valor",
+      mensagem: "O valor da mensalidade vem do plano do túmulo. Ajuste o plano na ficha, ou apague este lançamento e gere de novo.",
+    }, { status: 400 });
+  }
+
+  const { error } = await db.from("conta_corrente").update(patch).eq("id", id);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+/** Apaga um lançamento. O registro de lavagem não some: ele é histórico. */
+export async function DELETE(req: NextRequest) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ ok: false, erro: "id_obrigatorio" }, { status: 400 });
+
+  const { error } = await auth.db.from("conta_corrente").delete().eq("id", id);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

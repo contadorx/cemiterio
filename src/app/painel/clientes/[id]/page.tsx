@@ -31,6 +31,18 @@ import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pe
  * Sobraram sete campos por túmulo, e todos são usados toda semana.
  */
 
+/** Quantas limpezas cabem num mês, para mostrar o total antes de salvar. */
+const POR_MES: Record<string, number> = {
+  semanal: 4, quinzenal: 2, mensal: 1, bimestral: 0.5, trimestral: 1 / 3,
+};
+
+function porMes(f: { valor_lavagem: any; valor_base: string; periodicidade: string }) {
+  const v = Number(String(f.valor_lavagem).replace(",", "."));
+  if (!isFinite(v)) return 0;
+  if (f.valor_base === "mes") return Math.round(v * 100) / 100;
+  return Math.round(v * (POR_MES[f.periodicidade] ?? 1) * 100) / 100;
+}
+
 const PERIODICIDADES = [
   ["semanal", "toda semana"],
   ["quinzenal", "a cada quinze dias"],
@@ -159,6 +171,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
   const [abrindo, setAbrindo] = useState(false);
   const [f, setF] = useState({
     valor_lavagem: t.valor_lavagem ?? "",
+    valor_base: t.valor_base ?? "mes",
     periodicidade: t.periodicidade ?? "",
     freq_pagamento: t.freq_pagamento ?? "",
     contratado: !!t.contratado,
@@ -235,7 +248,10 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {t.contratado ? (
               <>
-                <Selo tom="neutro">{dinheiro(Number(t.valor_lavagem || 0))} por limpeza</Selo>
+                <Selo tom="neutro">
+                  {dinheiro(Number(t.valor_lavagem || 0))}
+                  {(t.valor_base ?? "mes") === "mes" ? " por mês" : " por limpeza"}
+                </Selo>
                 <Selo tom="neutro">limpeza {t.periodicidade || "—"}</Selo>
                 <Selo tom="neutro">paga {t.freq_pagamento || "—"}</Selo>
               </>
@@ -245,12 +261,14 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
           </div>
         </div>
 
+        {/* Um chevron sozinho não diz que ali se edita — quem olha vê um
+            enfeite. A palavra "Editar" resolve, e o ícone só acompanha. */}
         <button
           onClick={() => setAbrindo((x) => !x)}
-          className="flex-shrink-0 rounded-lg p-2 text-ink-soft hover:bg-surface"
-          aria-label="Editar túmulo"
+          className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-2 text-[14px] font-medium text-ink hover:bg-surface"
         >
-          <ChevronDown size={18} className={abrindo ? "rotate-180 transition" : "transition"} />
+          {abrindo ? "Fechar" : "Editar"}
+          <ChevronDown size={16} className={abrindo ? "rotate-180 transition" : "transition"} />
         </button>
       </div>
 
@@ -299,13 +317,26 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 placeholder="opcional"
               />
             </Campo>
-            <Campo rotulo="Valor por limpeza">
+            <Campo rotulo="Valor combinado">
               <Entrada
                 inputMode="decimal"
                 value={f.valor_lavagem}
                 onChange={(e: any) => setF({ ...f, valor_lavagem: e.target.value })}
                 placeholder="40,00"
               />
+            </Campo>
+            {/* A BASE DO VALOR.
+                Sem perguntar, o sistema supunha "por lavagem" e multiplicava:
+                R$ 40 com limpeza semanal virava R$ 160 no mês — quatro vezes o
+                combinado, numa cobrança que a família não reconheceria. */}
+            <Campo rotulo="Esse valor é">
+              <Selecao
+                value={f.valor_base}
+                onChange={(e: any) => setF({ ...f, valor_base: e.target.value })}
+              >
+                <option value="mes">por mês, não importa quantas limpezas</option>
+                <option value="lavagem">o preço de cada limpeza</option>
+              </Selecao>
             </Campo>
             {/* Os três atributos ficam lado a lado e visivelmente separados: é
                 isso que impede o erro de tratar periodicidade e cobrança como
@@ -329,6 +360,16 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               </Selecao>
             </Campo>
           </div>
+
+          {/* O RESULTADO, escrito antes de salvar. É a única forma de a Sureya
+              perceber na hora que combinou uma coisa e o sistema entendeu
+              outra. */}
+          {f.valor_lavagem && f.periodicidade && (
+            <p className="mt-3 rounded-lg bg-brand-light px-3 py-2 text-[14px] text-ink">
+              Dá <b>{dinheiro(porMes(f))}</b> por mês
+              {f.valor_base === "lavagem" && " (o valor de cada limpeza vezes as do mês)"}.
+            </p>
+          )}
 
           <label className="mt-3 flex items-center gap-2 text-[14px] text-ink">
             <input
@@ -414,6 +455,10 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
   const [abrindo, setAbrindo] = useState<"pagamento" | "avulso" | "abertura" | null>(null);
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
+  // A data nasce hoje porque é o caso comum, mas precisa ser editável: o Pix
+  // costuma cair antes de a Sureya sentar para lançar, e sem isso o extrato
+  // registra o dia do lançamento em vez do dia do dinheiro.
+  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -468,7 +513,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            clienteId, imagemBase64: comprovante.b64, mimetype: comprovante.mt, valor: n,
+            clienteId, imagemBase64: comprovante.b64, mimetype: comprovante.mt, valor: n, data,
           }),
         }).then((x) => x.json());
         if (!up?.ok) { setErro(up?.mensagem || "Não consegui salvar o comprovante."); return; }
@@ -478,10 +523,11 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
       const r = await fetch("/api/conta-corrente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao, comprovanteId }),
+        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao, comprovanteId, data }),
       }).then((x) => x.json());
       if (!r?.ok) { setErro(r?.mensagem || "Não consegui lançar."); return; }
       setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null);
+      setData(new Date().toISOString().slice(0, 10));
       carregar(); aoMudar();
     } finally {
       setOcupado(false);
@@ -524,6 +570,13 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
               <Entrada inputMode="decimal" value={valor}
                        onChange={(e: any) => setValor(e.target.value)}
                        placeholder={abrindo === "abertura" ? "240 ou -80" : "160,00"} />
+            </Campo>
+            <Campo
+              rotulo={abrindo === "pagamento" ? "Quando o dinheiro entrou" : "Data"}
+              dica={abrindo === "pagamento" ? "a data do Pix, não a de hoje" : undefined}
+            >
+              <Entrada type="date" value={data}
+                       onChange={(e: any) => setData(e.target.value)} />
             </Campo>
             <Campo rotulo="Descrição">
               <Entrada value={descricao} onChange={(e: any) => setDescricao(e.target.value)}
@@ -570,7 +623,75 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
       )}
 
       {(dados?.linhas || []).map((l: any) => (
-        <div key={l.id} className="flex items-center justify-between gap-3 border-t border-line py-2.5">
+        <Lancamento key={l.id} l={l} aoMudar={() => { carregar(); aoMudar(); }} />
+      ))}
+    </Cartao>
+  );
+}
+
+/**
+ * UMA LINHA DO EXTRATO, corrigível.
+ *
+ * Errar a data de um Pix é banal. Sem poder corrigir, a pessoa passa a evitar
+ * registrar — e aí o extrato deixa de valer.
+ */
+function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [f, setF] = useState({ data: l.data, valor: String(l.valor), descricao: l.descricao || "" });
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  const MESES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const periodo = (comp: string) => `${MESES[Number(comp.slice(5, 7)) - 1]}/${comp.slice(2, 4)}`;
+
+  async function salvar() {
+    setOcupado(true); setErro("");
+    try {
+      const r = await fetch("/api/conta-corrente", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: l.id, ...f }),
+      }).then((x) => x.json());
+      if (!r?.ok) { setErro(r?.mensagem || "Não consegui salvar."); return; }
+      setEditando(false); aoMudar();
+    } finally { setOcupado(false); }
+  }
+
+  async function apagar() {
+    if (!confirm("Apagar este lançamento? O saldo muda na hora.")) return;
+    setOcupado(true);
+    await fetch(`/api/conta-corrente?id=${l.id}`, { method: "DELETE" });
+    setOcupado(false);
+    aoMudar();
+  }
+
+  if (editando) {
+    return (
+      <div className="border-t border-line py-3">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Campo rotulo="Data"><Entrada type="date" value={f.data}
+            onChange={(e: any) => setF({ ...f, data: e.target.value })} /></Campo>
+          <Campo rotulo="Valor"><Entrada inputMode="decimal" value={f.valor}
+            onChange={(e: any) => setF({ ...f, valor: e.target.value })} /></Campo>
+          <Campo rotulo="Descrição"><Entrada value={f.descricao}
+            onChange={(e: any) => setF({ ...f, descricao: e.target.value })} /></Campo>
+        </div>
+        {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Botao tom="principal" onClick={salvar} disabled={ocupado}>
+            {ocupado ? "Salvando…" : "Salvar"}
+          </Botao>
+          <Botao onClick={() => setEditando(false)}>Cancelar</Botao>
+          <Botao tom="perigo" onClick={apagar} disabled={ocupado}>
+            <Trash2 size={16} /> Apagar
+          </Botao>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+        <div className="flex items-center justify-between gap-3 border-t border-line py-2.5">
           <div className="min-w-0">
             <p className="text-[14px] text-ink">{l.descricao}</p>
             <p className="text-[12px] text-ink-soft">
@@ -588,17 +709,21 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
           </div>
           {/* A lavagem é REGISTRO, não dinheiro: "+ R$ 0,00" pareceria uma
               cobrança de valor zero. */}
+          {/* A lavagem é REGISTRO, não dinheiro, e não se edita: ela é o
+              espelho do serviço executado. */}
           {l.origem === "lavagem" ? (
             <span className="flex-shrink-0 text-[12px] text-ink-soft">✓ serviço feito</span>
           ) : (
-            <span className={`flex-shrink-0 text-[14px] font-semibold ${
-              l.tipo === "debito" ? "text-aviso" : "text-positivo"}`}>
+            <button
+              onClick={() => setEditando(true)}
+              className={`flex-shrink-0 text-[14px] font-semibold underline decoration-dotted ${
+                l.tipo === "debito" ? "text-aviso" : "text-positivo"}`}
+              title="Corrigir data, valor ou descrição"
+            >
               {l.tipo === "debito" ? "+" : "−"} {dinheiro(l.valor)}
-            </span>
+            </button>
           )}
         </div>
-      ))}
-    </Cartao>
   );
 }
 
