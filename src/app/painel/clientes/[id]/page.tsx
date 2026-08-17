@@ -31,6 +31,18 @@ import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pe
  * Sobraram sete campos por túmulo, e todos são usados toda semana.
  */
 
+const MESES_CICLO: Record<string, number> = {
+  mensal: 1, trimestral: 3, semestral: 6, anual: 12,
+};
+
+/** Quanto sai em cada cobrança, para mostrar antes de salvar. */
+function valorDaCobranca(f: any) {
+  const v = Number(String(f.valor_mensal).replace(",", "."));
+  if (!isFinite(v)) return 0;
+  if (f.valor_base === "cobranca") return Math.round(v * 100) / 100;
+  return Math.round(v * (MESES_CICLO[f.freq_pagamento] ?? 1) * 100) / 100;
+}
+
 const MES_CURTO = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const mesCurto = (d: string) => `${MES_CURTO[Number(d.slice(5, 7)) - 1]}/${d.slice(2, 4)}`;
 
@@ -127,6 +139,7 @@ export default function Ficha() {
       </div>
 
       <Identificacao c={c} aoMudar={carregar} />
+      <Contrato familiaId={c.familia_id} aoMudar={carregar} />
       <Pessoas familiaId={c.familia_id} atualId={id} />
       <Tumulos tumulos={d.tumulos || []} clienteId={id} aoMudar={carregar} />
       <ContaCorrente familiaId={c.familia_id} clienteId={id} aoMudar={carregar} />
@@ -173,11 +186,10 @@ function Tumulos({ tumulos, clienteId, aoMudar }: {
 function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
   const [abrindo, setAbrindo] = useState(false);
   const [f, setF] = useState({
-    valor_lavagem: t.valor_lavagem ?? "",
-    valor_base: t.valor_base ?? "mes",
-    inicio_cobranca: (t.inicio_cobranca ?? "").slice(0, 7),
+    // O CONTRATO subiu para a família: valor, frequência de pagamento e início
+    // moram lá, porque a Sureya combina UM valor por família mesmo com dois
+    // túmulos. Aqui fica só o que é do trabalho nesta pedra.
     periodicidade: t.periodicidade ?? "",
-    freq_pagamento: t.freq_pagamento ?? "",
     contratado: !!t.contratado,
     falecido_nome: t.falecido_nome ?? "",
     identificacao: t.identificacao ?? "",
@@ -205,7 +217,17 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
 
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
 
+  const [aviso, setAviso] = useState("");
+
   async function salvar() {
+    // Marcar "tem plano" sem dizer quando limpar e quando cobrar produz um
+    // túmulo que não aparece em lugar nenhum. Melhor barrar aqui que deixar
+    // a Sureya descobrir semanas depois.
+    if (f.contratado && !f.periodicidade) {
+      setAviso("Diga de quanto em quanto tempo a Nina limpa este túmulo.");
+      return;
+    }
+    setAviso("");
     setSalvando(true);
     try {
       await fetch(`/api/tumulos/${t.id}`, {
@@ -250,27 +272,23 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               a Nina nunca digita. */}
           {t.codigo && <p className="text-[11px] tracking-wide text-ink-soft">{t.codigo}</p>}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {/* PLANO PELA METADE — o caso que passava calado.
+                Com "tem plano" marcado mas sem periodicidade ou sem frequência
+                de pagamento, o túmulo não entra na agenda da Nina NEM na
+                cobrança do mês. Ficava tudo parado sem ninguém saber por quê. */}
+            {t.contratado && !t.periodicidade && (
+              <Selo tom="atencao">falta dizer quando limpar</Selo>
+            )}
             {t.contratado ? (
-              <>
-                <Selo tom="neutro">
-                  {dinheiro(Number(t.valor_lavagem || 0))}
-                  {(t.valor_base ?? "mes") === "mes" ? " por mês" : " por limpeza"}
-                </Selo>
-                <Selo tom="neutro">limpeza {t.periodicidade || "—"}</Selo>
-                <Selo tom="neutro">paga {t.freq_pagamento || "—"}</Selo>
-                {t.inicio_cobranca && (
-                  <Selo tom="neutro">desde {mesCurto(t.inicio_cobranca)}</Selo>
-                )}
-              </>
+              <Selo tom="neutro">limpeza {t.periodicidade || "—"}</Selo>
             ) : (
-              <Selo tom="atencao">sem plano · avulso</Selo>
+              <Selo tom="neutro">não entra na rota</Selo>
             )}
           </div>
         </div>
 
         {/* Um chevron sozinho não diz que ali se edita — quem olha vê um
             enfeite. A palavra "Editar" resolve, e o ícone só acompanha. */}
-        {t.contratado && <PorNaConta tumuloId={t.id} aoMudar={aoMudar} />}
         <button
           onClick={() => setAbrindo((x) => !x)}
           className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-2 text-[14px] font-medium text-ink hover:bg-surface"
@@ -325,30 +343,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 placeholder="opcional"
               />
             </Campo>
-            <Campo rotulo="Valor combinado">
-              <Entrada
-                inputMode="decimal"
-                value={f.valor_lavagem}
-                onChange={(e: any) => setF({ ...f, valor_lavagem: e.target.value })}
-                placeholder="40,00"
-              />
-            </Campo>
-            {/* A BASE DO VALOR.
-                Sem perguntar, o sistema supunha "por lavagem" e multiplicava:
-                R$ 40 com limpeza semanal virava R$ 160 no mês — quatro vezes o
-                combinado, numa cobrança que a família não reconheceria. */}
-            <Campo rotulo="Esse valor é">
-              <Selecao
-                value={f.valor_base}
-                onChange={(e: any) => setF({ ...f, valor_base: e.target.value })}
-              >
-                <option value="mes">por mês, não importa quantas limpezas</option>
-                <option value="lavagem">o preço de cada limpeza</option>
-              </Selecao>
-            </Campo>
-            {/* Os três atributos ficam lado a lado e visivelmente separados: é
-                isso que impede o erro de tratar periodicidade e cobrança como
-                a mesma coisa. */}
+
             <Campo rotulo="A Nina limpa" dica="de quanto em quanto tempo">
               <Selecao
                 value={f.periodicidade}
@@ -358,36 +353,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 {PERIODICIDADES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
               </Selecao>
             </Campo>
-            {/* A PARTIR DE QUANDO. Antes o sistema usava a data em que o
-                túmulo foi digitado — acidente do cadastro. Um plano assinado
-                em março e digitado em agosto cobrava em agosto. */}
-            <Campo rotulo="Começar a cobrar a partir de" dica="o mês em que o serviço começou">
-              <Entrada
-                type="month"
-                value={f.inicio_cobranca}
-                onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })}
-              />
-            </Campo>
-            <Campo rotulo="A família paga" dica="de quanto em quanto tempo">
-              <Selecao
-                value={f.freq_pagamento}
-                onChange={(e: any) => setF({ ...f, freq_pagamento: e.target.value })}
-              >
-                <option value="">escolha</option>
-                {FREQUENCIAS.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-              </Selecao>
-            </Campo>
           </div>
-
-          {/* O RESULTADO, escrito antes de salvar. É a única forma de a Sureya
-              perceber na hora que combinou uma coisa e o sistema entendeu
-              outra. */}
-          {f.valor_lavagem && f.periodicidade && (
-            <p className="mt-3 rounded-lg bg-brand-light px-3 py-2 text-[14px] text-ink">
-              Dá <b>{dinheiro(porMes(f))}</b> por mês
-              {f.valor_base === "lavagem" && " (o valor de cada limpeza vezes as do mês)"}.
-            </p>
-          )}
 
           <label className="mt-3 flex items-center gap-2 text-[14px] text-ink">
             <input
@@ -396,8 +362,10 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               onChange={(e: any) => setF({ ...f, contratado: e.target.checked })}
               className="h-4 w-4"
             />
-            Tem plano — entra na cobrança do mês
+            A Nina limpa este túmulo
           </label>
+
+          {aviso && <p className="mt-2 text-[13px] text-perigo">{aviso}</p>}
 
           <div className="mt-3 flex flex-wrap gap-2">
             <Botao tom="principal" onClick={salvar} disabled={salvando}>
@@ -461,6 +429,157 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
 }
 
 /**
+ * O CONTRATO DA FAMÍLIA.
+ *
+ * A Sureya combina UM valor com a família, mesmo que ela tenha dois túmulos.
+ * Por isso valor, frequência de pagamento e início moram aqui — e não no
+ * túmulo, onde geravam duas cobranças para quem tem duas pedras.
+ *
+ * O que fica no túmulo é a periodicidade da limpeza, porque essa sim pode ser
+ * diferente em cada um.
+ */
+function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: () => void }) {
+  const [d, setD] = useState<any>(null);
+  const [abrindo, setAbrindo] = useState(false);
+  const [f, setF] = useState<any>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [aviso, setAviso] = useState("");
+
+  const carregar = useCallback(() => {
+    if (!familiaId) return;
+    fetch(`/api/familias/${familiaId}`).then((x) => x.json())
+      .then((r) => {
+        if (!r?.ok) return;
+        setD(r.familia);
+        setF({
+          valor_mensal: r.familia.valor_mensal ?? "",
+          valor_base: r.familia.valor_base ?? "mes",
+          freq_pagamento: r.familia.freq_pagamento ?? "",
+          inicio_cobranca: (r.familia.inicio_cobranca ?? "").slice(0, 7),
+          contratado: !!r.familia.contratado,
+        });
+      }).catch(() => {});
+  }, [familiaId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (!familiaId || !f) return null;
+
+  async function salvar() {
+    if (f.contratado && (!f.valor_mensal || !f.freq_pagamento || !f.inicio_cobranca)) {
+      // Contrato pela metade não gera cobrança nenhuma, e ninguém descobre por
+      // quê. Melhor barrar aqui.
+      setAviso("Preencha valor, quando cobrar e a partir de quando.");
+      return;
+    }
+    setAviso(""); setSalvando(true);
+    try {
+      await fetch(`/api/familias/${familiaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(f),
+      });
+      setAbrindo(false); carregar(); aoMudar();
+    } finally { setSalvando(false); }
+  }
+
+  const FREQ: Record<string, string> = {
+    mensal: "todo mês", trimestral: "a cada três meses",
+    semestral: "a cada seis meses", anual: "uma vez por ano",
+  };
+  const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+
+  return (
+    <Cartao
+      titulo="Contrato"
+      acao={
+        <Botao onClick={() => setAbrindo((x) => !x)}>
+          <Pencil size={16} /> {abrindo ? "Fechar" : "Editar"}
+        </Botao>
+      }
+    >
+      {!abrindo ? (
+        !d?.contratado ? (
+          <p className="text-[14px] text-ink-soft">
+            Sem plano — as limpezas entram como avulso na conta corrente.
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Selo tom="neutro">
+              {dinheiro(Number(d.valor_mensal || 0))}
+              {(d.valor_base ?? "mes") === "mes" ? " por mês" : " por cobrança"}
+            </Selo>
+            <Selo tom="neutro">paga {FREQ[d.freq_pagamento] ?? "—"}</Selo>
+            {d.inicio_cobranca && (
+              <Selo tom="neutro">
+                desde {MES[Number(d.inicio_cobranca.slice(5, 7)) - 1]}/{d.inicio_cobranca.slice(2, 4)}
+              </Selo>
+            )}
+            <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />
+          </div>
+        )
+      ) : (
+        <>
+          <label className="mb-3 flex items-center gap-2 text-[14px] text-ink">
+            <input type="checkbox" checked={f.contratado} className="h-4 w-4"
+                   onChange={(e) => setF({ ...f, contratado: e.target.checked })} />
+            Esta família tem plano
+          </label>
+
+          {f.contratado && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Campo rotulo="Valor combinado" dica="um só, mesmo com vários túmulos">
+                <Entrada inputMode="decimal" value={f.valor_mensal}
+                         onChange={(e: any) => setF({ ...f, valor_mensal: e.target.value })}
+                         placeholder="100,00" />
+              </Campo>
+              {/* Nem todo combinado é dito por mês. "R$ 600 por semestre"
+                  existe, e obrigar a Sureya a dividir de cabeça é pedir erro —
+                  ainda mais quando a divisão não é exata. */}
+              <Campo rotulo="Esse valor é">
+                <Selecao value={f.valor_base}
+                         onChange={(e: any) => setF({ ...f, valor_base: e.target.value })}>
+                  <option value="mes">por mês</option>
+                  <option value="cobranca">o valor de cada cobrança</option>
+                </Selecao>
+              </Campo>
+              <Campo rotulo="A família paga">
+                <Selecao value={f.freq_pagamento}
+                         onChange={(e: any) => setF({ ...f, freq_pagamento: e.target.value })}>
+                  <option value="">escolha</option>
+                  {Object.entries(FREQ).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                </Selecao>
+              </Campo>
+              <Campo rotulo="Cobrar a partir de" dica="o mês em que o serviço começou">
+                <Entrada type="month" value={f.inicio_cobranca}
+                         onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })} />
+              </Campo>
+            </div>
+          )}
+
+          {/* O RESULTADO, escrito antes de salvar: é a única forma de perceber
+              na hora que se combinou uma coisa e o sistema entendeu outra. */}
+          {f.contratado && f.valor_mensal && f.freq_pagamento && (
+            <p className="mt-3 rounded-lg bg-brand-light px-3 py-2 text-[14px] text-ink">
+              A família recebe <b>{dinheiro(valorDaCobranca(f))}</b>{" "}
+              {FREQ[f.freq_pagamento]?.replace("todo mês", "todo mês") ?? ""}.
+            </p>
+          )}
+
+          {aviso && <p className="mt-2 text-[13px] text-perigo">{aviso}</p>}
+          <div className="mt-3 flex gap-2">
+            <Botao tom="principal" onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Botao>
+            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+        </>
+      )}
+    </Cartao>
+  );
+}
+
+/**
  * PÔR NA CONTA O QUE JÁ VENCEU.
  *
  * O fechamento automático roda no dia 1 e olha o mês corrente. Mas a Sureya
@@ -471,16 +590,16 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
  * O botão só aparece quando há mês em aberto para lançar — se está tudo em
  * dia, ele não ocupa espaço nem convida a clicar à toa.
  */
-function PorNaConta({ tumuloId, aoMudar }: { tumuloId: string; aoMudar: () => void }) {
+function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
   const [previa, setPrevia] = useState<any>(null);
   const [ocupado, setOcupado] = useState(false);
 
   const carregar = useCallback(() => {
-    fetch(`/api/financeiro/competencia/tumulo?tumuloId=${tumuloId}`)
+    fetch(`/api/financeiro/competencia/familia?familiaId=${familiaId}`)
       .then((x) => x.json())
       .then((r) => { if (r?.ok) setPrevia(r); })
       .catch(() => {});
-  }, [tumuloId]);
+  }, [familiaId]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -504,10 +623,10 @@ function PorNaConta({ tumuloId, aoMudar }: { tumuloId: string; aoMudar: () => vo
 
     setOcupado(true);
     try {
-      const r = await fetch("/api/financeiro/competencia/tumulo", {
+      const r = await fetch("/api/financeiro/competencia/familia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tumuloId }),
+        body: JSON.stringify({ familiaId }),
       }).then((x) => x.json());
       if (!r?.ok) { alert(r?.erro || "Não consegui lançar."); return; }
       carregar();

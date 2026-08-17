@@ -6,6 +6,10 @@ import { registrarErro } from "./monitor";
 // Dias de cada ciclo. qtd_por_passagem subdivide o ciclo:
 // mensal + 2/passagem => passa a cada ~15 dias (2x/mês). mensal + 1 => 30 dias.
 export const DIAS_CICLO: Record<string, number> = {
+  // Semanal e quinzenal faltavam: um plano semanal era simplesmente ignorado
+  // pela geração de agenda, e a Nina nunca recebia o serviço.
+  semanal: 7,
+  quinzenal: 15,
   mensal: 30,
   bimestral: 60,
   trimestral: 90,
@@ -97,6 +101,31 @@ async function temDataPlano(db: any): Promise<boolean> {
   return colunaDataPlano;
 }
 
+/**
+ * Os serviços deste TÚMULO — para não criar limpeza repetida na mesma data.
+ *
+ * Antes a checagem era por `plano_id`. Com o plano morando no túmulo, o
+ * `plano_id` nasce nulo, e filtrar por ele traria zero resultados: a geração
+ * criaria a mesma limpeza de novo a cada rodada.
+ */
+async function servicosDoTumulo(
+  db: any, org: string, tumuloId: string, comColuna: boolean
+): Promise<ServicoExistente[]> {
+  const campos = comColuna ? "id,data_plano,data_prevista,status" : "id,data_prevista,status";
+  const { data } = await db
+    .from("servicos")
+    .select(campos)
+    .eq("org_id", org)
+    .eq("tumulo_id", tumuloId)
+    .in("status", ["pendente", "agendado", "executado"]);
+  return ((data as any[]) || []).map((x) => ({
+    id: x.id,
+    data_plano: (x.data_plano as string) ?? null,
+    data_prevista: (x.data_prevista as string) ?? null,
+    status: x.status as string,
+  }));
+}
+
 async function servicosDoPlano(
   db: any, org: string, planoId: string, comColuna: boolean
 ): Promise<ServicoExistente[]> {
@@ -165,12 +194,20 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
   const org = env.orgId();
   const limite = addDias(isoHoje(), horizonteDias);
 
+  // O PLANO MORA NO TÚMULO.
+  //
+  // Isto lia `planos`, enquanto a ficha e a cobrança gravavam em `tumulos`. A
+  // Sureya configurava "limpa toda semana", o valor entrava na conta corrente
+  // — e a Nina nunca recebia o serviço, porque a agenda procurava numa tabela
+  // onde não havia nada.
+  //
+  // Agora as duas metades do sistema leem a mesma fonte.
   const { data: planos } = await db
-    .from("planos")
-    .select("id,cliente_id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,proximo_servico")
+    .from("tumulos")
+    .select("id,cliente_id,periodicidade,valor_lavagem,valor_base,proximo_servico,inicio_cobranca")
     .eq("org_id", org)
-    .eq("ativo", true)
-    .in("cadencia", Object.keys(DIAS_CICLO));
+    .eq("contratado", true)
+    .in("periodicidade", Object.keys(DIAS_CICLO));
 
   let criados = 0;
   let jaExistiam = 0;
@@ -180,11 +217,18 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
   let proximaData: string | null = null;
 
   for (const p of planos || []) {
-    const cicloDias = DIAS_CICLO[(p as any).cadencia];
-    const qtd = Math.max(1, Number((p as any).lavagens_por_ciclo ?? (p as any).qtd_por_passagem) || 1);
-    const passo = Math.max(1, Math.round(cicloDias / qtd));
+    // A periodicidade JÁ é o intervalo entre limpezas — não há mais "quantas
+    // por ciclo" para dividir. "Semanal" é a cada 7 dias, e ponto.
+    const passo = DIAS_CICLO[(p as any).periodicidade];
 
-    let prox: string = (p as any).proximo_servico || isoHoje();
+    // Nunca antes do início da cobrança: gerar agenda retroativa encheria a
+    // lista da Nina com dias que já passaram.
+    const piso = (p as any).inicio_cobranca
+      ? (String((p as any).inicio_cobranca).slice(0, 10) > isoHoje()
+          ? String((p as any).inicio_cobranca).slice(0, 10)
+          : isoHoje())
+      : isoHoje();
+    let prox: string = (p as any).proximo_servico || piso;
     let guarda = 0;      // trava anti-loop
     let falhou = false;  // erro inesperado neste plano: nao avanca o ponteiro
 
@@ -196,7 +240,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     noHorizonte++;
 
     const comColuna = await temDataPlano(db);
-    const existentes = await servicosDoPlano(db, org, (p as any).id, comColuna);
+    const existentes = await servicosDoTumulo(db, org, (p as any).id, comColuna);
     const tolerancia = toleranciaDoPasso(passo);
 
     while (prox <= limite && guarda < 60) {
@@ -208,12 +252,15 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
       } else {
         const linha: any = {
           org_id: org,
-          tumulo_id: (p as any).tumulo_id,
-          plano_id: (p as any).id,
+          tumulo_id: (p as any).id,
+          plano_id: null,          // o plano é o próprio túmulo agora
           cliente_id: (p as any).cliente_id,
           data_prevista: prox,
           status: "pendente",
-          valor: (p as any).valor_vigente,
+          // O valor do SERVIÇO é o de uma limpeza. Quando o contrato é por
+          // mês, dividir pelo número de limpeza daria centavos quebrados sem
+          // servir para nada: o dinheiro vem da competência, não daqui.
+          valor: (p as any).valor_base === "lavagem" ? (p as any).valor_lavagem : null,
         };
         if (comColuna) linha.data_plano = prox;
 
@@ -237,7 +284,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
           falhou = true;
           falhasTotais++;
           await registrarErro("agenda: nao consegui criar a limpeza", error.message, {
-            planoId: (p as any).id, data: prox,
+            tumuloId: (p as any).id, data: prox,
           });
           break; // para este plano aqui: o ponteiro nao anda por cima do buraco
         }
@@ -248,7 +295,7 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     // O PONTEIRO SO ANDA SE NAO HOUVE FALHA NESTE PLANO. Antes ele era gravado
     // sempre — inclusive quando o insert falhou e quando nada foi criado.
     if (!falhou) {
-      await db.from("planos").update({ proximo_servico: prox }).eq("id", (p as any).id);
+      await db.from("tumulos").update({ proximo_servico: prox }).eq("id", (p as any).id);
     }
   }
 

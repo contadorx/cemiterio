@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const fim = d.toISOString().slice(0, 10);
 
   const [famRes, tumRes, servRes, ccRes] = await Promise.all([
-    db.from("familias").select("id,nome").eq("org_id", org).order("nome"),
+    db.from("familias").select("id,nome,contratado").eq("org_id", org).order("nome"),
     db.from("tumulos").select("id,familia_id,contratado,codigo,ruas(nome),quadras(codigo)").eq("org_id", org),
     db.from("servicos")
       .select("id,tumulo_id,data_executada,status")
@@ -90,9 +90,11 @@ export async function GET(req: NextRequest) {
       tumulos: meus.length,
       contratados: contratados.length,
       limpos,
-      // Sem túmulo contratado não existe "faltando limpar" — é avulso.
+      // "Falta limpar" é sobre o TRABALHO: túmulos que a Nina deve limpar.
+      // "Sem plano" é sobre o CONTRATO, que mora na família — uma família sem
+      // plano tem as limpezas cobradas como avulso.
       limpezaOk: contratados.length > 0 && limpos >= contratados.length,
-      semPlano: contratados.length === 0,
+      semPlano: !f.contratado,
       saldo: s,
       pagamentoOk: s <= 0.005,
       frase: s <= 0.005 ? "Em dia" : `Em aberto · ${dinheiro(s)}`,

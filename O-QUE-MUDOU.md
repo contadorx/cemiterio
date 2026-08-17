@@ -1319,6 +1319,147 @@ critério do fechamento do dia 1.
 
 ---
 
+## O VALOR ESTAVA EM DOIS LUGARES — e cada metade do sistema lia um
+
+Sua pergunta achou o problema mais sério que restava.
+
+### O que estava acontecendo
+
+O plano vivia em **duas tabelas**:
+
+| | Lia de | Campos |
+|---|---|---|
+| **Cobrança** | `tumulos` | valor_lavagem, valor_base, periodicidade, freq_pagamento |
+| **Agenda** | `planos` | cadencia, valor_vigente |
+
+Na prática: a Sureya configurava *"limpa toda semana, R$ 40 por mês"* na
+ficha, o valor entrava na conta corrente — e **a Nina nunca recebia o
+serviço**, porque a geração de agenda procurava em `planos`, onde não havia
+nada.
+
+Pior: `DIAS_CICLO` nem conhecia `semanal` e `quinzenal`. Um plano semanal seria
+ignorado mesmo se existisse na tabela antiga.
+
+### A escolha: o plano mora no TÚMULO
+
+É onde a Sureya edita, onde o valor já estava, e é o objeto que existe no
+mundo — `planos` era uma camada a mais entre a pedra e o dinheiro. A tabela
+não foi apagada; fica como histórico.
+
+O que mudou em `src/lib/agenda.ts`:
+
+- a geração lê `tumulos` (contratado + periodicidade), não `planos`
+- `semanal` (7 dias) e `quinzenal` (15) entraram no ciclo
+- a checagem de duplicata passou a ser **por túmulo**; era por `plano_id`, que
+  agora nasce nulo — sem isso a mesma limpeza seria criada a cada rodada
+- nunca gera antes do **início da cobrança**: agenda retroativa encheria a
+  lista da Nina de dias que já passaram
+
+### Trocar a periodicidade agora tem efeito imediato
+
+Mudar de mensal para semanal reinicia o ponteiro da agenda para hoje. Antes,
+nada aconteceria até o ponteiro antigo vencer — a Sureya faria a troca e não
+veria efeito por semanas.
+
+### Um achado nos dados reais
+
+**Dois dos três túmulos contratados estão sem periodicidade.** Com "tem plano"
+marcado e valor definido, mas sem dizer quando limpar, eles não entram na
+agenda **nem** na cobrança — e nada avisava.
+
+Agora o cartão mostra o selo **"falta dizer quando limpar"**, e salvar um plano
+pela metade é barrado com a explicação.
+
+`next build` executado: passou limpo.
+
+---
+
+## O CONTRATO É DA FAMÍLIA. O TRABALHO É DO TÚMULO.
+
+### A regra confirmada
+
+- A Sureya combina **um valor** com a família, mesmo que ela tenha dois
+  túmulos.
+- Mas **cada túmulo pode ser limpo num ritmo diferente** — um toda semana,
+  outro uma vez por mês.
+
+Eu tinha posto os dois no túmulo. Com duas pedras na mesma família, isso
+geraria **duas cobranças onde existe uma só**: a família receberia o dobro.
+
+### A divisão certa
+
+| Onde | O quê |
+|---|---|
+| `familias` | valor mensal · frequência de pagamento · início da cobrança · tem plano |
+| `tumulos` | periodicidade da limpeza · a Nina limpa este túmulo |
+
+E some a pergunta *"por mês ou por lavagem"*: no nível da família não existe
+"a lavagem" — cada túmulo tem a sua. O valor da família é sempre mensal.
+
+### Na ficha
+
+Entrou o cartão **Contrato**, logo abaixo dos dados da família, com valor,
+quando cobrar e desde quando. O botão **"Pôr na conta"** mudou-se para lá,
+porque quem deve é a família.
+
+O bloco do túmulo ficou com o endereço, o falecido, o nome na pedra e uma
+pergunta só: **de quanto em quanto tempo a Nina limpa**.
+
+### A trava mudou de lugar junto
+
+A proteção contra cobrar duas vezes era `(tumulo_id, competencia)`. Com a
+cobrança na família, o `tumulo_id` nasce nulo nesses lançamentos — e índice
+único ignora nulo, então a proteção sumiria justamente onde mais importa.
+Agora é `(familia_id, competencia)`.
+
+### Migração sem perda *(já aplicada)*
+
+O valor que estava nos túmulos subiu para a família. Quando havia mais de um
+túmulo com valor, os valores foram **somados** — era isso que a Sureya
+receberia hoje, e reduzir por conta própria mudaria o combinado sem avisar.
+
+As três famílias com plano ficaram: Andre R$ 25/mês, Anninha R$ 20/mês
+(semestral) e Perrela R$ 15/mês.
+
+### Testado
+
+| Caso | Resultado |
+|---|---|
+| Família com 2 túmulos, R$ 40/mês | **1** lançamento de R$ 40 (era 2 de 40) |
+| Trimestral R$ 60/mês desde mar/26 | cobra mar, jun, set · R$ 180 cada |
+| Família sem plano | não cobra |
+
+`next build` executado: passou limpo.
+
+---
+
+## O VALOR NEM SEMPRE É MENSAL
+
+Eu só aceitava valor por mês e multiplicava pelo ciclo. Mas o combinado nem
+sempre é dito assim: *"R$ 600 por semestre"* existe, e obrigar a Sureya a
+dividir de cabeça para digitar R$ 100 é pedir erro — ainda mais quando a
+divisão não é exata.
+
+Agora o campo pergunta o que o número significa:
+
+- **por mês** — a cobrança é ele vezes os meses do ciclo *(padrão)*
+- **o valor de cada cobrança** — sai exatamente esse valor
+
+E, antes de salvar, a ficha escreve o resultado: *"A família recebe R$ 600,00
+a cada seis meses"*.
+
+## A LIMPEZA REGISTRADA À MÃO NÃO APARECIA NO EXTRATO
+
+Bug meu. O registro de lavagem na conta corrente era criado quando **a Nina
+concluía pelo app** — mas não quando **a Sureya registrava à mão**. A limpeza
+ficava só na lista de serviços e sumia do extrato, que é onde ela olha o
+histórico da família.
+
+Corrigido: os dois caminhos agora criam o registro. Valor zero, como sempre —
+quem gera a dívida é a competência.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

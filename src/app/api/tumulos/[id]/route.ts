@@ -67,7 +67,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.valor_lavagem = isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
   }
   if (body.valor_base !== undefined) patch.valor_base = body.valor_base || "mes";
-  if (body.periodicidade !== undefined) patch.periodicidade = body.periodicidade || null;
+  if (body.periodicidade !== undefined) {
+    patch.periodicidade = body.periodicidade || null;
+    // Mudou o ritmo: o ponteiro da agenda volta para hoje (ou para o início da
+    // cobrança, se ainda estiver à frente). Sem isso, trocar de mensal para
+    // semanal não mudaria nada até o ponteiro antigo vencer — a Sureya faria a
+    // troca e não veria efeito nenhum por semanas.
+    const hoje = new Date().toISOString().slice(0, 10);
+    const inicio = String(body.inicio_cobranca || "").slice(0, 10);
+    patch.proximo_servico = inicio && inicio > hoje ? `${inicio.slice(0, 7)}-01` : hoje;
+  }
   if (body.freq_pagamento !== undefined) patch.freq_pagamento = body.freq_pagamento || null;
   if (body.contratado !== undefined) patch.contratado = !!body.contratado;
 

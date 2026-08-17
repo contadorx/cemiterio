@@ -4,17 +4,21 @@
  * A regra, em uma linha:
  *   LAVAGEM LANÇA DÉBITO. PAGAMENTO LANÇA CRÉDITO. O SALDO DIZ SE ESTÁ EM DIA.
  *
+ * ONDE MORA O CONTRATO
+ * A Sureya combina UM valor com a família, mesmo que ela tenha dois túmulos —
+ * mas cada túmulo pode ser limpo num ritmo diferente. Por isso:
+ *
+ *   familia -> valor_mensal, freq_pagamento, inicio_cobranca   (o contrato)
+ *   tumulo  -> periodicidade                                    (o trabalho)
+ *
+ * Isto já esteve todo no túmulo, e com dois túmulos na mesma família gerava
+ * DUAS cobranças onde existe uma só: a família receberia o dobro.
+ *
  * POR QUE POR COMPETÊNCIA, E NÃO POR EXECUÇÃO
- * A lavagem pode falhar de várias maneiras honestas: a foto não sobe, o
- * celular fica sem sinal no cemitério, a Nina esquece de tocar no botão.
- * Se o débito nascesse do registro do serviço, cada uma dessas falhas viraria
- * dinheiro perdido — e perdido em silêncio, que é o pior tipo.
- *
- * Por isso o débito nasce do PERÍODO DEVIDO (a competência), não do serviço
- * executado. O financeiro deixa de ser refém do operacional.
- *
- * O vínculo entre o débito e a lavagem específica pode vir depois, se um dia
- * fizer falta. No começo, não amarra.
+ * A lavagem falha de maneiras honestas: a foto não sobe, o celular fica sem
+ * sinal, a Nina esquece de tocar no botão. Se o débito nascesse do registro do
+ * serviço, cada falha viraria dinheiro perdido — e em silêncio, que é o pior
+ * tipo.
  */
 
 export type Periodicidade =
@@ -22,34 +26,23 @@ export type Periodicidade =
 
 export type FreqPagamento = "mensal" | "trimestral" | "semestral" | "anual";
 
-export type BaseValor = "mes" | "lavagem";
-
-export interface TumuloCobranca {
-  tumuloId: string;
+export interface FamiliaCobranca {
   familiaId: string;
   contratado: boolean;
-  valorLavagem: number;
+  /** O valor combinado. Um só, mesmo com vários túmulos. */
+  valorMensal: number;
   /**
    * O QUE O VALOR SIGNIFICA.
    *
-   *   "mes"      -> é o valor do MÊS, não importa quantas limpezas cabem nele.
-   *                 É como a Sureya vende: "R$ 40 por mês, e eu vou toda semana".
-   *   "lavagem"  -> é o preço de CADA limpeza; o mês é ele vezes a periodicidade.
-   *
-   * Sem este campo o sistema supunha "lavagem" e multiplicava: um contrato de
-   * R$ 40 por mês com limpeza semanal virava R$ 160. Quatro vezes o combinado,
-   * numa cobrança que a família não reconheceria.
+   *   "mes"      -> é o valor de UM MÊS; a cobrança é ele vezes os meses do
+   *                 ciclo. R$ 100/mês pago por semestre cobra R$ 600.
+   *   "cobranca" -> é o valor de CADA COBRANÇA, exatamente como sai. Existe
+   *                 combinado dito assim ("R$ 600 por semestre"), e obrigar a
+   *                 Sureya a dividir de cabeça é pedir erro.
    */
-  valorBase?: BaseValor;
-  periodicidade: Periodicidade | null;
+  valorBase?: "mes" | "cobranca";
   freqPagamento: FreqPagamento | null;
-  /**
-   * A PARTIR DE QUANDO COBRAR — "2026-03-01".
-   *
-   * Ancora o ciclo e barra competência anterior. Antes o sistema usava a data
-   * em que o túmulo foi DIGITADO, que é acidente do cadastro: um plano anual
-   * assinado em março e digitado em agosto passava a cobrar em agosto.
-   */
+  /** "2026-03-01" — ancora o ciclo e barra competência anterior. */
   inicioCobranca?: string | null;
 }
 
@@ -62,17 +55,6 @@ export interface Lancamento {
   valor: number;
   descricao: string;
 }
-
-/** Quantas lavagens cabem em um mês, conforme a periodicidade. */
-const LAVAGENS_POR_MES: Record<Periodicidade, number> = {
-  semanal: 4,        // 4 e não 4,33: cobrar a mais gera atrito com a família
-  quinzenal: 2,
-  mensal: 1,
-  bimestral: 0.5,
-  trimestral: 1 / 3,
-  semestral: 1 / 6,
-  anual: 1 / 12,
-};
 
 const MESES_DO_CICLO: Record<FreqPagamento, number> = {
   mensal: 1, trimestral: 3, semestral: 6, anual: 12,
@@ -89,78 +71,58 @@ export function competenciaDe(data: Date): string {
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
 /**
- * O VALOR DE UM MÊS de um túmulo contratado.
- * valor da lavagem x quantas lavagens aquele mês tem.
- */
-export function valorMensal(t: TumuloCobranca): number {
-  if (!t.contratado || !t.periodicidade) return 0;
-  // O padrão é "mes" porque é assim que o contrato é fechado. Supor
-  // "lavagem" multiplicaria um valor que já é mensal.
-  if ((t.valorBase ?? "mes") === "mes") return centavos(t.valorLavagem);
-  return centavos(t.valorLavagem * LAVAGENS_POR_MES[t.periodicidade]);
-}
-
-/**
  * O débito de uma competência.
  *
- * A frequência de PAGAMENTO decide quando cobrar; a periodicidade da LIMPEZA
- * decide quanto. Um túmulo semanal pago por trimestre gera um lançamento a
- * cada três meses, no valor de três meses de lavagem semanal.
+ * A frequência de pagamento decide QUANDO cobrar; o valor mensal decide
+ * QUANTO. Uma família de R$ 40 por mês que paga por trimestre recebe um
+ * lançamento a cada três meses, de R$ 120.
  *
  * Devolve null quando o mês não fecha ciclo — aí não há o que cobrar.
  */
 export function debitoDaCompetencia(
-  t: TumuloCobranca,
-  competencia: string,
-  mesInicial = 1
+  f: FamiliaCobranca,
+  competencia: string
 ): Lancamento | null {
-  if (!t.contratado || !t.periodicidade || !t.freqPagamento) return null;
+  if (!f.contratado || !f.freqPagamento || !(f.valorMensal > 0)) return null;
 
-  // ANTES DO INÍCIO NÃO SE COBRA.
-  //
-  // Sem esta trava, rodar o fechamento de um mês passado geraria débito para
-  // uma família que ainda nem era cliente — e ela receberia uma cobrança de
-  // um período em que não contratou nada.
-  if (t.inicioCobranca && competencia < t.inicioCobranca.slice(0, 10)) return null;
+  // ANTES DO INÍCIO NÃO SE COBRA. Sem esta trava, rodar o fechamento de um mês
+  // passado geraria débito para quem ainda nem era cliente.
+  if (f.inicioCobranca && competencia < f.inicioCobranca.slice(0, 10)) return null;
 
+  const passo = MESES_DO_CICLO[f.freqPagamento];
   const mes = Number(competencia.slice(5, 7));
-  const passo = MESES_DO_CICLO[t.freqPagamento];
 
   // O ciclo fecha a cada `passo` meses, contados do mês em que a cobrança
-  // começou. Um plano anual que começa em março cobra em março, não em
-  // janeiro — e não no mês em que alguém digitou o cadastro.
-  const ancora = t.inicioCobranca
-    ? Number(t.inicioCobranca.slice(5, 7))
-    : mesInicial;
+  // começou: um plano anual que começa em março cobra em março, não em janeiro.
+  const ancora = f.inicioCobranca ? Number(f.inicioCobranca.slice(5, 7)) : 1;
+  if (((mes - ancora + 12) % 12) % passo !== 0) return null;
 
-  const desde = (mes - ancora + 12) % 12;
-  if (desde % passo !== 0) return null;
-
-  const valor = centavos(valorMensal(t) * passo);
+  const valor = centavos(
+    (f.valorBase ?? "mes") === "cobranca" ? f.valorMensal : f.valorMensal * passo
+  );
   if (valor <= 0) return null;
 
   const rotulo: Record<FreqPagamento, string> = {
     mensal: "1 mês", trimestral: "3 meses", semestral: "6 meses", anual: "12 meses",
   };
 
-
   return {
-    familiaId: t.familiaId,
-    tumuloId: t.tumuloId,
+    familiaId: f.familiaId,
+    tumuloId: null,          // o contrato é da família, não de uma pedra
     tipo: "debito",
     origem: "competencia",
     competencia,
     valor,
-    descricao: `Manutenção · ${rotulo[t.freqPagamento]} · limpeza ${t.periodicidade}`,
+    descricao: `Manutenção · ${rotulo[f.freqPagamento]}`,
   };
 }
 
 /**
- * SERVIÇO AVULSO — o túmulo sem plano.
+ * SERVIÇO AVULSO — a família sem plano.
  *
  * Família cadastrada, túmulo cadastrado, nenhum serviço contratado. A lavagem
- * entra como débito único, sem competência, sem recorrência. É a mesma conta
- * corrente: por isso o modelo acomoda o avulso sem inventar estrutura nova.
+ * entra como débito único, sem competência. É a mesma conta corrente: por isso
+ * o modelo acomoda o avulso sem inventar estrutura nova.
  */
 export function debitoAvulso(
   familiaId: string,
@@ -225,16 +187,14 @@ export function situacao(lancamentos: Lancamento[]): SituacaoFamilia {
  * O gerador mensal, chamado pelo cron do dia 1.
  *
  * A trava contra cobrar duas vezes NÃO está aqui — está no banco, no índice
- * único (tumulo_id, competencia) da 0049. Se este código rodar duas vezes no
- * mesmo mês, o segundo insert é recusado pelo Postgres. Regra de dinheiro se
- * garante no banco, não na tela.
+ * único (familia_id, competencia). Regra de dinheiro se garante no banco, não
+ * na tela.
  */
 export function gerarCompetenciaDoMes(
-  tumulos: TumuloCobranca[],
-  competencia: string,
-  mesInicialPorTumulo: Record<string, number> = {}
+  familias: FamiliaCobranca[],
+  competencia: string
 ): Lancamento[] {
-  return tumulos
-    .map((t) => debitoDaCompetencia(t, competencia, mesInicialPorTumulo[t.tumuloId] ?? 1))
+  return familias
+    .map((f) => debitoDaCompetencia(f, competencia))
     .filter((l): l is Lancamento => l !== null);
 }

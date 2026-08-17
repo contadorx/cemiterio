@@ -130,6 +130,39 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 400 });
 
+  // A LAVAGEM APARECE NO EXTRATO — valor zero, só para acompanhar.
+  //
+  // Isto já acontecia quando a Nina concluía pelo app, mas NÃO quando a Sureya
+  // registrava à mão: a limpeza ficava só na lista de serviços e sumia da
+  // conta corrente, onde ela olha o histórico da família.
+  //
+  // Não mexe no saldo: quem gera a dívida é a competência. Se a lavagem também
+  // lançasse valor, a família seria cobrada duas vezes pelo mesmo serviço.
+  if (jaFeita) {
+    try {
+      const { data: tumInfo } = await db
+        .from("tumulos").select("familia_id,codigo").eq("id", tumuloId).maybeSingle();
+      const fam = (tumInfo as any)?.familia_id;
+      if (fam) {
+        const onde = (tumInfo as any)?.codigo ? ` · ${(tumInfo as any).codigo}` : "";
+        await db.from("conta_corrente").insert({
+          org_id: org,
+          familia_id: fam,
+          tumulo_id: tumuloId,
+          tipo: "debito",          // lado irrelevante: o valor é 0
+          origem: "lavagem",
+          competencia: null,
+          valor: 0,
+          descricao: `Limpeza realizada${onde}`,
+          data,
+        });
+      }
+    } catch {
+      // Só o registro visual. A limpeza está gravada em `servicos`, que é a
+      // prova do trabalho — não pode cair por causa do espelho.
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     servicoId: (srv as any)?.id,

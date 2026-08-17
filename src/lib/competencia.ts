@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "./supabase-admin";
-import { gerarCompetenciaDoMes, competenciaDe, type TumuloCobranca } from "./conta-corrente";
+import { gerarCompetenciaDoMes, competenciaDe, type FamiliaCobranca } from "./conta-corrente";
 
 /**
  * O FECHAMENTO DA COMPETÊNCIA, do lado do servidor.
@@ -23,53 +23,49 @@ export interface ResultadoCompetencia {
   total: number;
 }
 
-async function planosDoMes(org: string, competencia: string) {
+/**
+ * Quais famílias fecham ciclo neste mês.
+ *
+ * Lê `familias`, e não `tumulos`: o contrato é da família. Com dois túmulos na
+ * mesma casa, iterar por túmulo geraria duas cobranças onde existe uma só.
+ */
+async function contratosDoMes(org: string, competencia: string) {
   const db = supabaseAdmin();
 
   const { data, error } = await db
-    .from("tumulos")
-    .select("id,familia_id,valor_lavagem,valor_base,periodicidade,freq_pagamento,contratado,inicio_cobranca,created_at")
+    .from("familias")
+    .select("id,valor_mensal,valor_base,freq_pagamento,contratado,inicio_cobranca")
     .eq("org_id", org)
-    .eq("contratado", true)
-    .not("familia_id", "is", null);
+    .eq("contratado", true);
 
   if (error) throw new Error(error.message);
 
-  const tumulos: TumuloCobranca[] = (data || []).map((t: any) => ({
-    tumuloId: t.id,
-    familiaId: t.familia_id,
+  const familias: FamiliaCobranca[] = (data || []).map((f: any) => ({
+    familiaId: f.id,
     contratado: true,
-    valorLavagem: Number(t.valor_lavagem || 0),
-    valorBase: t.valor_base ?? "mes",
-    inicioCobranca: t.inicio_cobranca ?? null,
-    periodicidade: t.periodicidade,
-    freqPagamento: t.freq_pagamento,
+    valorMensal: Number(f.valor_mensal || 0),
+    valorBase: f.valor_base ?? "mes",
+    freqPagamento: f.freq_pagamento,
+    inicioCobranca: f.inicio_cobranca ?? null,
   }));
 
-  // O mês em que o plano começou é a âncora do ciclo: um plano anual assinado
-  // em março cobra em março, não em janeiro.
-  const mesInicial: Record<string, number> = {};
-  for (const t of (data || []) as any[]) {
-    mesInicial[t.id] = new Date(t.created_at).getMonth() + 1;
-  }
-
-  return gerarCompetenciaDoMes(tumulos, competencia, mesInicial);
+  return gerarCompetenciaDoMes(familias, competencia);
 }
 
 /** Só olha, não grava. Alimenta a prévia da tela. */
 export async function previewCompetencia(org: string, competencia?: string) {
   const db = supabaseAdmin();
   const comp = competencia || competenciaDe(new Date());
-  const lancamentos = await planosDoMes(org, comp);
+  const lancamentos = await contratosDoMes(org, comp);
 
   const { data: jaFeitos } = await db
     .from("conta_corrente")
-    .select("tumulo_id")
+    .select("familia_id")
     .eq("competencia", comp)
     .eq("origem", "competencia");
 
-  const feitos = new Set((jaFeitos || []).map((x: any) => x.tumulo_id));
-  const novos = lancamentos.filter((l) => !feitos.has(l.tumuloId));
+  const feitos = new Set((jaFeitos || []).map((x: any) => x.familia_id));
+  const novos = lancamentos.filter((l) => !feitos.has(l.familiaId));
 
   return {
     competencia: comp,
@@ -96,7 +92,7 @@ export async function fecharCompetencia(
 ): Promise<ResultadoCompetencia> {
   const db = supabaseAdmin();
   const comp = competencia || competenciaDe(new Date());
-  const lancamentos = await planosDoMes(org, comp);
+  const lancamentos = await contratosDoMes(org, comp);
 
   let lancados = 0;
   let repetidos = 0;
