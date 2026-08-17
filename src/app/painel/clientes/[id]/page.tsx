@@ -270,6 +270,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
 
         {/* Um chevron sozinho não diz que ali se edita — quem olha vê um
             enfeite. A palavra "Editar" resolve, e o ícone só acompanha. */}
+        {t.contratado && <PorNaConta tumuloId={t.id} aoMudar={aoMudar} />}
         <button
           onClick={() => setAbrindo((x) => !x)}
           className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-2 text-[14px] font-medium text-ink hover:bg-surface"
@@ -455,6 +456,70 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
       }}
     >
       <Link2 size={16} /> {copiado ? "link copiado" : "Copiar link do portal"}
+    </Botao>
+  );
+}
+
+/**
+ * PÔR NA CONTA O QUE JÁ VENCEU.
+ *
+ * O fechamento automático roda no dia 1 e olha o mês corrente. Mas a Sureya
+ * está cadastrando agora contratos que começaram meses atrás: uma família que
+ * paga desde março entra no sistema em agosto, e o extrato nasceria vazio,
+ * como se nada fosse devido.
+ *
+ * O botão só aparece quando há mês em aberto para lançar — se está tudo em
+ * dia, ele não ocupa espaço nem convida a clicar à toa.
+ */
+function PorNaConta({ tumuloId, aoMudar }: { tumuloId: string; aoMudar: () => void }) {
+  const [previa, setPrevia] = useState<any>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  const carregar = useCallback(() => {
+    fetch(`/api/financeiro/competencia/tumulo?tumuloId=${tumuloId}`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setPrevia(r); })
+      .catch(() => {});
+  }, [tumuloId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (!previa?.novos) return null;
+
+  const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const rotulo = (c: string) => `${MES[Number(c.slice(5, 7)) - 1]}/${c.slice(2, 4)}`;
+  const primeiro = previa.meses?.[0];
+  const ultimo = previa.meses?.[previa.meses.length - 1];
+
+  async function lancar() {
+    // A prévia vem antes de gravar, sempre: lançar dívida sem ver o que entra
+    // é o tipo de botão que ninguém deveria ter.
+    const faixa = previa.novos === 1
+      ? rotulo(primeiro)
+      : `${rotulo(primeiro)} até ${rotulo(ultimo)}`;
+    if (!confirm(
+      `Vou lançar ${previa.novos} cobrança(s) — ${faixa} — somando ` +
+      `${dinheiro(previa.total)}.\n\nConfirma?`
+    )) return;
+
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/financeiro/competencia/tumulo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tumuloId }),
+      }).then((x) => x.json());
+      if (!r?.ok) { alert(r?.erro || "Não consegui lançar."); return; }
+      carregar();
+      aoMudar();
+    } finally { setOcupado(false); }
+  }
+
+  return (
+    <Botao tom="principal" onClick={lancar} disabled={ocupado} className="flex-shrink-0">
+      {ocupado
+        ? "Lançando…"
+        : `Pôr na conta ${previa.novos} ${previa.novos === 1 ? "mês" : "meses"} · ${dinheiro(previa.total)}`}
     </Botao>
   );
 }

@@ -1276,6 +1276,49 @@ gerador já usava. Ninguém muda de situação por causa desta migration.
 
 ---
 
+## PÔR NA CONTA O QUE JÁ VENCEU
+
+### O problema
+
+O fechamento automático roda no dia 1 e olha o **mês corrente**. Mas a Sureya
+está cadastrando agora contratos que começaram meses atrás: uma família que
+paga desde março entra no sistema em agosto, e o extrato dela nasceria vazio —
+como se nada fosse devido.
+
+Definir "começar a cobrar em março" não bastava: ninguém ia gerar março a
+julho.
+
+### O botão
+
+No bloco do túmulo aparece **"Pôr na conta 6 meses · R$ 240,00"**, já com a
+contagem e o total. Ele percorre da data de início até o mês corrente e lança
+tudo que aquele plano teria gerado.
+
+Três cuidados:
+
+- **Só aparece quando há mês em aberto.** Se está tudo em dia, não ocupa
+  espaço nem convida a clicar à toa.
+- **Confirma antes**, dizendo a faixa e o total: *"6 cobranças — mar/26 até
+  ago/26 — somando R$ 240,00"*. Lançar dívida sem ver o que entra é o tipo de
+  botão que ninguém deveria ter.
+- **Não duplica.** A trava é o índice único `(tumulo_id, competencia)`: rodar
+  depois do fechamento automático, ou duas vezes seguidas, não repete nada.
+
+O mês corrente entra, porque a manutenção dele já está contratada — é o mesmo
+critério do fechamento do dia 1.
+
+### Testado
+
+| Contrato desde mar/26, cadastrado em ago/26 | Lança |
+|---|---|
+| R$ 40/mês, pago por mês | mar, abr, mai, jun, jul, ago · **R$ 240** |
+| R$ 60/mês, pago por trimestre | mar e jun · **R$ 360** |
+| R$ 50/mês, pago no ano | mar · **R$ 600** |
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada
