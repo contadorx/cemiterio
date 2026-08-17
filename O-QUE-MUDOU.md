@@ -1071,6 +1071,44 @@ desfeito.
 
 ---
 
+## OS JAZIGOS DO CAMPO AGORA SÃO EDITÁVEIS
+
+### O erro
+
+Eu desliguei a tela `/painel/jazigos` achando que duplicava a ficha da
+família. **Não duplica.** É a única tela onde se edita um jazigo que ainda
+não tem família — e é exatamente esse o estado dos 71 que a Nina cadastrou no
+campo.
+
+Resultado: corrigir a rua de um jazigo órfão era impossível. Ele não aparece
+em ficha nenhuma, e a tela que serviria estava devolvendo 404.
+
+### O que voltou
+
+`Jazigos` saiu da lista de rotas bloqueadas e entrou no menu, em *Carteira*.
+
+Ela já trazia o filtro **"Sem família"**, as fotos lado a lado para comparar,
+apagar GPS e separar jazigo duplicado.
+
+### O que faltava nela
+
+Ela não editava **quadra, rua e nome na pedra** — só apagava foto e posição.
+Acrescentei o bloco *"Corrigir endereço"*, com quadra e rua em lista (nunca
+digitação, para não repetir a bagunça que gerou treze quadras) e o nome na
+pedra opcional.
+
+Como o PATCH já atualiza o `rua_id` junto com o texto, corrigir a rua aqui
+reposiciona o jazigo no roteiro do dia.
+
+### O caminho, agora
+
+1. **Jazigos → filtro "Sem família"** — corrigir endereço do que veio torto
+2. **Ficha da família → Adicionar → "Cadastrados no campo"** — ligar à família
+
+`next build` executado: passou limpo.
+
+---
+
 ## Falta ligar
 
 0. **Publicar no Vercel.** O que está no ar hoje é o código antigo — nada

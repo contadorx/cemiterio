@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays, Home, Inbox, MapPin, Receipt, Settings,
-  Sparkles, Users, MessageCircle, LogOut,
+  Sparkles, Users, MessageCircle, LogOut, Landmark,
 } from "lucide-react";
 
 /**
@@ -28,6 +28,9 @@ const DIA_A_DIA = [
 
 const CARTEIRA = [
   { href: "/painel/clientes", label: "Famílias", icon: Users },
+  // Onde se edita e corrige jazigo — inclusive os que ainda não têm família,
+  // que é o caso de tudo que a Nina cadastra no campo.
+  { href: "/painel/jazigos", label: "Jazigos", icon: Landmark },
   { href: "/painel/financeiro", label: "Financeiro", icon: Receipt },
 ];
 

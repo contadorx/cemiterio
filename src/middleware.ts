@@ -35,8 +35,11 @@ const DESLIGADAS = [
   // Substituídos pela plaquinha física e pelo endereço
   "/painel/mapa",
   "/painel/plaquetas",
-  // Viraram blocos dentro da ficha da família
-  "/painel/jazigos",
+  // ATENÇÃO: "/painel/jazigos" NÃO entra nesta lista.
+  // Eu a desliguei achando que duplicava a ficha da família. Não duplica: é a
+  // ÚNICA tela onde se edita um jazigo que ainda não tem família — e os 71
+  // cadastrados no campo estão exatamente nesse estado. Sem ela, corrigir a
+  // rua de um jazigo órfão era impossível.
   "/painel/planos",
   // ATENÇÃO: "/familia" e "/t/" NÃO entram nesta lista.
   // O portal voltou a ter função: mostra o ANTES E O DEPOIS de cada limpeza

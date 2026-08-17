@@ -246,6 +246,7 @@ function Cartao({
         </div>
 
         <div style={{ flex: 1, minWidth: 280 }}>
+          <EditarEndereco j={j} onSalvo={onMudou} />
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
             <b style={{ color: cor.navy, fontSize: 17 }}>
               {j.quadra || "?"} · {j.identificacao}
@@ -486,6 +487,99 @@ function Campo({ rotulo, largura, children }: { rotulo: string; largura: number;
     <div style={{ width: largura, maxWidth: "100%" }}>
       <div style={{ fontSize: 13, color: cor.cinza, marginBottom: 2 }}>{rotulo}</div>
       {children}
+    </div>
+  );
+}
+
+
+/**
+ * CORRIGIR O ENDEREÇO DE UM JAZIGO.
+ *
+ * Esta tela é a única onde se edita um jazigo que **ainda não tem família** —
+ * e é esse o estado de tudo que a Nina cadastra no campo. A ficha da família
+ * não serve para isso: um jazigo órfão não aparece em ficha nenhuma.
+ *
+ * O que se corrige aqui é justamente o que erra no cemitério, de pé, no sol:
+ * a quadra, a rua e o nome escrito na pedra.
+ */
+function EditarEndereco({ j, onSalvo }: { j: Jazigo; onSalvo: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [quadras, setQuadras] = useState<any[]>([]);
+  const [ruas, setRuas] = useState<any[]>([]);
+  const [f, setF] = useState({
+    quadra_id: j.quadraId || "",
+    rua: j.rua || "",
+    identificacao: j.identificacao || "",
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    if (!aberto || quadras.length) return;
+    fetch("/api/quadras").then((x) => x.json())
+      .then((r) => { if (r?.ok) setQuadras(r.quadras || []); }).catch(() => {});
+  }, [aberto, quadras.length]);
+
+  useEffect(() => {
+    if (!aberto || !f.quadra_id) { setRuas([]); return; }
+    fetch(`/api/ruas?quadraId=${f.quadra_id}`).then((x) => x.json())
+      .then((r) => { if (r?.ok) setRuas(r.ruas || []); }).catch(() => {});
+  }, [aberto, f.quadra_id]);
+
+  async function salvar() {
+    setSalvando(true); setErro("");
+    const r = await fetch(`/api/tumulos/${j.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(f),
+    }).then((x) => x.json()).catch(() => null);
+    setSalvando(false);
+    if (!r?.ok) { setErro(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+    setAberto(false);
+    onSalvo();
+  }
+
+  if (!aberto) {
+    return (
+      <button style={{ ...painel.botaoMiniSec, marginBottom: 8 }} onClick={() => setAberto(true)}>
+        Corrigir endereço
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: cor.bg, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))" }}>
+        <label>
+          <span style={painel.rotulo}>Quadra</span>
+          <select style={painel.input} value={f.quadra_id}
+                  onChange={(e) => setF({ ...f, quadra_id: e.target.value, rua: "" })}>
+            <option value="">escolha</option>
+            {quadras.map((q: any) => <option key={q.id} value={q.id}>{q.codigo}</option>)}
+          </select>
+        </label>
+        <label>
+          <span style={painel.rotulo}>Rua</span>
+          <select style={painel.input} value={f.rua} disabled={!ruas.length}
+                  onChange={(e) => setF({ ...f, rua: e.target.value })}>
+            <option value="">{f.quadra_id ? "escolha" : "escolha a quadra antes"}</option>
+            {ruas.map((r: any) => <option key={r.id} value={r.nome}>{r.nome}</option>)}
+          </select>
+        </label>
+        <label>
+          <span style={painel.rotulo}>Nome na pedra</span>
+          <input style={painel.input} value={f.identificacao}
+                 onChange={(e) => setF({ ...f, identificacao: e.target.value })}
+                 placeholder="opcional — ex.: Almeida" />
+        </label>
+      </div>
+      {erro && <p style={{ color: cor.perigo, fontSize: 14, marginTop: 8 }}>{erro}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button style={painel.botaoMini} onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+        <button style={painel.botaoMiniSec} onClick={() => setAberto(false)}>Cancelar</button>
+      </div>
     </div>
   );
 }
