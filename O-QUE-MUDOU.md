@@ -1551,6 +1551,63 @@ Agora os dois caminhos mostram o que deu errado.
 
 ---
 
+## A CONTA CORRENTE MOSTRA O CONSUMO
+
+### O que faltava
+
+A cobrança por competência lança o mês inteiro de uma vez: débito de R$ 100 em
+agosto, crédito de R$ 100 quando a família paga, saldo zero. Correto quanto ao
+contrato — e **mudo sobre o serviço**.
+
+O extrato não respondia à pergunta que a família faz: *"paguei 100, quantas
+limpezas já recebi? sobrou quanto?"*.
+
+### Como ficou
+
+**Cada limpeza lança um débito com o seu valor.** O pagamento credita. O saldo
+passa a ser a sobra.
+
+O valor de uma limpeza sai do contrato da família dividido pelas limpezas que
+cabem no mês, somando todos os túmulos:
+
+| Contrato | Ritmo | Cada limpeza |
+|---|---|---|
+| R$ 100/mês | 1 túmulo semanal | R$ 25 |
+| R$ 100/mês | 1 semanal + 1 mensal | R$ 20 |
+
+Sobre usar **4 semanas e não 4,33**: o número exato faria a limpeza valer
+R$ 23,09 e o extrato viraria centavos quebrados que ninguém confere. Com 4, a
+família às vezes ganha uma quinta limpeza sem débito — erra a favor dela, que
+é o lado certo de errar.
+
+### Os dois modos não convivem
+
+Somados, cobrariam duas vezes o mesmo serviço. Por isso a escolha é explícita
+no contrato, e o padrão é **consumo**:
+
+- **cada limpeza desconta do que foi pago** — o saldo mostra a sobra
+- **o mês inteiro entra de uma vez** — independentemente das limpezas
+
+No modo consumo o botão "Pôr na conta" some (não existe mês em aberto) e o
+fechamento automático ignora a família.
+
+### O André, corrigido *(banco já ajustado)*
+
+As duas limpezas estavam com valor zero — foram lançadas antes disto existir.
+Recalculei e sincronizei todas as limpezas executadas que não tinham registro
+no extrato.
+
+O extrato dele agora é: limpeza 03/08 R$ 25 · pagamento 08/08 R$ 100 · limpeza
+10/08 R$ 25 → **R$ 50 a favor**.
+
+## O MENU NÃO CABIA NA TELA
+
+Dez itens, três títulos de grupo, cabeçalho e o "Sair" passavam da altura da
+janela e a coluna ganhava barra de rolagem. Compactei espaçamento, altura de
+item e tamanho de fonte e ícone — sem tirar nada.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você

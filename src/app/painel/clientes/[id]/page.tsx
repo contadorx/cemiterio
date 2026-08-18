@@ -442,6 +442,7 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
         setF({
           valor_mensal: r.familia.valor_mensal ?? "",
           valor_base: r.familia.valor_base ?? "mes",
+          modo_cobranca: r.familia.modo_cobranca ?? "consumo",
           freq_pagamento: r.familia.freq_pagamento ?? "",
           inicio_cobranca: (r.familia.inicio_cobranca ?? "").slice(0, 7),
           contratado: !!r.familia.contratado,
@@ -503,7 +504,9 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
                 desde {MES[Number(d.inicio_cobranca.slice(5, 7)) - 1]}/{d.inicio_cobranca.slice(2, 4)}
               </Selo>
             )}
-            <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />
+            {d.modo_cobranca === "consumo"
+              ? <Selo tom="neutro">cada limpeza desconta</Selo>
+              : <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
           </div>
         )
       ) : (
@@ -542,6 +545,16 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
                 <Entrada type="month" value={f.inicio_cobranca}
                          onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })} />
               </Campo>
+              {/* COMO O EXTRATO CONTA.
+                  Os dois modos não convivem: somados, cobrariam duas vezes o
+                  mesmo serviço. */}
+              <Campo rotulo="No extrato" dica="como o saldo é calculado">
+                <Selecao value={f.modo_cobranca}
+                         onChange={(e: any) => setF({ ...f, modo_cobranca: e.target.value })}>
+                  <option value="consumo">cada limpeza desconta do que foi pago</option>
+                  <option value="competencia">o mês inteiro entra de uma vez</option>
+                </Selecao>
+              </Campo>
             </div>
           )}
 
@@ -550,7 +563,10 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
           {f.contratado && f.valor_mensal && f.freq_pagamento && (
             <p className="mt-3 rounded-lg bg-brand-light px-3 py-2 text-[14px] text-ink">
               A família recebe <b>{dinheiro(valorDaCobranca(f))}</b>{" "}
-              {FREQ[f.freq_pagamento]?.replace("todo mês", "todo mês") ?? ""}.
+              {FREQ[f.freq_pagamento] ?? ""}.
+              {f.modo_cobranca === "consumo" && (
+                <> No extrato, cada limpeza vai descontando desse valor.</>
+              )}
             </p>
           )}
 

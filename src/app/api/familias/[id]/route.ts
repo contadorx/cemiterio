@@ -23,7 +23,7 @@ export async function GET(
 
   const { data, error } = await auth.db
     .from("familias")
-    .select("id,nome,observacoes,valor_mensal,valor_base,freq_pagamento,inicio_cobranca,contratado")
+    .select("id,nome,observacoes,valor_mensal,valor_base,freq_pagamento,inicio_cobranca,contratado,modo_cobranca")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -53,6 +53,7 @@ export async function PATCH(
   }
 
   if (b.valor_base !== undefined) patch.valor_base = b.valor_base || "mes";
+  if (b.modo_cobranca !== undefined) patch.modo_cobranca = b.modo_cobranca || "consumo";
   if (b.freq_pagamento !== undefined) patch.freq_pagamento = b.freq_pagamento || null;
 
   // Sempre o dia 1: competência é mês, não dia. Guardar "15/03" faria a

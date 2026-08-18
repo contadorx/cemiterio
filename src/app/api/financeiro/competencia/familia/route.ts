@@ -30,7 +30,7 @@ export const maxDuration = 120;
 async function calcular(db: any, org: string, familiaId: string) {
   const { data: f, error } = await db
     .from("familias")
-    .select("id,valor_mensal,valor_base,freq_pagamento,contratado,inicio_cobranca,created_at")
+    .select("id,valor_mensal,valor_base,freq_pagamento,contratado,inicio_cobranca,modo_cobranca,created_at")
     .eq("id", familiaId)
     .eq("org_id", org)
     .maybeSingle();
@@ -38,6 +38,9 @@ async function calcular(db: any, org: string, familiaId: string) {
   if (error) throw new Error(error.message);
   if (!f) throw new Error("familia_nao_encontrada");
   if (!(f as any).contratado) throw new Error("familia_sem_plano");
+  // No modo consumo não existe "mês em aberto": o débito nasce de cada
+  // limpeza. Oferecer o botão aqui geraria cobrança em duplicidade.
+  if ((f as any).modo_cobranca !== "competencia") throw new Error("familia_modo_consumo");
 
   const alvo: FamiliaCobranca = {
     familiaId: (f as any).id,

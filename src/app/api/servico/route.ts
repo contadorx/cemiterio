@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { valorDaLimpeza } from "@/lib/valor-limpeza";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,14 +146,21 @@ export async function POST(req: NextRequest) {
       const fam = (tumInfo as any)?.familia_id;
       if (fam) {
         const onde = (tumInfo as any)?.codigo ? ` · ${(tumInfo as any).codigo}` : "";
+        // A LIMPEZA CONSOME O QUE FOI PAGO.
+        //
+        // No modo consumo cada limpeza debita o seu valor, e o saldo passa a
+        // mostrar a sobra: pagou R$ 100, recebeu duas de R$ 25, sobram R$ 50 a
+        // favor dela. No modo competência o valor é 0, porque o mês já foi
+        // debitado inteiro — somar os dois cobraria duas vezes.
+        const valorLimpeza = await valorDaLimpeza(fam);
         await db.from("conta_corrente").insert({
           org_id: org,
           familia_id: fam,
           tumulo_id: tumuloId,
-          tipo: "debito",          // lado irrelevante: o valor é 0
+          tipo: "debito",
           origem: "lavagem",
           competencia: null,
-          valor: 0,
+          valor: valorLimpeza,
           descricao: `Limpeza realizada${onde}`,
           data,
         });

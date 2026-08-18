@@ -6,6 +6,7 @@ import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
 import { diaOperacao } from "@/lib/vencimento";
 import { registrarErro } from "@/lib/monitor";
 import { rascunhoDaLavagem } from "@/lib/mensagens";
+import { valorDaLimpeza } from "@/lib/valor-limpeza";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

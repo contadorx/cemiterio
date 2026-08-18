@@ -69,12 +69,14 @@ export async function GET(req: NextRequest) {
   // Soma no servidor: o saldo é a resposta que a Sureya lê antes de ligar
   // para a família, e não pode depender de a lista ter sido paginada.
   //
-  // Os registros de LAVAGEM ficam de fora da conta. Eles existem no extrato
-  // só para acompanhar o que foi feito — quem gera a dívida é a competência.
-  // Somá-los cobraria a família duas vezes pelo mesmo serviço.
-  const saldo = linhas
-    .filter((l) => l.origem !== "lavagem")
-    .reduce((s, l) => s + (l.tipo === "debito" ? l.valor : -l.valor), 0);
+  // A LAVAGEM CONTA, quando tem valor.
+  //
+  // No modo consumo cada limpeza debita o que vale, e é isso que faz o saldo
+  // mostrar a sobra. No modo competência ela vem com valor zero e não altera
+  // nada — somar tudo funciona nos dois casos, sem precisar saber o modo aqui.
+  const saldo = linhas.reduce(
+    (s, l) => s + (l.tipo === "debito" ? l.valor : -l.valor), 0
+  );
   const arredondado = Math.round(saldo * 100) / 100;
 
   return NextResponse.json({

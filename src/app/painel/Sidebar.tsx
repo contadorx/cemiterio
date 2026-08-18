@@ -48,8 +48,8 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
     href === "/painel" ? caminho === "/painel" : caminho.startsWith(href);
 
   const grupo = (titulo: string, itens: typeof DIA_A_DIA) => (
-    <div className="mb-5">
-      <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-rail-muted">
+    <div className="mb-3">
+      <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-rail-muted">
         {titulo}
       </p>
       {itens.map(({ href, label, icon: Icone }) => (
@@ -59,7 +59,7 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
           onClick={aoNavegar}
           aria-current={ativo(href) ? "page" : undefined}
           className={[
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors",
+            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors",
             ativo(href)
               ? "bg-rail-hover font-semibold text-sobre"
               : "text-rail-muted hover:bg-rail-hover hover:text-sobre",
@@ -70,11 +70,11 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
           <span
             aria-hidden
             className={[
-              "h-5 w-[3px] rounded-full",
+              "h-4 w-[3px] rounded-full",
               ativo(href) ? "bg-ouro" : "bg-transparent",
             ].join(" ")}
           />
-          <Icone size={18} strokeWidth={2} />
+          <Icone size={17} strokeWidth={2} />
           {label}
         </Link>
       ))}
@@ -82,12 +82,12 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
   );
 
   return (
-    <nav className="flex h-full flex-col overflow-y-auto bg-rail px-3 py-5">
-      <div className="mb-6 px-3">
-        <p className="text-[17px] font-semibold leading-tight text-sobre">
+    <nav className="flex h-full flex-col overflow-y-auto bg-rail px-3 py-4">
+      <div className="mb-4 px-3">
+        <p className="text-[15px] font-semibold leading-tight text-sobre">
           Zelo &amp; Memória
         </p>
-        <p className="text-[12px] text-rail-muted">Dona Nadir · desde 1990</p>
+        <p className="text-[11px] text-rail-muted">Dona Nadir · desde 1990</p>
       </div>
 
       {grupo("Dia a dia", DIA_A_DIA)}
@@ -97,10 +97,10 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
       <form action="/api/sair" method="post" className="mt-auto px-1">
         <button
           type="submit"
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] text-rail-muted transition-colors hover:bg-rail-hover hover:text-sobre"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] text-rail-muted transition-colors hover:bg-rail-hover hover:text-sobre"
         >
-          <span aria-hidden className="h-5 w-[3px]" />
-          <LogOut size={18} strokeWidth={2} />
+          <span aria-hidden className="h-4 w-[3px]" />
+          <LogOut size={17} strokeWidth={2} />
           Sair
         </button>
       </form>

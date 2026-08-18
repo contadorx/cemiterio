@@ -34,9 +34,12 @@ async function contratosDoMes(org: string, competencia: string) {
 
   const { data, error } = await db
     .from("familias")
-    .select("id,valor_mensal,valor_base,freq_pagamento,contratado,inicio_cobranca")
+    .select("id,valor_mensal,valor_base,freq_pagamento,contratado,inicio_cobranca,modo_cobranca")
     .eq("org_id", org)
-    .eq("contratado", true);
+    .eq("contratado", true)
+    // Só quem cobra por competência. No modo consumo o débito nasce de cada
+    // limpeza; lançar o mês também cobraria duas vezes o mesmo serviço.
+    .eq("modo_cobranca", "competencia");
 
   if (error) throw new Error(error.message);
 
