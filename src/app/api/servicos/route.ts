@@ -76,9 +76,32 @@ export async function GET(req: NextRequest) {
 
   const linhas = (r.data || []) as any[];
 
-  // cobrança: existe débito lançado para este serviço?
+  // QUANTO CADA LIMPEZA VALEU.
+  //
+  // O serviço não carrega valor — o dinheiro vive na conta corrente, para não
+  // haver dois números para a mesma coisa. Mas a lista precisa MOSTRAR o
+  // valor: sem ele, a Sureya vê "três limpezas" e não sabe quanto isso
+  // consumiu do que a família pagou.
+  //
+  // O casamento é por túmulo + data, que é como o lançamento nasce.
   const ids = linhas.map((s) => s.id);
   const cobr = new Map<string, number>();
+  const porTumuloData = new Map<string, number>();
+
+  const tumulosDaLista = [...new Set(linhas.map((s) => s.tumulo_id).filter(Boolean))];
+  if (tumulosDaLista.length) {
+    const { data: lav } = await db
+      .from("conta_corrente")
+      .select("tumulo_id,data,valor")
+      .eq("org_id", org)
+      .eq("origem", "lavagem")
+      .in("tumulo_id", tumulosDaLista);
+
+    for (const l of (lav || []) as any[]) {
+      porTumuloData.set(`${l.tumulo_id}|${String(l.data).slice(0, 10)}`, Number(l.valor) || 0);
+    }
+  }
+
   if (ids.length) {
     const { data: movs } = await db
       .from("movimentos")
@@ -111,6 +134,10 @@ export async function GET(req: NextRequest) {
       executadaEm: s.data_executada ? String(s.data_executada).slice(0, 10) : null,
       mes: (s.data_executada ? String(s.data_executada) : s.data_prevista || "").slice(0, 7) || null,
       valor: s.valor === null || s.valor === undefined ? null : Number(s.valor),
+      // O que esta limpeza consumiu do que a família pagou.
+      valorLimpeza: s.data_executada
+        ? porTumuloData.get(`${s.tumulo_id}|${String(s.data_executada).slice(0, 10)}`) ?? null
+        : null,
       observacao: s.observacao ?? null,
       cobrado: cobr.has(s.id),
       valorCobrado: cobr.get(s.id) ?? null,

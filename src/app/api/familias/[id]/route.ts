@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { valorDaLimpeza } from "@/lib/valor-limpeza";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,14 @@ export async function GET(
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
 
-  return NextResponse.json({ ok: true, familia: data });
+  // QUANTO VALE CADA LIMPEZA — calculado no servidor, e não na tela.
+  //
+  // A conta depende do ritmo de TODOS os túmulos da família, e a ficha só
+  // conhece os do cliente aberto. Calcular lá daria um número diferente do que
+  // o extrato lança — o pior tipo de divergência, porque parece certo.
+  const porLimpeza = await valorDaLimpeza(params.id);
+
+  return NextResponse.json({ ok: true, familia: { ...data, valor_por_limpeza: porLimpeza } });
 }
 
 export async function PATCH(

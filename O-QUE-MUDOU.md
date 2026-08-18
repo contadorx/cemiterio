@@ -1608,6 +1608,44 @@ item e tamanho de fonte e ícone — sem tirar nada.
 
 ---
 
+## O VALOR AO LADO DE CADA SERVIÇO
+
+**Sempre 4 semanas no mês**, confirmado — o cálculo já usava e continua.
+
+### Onde o valor aparece agora
+
+| Lugar | O que mostra |
+|---|---|
+| Contrato | *"cada limpeza vale R$ 25,00"* |
+| Ao editar o contrato | *"...cada limpeza vai descontando desse valor — hoje R$ 25,00 por limpeza"* |
+| Lista de limpezas | o valor de cada uma, ao lado da data |
+| Extrato | já mostrava, no lançamento |
+
+Sem isso a lista dizia "três limpezas" e não dizia quanto aquilo consumiu do
+que a família pagou.
+
+### Duas decisões
+
+**O valor unitário é calculado no servidor**, não na tela. A conta depende do
+ritmo de **todos** os túmulos da família, e a ficha só conhece os do cliente
+aberto — calcular lá daria um número diferente do que o extrato lança, que é o
+pior tipo de divergência, porque parece certo.
+
+**Na lista de limpezas, o valor vem do lançamento real**, casado por túmulo e
+data — e não recalculado. Se o contrato mudar amanhã, as limpezas antigas
+continuam mostrando o que valeram na época.
+
+### Quando não dá para calcular
+
+A Família Perrela tem plano de R$ 15/mês mas nenhum túmulo com ritmo definido
+— não há por quantas limpezas dividir. Antes a limpeza entraria valendo zero,
+calada. Agora o contrato mostra **"falta dizer o ritmo da limpeza no túmulo"**.
+
+Conferido no banco: André R$ 100 ÷ 4 semanais = **R$ 25**; Anninha R$ 20 ÷ 2
+quinzenais = **R$ 10**.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você

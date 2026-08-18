@@ -504,8 +504,13 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
                 desde {MES[Number(d.inicio_cobranca.slice(5, 7)) - 1]}/{d.inicio_cobranca.slice(2, 4)}
               </Selo>
             )}
+            {/* Sem ritmo em nenhum túmulo não há como dividir o valor, e a
+                limpeza entraria no extrato valendo zero. Melhor dizer o que
+                falta que mostrar um número errado. */}
             {d.modo_cobranca === "consumo"
-              ? <Selo tom="neutro">cada limpeza desconta</Selo>
+              ? (d.valor_por_limpeza > 0
+                  ? <Selo tom="neutro">cada limpeza vale {dinheiro(d.valor_por_limpeza)}</Selo>
+                  : <Selo tom="atencao">falta dizer o ritmo da limpeza no túmulo</Selo>)
               : <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
           </div>
         )
@@ -565,7 +570,10 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
               A família recebe <b>{dinheiro(valorDaCobranca(f))}</b>{" "}
               {FREQ[f.freq_pagamento] ?? ""}.
               {f.modo_cobranca === "consumo" && (
-                <> No extrato, cada limpeza vai descontando desse valor.</>
+                <>
+                  {" "}No extrato, cada limpeza vai descontando desse valor
+                  {d?.valor_por_limpeza > 0 && <> — hoje <b>{dinheiro(d.valor_por_limpeza)}</b> por limpeza</>}.
+                </>
               )}
             </p>
           )}
@@ -1045,6 +1053,13 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
               <p className="text-[12px] text-ink-soft">{l.tumulo}</p>
             )}
           </div>
+          {/* O VALOR AO LADO DO SERVIÇO. Sem ele, a lista diz "três limpezas"
+              e não diz quanto isso consumiu do que a família pagou. */}
+          {l.valorLimpeza > 0 && (
+            <span className="text-[14px] font-semibold text-aviso">
+              {dinheiro(l.valorLimpeza)}
+            </span>
+          )}
           <Selo tom="bom">feita</Selo>
         </div>
       ))}
