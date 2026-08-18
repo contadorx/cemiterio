@@ -926,6 +926,7 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
   const [tumuloId, setTumuloId] = useState("");
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
   const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
 
   // LIMPEZA AVULSA — a que a Sureya registra à mão.
   // Existe porque nem toda limpeza passa pelo app da Nina: a própria Sureya
@@ -933,12 +934,23 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
   async function registrar() {
     if (!tumuloId) return;
     setOcupado(true);
+    setErro("");
     try {
-      await fetch("/api/servico", {
+      // A RESPOSTA PRECISA SER CONFERIDA.
+      //
+      // Isto era um `await fetch(...)` solto: se a gravação falhasse, a tela
+      // fechava o formulário e não dizia nada. A Sureya registrou quatro
+      // limpezas, três falharam e ela só descobriu olhando a lista vazia.
+      const r = await fetch("/api/servico", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tumuloId, dataExecutada: data }),
-      });
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) {
+        setErro(r?.mensagem || r?.erro || "Não consegui registrar a limpeza.");
+        return;
+      }
       setLancando(false);
       setTumuloId("");
       aoMudar();
@@ -947,24 +959,21 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
   }
 
   function recarregar() {
-    fetch(`/api/servicos?clienteId=${clienteId}&situacao=todos&limite=100`)
-      .then((x) => x.json())
-      .then((r) => setLista((r?.servicos || []).filter((sv: any) => sv.data_executada)))
-      .catch(() => {});
-  }
-
-  useEffect(() => {
-    // Só as executadas: a ficha mostra o que FOI feito. O que está agendado
-    // vive na Agenda, e misturar os dois faria a família parecer atendida
-    // antes de a Nina ter ido lá.
-    fetch(`/api/servicos?clienteId=${clienteId}&situacao=todos&limite=100`)
+    // A API devolve `executadaEm`, e não `data_executada` — o nome muda ali
+    // porque a rota já entrega os campos prontos para a tela. Filtrar pelo
+    // nome do banco fazia a lista vir SEMPRE vazia, mesmo com a limpeza
+    // gravada corretamente.
+    fetch(`/api/servicos?clienteId=${clienteId}&situacao=feitos&limite=100`)
       .then((x) => x.json())
       .then((r) => {
-        const feitos = (r?.servicos || []).filter((s: any) => s.data_executada);
-        setLista(feitos);
+        if (!r?.ok) { setErro(r?.erro || "Não consegui carregar as limpezas."); return; }
+        setErro("");
+        setLista((r.servicos || []).filter((sv: any) => sv.executadaEm));
       })
-      .catch(() => {});
-  }, [clienteId]);
+      .catch(() => setErro("Não consegui carregar as limpezas."));
+  }
+
+  useEffect(() => { recarregar(); }, [clienteId]);
 
   return (
     <Cartao
@@ -1003,22 +1012,22 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
         </div>
       )}
 
-      {!lista.length && (
+      {erro && <p className="mb-2 text-[13px] text-perigo">{erro}</p>}
+
+      {!lista.length && !erro && (
         <p className="text-[14px] text-ink-soft">Nenhuma limpeza registrada ainda.</p>
       )}
       {lista.map((l: any) => (
         <div key={l.id} className="flex items-center gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0">
-          {l.foto_depois_url && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={l.foto_depois_url} alt="" className="h-12 w-12 rounded-lg object-cover" />
-          )}
           <div className="min-w-0 flex-1">
             <p className="text-[14px] text-ink">
-              {l.data_executada
-                ? new Date(l.data_executada).toLocaleDateString("pt-BR")
+              {l.executadaEm
+                ? new Date(l.executadaEm + "T12:00:00").toLocaleDateString("pt-BR")
                 : "sem data"}
             </p>
-            {l.executora && <p className="text-[12px] text-ink-soft">{l.executora}</p>}
+            {l.tumulo && l.tumulo !== "—" && (
+              <p className="text-[12px] text-ink-soft">{l.tumulo}</p>
+            )}
           </div>
           <Selo tom="bom">feita</Selo>
         </div>

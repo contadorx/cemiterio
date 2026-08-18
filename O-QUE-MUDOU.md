@@ -1522,6 +1522,35 @@ comentário que explica por que ele não é mais aceito.
 
 ---
 
+## AS LIMPEZAS NÃO APARECIAM — dois erros meus
+
+### 1. O filtro procurava um campo que não existe
+
+A rota `/api/servicos` entrega os campos **prontos para a tela**, e ali
+`data_executada` vira **`executadaEm`**. Meu filtro procurava o nome do banco,
+que nunca chega no navegador — então a lista vinha **sempre vazia**, mesmo com
+a limpeza gravada corretamente.
+
+Conferi no banco: a limpeza do André de 03/08 estava lá, executada, com
+cliente e túmulo certos. O registro funcionava; quem mentia era a tela.
+
+Também troquei o filtro da consulta para `situacao=feitos`, que já faz esse
+recorte no servidor.
+
+### 2. A tela engolia erro nos dois sentidos
+
+`registrar()` era um `await fetch(...)` solto, sem olhar a resposta: se a
+gravação falhasse, o formulário fechava e nada era dito. Foi por isso que
+**quatro limpezas foram registradas e só uma entrou** — as outras três
+falharam em silêncio.
+
+E o carregamento tinha `.catch(() => {})`, então erro de API virava lista
+vazia com a mensagem tranquilizadora "nenhuma limpeza registrada ainda".
+
+Agora os dois caminhos mostram o que deu errado.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você
