@@ -1780,6 +1780,44 @@ opção espera que ela traga resultado.
 
 ---
 
+## A DUPLICAÇÃO ENTRE FICHA E JAZIGOS
+
+### O que estava repetido
+
+As duas telas editavam a mesma pedra: endereço, nome na pedra, falecido. E
+cadastro que se corrige em dois lugares acaba divergindo — alguém arruma num,
+o outro segue mostrando o antigo.
+
+### A divisão
+
+| Tela | O que edita | Por quê |
+|---|---|---|
+| **Jazigos** | quadra, rua, nome na pedra, número, falecido, **família**, observações | é a única que alcança pedra ainda sem família, e permite trabalhar **por rua**, em lote |
+| **Ficha da família** | o **ritmo** da limpeza | é a única coisa da pedra que pertence ao contrato |
+
+Na ficha, o bloco do túmulo agora traz o link **"corrigir em Jazigos →"**, que
+já abre a tela **filtrada pela rua daquele jazigo** — sem isso a pessoa cairia
+na lista inteira e teria que procurar de novo o que estava vendo.
+
+Continua sendo possível **criar** um túmulo pela ficha: ali dizer o endereço é
+necessário, e não é edição.
+
+## BUSCA NA ESCOLHA DA FAMÍLIA
+
+São quase 300 famílias. O `<select>` do navegador vira inútil passando de umas
+trinta opções: não filtra, não diz quantas existem, e achar "Zulmira Molina"
+exige rolar tudo.
+
+O novo `BuscaSelect` filtra enquanto se digita, e **todos os termos precisam
+bater** — *"rosa ike"* acha *"Rosa Ikehara"* —, porque com nomes parecidos um
+termo só não separa nada.
+
+Mostra no máximo 60 de uma vez e diz *"mostrando 60 de 298 — digite para
+estreitar"*: sem esse aviso, quem não achasse o nome concluiria que a família
+não existe.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você
