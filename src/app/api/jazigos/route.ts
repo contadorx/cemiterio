@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const busca = (sp.get("q") || "").trim().toLowerCase();
   const quadraId = sp.get("quadra") || "";
+  const ruaFiltro = sp.get("rua") || "";
   const filtro = sp.get("filtro") || "todos";
   const limite = Math.min(Number(sp.get("limite") || 800), 2000);
 
@@ -45,6 +46,12 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limite);
     if (quadraId) s = s.eq("quadra_id", quadraId);
+    // FILTRO POR RUA.
+    //
+    // Quadra sozinha não estreita o bastante: a Quadra 1 tem dezenas de
+    // jazigos espalhados por dez ruas. Quem vai corrigir o cadastro trabalha
+    // por rua, que é como a Nina anda.
+    if (ruaFiltro) s = s.eq("rua", ruaFiltro);
     return s;
   };
 
@@ -157,5 +164,9 @@ export async function GET(req: NextRequest) {
       cemiterio: ((cems as any[]) || []).find((c) => c.id === q.cemiterio_id)?.nome || null,
     })),
     clientes: ((cli as any[]) || []).map((c) => ({ id: c.id, nome: c.nome })),
+    // As ruas que EXISTEM nos jazigos carregados. Listar as 39 do cadastro
+    // ofereceria filtros que não achariam nada — quem escolhe uma opção espera
+    // que ela traga resultado.
+    ruas: [...new Set(jazigos.map((j: any) => j.rua).filter(Boolean))].sort(),
   });
 }

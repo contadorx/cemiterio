@@ -1735,6 +1735,51 @@ Família operacional não recebe etiqueta: já está resolvida e não pede açã
 
 ---
 
+## IMPORTAÇÃO DA PLANILHA *(banco já atualizado)*
+
+### O cruzamento
+
+| Origem | Na planilha | Já no banco | Importados |
+|---|---|---|---|
+| Controle 2026 | 76 clientes | 62 | **13** |
+| Contatos marcados com **x** | 273 | 42 | **219** |
+
+**De 66 para 298 clientes**, e o gatilho criou uma família para cada um.
+
+O cruzamento foi por **telefone** (últimos 8 dígitos, para casar com e sem DDD
+e com e sem o 9) e por **nome normalizado** — sem acento e sem maiúscula. Só
+comparar nome traria falso positivo em "KATIA" e "Kátia", que são pessoas
+diferentes no seu cadastro.
+
+### Duas decisões que precisam da sua conferência
+
+**92 contatos vieram sem DDD** (só nove dígitos, como `998169679`). Assumi
+**11**, porque o negócio é em Mauá e o export perdeu o prefixo. Se algum for de
+outra região, o WhatsApp não vai encontrar — dá para achar todos filtrando por
+"Importado da planilha · Contatos marcados".
+
+**4 ficaram de fora por não terem telefone:** ABIGAIL, Judite Preto Cantão,
+Nice Dell Antônia e "família reis". Cadastre à mão se forem clientes.
+
+### O que NÃO foi importado, de propósito
+
+A coluna *"Localização do Jazigo"* da planilha (QD 3 - RUA 9 e afins) **não
+virou túmulo**, conforme você pediu — o cadastro das pedras está sendo feito
+pela tela Jazigos, com o mapa já ajustado. O texto da planilha ficou guardado
+nas observações de cada cliente, para consulta.
+
+## FILTRO POR RUA EM JAZIGOS
+
+Quadra sozinha não estreita o bastante: a Quadra 1 tem dezenas de jazigos
+espalhados por dez ruas, e quem corrige cadastro trabalha **por rua**, que é
+como a Nina anda.
+
+A lista de ruas mostra só as que **existem nos jazigos carregados** — oferecer
+as 39 do cadastro daria filtros que não achariam nada, e quem escolhe uma
+opção espera que ela traga resultado.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você

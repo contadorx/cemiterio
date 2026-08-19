@@ -60,13 +60,14 @@ function quando(d: string | null) {
 
 export default function JazigosPage() {
   const [dados, setDados] = useState<{
-    jazigos: Jazigo[]; quadras: Quadra[]; clientes: Cliente[];
+    jazigos: Jazigo[]; quadras: Quadra[]; clientes: Cliente[]; ruas: string[];
     total: number; suspeitos: number; completo: boolean;
   } | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
   const [quadraFiltro, setQuadraFiltro] = useState("");
+  const [ruaFiltro, setRuaFiltro] = useState("");
   const [erro, setErro] = useState("");
 
   const carregar = useCallback(async () => {
@@ -74,11 +75,12 @@ export default function JazigosPage() {
     const p = new URLSearchParams();
     if (filtro !== "todos") p.set("filtro", filtro);
     if (quadraFiltro) p.set("quadra", quadraFiltro);
+    if (ruaFiltro) p.set("rua", ruaFiltro);
     const r = await fetch(`/api/jazigos?${p.toString()}`).then((x) => x.json()).catch(() => null);
     if (!r?.ok) setErro(r?.erro || "não consegui carregar a lista");
     else { setErro(""); setDados(r); }
     setCarregando(false);
-  }, [filtro, quadraFiltro]);
+  }, [filtro, quadraFiltro, ruaFiltro]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -128,6 +130,21 @@ export default function JazigosPage() {
               <option value="">todas as quadras</option>
               {(dados?.quadras || []).map((q) => (
                 <option key={q.id} value={q.id}>{q.codigo}</option>
+              ))}
+            </select>
+
+            {/* FILTRO POR RUA.
+                Quadra sozinha não estreita o bastante: a Quadra 1 tem dezenas
+                de jazigos em dez ruas. Quem corrige cadastro trabalha por rua,
+                que é como a Nina anda. */}
+            <select
+              style={{ ...painel.input, width: "auto" }}
+              value={ruaFiltro}
+              onChange={(e) => setRuaFiltro(e.target.value)}
+            >
+              <option value="">todas as ruas</option>
+              {(dados?.ruas || []).map((r) => (
+                <option key={r} value={r}>{r}</option>
               ))}
             </select>
             {[
