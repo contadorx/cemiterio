@@ -106,7 +106,7 @@ interface Cli {
 function VisaoFamilias() {
   const [d, setD] = useState<any>(null);
   const [f, setF] = useState({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
-                               regua: "", venceEm: "", ordem: "nome", teste: false });
+                               regua: "", venceEm: "", ordem: "nome", teste: false, etapa: "" });
   const [quadras, setQuadras] = useState<any[]>([]);
   const [abrindo, setAbrindo] = useState(false);
 
@@ -132,6 +132,33 @@ function VisaoFamilias() {
     <div>
       <div>
         <div style={{ ...painel.card, padding: 12 }}>
+          {/* AS ETAPAS DO CADASTRO.
+              São 66 famílias e o trabalho é feito aos poucos: ligar o túmulo,
+              preencher o contrato, começar a registrar limpeza. Sem isto, a
+              Sureya reabre as mesmas fichas para descobrir que já fez — e as
+              que faltam somem no meio.
+              A etapa é derivada dos dados: um "já conferi" marcado à mão
+              desatualiza no dia em que alguém mexe por outro caminho. */}
+          {d?.porEtapa && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {([
+                ["", "Todas", null],
+                ["sem_tumulo", "Sem túmulo", d.porEtapa.sem_tumulo],
+                ["sem_contrato", "Falta contrato", d.porEtapa.sem_contrato],
+                ["pronta", "Pronta, sem limpeza", d.porEtapa.pronta],
+                ["operacional", "Operacional", d.porEtapa.operacional],
+              ] as [string, string, number | null][]).map(([v, rot, n]) => (
+                <button
+                  key={v || "todas"}
+                  onClick={() => setF({ ...f, etapa: v })}
+                  style={f.etapa === v ? painel.botaoMini : painel.botaoMiniSec}
+                >
+                  {rot}{n !== null ? ` (${n})` : ""}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input style={{ ...painel.input, flex: 1, minWidth: 180 }} value={f.busca}
                    onChange={(e) => setF({ ...f, busca: e.target.value })}
@@ -186,7 +213,7 @@ function VisaoFamilias() {
             </label>
             <button style={painel.botaoSec}
                     onClick={() => setF({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
-                                          regua: "", venceEm: "", ordem: "nome", teste: false })}>
+                                          regua: "", venceEm: "", ordem: "nome", teste: false, etapa: "" })}>
               Limpar
             </button>
           </div>
@@ -222,6 +249,21 @@ function VisaoFamilias() {
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <strong style={{ color: cor.navy, fontSize: 16 }}>{c.nome}</strong>
+                  {/* A ETAPA, ao lado do nome. Ela diz qual é o PRÓXIMO passo
+                      daquela família — e não só um rótulo de estado. Quem abre
+                      a lista para trabalhar precisa saber onde continuar. */}
+                  {c.etapa && c.etapa !== "operacional" && (
+                    <span style={{
+                      marginLeft: 8, borderRadius: 999, padding: "2px 9px", fontSize: 12,
+                      fontWeight: 600, whiteSpace: "nowrap",
+                      background: "rgb(var(--zm-aviso) / 0.12)",
+                      color: "rgb(var(--zm-aviso))",
+                    }}>
+                      {c.etapa === "sem_tumulo" ? "ligar o túmulo"
+                        : c.etapa === "sem_contrato" ? "iniciar controle"
+                        : "falta a 1ª limpeza"}
+                    </span>
+                  )}
                   <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
                     {(c.jazigos || []).map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
                   </div>

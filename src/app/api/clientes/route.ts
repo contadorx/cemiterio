@@ -32,6 +32,38 @@ export async function GET(req: NextRequest) {
 
   const ids = (clientes || []).map((c: any) => c.id);
 
+  // A ETAPA DO CADASTRO.
+  //
+  // São 66 famílias e o trabalho é feito aos poucos: ligar o túmulo, depois
+  // preencher o contrato, depois começar a registrar limpeza. Sem saber em que
+  // pé cada uma está, a Sureya reabre as mesmas fichas para descobrir que já
+  // fez — e as que faltam somem no meio.
+  //
+  // A etapa é DERIVADA dos dados, não marcada à mão: um campo "já conferi"
+  // desatualiza no dia em que alguém mexe por outro caminho.
+  const familiaIds = [...new Set((clientes || []).map((c: any) => c.familia_id).filter(Boolean))];
+
+  const [{ data: tumsFam }, { data: famsInfo }, { data: servs }] = await Promise.all([
+    db.from("tumulos").select("familia_id,periodicidade,contratado")
+      .in("familia_id", familiaIds.length ? familiaIds : ["-"]),
+    db.from("familias").select("id,contratado,valor_mensal,freq_pagamento,inicio_cobranca")
+      .in("id", familiaIds.length ? familiaIds : ["-"]),
+    db.from("servicos").select("cliente_id").not("data_executada", "is", null)
+      .in("cliente_id", ids.length ? ids : ["-"]),
+  ]);
+
+  const tumulosPorFamilia = new Map<string, any[]>();
+  for (const t of (tumsFam || []) as any[]) {
+    tumulosPorFamilia.set(t.familia_id, [...(tumulosPorFamilia.get(t.familia_id) || []), t]);
+  }
+  const infoFamilia = new Map<string, any>();
+  for (const x of (famsInfo || []) as any[]) infoFamilia.set(x.id, x);
+
+  const servicosPorCliente = new Map<string, number>();
+  for (const sv of (servs || []) as any[]) {
+    servicosPorCliente.set(sv.cliente_id, (servicosPorCliente.get(sv.cliente_id) || 0) + 1);
+  }
+
   const [{ data: tums }, { data: plans }, { data: movs }] = await Promise.all([
     db.from("tumulos").select("cliente_id,identificacao,rua,quadra_id,quadras(codigo)").in("cliente_id", ids.length ? ids : ["-"]),
     db.from("planos").select("cliente_id,cadencia,lavagens_por_ciclo,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate,migrado_em").in("cliente_id", ids.length ? ids : ["-"]),
@@ -135,7 +167,39 @@ export async function GET(req: NextRequest) {
     faltaData: lista.filter((c) => c.faltaData).length,
   };
 
-  return NextResponse.json({ ok: true, clientes: lista, totais });
+  // As quatro etapas, na ordem do trabalho:
+  //   sem_tumulo   -> família cadastrada, nenhuma pedra ligada
+  //   sem_contrato -> tem pedra, mas falta valor / quando cobrar / ritmo
+  //   pronta       -> contrato completo, ainda sem limpeza registrada
+  //   operacional  -> contrato completo e limpeza acontecendo
+  const comEtapa = lista.map((c: any) => {
+    const meus = tumulosPorFamilia.get(c.familia_id) || [];
+    const fam = infoFamilia.get(c.familia_id);
+    const servicos = servicosPorCliente.get(c.id) || 0;
+
+    const contratoOk = !!fam?.contratado && Number(fam?.valor_mensal) > 0
+      && !!fam?.freq_pagamento && !!fam?.inicio_cobranca
+      && meus.some((t: any) => t.contratado && t.periodicidade);
+
+    const etapa = !meus.length ? "sem_tumulo"
+      : !contratoOk ? "sem_contrato"
+      : servicos > 0 ? "operacional"
+      : "pronta";
+
+    return { ...c, etapa, qtdTumulos: meus.length, qtdServicos: servicos };
+  });
+
+  const filtroEtapa = q.get("etapa");
+  const final = filtroEtapa ? comEtapa.filter((c: any) => c.etapa === filtroEtapa) : comEtapa;
+
+  const porEtapa = {
+    sem_tumulo: comEtapa.filter((c: any) => c.etapa === "sem_tumulo").length,
+    sem_contrato: comEtapa.filter((c: any) => c.etapa === "sem_contrato").length,
+    pronta: comEtapa.filter((c: any) => c.etapa === "pronta").length,
+    operacional: comEtapa.filter((c: any) => c.etapa === "operacional").length,
+  };
+
+  return NextResponse.json({ ok: true, clientes: final, totais, porEtapa });
 }
 
 export async function POST(req: NextRequest) {

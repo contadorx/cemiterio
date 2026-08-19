@@ -1646,6 +1646,95 @@ quinzenais = **R$ 10**.
 
 ---
 
+## "FECHAR O MÊS" — o ajuste de quando faltou limpeza
+
+### A lacuna
+
+No modo consumo, cada limpeza debita o que vale. Se a Nina esquecer uma
+semana, a família é debitada por três limpezas e **sobra crédito**.
+
+Mas o combinado é MENSAL: a família paga R$ 100 pelo mês, não R$ 25 por
+limpeza. Sem fechar, esse crédito viraria desconto no mês seguinte **sem
+ninguém ter decidido** — e a Sureya descobriria a perda quando o dinheiro não
+entrasse.
+
+### O que vale, afinal
+
+**O contrato.** O consumo existe para mostrar o que foi entregue; o mês fecha
+no valor combinado.
+
+### O botão
+
+No cartão Contrato aparece **"Fechar o mês · falta R$ 50,00"** quando há
+diferença. Ele lança um ajuste que completa até o valor do contrato.
+
+Confirma antes, com a conta aberta: *"Este mês teve 2 limpezas, somando
+R$ 50,00. O combinado é R$ 100,00. Lançar R$ 50,00?"*.
+
+A descrição do lançamento diz o que aconteceu — *"Fechamento de agosto/26 · 2
+limpeza(s) no mês"* — para quem abrir o extrato daqui a um ano entender que
+ali faltou serviço, e não que houve cobrança extra sem motivo.
+
+### Três decisões
+
+**Não é automático.** A Sureya pode preferir deixar o crédito com a família
+justamente porque não entregou. Cobrar por uma limpeza que não aconteceu é
+decisão dela, não do sistema.
+
+**Só aparece quando falta.** Mês completo não pede ação, e o botão some.
+
+**Um por mês.** Índice único em `(familia_id, competencia)` para origem
+`ajuste`.
+
+Se as limpezas passarem do combinado — um mês com cinco semanas —, não há o
+que completar, e a mensagem diz isso em vez de lançar valor negativo.
+
+**Conferido no banco:** o André mostraria "falta R$ 50,00" (R$ 100 devidos, 2
+limpezas de R$ 25).
+
+---
+
+## AS ETAPAS DO CADASTRO
+
+São 66 famílias e o trabalho é feito aos poucos: ligar o túmulo, preencher o
+contrato, começar a registrar limpeza. Sem saber em que pé cada uma está, a
+Sureya reabre as mesmas fichas para descobrir que já fez — e as que faltam
+somem no meio.
+
+### Quatro etapas, com contador
+
+| Filtro | O que significa | Hoje |
+|---|---|---|
+| **Sem túmulo** | família cadastrada, nenhuma pedra ligada | 28 |
+| **Falta contrato** | tem pedra, mas falta valor, quando cobrar ou ritmo | 36 |
+| **Pronta, sem limpeza** | contrato completo, nenhuma limpeza ainda | 1 |
+| **Operacional** | contrato completo e limpeza acontecendo | 1 |
+
+Os botões ficam no topo da lista de Famílias, cada um com o número, e filtram
+com um toque.
+
+### A etapa é derivada, não marcada à mão
+
+Um campo "já conferi" desatualiza no dia em que alguém mexe por outro caminho —
+e aí a lista passa a mentir justamente para quem confia nela. A etapa é
+calculada dos dados a cada carregamento.
+
+Uma família só é considerada **com contrato** quando tem as quatro coisas:
+plano ligado, valor, frequência de pagamento, mês de início, **e** pelo menos
+um túmulo com ritmo definido. Faltando qualquer uma, nada é cobrado — então
+não adianta contar como pronta.
+
+### A etiqueta diz o próximo passo
+
+Ao lado do nome, na lista, aparece **"ligar o túmulo"**, **"iniciar
+controle"** ou **"falta a 1ª limpeza"** — e não um rótulo de estado. Quem abre
+a lista para trabalhar precisa saber onde continuar, não como se chama a
+situação.
+
+Família operacional não recebe etiqueta: já está resolvida e não pede ação.
+
+---
+
 ## O QUE FALTA
 
 ### Depende de você

@@ -507,6 +507,7 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
             {/* Sem ritmo em nenhum túmulo não há como dividir o valor, e a
                 limpeza entraria no extrato valendo zero. Melhor dizer o que
                 falta que mostrar um número errado. */}
+            {d.modo_cobranca === "consumo" && <FecharMes familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
             {d.modo_cobranca === "consumo"
               ? (d.valor_por_limpeza > 0
                   ? <Selo tom="neutro">cada limpeza vale {dinheiro(d.valor_por_limpeza)}</Selo>
@@ -588,6 +589,58 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
         </>
       )}
     </Cartao>
+  );
+}
+
+/**
+ * FECHAR O MÊS — o ajuste de quando faltou limpeza.
+ *
+ * Cada limpeza debita o que vale. Se a Nina esquecer uma semana, a família é
+ * debitada por três e sobra crédito — mas o combinado é MENSAL. Sem fechar,
+ * esse crédito vira desconto no mês seguinte sem ninguém ter decidido.
+ *
+ * O botão só aparece quando FALTA alguma coisa. Mês completo não pede ação.
+ */
+function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
+  const [p, setP] = useState<any>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  const carregar = useCallback(() => {
+    fetch(`/api/financeiro/fechar-mes?familiaId=${familiaId}`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setP(r); })
+      .catch(() => {});
+  }, [familiaId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  // Nada faltando, ou já fechado: não ocupa espaço nem convida a clicar.
+  if (!p || p.jaAjustado || p.falta <= 0.005) return null;
+
+  async function fechar() {
+    if (!confirm(
+      `Este mês teve ${p.limpezas} limpeza(s), somando ${dinheiro(p.consumido)}.\n` +
+      `O combinado é ${dinheiro(p.devidoNoMes)}.\n\n` +
+      `Lançar ${dinheiro(p.falta)} para fechar o mês no valor do contrato?`
+    )) return;
+
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/financeiro/fechar-mes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId }),
+      }).then((x) => x.json());
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui fechar."); return; }
+      carregar();
+      aoMudar();
+    } finally { setOcupado(false); }
+  }
+
+  return (
+    <Botao tom="principal" onClick={fechar} disabled={ocupado} className="flex-shrink-0">
+      {ocupado ? "Fechando…" : `Fechar o mês · falta ${dinheiro(p.falta)}`}
+    </Botao>
   );
 }
 
