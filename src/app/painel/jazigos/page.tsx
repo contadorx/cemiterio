@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
+import BuscaSelect from "../BuscaSelect";
 
 /**
  * /painel/jazigos — a tela de correção em lote.
@@ -68,6 +69,14 @@ export default function JazigosPage() {
   const [filtro, setFiltro] = useState("todos");
   const [quadraFiltro, setQuadraFiltro] = useState("");
   const [ruaFiltro, setRuaFiltro] = useState("");
+
+  // A ficha da família manda para cá com a rua já escolhida ("corrigir em
+  // Jazigos"). Sem ler o endereço, a pessoa cairia na lista inteira e teria
+  // que procurar de novo o jazigo que estava vendo.
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("rua");
+    if (r) setRuaFiltro(r);
+  }, []);
   const [erro, setErro] = useState("");
 
   const carregar = useCallback(async () => {
@@ -318,14 +327,14 @@ function Cartao({
               />
             </Campo>
             <Campo rotulo="Família" largura={220}>
-              <select
-                style={{ ...painel.input, margin: 0 }}
-                value={f.cliente_id}
-                onChange={(e) => setF({ ...f, cliente_id: e.target.value })}
-              >
-                <option value="">— sem família —</option>
-                {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
+              {/* São quase 300 famílias: o `select` do navegador não filtra e
+                  não diz quantas existem. */}
+              <BuscaSelect
+                valor={f.cliente_id}
+                opcoes={clientes}
+                vazio="— sem família —"
+                aoEscolher={(id) => setF({ ...f, cliente_id: id })}
+              />
             </Campo>
           </div>
 

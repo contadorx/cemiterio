@@ -174,35 +174,10 @@ function Tumulos({ tumulos, clienteId, aoMudar }: {
 function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
   const [abrindo, setAbrindo] = useState(false);
   const [f, setF] = useState({
-    // O CONTRATO subiu para a família: valor, frequência de pagamento e início
-    // moram lá, porque a Sureya combina UM valor por família mesmo com dois
-    // túmulos. Aqui fica só o que é do trabalho nesta pedra.
     periodicidade: t.periodicidade ?? "",
     contratado: !!t.contratado,
-    falecido_nome: t.falecido_nome ?? "",
-    identificacao: t.identificacao ?? "",
-    quadra_id: t.quadra_id ?? "",
-    rua: t.ruas?.nome ?? "",
   });
   const [salvando, setSalvando] = useState(false);
-  const [quadras, setQuadras] = useState<any[]>([]);
-  const [ruas, setRuas] = useState<any[]>([]);
-
-  // As listas só carregam quando a gaveta abre: são 4 quadras e 10 ruas por
-  // quadra, mas buscar isso para cada túmulo da ficha ao entrar seria pedir ao
-  // servidor um trabalho que ninguém pediu.
-  useEffect(() => {
-    if (!abrindo || quadras.length) return;
-    fetch("/api/quadras").then((x) => x.json())
-      .then((r) => { if (r?.ok) setQuadras(r.quadras || []); }).catch(() => {});
-  }, [abrindo, quadras.length]);
-
-  useEffect(() => {
-    if (!abrindo || !f.quadra_id) { setRuas([]); return; }
-    fetch(`/api/ruas?quadraId=${f.quadra_id}`).then((x) => x.json())
-      .then((r) => { if (r?.ok) setRuas(r.ruas || []); }).catch(() => {});
-  }, [abrindo, f.quadra_id]);
-
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
 
   const [aviso, setAviso] = useState("");
@@ -288,50 +263,14 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
 
       {abrindo && (
         <div className="mt-3 rounded-lg bg-surface p-3">
+          {/* O ENDEREÇO NÃO SE EDITA AQUI.
+              Ele era editável nos dois lugares — nesta ficha e na tela Jazigos
+              — e cadastro que se corrige em dois lugares acaba divergindo:
+              alguém arruma num, o outro segue mostrando o antigo.
+              Jazigos é onde a correção acontece de verdade, porque é a única
+              tela que alcança pedra ainda sem família e permite trabalhar por
+              rua, em lote. Aqui fica só o que é do contrato: o ritmo. */}
           <div className="grid gap-3 sm:grid-cols-2">
-            {/* O ENDEREÇO é editável aqui porque foi cadastrado no campo, de
-                pé, no sol — e é onde o erro acontece. */}
-            <Campo rotulo="Quadra">
-              <Selecao
-                value={f.quadra_id}
-                onChange={(e: any) => setF({ ...f, quadra_id: e.target.value, rua: "" })}
-              >
-                <option value="">escolha</option>
-                {quadras.map((q: any) => (
-                  <option key={q.id} value={q.id}>{q.codigo}</option>
-                ))}
-              </Selecao>
-            </Campo>
-            <Campo rotulo="Rua">
-              <Selecao
-                value={f.rua}
-                onChange={(e: any) => setF({ ...f, rua: e.target.value })}
-                disabled={!f.quadra_id || !ruas.length}
-              >
-                <option value="">{f.quadra_id ? "escolha" : "escolha a quadra antes"}</option>
-                {ruas.map((r: any) => (
-                  <option key={r.id} value={r.nome}>{r.nome}</option>
-                ))}
-              </Selecao>
-            </Campo>
-            <Campo
-              rotulo="Nome escrito na pedra"
-              dica="opcional — quem identifica o túmulo é o código e a foto"
-            >
-              <Entrada
-                value={f.identificacao}
-                onChange={(e: any) => setF({ ...f, identificacao: e.target.value })}
-                placeholder="Ex.: Almeida"
-              />
-            </Campo>
-            <Campo rotulo="Nome do falecido">
-              <Entrada
-                value={f.falecido_nome}
-                onChange={(e: any) => setF({ ...f, falecido_nome: e.target.value })}
-                placeholder="opcional"
-              />
-            </Campo>
-
             <Campo rotulo="A Nina limpa" dica="de quanto em quanto tempo">
               <Selecao
                 value={f.periodicidade}
@@ -340,6 +279,14 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 <option value="">escolha</option>
                 {PERIODICIDADES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
               </Selecao>
+            </Campo>
+            <Campo rotulo="Endereço, foto e falecido">
+              <a
+                href={`/painel/jazigos?rua=${encodeURIComponent(t.ruas?.nome || "")}`}
+                className="inline-flex items-center gap-1 text-[14px] text-brand underline"
+              >
+                corrigir em Jazigos →
+              </a>
             </Campo>
           </div>
 
