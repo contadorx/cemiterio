@@ -333,3 +333,10 @@ A avaliação da experiência da responsável pela operação está em
 [`AUDITORIA_UX_ADMIN.md`](./AUDITORIA_UX_ADMIN.md). O documento analisa arquitetura de
 informação, página inicial, agenda, famílias, financeiro, liberação e configurações, além de
 definir contraprovas práticas para validar a operação administrativa antes do go-live.
+
+## 11. Ordem recomendada dos builds
+
+A transformação dos achados em uma sequência de entregas com dependências, escopo e gates
+de aprovação está em [`ROADMAP_BUILDS.md`](./ROADMAP_BUILDS.md). A ordem prioriza proteção
+dos dados, confiabilidade da lavagem e verdade financeira antes de simplificação visual,
+automação e expansão.
