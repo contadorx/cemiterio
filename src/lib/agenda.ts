@@ -202,12 +202,32 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
   // onde não havia nada.
   //
   // Agora as duas metades do sistema leem a mesma fonte.
-  const { data: planos } = await db
+  const { data: planos, error: erroContratos } = await db
     .from("tumulos")
     .select("id,cliente_id,familia_id,periodicidade,proximo_servico")
     .eq("org_id", org)
     .eq("contratado", true)
     .in("periodicidade", Object.keys(DIAS_CICLO));
+
+  // ESTE ERRO NAO PODE SER ENGOLIDO.
+  //
+  // O `error` desta consulta era descartado. Quando ela falhava — coluna que
+  // nao existe, RLS, timeout — `planos` vinha nulo, o laco nao rodava nenhuma
+  // vez e a funcao devolvia `criados: 0` com cara de "nao havia nada a fazer".
+  // O cron diario seguia verde, a tela dizia "0 planos ativos" e NENHUMA
+  // familia era agendada, todos os dias, sem um unico sinal em lugar nenhum.
+  //
+  // Agora a falha aparece no diagnostico (`falhas > 0`) e vai para o log de
+  // erros, em vez de virar um zero tranquilo.
+  if (erroContratos) {
+    await registrarErro("agenda: nao consegui ler os contratos dos jazigos", erroContratos.message, {
+      horizonteDias,
+    });
+    return {
+      criados: 0, planosAtivos: 0, planosNoHorizonte: 0, foraDoHorizonte: 0,
+      jaExistiam: 0, falhas: 1, proximaData: null, horizonteDias,
+    };
+  }
 
   let criados = 0;
   let jaExistiam = 0;

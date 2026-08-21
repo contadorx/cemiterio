@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "checar": "node testes/checar-render.js && node testes/checar-enums.js",
+    "tipos": "tsc --noEmit",
+    "ci": "npm run checar && npm run tipos && npm run testar && npm run build",
     "auditar": "bash testes/auditar.sh",
     "testar": "tsx --tsconfig testes/tsconfig.json testes/simular.ts"
   },
@@ -31,6 +33,7 @@
     "autoprefixer": "^10.5.4",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
+    "tsx": "4.19.2",
     "typescript": "^5"
   }
 }
