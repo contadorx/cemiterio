@@ -319,3 +319,4 @@ uma unidade transacional recuperável. Depois desses bloqueadores, a estratégia
 Esta auditoria não deve ser tratada como certificação do ambiente. O aceite final depende
 das evidências do Supabase/Vercel reais, do ensaio de restauração e da validação operacional
 pelas pessoas que fazem as lavagens e atendem as famílias.
+
