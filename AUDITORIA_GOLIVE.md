@@ -326,3 +326,10 @@ A análise específica de simplicidade, usabilidade e contraprovas do aplicativo
 cemitério está em [`AUDITORIA_UX_CAMPO.md`](./AUDITORIA_UX_CAMPO.md). Ela avalia o fluxo
 realmente renderizado, contesta a promessa literal de “dois toques”, testa a coerência
 offline e define critérios mensuráveis para o piloto presencial.
+
+## 10. Auditoria complementar da área administrativa
+
+A avaliação da experiência da responsável pela operação está em
+[`AUDITORIA_UX_ADMIN.md`](./AUDITORIA_UX_ADMIN.md). O documento analisa arquitetura de
+informação, página inicial, agenda, famílias, financeiro, liberação e configurações, além de
+definir contraprovas práticas para validar a operação administrativa antes do go-live.
