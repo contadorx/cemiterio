@@ -1,0 +1,55 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Anwendungsfall</p>
+    <h1 style="font-size:32px">Arbeitsanweisung, ohne vierzig von Hand eingefügte Screenshots</h1>
+    <p class="updated">Die Schritt-für-Schritt-Anleitung, die der Key User jede Woche ausführen wird — erzeugt aus derselben Aufnahme, die Sie ohnehin gemacht hätten. In einem Einführungsprojekt ist die Endanwenderdokumentation in der Regel eine vertraglich geschuldete Leistung: keine Freundlichkeit zum Projektende, sondern eine Zeile in der Go-live-Checkliste.</p>
+
+    {{figura}}
+
+    <h2>Drei Dinge, die Ihnen einen Nachmittag sparen</h2>
+    <p><b>Es kommt auch als PowerPoint heraus.</b> Eine Folie je Schritt, mit Screenshot und Text, für alle, die im Raum schulen. Und als SCORM, für alle, die im LMS schulen — dort erfasst das LMS des Kunden den Abschluss.</p>
+    <p><b>Die Anweisung aktualisieren, wenn sich das System ändert.</b> Öffnen Sie das Dokument erneut, lassen Sie sich von der geführten Überprüfung leiten und tauschen Sie nur die Screenshots aus, die sich geändert haben. Die neue Fassung erhält das neue Datum, alles Übrige bleibt unberührt.</p>
+    <p><b>Kein Datumsstempel bei jedem Schritt.</b> Eine Arbeitsanweisung ist kein Nachweis: Hier entfällt die Uhrzeit mit Absicht, denn eine Anleitung, die nach 2024 aussieht, ist eine Anleitung, der niemand folgt.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=de">Jetzt eine Arbeitsanweisung aufzeichnen</a>
+      <span class="small muted">kostenlos, ohne Installation</span>
+    </p>
+
+    <h2>Das Problem</h2>
+    <p>Es ist derselbe Ablauf <code>Druck-Taste → Word → Pfeil → Bildunterschrift</code> wie beim Nachweis, mit einer Verschärfung: Die Anweisung wird <b>nach</b> dem Projekt geschrieben, von jemandem, der bereits dem nächsten Projekt zugeteilt ist. Sie entsteht verspätet, und sie bleibt an der Person hängen, die am wenigsten Macht hat, sie abzulehnen.</p>
+    <p><b>Eine schlechte Anweisung wird von niemandem beanstandet — sie wird schlicht nicht benutzt</b>, und der Key User ruft wieder beim Berater an. Die Gründe sind immer dieselben vier: ein fehlender Schritt, ein Screenshot, der nicht dem echten Bildschirm entspricht, die Sprache von jemandem, der es bereits weiß, und kein Hinweis darauf, welches Feld zu beachten ist. Die letzten beiden sind ein Problem der Formulierung — und genau die Formulierung löst das laute Erzählen, denn wer erzählt, während er etwas tut, erklärt es so, wie es jemand tut, der unterrichtet.</p>
+
+    <h2>Was dabei herauskommt</h2>
+    <p>Ein Verfahrensdokument, kein historischer Nachweis. Der Unterschied steckt in den Details:</p>
+    <ul>
+      <li><b>Kein Datumsstempel bei jedem Schritt.</b> In einem Nachweis ist die Uhrzeit Pflicht; in einer Anweisung lässt sie das Dokument von Anfang an veraltet wirken. Die Schrittnummer bleibt, die Uhrzeit entfällt</li>
+      <li><b>Ihre Notiz wird zur Überschrift des Schritts</b>, und das Gesprochene aus diesem Abschnitt wird zur Beschreibung</li>
+      <li><b>Kopfzeile des Verfahrens</b>: Titel, System, Autor und Version</li>
+      <li><b>Fertiger Prompt, damit die KI in die Befehlsform umschreibt</b>: „dann gehe ich in die ME21N und erfasse die Bestellung“ wird zu „Rufen Sie die ME21N auf und erfassen Sie die Bestellung“. Formuliert wird von der KI, die Sie ohnehin nutzen; das Dokument und die Screenshots kommen von uns</li>
+      <li><b>Fachwortliste</b>: ME21N, KI235 und Fiori erscheinen in der Transkription nicht mehr ausgeschrieben</li>
+      <li><b>Word zum Bearbeiten, PDF zum Verteilen, HTML für das Wiki</b> — und Markdown, um es ohne separaten Anhang in Confluence einzufügen</li>
+      <li><b>SCORM-1.2-Paket</b> zum Hochladen in das LMS des Unternehmens (SuccessFactors, Cornerstone, Moodle, TalentLMS) — wer gelesen hat, erfasst das LMS des Kunden, nicht wir</li>
+      <li><b>Das Dokument sechs Monate später erneut öffnen</b>: Sie laden die <code>.json</code> oder die <code>.zip</code>, tauschen das Bild des geänderten Schritts aus und erzeugen es neu — ohne die vierzig Schritte neu aufzuzeichnen</li>
+    </ul>
+
+    <h2>So gehen Sie vor</h2>
+    <ol class="passos">
+      <li>Wählen Sie in Schritt 1 den Anwendungsfall <b>Schritt für Schritt</b>.</li>
+      <li>Zeichnen Sie den Vorgang einmal auf und erzählen Sie dabei, was Sie tun und warum. Nennen Sie die Namen der Felder: Danach sucht der Key User.</li>
+      <li>Verwerfen Sie bei der Überprüfung, was nicht relevant ist, ordnen Sie mit den Pfeilen um und korrigieren Sie die Kürzel mit der Fachwortliste Ihres Systems.</li>
+      <li>Erzeugen Sie das Word zum Bearbeiten oder direkt das PDF. Wenn Sie im Raum schulen, wird dasselbe Material zum Leitfaden.</li>
+    </ol>
+
+    <h2>Was es nicht leistet — und das sollten Sie vorher wissen</h2>
+    <p><b>Es aktualisiert die Screenshots nicht von selbst, wenn sich das System ändert.</b> Das nennt sich <i>Replay</i>, das verkauft ClickLearn, und es setzt voraus, die Anwendung zu steuern — unmöglich in einem Tab, der nur ein Bild des geteilten Bildschirms erhält. So zu tun, als wären wir dort ein Wettbewerber, wäre die erste Lüge des Produkts.</p>
+    <p><b>Es führt Sie nicht von selbst Schritt für Schritt durch die Überprüfung.</b> Das Dokument erneut zu öffnen und das Bild eines Schritts auszutauschen gibt es bereits; was es noch nicht gibt, ist, dass das Werkzeug Sie hindurchführt und dabei fragt: <i>&bdquo;Sieht dieser Bildschirm noch so aus?&ldquo;</i> — das ist der nächste Punkt, und es ist unsere ehrliche Antwort auf das <i>Replay</i>.</p>
+    <p><b>Es hostet die Inhalte nicht und sagt nicht, wer sie gelesen hat.</b> Das beantwortet das LMS Ihres Unternehmens. Wir liefern das SCORM-Paket und wissen weiterhin nicht, wer was geöffnet hat.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=de">Jetzt eine Arbeitsanweisung aufzeichnen</a>
+      <a class="btn ghost" href="{{precos}}">Die Pläne ansehen</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Es ist derselbe Berater, der im Juni den Nachweis des UAT aufgezeichnet hat und im August die Anweisung für den Key User schreibt, mit denselben Transaktionen. Deshalb ist dieser Anwendungsfall eine <b>Vorlage innerhalb des Produkts</b> und kein zweites Werkzeug.</p>
+  </div>
+</section>

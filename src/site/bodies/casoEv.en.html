@@ -1,0 +1,53 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Use case</p>
+    <h1 style="font-size:32px">Test evidence an auditor will accept</h1>
+    <p class="updated">You ran the test. Now you have to prove you ran it — with the screen, the clock time and what was observed. This is {{marca}}’s main case, and the only one where rejected evidence costs someone a whole day.</p>
+
+    {{figura}}
+
+    <h2>Three things that save you an afternoon</h2>
+    <p><b>Several cases in a single recording.</b> Mark where one case ends and the next begins, and walk away with one document per case — or a single one split into chapters, with each one’s time in the spreadsheet.</p>
+    <p><b>Retest without recording it all again.</b> The guided review walks the old document step by step and recaptures only the screens that changed. What stayed the same stays the same.</p>
+    <p><b>Redact everything at once.</b> It reads the text on the screens, warns you when it finds a tax ID, an email or a card number, and covers every occurrence in one click — the redaction is burned into the image, not a layer on top.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia&amp;lang=en">Record evidence now</a>
+      <span class="small muted">free, no sign-up, and nothing leaves your computer</span>
+    </p>
+
+    <h2>The pain</h2>
+    <p>Print Screen, paste into Word, write the caption, repeat forty times. Two hours of manual work after a twenty-minute test — and the expensive part is not taking the screenshot: it is remembering what was being tested in each one when you come back to the document the next day.</p>
+    <p><b>And evidence gets rejected on detail.</b> The clock time is missing, the step does not show the result, the header does not say which client it was, the image was cropped and the field cannot be read. The auditor does not argue the merit of the test: they hand the document back. Anyone who has had a pack returned on the eve of go-live knows the problem was never the test.</p>
+
+    <h2>What comes out</h2>
+    <p>A PDF (or Word, HTML, spreadsheet, ZIP) with one screen per step, in order, and nothing you have to type twice:</p>
+    <ul>
+      <li><b>Clock time on every step</b>, anchored to the real start of the recording — usually the make-or-break item</li>
+      <li><b>Your narration becomes the step note.</b> You talk while you test and the text comes out written, paired with the screen of that moment</li>
+      <li><b>Identification header</b>: test case, system and client, who ran it, ticket and result — and the file name already carries the case inside it</li>
+      <li><b>Redaction and highlights burned into the image</b>: the covered ID number does not come back, and the arrow pointing at the field does not come off</li>
+      <li><b>Sensitive-data warning</b>: the tool reads the text on screen and tells you which steps showed a tax ID, an email, a phone number or a card — and stops there, because sometimes that number is the proof</li>
+      <li><b>A hash per image and a verification package</b>: whoever receives it checks in their own browser, at <a href="{{verificar}}">/verify</a>, whether the images are still the same</li>
+    </ul>
+
+    <h2>How to do it</h2>
+    <ol class="passos">
+      <li>Open the tool and pick the <b>Test evidence</b> use case in step 1.</li>
+      <li>Click <b>Record the screen</b> and leave the microphone on. Narrate what you are doing: that is what becomes the description of each step.</li>
+      <li>Run the test the way you would run it. The tool keeps a frame on every screen change and transcribes your speech alongside.</li>
+      <li>Stop, discard the repeated screens, fill in case and ticket, and produce the <b>PDF</b>. Attach it in Zephyr, in Jira or on the ticket.</li>
+    </ol>
+
+    <h2>What it does not do — better to know up front</h2>
+    <p><b>It does not read fields from SAP GUI for Windows.</b> The browser receives an image of the shared screen, not the structure of the application. Capture picks up any window the operating system will share — Fiori, S/4 web, Ariba, SuccessFactors, Concur and the GUI itself all appear as an image — but with no field reading.</p>
+    <p><b>It does not guarantee compliance.</b> 21 CFR Part 11, SOX, CSV and ISO 9001 are not features you can buy: the product produces the document with time, identification and verifiable integrity; compliance belongs to your company’s process. Anyone promising otherwise is selling what they cannot deliver.</p>
+    <p><b>It does not attach back into your test management tool.</b> That would need an API and IT permission. What exists is the <a href="{{site}}/en/link">pre-filled link</a>, which opens the tool with the case and the ticket already in place — and the way back is still dragging the file, which works in any tool.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia&amp;lang=en">Record evidence now</a>
+      <a class="btn ghost" href="{{precos}}">See the plans</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Everything above is in the <b>free plan</b>. What you pay for is the client brand on the document and the administration of a team — never the quality of the evidence.</p>
+  </div>
+</section>

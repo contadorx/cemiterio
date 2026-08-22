@@ -1,0 +1,97 @@
+<section style="padding-top:60px">
+  <div class="wrap doc" style="max-width:860px">
+    <h1 style="font-size:32px">{{marca}} et les alternatives</h1>
+    <p class="updated">Mis à jour le 14 août 2026.<br>
+    Cette page a été écrite par nous, alors lisez-la avec cette lentille. Pour compenser, elle contient deux
+    choses qu’un comparatif de fournisseur n’a jamais : les prix catalogue des concurrents et la section
+    <a href="#perdemos" style="color:var(--accent)">où chacun nous bat</a>.</p>
+
+    <h2>Les cinq groupes</h2>
+    <p>Tous les outils qui transforment du travail à l’écran en document tombent dans l’un de ces groupes :</p>
+    <ul>
+      <li><b>Ce qui venait avec Windows</b> — le Steps Recorder (<code>psr.exe</code>), abandonné en 2024.
+      <a href="{{steps}}" style="color:var(--accent)">Il y a une page entière là-dessus</a>.</li>
+      <li><b>Le pas à pas dans le cloud</b> — Scribe, Tango, Guidde et consorts : vous cliquez, ils montent le guide
+      sur un site à eux.</li>
+      <li><b>Installés sur le PC</b> — FlowShare, Folge : des logiciels de bureau qui capturent en local.</li>
+      <li><b>Suites de test</b> — Tricentis Tosca, Worksoft Certify, qTest : de l’automatisation de régression qui
+      documente aussi ce qu’elle exécute.</li>
+      <li><b>{{marca}}</b> — enregistrement et document dans le navigateur, sans installation et sans upload.</li>
+    </ul>
+
+    <h2>Côte à côte</h2>
+    <table class="legal">
+      <tr><th></th><th>{{marca}}</th><th>Steps Recorder</th><th>Cloud<br><span style="font-weight:400">(Scribe, Tango, Guidde)</span></th><th>Installés<br><span style="font-weight:400">(FlowShare, Folge)</span></th><th>Suites<br><span style="font-weight:400">(Tosca, Worksoft, qTest)</span></th></tr>
+      <tr><td>Installation</td>
+          <td class="sim">Aucune — c’est une adresse</td><td>Venait avec Windows</td>
+          <td class="sim">Extension de navigateur</td><td class="nao">Logiciel sur le PC, avec approbation de la DSI</td>
+          <td class="nao">Projet de déploiement</td></tr>
+      <tr><td>Votre contenu quitte-t-il la machine ?</td>
+          <td class="sim">Non — traitement dans l’onglet</td><td class="sim">Non</td>
+          <td class="nao">Oui : les écrans montent vers leur serveur</td><td class="sim">Non</td>
+          <td>Dépend de l’installation</td></tr>
+      <tr><td>La narration parlée devient du texte</td>
+          <td class="sim">Oui, transcrite et synchronisée</td><td class="nao">Non</td>
+          <td class="nao">Non</td><td class="nao">Non</td><td class="nao">Non</td></tr>
+      <tr><td>Heure d’horloge par étape</td>
+          <td class="sim">Oui</td><td>Oui</td><td class="nao">Non</td><td class="nao">Non</td>
+          <td class="sim">Oui</td></tr>
+      <tr><td>En-tête de preuve<br><span style="font-weight:400;font-size:12.5px">cas, système, ticket, résultat</span></td>
+          <td class="sim">Oui</td><td class="nao">Non</td><td class="nao">Non</td><td class="nao">Non</td>
+          <td class="sim">Oui, au format de la suite</td></tr>
+      <tr><td>Empreinte des images (SHA-256)</td>
+          <td class="sim">Optionnelle</td><td class="nao">Non</td><td class="nao">Non</td><td class="nao">Non</td>
+          <td>Piste d’audit propre</td></tr>
+      <tr><td>Sorties</td>
+          <td class="sim">PDF, Word, ZIP, JSON</td><td class="nao">MHT</td>
+          <td>Lien, PDF dans les offres payantes</td><td class="sim">PDF, Word, HTML, PPT</td>
+          <td>Rapports de la suite</td></tr>
+      <tr><td>Fonctionne hors ligne</td>
+          <td class="sim">Oui — fichier unique</td><td class="sim">Oui</td><td class="nao">Non</td>
+          <td class="sim">Oui</td><td>Ça dépend</td></tr>
+      <tr><td>Prix catalogue</td>
+          <td class="sim">Gratuit</td><td>Terminé</td>
+          <td>US$ 13–38 par utilisateur/mois</td><td>Folge : €75–130 une fois<br>FlowShare : €450/utilisateur/an</td>
+          <td class="nao">Non public ; témoignages de €10–20 mille par licence/an</td></tr>
+      <tr><td>Fait pour</td>
+          <td>La preuve de test et le contexte pour l’IA, sans rien téléverser</td>
+          <td>Ce qui est aujourd’hui orphelin</td><td>Les guides d’accueil et de support</td>
+          <td>Les manuels et la formation</td><td>La régression automatisée</td></tr>
+    </table>
+    <p class="small muted">Prix catalogue publics en août 2026, sur les sites des fournisseurs ; ceux des
+    suites viennent de témoignages de clients (PeerSpot), parce qu’il n’y a pas de tarif public. Vérifiez avant de décider —
+    un prix change, et cette page n’est mise à jour que de temps en temps.</p>
+
+    <h2 id="perdemos">Où chacun nous bat</h2>
+    <p>La partie qui manque dans les comparatifs des autres :</p>
+    <ul>
+      <li><b>FlowShare</b> lit les champs de <b>SAP GUI for Windows</b> — il sait sur quelle transaction et sur quel bouton
+      vous avez cliqué, et il l’écrit tout seul. Un navigateur n’a pas cet accès, et {{marca}} non plus. Si votre
+      journée n’est que du SAP GUI classique et que la DSI approuve l’installation, c’est le meilleur outil pour ce travail.</li>
+      <li><b>Scribe, Tango et Guidde</b> génèrent la description de chaque clic automatiquement, ont une édition riche et
+      hébergent le guide derrière un lien qui se met à jour. Si l’objectif est une base de guides vivante pour l’équipe — et que les
+      écrans n’ont pas de donnée sensible — ils résolvent un problème que nous n’essayons pas de résoudre.</li>
+      <li><b>Tosca, Worksoft et qTest</b> <b>exécutent</b> le test de régression à votre place, des milliers de fois,
+      et documentent chaque exécution. {{marca}} documente un test qu’une personne a fait une fois. Ce sont des problèmes
+      différents ; si le vôtre est le premier, c’est là qu’il vit.</li>
+      <li><b>Le Steps Recorder</b> venait installé sur toutes les machines du monde de l’entreprise — une distribution
+      que plus personne n’aura. C’est pour ça que sa page est notre porte d’entrée, et non un trophée.</li>
+    </ul>
+
+    <h2>Où {{marca}} gagne</h2>
+    <ul>
+      <li><b>Le frottement.</b> Aucune installation, aucun compte, aucun ticket pour la DSI. Sur un poste verrouillé
+      par la politique interne, c’est la différence entre utiliser aujourd’hui et utiliser au trimestre prochain.</li>
+      <li><b>La confidentialité structurelle.</b> Ce n’est pas une promesse contractuelle : il n’existe pas de serveur vers lequel téléverser.
+      <a href="{{seguranca}}" style="color:var(--accent)">La page de sécurité de l’information</a> apprend à le vérifier
+      en trente secondes.</li>
+      <li><b>La parole.</b> Vous racontez le test à voix haute et la narration devient la description écrite de chaque étape.
+      Aucune des alternatives n’écoute.</li>
+      <li><b>Le document de l’audit.</b> Heure d’horloge, en-tête d’identification, numérotation des étapes et
+      hash optionnel — au format qu’on joint à un ticket, avec le bon nom sur le fichier.</li>
+      <li><b>Le prix.</b> Gratuit, parce que c’est votre ordinateur qui fait le travail.</li>
+    </ul>
+
+    <p style="margin-top:34px"><a class="btn" href="{{app}}">Ouvrir l’outil</a></p>
+  </div>
+</section>

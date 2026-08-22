@@ -1,0 +1,24 @@
+{
+  "name": "Walkstamp",
+  "short_name": "Walkstamp",
+  "description": "Grave a tela e receba um documento com hora por passo.",
+  "start_url": "/app?lang=pt",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#3A3F9E",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png?v=3",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

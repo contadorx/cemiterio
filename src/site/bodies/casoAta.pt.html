@@ -1,0 +1,53 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Caso de uso</p>
+    <h1 style="font-size:32px">Ata de reunião com as telas do que foi mostrado</h1>
+    <p class="updated">A reunião foi gravada, alguém compartilhou a tela, e o que ficou é um arquivo de 800 MB que ninguém vai reabrir. A ata vira um documento com os momentos que importam, a tela de cada um e a fala pareada.</p>
+
+    {{figura}}
+
+    <h2>Três coisas que economizam a tarde</h2>
+    <p><b>Um slide por momento, se for para apresentar.</b> A mesma gravação sai em PowerPoint, em Word ou em PDF — você escolhe no fim, e pode baixar mais de um.</p>
+    <p><b>Corrigir um nome mal transcrito.</b> Cada trecho de fala é um campo na lente do quadro: corrija ali e a transcrição inteira é reescrita junto.</p>
+    <p><b>Reabrir a ata depois.</b> Guarde o .zip: dias depois ele volta com as imagens, as anotações, a transcrição e a identificação, e você corrige o que precisar.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=ata">Transformar uma reunião em ata</a>
+      <span class="small muted">use a gravação que você já tem</span>
+    </p>
+
+    <h2>A dor</h2>
+    <p>Quem faz a ata reassiste a reunião. Uma hora de reunião custa uma hora de alguém, mais o tempo de voltar três vezes no trecho em que o número foi dito. E quando a decisão é contestada duas semanas depois, a resposta está no minuto 47 de um arquivo que ninguém quer abrir.</p>
+    <p>A transcrição pura resolve metade: ela diz o que foi <i>dito</i>, e não o que estava <i>na tela</i>. Numa reunião de projeto, metade das decisões acontece olhando um número num relatório compartilhado — e esse número não está na transcrição.</p>
+
+    <h2>O que sai</h2>
+    <p>Uma ata em grade compacta: as telas em sequência, e a transcrição completa no fim para quem quiser conferir.</p>
+    <ul>
+      <li><b>Só as telas que mudaram</b> — uma hora de reunião com um slide parado não vira sessenta imagens iguais</li>
+      <li><b>Cada momento com a hora de relógio</b>, ancorada no horário real do início da reunião</li>
+      <li><b>Os dois canais de áudio separados</b>: quem estava no microfone e o que veio do computador saem rotulados na transcrição</li>
+      <li><b>Cabeçalho da reunião</b>: assunto, local ou plataforma, quem conduziu e participantes</li>
+      <li><b>Prompt pronto para a IA escrever a ata</b> — assuntos, decisões, pendências com responsável e próximos passos, com o instante de cada decisão</li>
+      <li><b>A transcrição é sua</b>: exporte em .vtt, .srt ou .txt, ou traduza para outro idioma sem que o texto saia do aparelho</li>
+    </ul>
+
+    <h2>Como fazer</h2>
+    <ol class="passos">
+      <li>Escolha o cenário <b>Ata de reunião</b> no passo 1.</li>
+      <li>Arraste a gravação da reunião — do Teams, do Meet, do Zoom, de onde for. O arquivo é lido pelo navegador e não sai do seu computador.</li>
+      <li>Deixe transcrever e extrair os quadros. Se você já tem a legenda do Drive ou do Teams, cole no lugar da transcrição.</li>
+      <li>Revise, gere o documento e cole o prompt na IA que a sua empresa já aprovou — junto com o PDF.</li>
+    </ol>
+
+    <h2>O que ele não faz — e é melhor saber antes</h2>
+    <p><b>Não escreve a ata sozinho.</b> Ele produz o documento com as telas, a fala e os instantes, e o pedido pronto para a IA que <i>você</i> usa. Embutir um modelo de linguagem no navegador hoje seria peso sem ganho — e mandar a sua reunião para um servidor nosso seria quebrar a única promessa que este produto faz.</p>
+    <p><b>Não identifica quem falou por nome.</b> Ele separa os dois canais de áudio (microfone e computador), que é o que dá para fazer com honestidade sem reconhecimento de voz. Numa chamada com oito pessoas, todas as remotas chegam pelo mesmo canal.</p>
+    <p><b>Não entra na reunião como participante.</b> Não há robô nosso na sua chamada, não há convite para aceitar e não há gravação hospedada em lugar nenhum.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=ata">Transformar uma reunião em ata</a>
+      <a class="btn ghost" href="{{precos}}">Ver os planos</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Vale para reunião de projeto, comitê, cerimônia de ágil e demonstração de sistema — qualquer coisa em que <b>a tela seja parte do que foi decidido</b>.</p>
+  </div>
+</section>

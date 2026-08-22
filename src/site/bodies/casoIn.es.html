@@ -1,0 +1,55 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Caso de uso</p>
+    <h1 style="font-size:32px">Instrucción de trabajo sin cuarenta capturas pegadas a mano</h1>
+    <p class="updated">El paso a paso que el key user va a ejecutar cada semana — generado de la misma grabación que ya harías. En un proyecto de implantación, la documentación de usuario final suele ser entregable de contrato: no es una cortesía de fin de proyecto, es una línea del checklist de go-live.</p>
+
+    {{figura}}
+
+    <h2>Tres cosas que te ahorran la tarde</h2>
+    <p><b>Sale en PowerPoint también.</b> Una diapositiva por paso, con la pantalla y el texto, para quien forma en sala. Y en SCORM, para quien forma en el LMS — ahí quien registra la conclusión es el LMS del cliente.</p>
+    <p><b>Actualizar la instrucción cuando el sistema cambia.</b> Reabre el documento, deja que la revisión asistida conduzca, y cambia solo las pantallas que cambiaron. La versión nueva sale con la fecha nueva y el resto intacto.</p>
+    <p><b>Sin sello de fecha en cada paso.</b> Una instrucción de trabajo no es evidencia: aquí la hora de reloj se deja fuera a propósito, porque un procedimiento que parece de 2024 es un procedimiento que nadie sigue.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=es">Grabar una instrucción ahora</a>
+      <span class="small muted">gratis, sin instalar nada</span>
+    </p>
+
+    <h2>El dolor</h2>
+    <p>Es el mismo <code>Print Screen → Word → flecha → pie</code> de la evidencia, con un agravante: la instrucción se escribe <b>después</b> del proyecto, por quien ya está asignado al siguiente. Nace tarde, y es la tarea que le toca a quien menos poder tiene de negarse.</p>
+    <p><b>Una instrucción mala no la rechaza nadie — simplemente no se usa</b>, y el key user vuelve a llamar al consultor. Los motivos son siempre los mismos cuatro: falta un paso, la pantalla ya no es la real, el lenguaje es de quien ya sabe, y no hay indicación de qué campo mirar. Los dos últimos son problema de redacción — y la redacción es justo lo que resuelve la narración hablada, porque quien narra mientras hace explica como quien enseña.</p>
+
+    <h2>Qué sale</h2>
+    <p>Un documento de procedimiento, no un registro histórico. La diferencia está en los detalles:</p>
+    <ul>
+      <li><b>Sin sello de fecha en cada paso.</b> En una evidencia la hora es obligatoria; en una instrucción hace que el documento nazca con cara de caducado. El número del paso queda, el reloj se va</li>
+      <li><b>Tu anotación pasa a ser el título del paso</b>, y el habla de ese tramo pasa a ser la descripción</li>
+      <li><b>Cabecera de procedimiento</b>: título, sistema, autor y versión</li>
+      <li><b>Prompt listo para que la IA lo reescriba en imperativo</b>: "y entonces entro en ME21N y lanzo el pedido" pasa a "Accede a ME21N y lanza el pedido". Quien redacta es la IA que ya usas; el documento y las pantallas son nuestros</li>
+      <li><b>Vocabulario del dominio</b>: ME21N, KI235 y Fiori dejan de salir escritos en letras en la transcripción</li>
+      <li><b>Word para editar, PDF para repartir, HTML para la wiki</b> — y Markdown para pegar en Confluence sin adjunto aparte</li>
+      <li><b>Paquete SCORM 1.2</b> para subir al LMS de la empresa (SuccessFactors, Cornerstone, Moodle, TalentLMS) — quien registra quién lo leyó es el LMS del cliente, no nosotros</li>
+      <li><b>Reabrir el documento seis meses después</b>: carga el <code>.json</code> o el <code>.zip</code>, cambia la imagen del paso que cambió y genera otra vez — sin volver a grabar los cuarenta</li>
+    </ul>
+
+    <h2>Cómo hacerlo</h2>
+    <ol class="passos">
+      <li>Elige el escenario <b>Paso a paso</b> en el paso 1.</li>
+      <li>Graba el proceso una vez, narrando qué haces y por qué. Di el nombre de los campos: es lo que el key user va a buscar.</li>
+      <li>En la revisión, descarta lo que no interesa, reordena con las flechas y corrige las siglas con la lista de términos de tu sistema.</li>
+      <li>Genera el Word para editar, o el PDF directo. Si vas a formar en sala, el mismo material es el guion.</li>
+    </ol>
+
+    <h2>Lo que no hace — mejor saberlo antes</h2>
+    <p><b>No actualiza las capturas solo cuando el sistema cambia.</b> Eso se llama <i>replay</i>, es lo que vende ClickLearn, y exige dirigir la aplicación — imposible en una pestaña que solo recibe una imagen de pantalla compartida. Fingir que competimos ahí sería la primera mentira del producto.</p>
+    <p><b>No conduce la revisión paso a paso por su cuenta.</b> Reabrir el documento y cambiar la imagen de un paso ya existe; lo que aún no existe es que la herramienta te guíe preguntando <i>&ldquo;¿esta pantalla sigue así?&rdquo;</i> — es el siguiente ítem, y es nuestra respuesta honesta al <i>replay</i>.</p>
+    <p><b>No aloja el contenido ni dice quién lo leyó.</b> Eso lo responde el LMS de tu empresa. Nosotros entregamos el paquete SCORM y seguimos sin saber quién abrió qué.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=es">Grabar una instrucción ahora</a>
+      <a class="btn ghost" href="{{precos}}">Ver los planes</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Es el mismo consultor que grabó la evidencia del UAT en junio escribiendo la instrucción del key user en agosto, con las mismas transacciones. Por eso este caso es un <b>modelo dentro del producto</b>, y no otra herramienta.</p>
+  </div>
+</section>

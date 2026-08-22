@@ -1,0 +1,209 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Recevez votre lien de l’offre Team</h1>
+    <p class="updated">Vous écrivez votre e-mail, vous recevez un lien, vous cliquez. Le lien allume l’<b>offre Team</b>
+    dans le navigateur — et c’est le même lien que vous transmettez au reste de l’équipe.<br>
+    <b>Il n’y a ni inscription, ni mot de passe, ni carte.</b> L’e-mail sert à une seule chose : prouver que la boîte est
+    à vous, et avoir où envoyer le renouvellement. C’est ce que ce produit aura de plus proche d’une connexion,
+    et cela se passe <i>en dehors</i> de l’outil — à l’intérieur, rien n’a changé : aucune vidéo, aucun audio, aucun document
+    ne sort de votre ordinateur.</p>
+
+    <div class="linkBox">
+      <div id="tmPedir">
+        <label class="tmL" for="tmEmail">Votre e-mail professionnel</label>
+        <div class="row" style="gap:9px;margin-top:6px;flex-wrap:wrap">
+          <input id="tmEmail" type="email" autocomplete="email" placeholder="vous@entreprise.fr"
+                 style="flex:1;min-width:260px">
+          <button class="btn" id="tmEnviar">Recevoir le lien</button>
+        </div>
+        <p class="small muted" id="tmMsg" role="status" style="margin:12px 0 0"></p>
+        <p class="small muted" style="margin:10px 0 0">Si votre entreprise a déjà souscrit, le lien arrive avec
+        l’offre souscrite et avec le nom du client. Sinon, il arrive avec un <b>essai de 14 jours</b> — une fois par
+        e-mail.</p>
+      </div>
+
+      <div id="tmPronto" hidden>
+        <p class="small muted" style="margin:0 0 6px"><b>C’est prêt.</b> <span id="tmQuem"></span></p>
+        <div class="lkSaida"><code id="tmUrl"></code></div>
+        <p class="row" style="gap:9px;margin-top:12px;flex-wrap:wrap">
+          <a class="btn" id="tmAbrir" href="#">Ouvrir {{marca}} avec l’offre allumée</a>
+          <button class="btn ghost" id="tmCopiar">Copier le lien</button>
+          <span class="small muted" id="tmCopiado" role="status"></span>
+        </p>
+        <p class="small muted" style="margin:12px 0 0"><b>Où ne pas coller ce lien :</b> dans un ticket que
+        n’importe qui dans l’entreprise peut ouvrir, dans un canal public, dans un document partagé avec le client. Qui
+        a le lien a l’offre — et celui-ci est à votre nom.</p>
+      </div>
+
+      <!-- O painel do cliente. Ele só existe para quem administra, e quem
+           administra é decidido pelo servidor a partir do e-mail de dentro do
+           token — não por nada que esta página mande. O conteúdo é desenhado
+           por JavaScript a partir de um dicionário: três cópias do mesmo HTML
+           em três idiomas é onde as traduções começam a divergir. -->
+      <div id="tmPainel" style="margin-top:26px;border-top:1px solid var(--line);padding-top:22px">
+        <h3 style="margin:0 0 4px">Administrer votre équipe</h3>
+        <p class="small muted" style="margin:0 0 12px">Les sièges, les invitations, les factures, les valeurs par défaut du document et les modèles sont dans votre compte.</p>
+        <a class="btn ghost" href="/en/account">Ouvrir mon compte</a>
+      </div>
+    </div>
+
+    <h2>Comment cela fonctionne à l’intérieur</h2>
+    <ol class="passos">
+      <li><b>Vous demandez.</b> Vous écrivez l’e-mail ici. Rien n’est décidé à ce moment-là : il ne part qu’un message vers
+      votre boîte.</li>
+      <li><b>Vous cliquez sur ce qui est arrivé.</b> C’est cela qui prouve que l’adresse est à vous — et c’est le seul moment où
+      il existe quelque chose qui ressemble à une session.</li>
+      <li><b>Vous revenez avec le lien prêt.</b> La clé est signée sur le serveur, avec votre e-mail à l’intérieur, et
+      livrée déjà à l’intérieur d’une adresse de {{marca}}.</li>
+      <li><b>À partir de là, plus rien qui passe par le réseau.</b> La clé est vérifiée <b>à l’intérieur du navigateur</b>, contre
+      une clé publique qui se trouve dans le HTML même de l’outil. Elle fonctionne dans l’avion, sur la machine du
+      client avec internet verrouillé, et sur l’ordinateur que la DSI ne laisse pas parler avec notre hébergement.</li>
+    </ol>
+
+    <h2>Pourquoi la validité est courte</h2>
+    <p>Chaque clé émise vaut <b>90 jours</b> (14 pour l’essai), et la suivante arrive par e-mail avant que la
+    précédente n’expire. Ce n’est pas de la bureaucratie : c’est ce qui fait qu’un lien fuité <b>meurt tout seul</b>. Comme aucun
+    serveur ne vérifie quoi que ce soit pendant l’usage, il n’existe pas de bouton de révocation — la durée est la révocation. C’est
+    l’arbitrage choisi exprès : nous préférons une fuite qui expire à un produit payant qui cesse de
+    fonctionner quand internet tombe.</p>
+
+    <h2>Ce qui est conservé</h2>
+    <p>Votre e-mail, l’offre à laquelle il donne droit et la date de la dernière émission. Rien d’autre, et seulement pour
+    que nous puissions renouveler et repérer un usage étrange. <b>La clé elle-même n’est pas conservée</b> — elle est signée et
+    livrée. Rien de ce que vous enregistrez, transcrivez ou générez ne passe par ici : voyez la
+    <a href="{{seguranca}}" style="color:var(--accent)">page de sécurité de l’information</a> et la
+    <a href="{{privacidade}}" style="color:var(--accent)">politique de confidentialité</a>.</p>
+
+    <h2>Vous préférez ne pas donner votre e-mail ?</h2>
+    <p>Alors restez sur l’<b>offre gratuite</b>, qui fait le travail entier : enregistrer, transcrire, monter le
+    PDF, le Word et le paquet de vérification, et le
+    <a href="{{site}}/fr/link" style="color:var(--accent)">lien préconfiguré</a> pour votre système de
+    test. Ce que Team ajoute est sur la
+    <a href="{{precos}}" style="color:var(--accent)">page des tarifs</a>. Et si vous avez déjà une clé en
+    main, elle reste valable : dans l’outil, sous <i>Activer l’offre Team</i> → <i>j’ai une clé à
+    coller</i>.</p>
+  </div>
+</section>
+
+<style>
+.linkBox{border:1px solid var(--line);border-radius:12px;padding:22px;margin:26px 0 8px;background:var(--panel)}
+.tmL{font-size:13px;color:var(--muted)}
+#tmEmail{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);
+  color:var(--ink);font-size:15px;font-family:inherit}
+.lkSaida{border:1px solid var(--line);border-radius:8px;padding:12px 13px;background:var(--bg);overflow-x:auto}
+.lkSaida code{font:12.5px ui-monospace,Menlo,Consolas,monospace;color:var(--ink);white-space:pre-wrap;
+  word-break:break-all}
+</style>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  if (!$('tmEnviar')) return;
+
+  const SUPA = '{{supaUrl}}', ANON = '{{supaKey}}';
+  const FN = SUPA + '/functions/v1/walkstamp-licenca';
+  const VOLTA = location.origin + location.pathname;
+
+  const diz = (txt, erro) => {
+    $('tmMsg').innerHTML = erro ? '<span style="color:#c0392b">' + txt + '</span>' : txt;
+  };
+
+  /* Pedir o link é um POST solto na API de autenticação — sem SDK. Um produto
+     que carrega 40 kB de biblioteca para mandar um e-mail está pagando caro por
+     uma linha de fetch, e cada kilobyte aqui é uma página que demora mais. */
+  $('tmEnviar').onclick = async () => {
+    const email = ($('tmEmail').value || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return diz('Cette adresse ne semble pas complète. Vérifiez-la avant d’envoyer.', true);
+    }
+    $('tmEnviar').disabled = true;
+    diz('Envoi…');
+    try {
+      const r = await fetch(SUPA + '/auth/v1/otp?redirect_to=' + encodeURIComponent(VOLTA), {
+        method: 'POST',
+        headers: { apikey: ANON, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, create_user: true })
+      });
+      if (r.ok) {
+        diz('<b>Envoyé.</b> Ouvrez le message dans <b>' + email + '</b> et cliquez sur le lien qu’il contient. ' +
+            'Il arrive en quelques secondes — s’il n’arrive pas, regardez le dossier spam avant d’en redemander un.');
+      } else {
+        const t = await r.text();
+        diz(/rate|limit/i.test(t)
+          ? 'Trop de demandes à la suite pour cette adresse. Attendez quelques minutes et réessayez.'
+          : 'Je n’ai pas pu envoyer maintenant. Réessayez dans un instant, ou écrivez-moi à {{contato}}.', true);
+        $('tmEnviar').disabled = false;
+      }
+    } catch (e) {
+      diz('Pas de connexion avec le service d’envoi. Réessayez dans un instant.', true);
+      $('tmEnviar').disabled = false;
+    }
+  };
+  $('tmEmail').addEventListener('keydown', e => { if (e.key === 'Enter') $('tmEnviar').click(); });
+
+  /* A volta do link mágico traz os tokens no #fragmento — que, por ser
+     fragmento, não chega a servidor nenhum. Lemos, usamos e apagamos da barra. */
+  async function daVolta(){
+    const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const token = h.get('access_token');
+    if (!token) {
+      if (h.get('error_description')) {
+        diz('Le lien de l’e-mail n’a pas été accepté : ' + h.get('error_description') +
+            '. Demandez-en un autre ci-dessous.', true);
+        history.replaceState(null, '', VOLTA);
+      }
+      return;
+    }
+    history.replaceState(null, '', VOLTA);
+    diz('Vérifié. Émission de votre clé…');
+    try {
+      const r = await fetch(FN, {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.link) {
+        const motivos = {
+          teste_usado: 'Cet e-mail a déjà utilisé l’essai de 14 jours. Pour continuer sur l’offre Team, écrivez-moi à {{contato}}.',
+          suspensa:    'Ce compte est suspendu. Écrivez-moi à {{contato}}.',
+          sem_sessao:  'Le lien de l’e-mail a expiré. Demandez-en un autre ci-dessous.',
+          sem_segredo: 'L’émetteur est hors service. Écrivez-moi à {{contato}}.'
+        };
+        return diz(motivos[d.erro] || 'Je n’ai pas pu émettre maintenant. Écrivez-moi à {{contato}}.', true);
+      }
+      $('tmPedir').hidden = true;
+      $('tmPronto').hidden = false;
+      $('tmUrl').textContent = d.link;
+      $('tmAbrir').href = d.link;
+      $('tmQuem').textContent = 'Licence de ' + d.assentos + ' personne(s) pour ' + d.email +
+                                ', valable jusqu’au ' + d.vence + '.';
+      $('tmCopiar').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(d.link);
+          $('tmCopiado').textContent = 'Copié.';
+        } catch (e) {
+          const rg = document.createRange(); rg.selectNodeContents($('tmUrl'));
+          const s = getSelection(); s.removeAllRanges(); s.addRange(rg);
+          $('tmCopiado').textContent = 'J’ai sélectionné le lien — copiez avec Ctrl+C.';
+        }
+      };
+    } catch (e) {
+      diz('Je n’ai pas pu joindre l’émetteur. Réessayez dans un instant.', true);
+    }
+  }
+
+  /* O painel do time NÃO mora mais aqui.
+     Ele existia nesta página em JavaScript no navegador, com o JWT do link
+     mágico na mão, falando com a Edge Function `walkstamp-time`. E existia
+     TAMBÉM em /conta, em Server Actions, com o e-mail vindo da sessão. Duas
+     telas para o mesmo painel divergem — é questão de tempo até uma ganhar um
+     conserto que a outra não tem. Ficou a de /conta, que é a que não confia em
+     nada que o navegador diga.
+
+     Esta página voltou a ser o que ela é: a porta de entrada do plano. Ela pede
+     o e-mail, emite a chave, e aponta para a conta. */
+
+  daVolta();
+})();
+</script>

@@ -1,0 +1,498 @@
+<title>Dez Builds do Walkstamp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ---- fichário ----------------------------------------------------------
+     O acento sai do próprio produto: #737cf0 é a cor da janelinha que fica
+     por cima da tela gravada. Os cinzas puxam para ele em vez de serem
+     neutros de catálogo. */
+  :root{
+    --chao:#F6F6FA;
+    --papel:#FFFFFF;
+    --tinta:#191B23;
+    --tinta2:#4A4F60;
+    --apagado:#727890;
+    --linha:#E2E3EC;
+    --linha2:#CFD1DF;
+    --acento:#4F58CE;
+    --acento-fraco:#ECEDFA;
+    --urgente:#B03A12;
+    --urgente-fraco:#FBEDE7;
+    --reflow:#8A6A12;
+    --reflow-fraco:#FAF2DC;
+    --sombra:0 1px 2px rgba(25,27,35,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --chao:#111319;
+      --papel:#181B22;
+      --tinta:#EDEEF4;
+      --tinta2:#B9BDCC;
+      --apagado:#878DA2;
+      --linha:#282C38;
+      --linha2:#3A3F4F;
+      --acento:#98A0FF;
+      --acento-fraco:#1E2137;
+      --urgente:#F0A184;
+      --urgente-fraco:#2E1D16;
+      --reflow:#E0C067;
+      --reflow-fraco:#2B2415;
+      --sombra:0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --chao:#111319;
+    --papel:#181B22;
+    --tinta:#EDEEF4;
+    --tinta2:#B9BDCC;
+    --apagado:#878DA2;
+    --linha:#282C38;
+    --linha2:#3A3F4F;
+    --acento:#98A0FF;
+    --acento-fraco:#1E2137;
+    --urgente:#F0A184;
+    --urgente-fraco:#2E1D16;
+    --reflow:#E0C067;
+    --reflow-fraco:#2B2415;
+    --sombra:0 1px 2px rgba(0,0,0,.3);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--chao); color:var(--tinta);
+    font:400 17px/1.62 Newsreader,Georgia,"Times New Roman",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .folha{max-width:920px;margin:0 auto;padding:56px 24px 96px}
+
+  h1,h2,h3,.eyebrow,.dias,.tag,th,.num{
+    font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+  }
+  .eyebrow{
+    font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--acento);margin:0 0 14px;
+  }
+  h1{
+    font-size:clamp(34px,5.2vw,50px);font-weight:700;line-height:1.05;
+    letter-spacing:-.023em;margin:0 0 16px;text-wrap:balance;
+  }
+  .abre{font-size:19px;line-height:1.6;color:var(--tinta2);max-width:60ch;margin:0 0 10px}
+  .selo{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;
+    color:var(--apagado);margin:26px 0 0;
+  }
+
+  h2{
+    font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--apagado);margin:0 0 20px;
+  }
+  section.bloco{margin:52px 0 0;padding:34px 0 0;border-top:1px solid var(--linha)}
+
+  p{margin:0 0 15px;max-width:64ch}
+  .fina{font-size:15.5px;color:var(--tinta2)}
+  strong{font-weight:500;color:var(--tinta)}
+  code{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;
+    background:var(--acento-fraco);color:var(--acento);
+    padding:1px 5px;border-radius:4px;
+  }
+
+  /* ---- a prova: sete dias de uso ---- */
+  .rolo{overflow-x:auto;margin:22px 0 8px}
+  table{border-collapse:collapse;width:100%;min-width:420px;font-size:15px}
+  th{
+    font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--apagado);text-align:right;padding:0 0 9px;border-bottom:1px solid var(--linha2);
+  }
+  th:first-child{text-align:left}
+  td{
+    padding:9px 0;border-bottom:1px solid var(--linha);text-align:right;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:14.5px;
+    font-variant-numeric:tabular-nums;
+  }
+  td:first-child{text-align:left;font-family:Archivo,sans-serif;font-weight:500}
+  td.zero{color:var(--urgente);font-weight:600}
+  td.forte{color:var(--acento);font-weight:600}
+  .legenda{font-size:14px;color:var(--apagado);margin:10px 0 0;max-width:64ch}
+
+  /* ---- as bandas de build ---- */
+  .build{
+    display:grid;grid-template-columns:76px 1fr;gap:0 26px;
+    padding:30px 0;border-top:1px solid var(--linha);
+  }
+  .build:first-of-type{border-top:2px solid var(--linha2)}
+  .canhoto{padding-top:3px}
+  .num{
+    font-size:30px;font-weight:700;line-height:1;letter-spacing:-.03em;
+    color:var(--linha2);font-variant-numeric:tabular-nums;
+  }
+  .build.destaque .num{color:var(--acento)}
+  .dias{
+    display:block;margin-top:9px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:12.5px;font-weight:500;color:var(--apagado);font-variant-numeric:tabular-nums;
+  }
+  h3{
+    font-size:22px;font-weight:600;letter-spacing:-.015em;line-height:1.25;
+    margin:0 0 4px;text-wrap:balance;
+  }
+  .tags{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 13px}
+  .tag{
+    font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+    padding:3px 8px;border-radius:3px;background:var(--acento-fraco);color:var(--acento);
+  }
+  .tag.u{background:var(--urgente-fraco);color:var(--urgente)}
+  .tag.r{background:var(--reflow-fraco);color:var(--reflow)}
+  ul{margin:13px 0 0;padding:0;list-style:none}
+  li{
+    position:relative;padding-left:19px;margin:0 0 8px;
+    font-size:16px;line-height:1.55;color:var(--tinta2);max-width:62ch;
+  }
+  li::before{
+    content:"";position:absolute;left:2px;top:.62em;
+    width:5px;height:1px;background:var(--linha2);
+  }
+  .regua{
+    margin:15px 0 0;padding:11px 14px;background:var(--papel);
+    border:1px solid var(--linha);border-radius:6px;box-shadow:var(--sombra);
+    font-size:14.5px;line-height:1.5;color:var(--tinta2);max-width:62ch;
+  }
+  .regua b{
+    font-family:Archivo,sans-serif;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--acento);
+    display:block;margin-bottom:4px;
+  }
+
+  /* ---- a linha de corte: estrutura que diz algo verdadeiro ---- */
+  .corte{
+    display:flex;align-items:center;gap:16px;margin:8px 0;padding:16px 0;
+    border-top:2px dashed var(--acento);border-bottom:1px solid var(--linha);
+  }
+  .corte p{margin:0;font-size:15.5px;color:var(--tinta2);max-width:none}
+  .corte .marca{
+    font-family:Archivo,sans-serif;font-size:11px;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--acento);
+    white-space:nowrap;flex:none;
+  }
+
+  .listinha{columns:2;column-gap:34px;font-size:15px;color:var(--tinta2);margin:14px 0 0}
+  .listinha li{break-inside:avoid;margin-bottom:7px}
+
+  @media (max-width:640px){
+    .folha{padding:40px 18px 72px}
+    .build{grid-template-columns:1fr;gap:0}
+    .canhoto{display:flex;align-items:baseline;gap:12px;padding:0 0 8px}
+    .dias{margin-top:0}
+    .num{font-size:22px}
+    .corte{flex-direction:column;align-items:flex-start;gap:6px}
+    .listinha{columns:1}
+    p,li,.regua{max-width:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="folha">
+
+  <p class="eyebrow">Plano de trabalho</p>
+  <h1>Dez builds, na ordem em que se pagam</h1>
+  <p class="abre">
+    A auditoria de código e a proposta de redesenho de UX, medidas contra o código real e
+    remontadas numa fila. Cada build sai sozinho: com zip, régua verde e um ganho que a pessoa
+    percebe. Nenhum depende do seguinte.
+  </p>
+  <p class="selo">20/08/2026 · 54–78 dias no total · a ordem não é a dos documentos</p>
+
+  <!-- ============================================================ -->
+  <section class="bloco">
+    <h2>Três decisões moldam a fila</h2>
+
+    <h3 style="font-size:19px;margin-bottom:8px">1. Português primeiro</h3>
+    <p class="fina">
+      Sete dias de uso real, direto da tabela de eventos. Não é preferência: é o que aconteceu.
+    </p>
+    <div class="rolo">
+      <table>
+        <thead>
+          <tr><th>Idioma</th><th>Abriu</th><th>Carregou vídeo</th><th>Baixou documento</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>pt</td><td>361</td><td>153</td><td class="forte">71</td></tr>
+          <tr><td>en</td><td>48</td><td>3</td><td class="zero">0</td></tr>
+          <tr><td>es</td><td>7</td><td>0</td><td class="zero">0</td></tr>
+          <tr><td>de</td><td>0</td><td>0</td><td class="zero">0</td></tr>
+          <tr><td>fr</td><td>0</td><td>0</td><td class="zero">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="legenda">
+      Nenhum documento saiu fora do português, e dois idiomas não têm um único registro. Chave
+      nova nasce escrita em pt e <strong>copiada</strong> para os outros quatro: <code>chaves.mjs</code>
+      segue verde, nenhuma tela mostra vazio, e traduzir depois é trocar string — não caçar o que
+      falta. Isso tira quase todo o custo “×5 idiomas”. Vale só para a ferramenta; no site,
+      <code>build.py</code> para o build se faltar chave em qualquer idioma.
+    </p>
+
+    <h3 style="font-size:19px;margin:30px 0 8px">2. O aditivo antes do reflow</h3>
+    <p class="fina">
+      Builds 1 a 6 criam estado novo sem tocar na hierarquia da página; 7 a 9 remexem. Isso
+      importa porque <strong>69 dos 125 testes afirmam visibilidade ou ordem</strong> — são eles que
+      cobram o reflow. Fazer o aditivo primeiro entrega valor sem pagar essa conta, e produz os
+      dados para decidir se o reflow ainda é o gargalo.
+    </p>
+
+    <h3 style="font-size:19px;margin:30px 0 8px">3. Régua rasa é pior que régua nenhuma</h3>
+    <p class="fina">
+      A régua da anotação passou verde com o recurso completamente quebrado: usava
+      <code>fill()</code>, que atribui o valor de uma vez, e o defeito morava no caminho de uma
+      tecla. Congelar afirmações de <em>layout</em> durante o reflow é legítimo. Congelar as que
+      carregam trabalho — texto até o documento, “não perdi o que escrevi”, “o download saiu
+      completo” — nunca é.
+    </p>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="bloco">
+    <h2>A fila</h2>
+
+    <div class="build destaque">
+      <div class="canhoto"><span class="num">01</span><span class="dias">1,5 d</span></div>
+      <div>
+        <h3>A régua roda, e a placa não trava</h3>
+        <div class="tags"><span class="tag u">Defeito P0</span><span class="tag">Aditivo</span></div>
+        <p class="fina">O único com urgência. Os dois achados foram confirmados no código.</p>
+        <ul>
+          <li><strong>O fallback da GPU espera por si mesmo.</strong> <code>usandoPipe++</code> fica
+            antes do <code>try</code>, o <code>finally</code> que decrementa só roda depois do
+            <code>catch</code>, e o <code>catch</code> chama <code>soltarPipe()</code> — que espera
+            <code>usandoPipe &gt; 0</code> por até 600 × 100 ms. Um minuto parado na máquina que
+            acabou de falhar.</li>
+          <li><strong>E o pipeline de recuperação nasce sem <code>device:'wasm'</code></strong> — pode
+            voltar ao backend que quebrou.</li>
+          <li><strong>A suíte não roda fora desta máquina.</strong> <code>preparar.sh</code> procura
+            <code>/root/cc/walkstamp</code>; os testes carregam <code>/root/walkstamp</code>. Ele
+            substitui zero arquivos. 117 testes com caminho absoluto, 118 com o Chromium fixo.</li>
+        </ul>
+        <div class="regua"><b>Régua</b>
+          Erro simulado na <em>primeira</em> inferência, cobrando: sem espera artificial, um
+          pipeline vivo, o mesmo trecho refeito, e <code>device === 'wasm'</code>.
+        </div>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">02</span><span class="dias">2,5–4 d</span></div>
+      <div>
+        <h3>O documento tem fim</h3>
+        <div class="tags"><span class="tag">Aditivo</span></div>
+        <p class="fina">
+          Hoje o download acontece e a tela fica igual, com os mesmos botões, como se nada
+          tivesse ocorrido. E o prompt para IA é o <strong>passo 4 de 4</strong> — a numeração diz
+          que ele é um quarto da tarefa, e para a maioria não é tarefa nenhuma.
+        </p>
+        <ul>
+          <li>estado de conclusão: o que saiu, quantas telas, se a fala estava completa</li>
+          <li>distinguir <em>documento baixado</em> de <em>projeto guardado</em>, uma vez só</li>
+          <li>baixar de novo sem reprocessar</li>
+          <li>o prompt sai da numeração e vira “próximos passos” da conclusão</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">03</span><span class="dias">2–3 d</span></div>
+      <div>
+        <h3>A saída certa primeiro</h3>
+        <div class="tags"><span class="tag">Aditivo</span></div>
+        <p class="fina">
+          Sete formatos com o mesmo peso viram sete decisões. A ferramenta já sabe o cenário.
+        </p>
+        <ul>
+          <li>formato recomendado por cenário, com os demais recolhidos em “ver todos”</li>
+          <li>layout e papel só depois de escolher um formato que os use</li>
+          <li>vocabulário unificado: <em>etapa</em>, <em>tela</em>, <em>passo do procedimento</em>,
+            <em>projeto</em>, <em>documento</em></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">04</span><span class="dias">4–6 d</span></div>
+      <div>
+        <h3>Parar sem perder</h3>
+        <div class="tags"><span class="tag">Aditivo</span></div>
+        <p class="fina">
+          A interface diz que dá para deixar rodando, mas não há como parar e ficar com o que já
+          saiu. Fechar a aba perde o trabalho.
+        </p>
+        <ul>
+          <li>“Parar e ficar com o que já está pronto”, entre janelas de transcrição</li>
+          <li>não prometer abortar a inferência corrente: dizer “parando após este trecho”</li>
+          <li>separar etapa, progresso, previsão, motor e ação — hoje disputam a mesma linha</li>
+          <li>leitor de tela anunciando só início, mudança relevante, erro e fim</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="corte">
+      <span class="marca">Linha de corte</span>
+      <p>
+        Se for para parar em algum lugar, pare aqui: <strong>10 a 15 dias</strong>, quatro dos
+        cinco maiores ganhos das duas listas, e nenhuma linha do reflow.
+      </p>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">05</span><span class="dias">3,5–4,5 d</span></div>
+      <div>
+        <h3>Medir antes de otimizar</h3>
+        <div class="tags"><span class="tag">Aditivo</span></div>
+        <p class="fina">
+          Sem isto, trocar janela, modelo ou runtime é palpite. Estende o <code>medir()</code> que
+          já existe — 9 eventos, com opt-out — em vez de construir telemetria nova.
+        </p>
+        <ul>
+          <li>marcas de tempo em cada fronteira: leitura, decodificação, cache, sessão ONNX,
+            primeiro texto, inferência, fallback, áudio enviado ÷ áudio original</li>
+          <li>amostras de 1, 10 e 40 min; cold e warm cache; CPU 1/4 threads e GPU; saída JSON</li>
+          <li><strong>e a pergunta aberta:</strong> inglês abre 48 vezes e converte zero. Funil
+            quebrado ou robôs? Meia hora responde, e muda a prioridade de traduzir.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">06</span><span class="dias">3–4 d</span></div>
+      <div>
+        <h3>Menos árvore, menos download</h3>
+        <div class="tags"><span class="tag">Aditivo</span></div>
+        <p class="fina">
+          Numa máquina sem combinação lembrada, a montagem percorre ambientes, runtimes,
+          quantização, repositório reserva, cache limpo e fp32 — algumas falhas custam 73 a 200 MB
+          extras. Há ainda uma URL sem versão fixada.
+        </p>
+        <ul>
+          <li>classificar o erro (rede, arquivo, operador, memória, worker, backend) e saltar
+            direto para o fallback pertinente</li>
+          <li>fixar versões, com manifesto testado de biblioteca ↔ runtime ↔ modelo</li>
+          <li>avisar antes de um fallback caro: “a alternativa baixa mais 73 MB”</li>
+          <li>nunca limpar cache sozinho sem evidência de corrupção</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">07</span><span class="dias">1,5–2,5 d</span></div>
+      <div>
+        <h3>A entrada</h3>
+        <div class="tags"><span class="tag r">Mexe na página</span></div>
+        <p class="fina">Primeiro toque no reflow, e o mais barato dele.</p>
+        <ul>
+          <li>gravar / escolher vídeo / abrir projeto deixam de ter o mesmo peso</li>
+          <li>Drive vira origem dentro de “escolher vídeo”, não terceira tarefa</li>
+          <li>roteiro aparece depois do tipo de documento, e só onde ajuda</li>
+          <li>modelo expresso por intenção — rápido, mais preciso — com tamanho e motor como
+            consequência abaixo, não como decisão separada</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">08</span><span class="dias">7–11 d</span></div>
+      <div>
+        <h3>A conferência</h3>
+        <div class="tags"><span class="tag r">Mexe na página</span></div>
+        <ul>
+          <li>resumo automático antes da grade: quantas telas, quantas com fala, quantas repetidas</li>
+          <li>limpeza recomendada como ação primária — consequência antes, <strong>desfazer</strong>
+            depois, e nunca descartando o que foi marcado à mão</li>
+          <li>cartão com o essencial; tarja, recorte, comparação e clipe dentro de “Editar”</li>
+          <li>fala como painel contextual: transcrição, vocabulário, hesitações e tradução moram
+            lá dentro</li>
+          <li>identificação progressiva: só o campo que falta, na hora de gerar</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">09</span><span class="dias">13–17 d</span></div>
+      <div>
+        <h3>As três etapas</h3>
+        <div class="tags"><span class="tag r">Mexe na página</span></div>
+        <p class="fina">
+          O reflow de verdade: Entrada → Conferir → Baixar, uma ação primária por etapa. É aqui
+          que os 69 testes de visibilidade cobram — por isso ele vem depois de tudo que entrega
+          valor sem mexer na página.
+        </p>
+        <ul>
+          <li>controlador de etapas com estado <strong>derivado</strong> dos dados que já existem,
+            e não um segundo lugar onde mora a verdade</li>
+          <li><code>hidden</code> e classes para revelar painéis, sem duplicar controle nem
+            inventar id novo</li>
+          <li>mover elemento no DOM só quando a ordem de foco exigir</li>
+          <li>acessibilidade: foco e rolagem nas transições, teclado completo, zoom 200%,
+            NVDA + Chrome e VoiceOver + Safari</li>
+          <li>ao fim, <strong>descongelar</strong> as réguas de layout e reescrevê-las contra a
+            hierarquia definitiva</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="build">
+      <div class="canhoto"><span class="num">10</span><span class="dias">16–24 d</span></div>
+      <div>
+        <h3>A dívida que sustenta o resto</h3>
+        <div class="tags"><span class="tag">Invisível</span></div>
+        <p class="fina">
+          Nada aqui o usuário vê. Tudo aqui decide o custo dos próximos anos.
+        </p>
+        <ul>
+          <li><strong>Máquina de estados do motor de voz</strong> — com fila e dono explícito da
+            sessão. O P0 do build 1 é sintoma disto: dez variáveis globais cooperando por
+            convenção.</li>
+          <li><strong>Modularizar a fonte.</strong> O artefato continua sendo um HTML só; o
+            <code>build.py</code> concatena. Começar pelo motor e pelos parsers, com funções puras
+            e teste sem navegador.</li>
+          <li><strong>Memória:</strong> arquivo comprimido, buffer decodificado e o mono de 16 kHz
+            coexistem no heap. Medir o pico por duração antes de redesenhar.</li>
+          <li><strong>Qualidade da compactação de silêncio:</strong> medir com voz baixa, ruído e
+            microfone distante, com e sem, antes de tocar em margens — e nunca adicionar VAD
+            neural só para ter VAD.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="bloco">
+    <h2>Sai do caminho principal, não do produto</h2>
+    <p class="fina">Nenhum é removido. Todos continuam a no máximo dois cliques.</p>
+    <ul class="listinha">
+      <li>reabrir e consolidar projetos como bloco fixo</li>
+      <li>detalhes de modelo e runtime</li>
+      <li>webcam e clipe</li>
+      <li>controles finos do detector</li>
+      <li>OCR e ações raras em lote</li>
+      <li>tradução múltipla</li>
+      <li>Jira, Google Docs e SCORM</li>
+      <li>layout e papel antes do formato</li>
+      <li>“JSON” como termo primário</li>
+      <li>prompt como quarta etapa</li>
+      <li>diagnóstico técnico sem erro presente</li>
+    </ul>
+  </section>
+
+  <section class="bloco">
+    <h2>O que não fazer</h2>
+    <ul class="listinha">
+      <li>aumentar threads além de quatro sem medir captura concorrente</li>
+      <li>trocar o modelo padrão antes de comparar tempo e qualidade</li>
+      <li>VAD neural só para ter VAD</li>
+      <li>virtualizar a grade para resolver lentidão de transcrição</li>
+      <li>backend ou GPU remota — contradiz a proposta local</li>
+      <li>remover os fallbacks: eles ficam seletivos, não desaparecem</li>
+      <li>converter o artefato final em bundle: modularizar a <em>fonte</em> preserva o HTML único</li>
+    </ul>
+  </section>
+
+</div>

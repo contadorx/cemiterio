@@ -1,0 +1,451 @@
+From e2aaafa24f0f35843ffca1a58b0305c27c2cdbf2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 22 Aug 2026 01:31:57 +0000
+Subject: [PATCH] B4: a pagina vendia o Personal e pedia e-mail para avisar
+ quando ele sair
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cada cartao ja tinha uma acao primaria — isso o plano supunha errado. O que
+estava jogado no meio era pior:
+
+  cartao Personal   "R$ 149 / ano", selo "teste de 14 dias",
+                    "Comecar os 14 dias", "Na hora, sem cartao"
+  secao #lista      "Deixe um e-mail e eu aviso quando o plano pago sair"
+
+Na mesma pagina, nos cinco idiomas. E ha checkout de verdade
+(`stripe().checkout.sessions.create` em `app/conta/acoes.ts`), entao quem manda e
+o cartao: o plano pago ja esta no ar ha tempo, e a pagina continuava pedindo o
+e-mail de quem quisesse ser avisado do lancamento.
+
+Nao e erro de texto. E a pagina nao saber que o que ela promete ja foi entregue —
+o mesmo defeito do B1, no sentido contrario: la ela escondia o que existia, aqui
+promete o que ja vende.
+
+A LISTA TINHA UM ASSUNTO VERDADEIRO ESPERANDO POR ELA. Dois paragrafos acima, a
+propria pagina diz: "Pro e API — converter formatos que o navegador recusa,
+transcrever no servidor, processar em lote, ou um endereco que devolve quadros e
+transcricao. Nada disso existe ainda". Agora e disso que a lista fala, e ela diz
+em voz alta que o plano pago ja esta no ar — a contradicao virou esclarecimento.
+
+Os quatro estados:
+
+  Free           testar agora    Abrir a ferramenta
+  Personal       testar agora    Comecar os 14 dias
+  Team           pedir acesso    Falar sobre o Team
+  Pro e API      entrar na lista Quero ser avisado
+
+A TRAVA E ESTRUTURAL, e nao casamento de frases. Casar texto em cinco idiomas
+para descobrir uma contradicao e o jeito de a regua envelhecer na primeira
+reescrita de copy. Entao: os cartoes ganharam `data-plano`, a secao ganhou
+`data-espera`, e `planos.mjs` afirma que o que a lista espera NAO PODE SER algo
+que a pagina vende — mais uma acao primaria por cartao.
+
+Provei as duas direcoes: apontar a lista para `personal` reprova nomeando o
+choque, e um segundo botao no cartao reprova com `1/2/1`.
+
+Um detalhe de implementacao que quase passou: cortar o cartao no primeiro
+`</div>` nao serve, porque ha `<div>` aninhado dentro dele — a contagem dava
+`0/0/0` e a afirmacao passaria a vida inteira sem medir nada. Dividir pelo
+proprio marcador da os tres pedacos certos.
+
+`support.js` fica: a mensagem de sucesso e "Aviso voce quando sair", que
+continua verdadeira e agora tem o assunto dito logo acima dela.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01SLmPMaXsHaVpudHTw6nJDS
+---
+ PLANO.md                       | 39 ++++++++++++++++++++++++++++------
+ offline/walkstamp-offline.html |  2 +-
+ public/app.html                |  2 +-
+ src/.build                     |  2 +-
+ src/site/bodies/precos.de.html | 12 +++++------
+ src/site/bodies/precos.en.html | 14 ++++++------
+ src/site/bodies/precos.es.html | 14 ++++++------
+ src/site/bodies/precos.fr.html | 12 +++++------
+ src/site/bodies/precos.pt.html | 12 +++++------
+ testes/planos.mjs              | 36 +++++++++++++++++++++++++++++++
+ 10 files changed, 103 insertions(+), 42 deletions(-)
+
+diff --git a/PLANO.md b/PLANO.md
+index 7bab9a1..62c05b5 100644
+--- a/PLANO.md
++++ b/PLANO.md
+@@ -140,7 +140,7 @@ medido — `aria-current`, o foco indo para o cabeçalho, o rótulo acessível c
+ número e a palavra "feita", a frase de status que não se repete, e as duas
+ guardas da travessia.
+ 
+-### Trilha B — o que trava a venda (2,5–3,5 d)
++### Trilha B — o que trava a venda (2–3 d)
+ 
+ **B1. Verdade única entre página, catálogo e código — FEITO**
+ 
+@@ -260,11 +260,36 @@ parede que separa o navegador das tabelas. Ver `supabase/LEIA-ME.md`.
+ As quatro novas ainda **não foram aplicadas**: falta um `supabase db push`, e só a da
+ limpeza mexe em dado.
+ 
+-**B4. Um estado por plano no funil (0,5 d)**
++**B4. Um estado por plano no funil — FEITO**
+ 
+-Hoje a página oferece "Começar os 14 dias", "Falar" e um campo para avisar "quando o
+-plano pago sair", tudo junto. Escolher um por plano: *Testar agora*, *Pedir acesso*,
+-*Entrar na lista*.
++Cada cartão já tinha uma ação primária. O que estava jogado no meio era outra
++coisa, e pior: a página **vendia o Personal** — preço, selo de 14 dias, "na hora,
++sem cartão" — e cinquenta linhas abaixo pedia o e-mail da pessoa para avisar
++**"quando o plano pago sair"**. Nos cinco idiomas.
++
++Não é erro de texto. É a página não saber que o que ela promete já foi entregue —
++o mesmo defeito do B1, no sentido contrário: lá ela escondia o que existia, aqui
++ela promete o que já vende. E há checkout de verdade
++(`stripe().checkout.sessions.create`), então quem manda é o cartão.
++
++A lista tinha um assunto verdadeiro esperando por ela: **Pro e API**, que a
++própria página descreve dois parágrafos acima como "nada disso existe ainda".
++Agora ela espera isso, e diz em voz alta que o plano pago já está no ar.
++
++Os quatro estados ficam assim:
++
++| plano | estado | ação |
++|---|---|---|
++| Free | *testar agora* | Abrir a ferramenta |
++| Personal | *testar agora* | Começar os 14 dias |
++| Team | *pedir acesso* | Falar sobre o Team |
++| Pro e API — não existe | *entrar na lista* | Quero ser avisado |
++
++**A trava** entrou no `planos.mjs`, e é estrutural em vez de casar frases: os
++cartões ganharam `data-plano`, a seção ganhou `data-espera`, e o teste afirma que
++o que a lista espera **não pode ser algo que a página vende** — mais uma ação
++primária por cartão. Provado nas duas direções: apontar a lista para `personal`
++reprova, e um segundo botão num cartão reprova.
+ 
+ **B5. Reposicionar o Personal em torno do roteiro (2–3 d)**
+ 
+@@ -303,9 +328,9 @@ fonte, medir o pico de memória, medir WER antes de tocar na compactação de si
+ | Trilha | Dias | O que você tem no fim |
+ |---|---:|---|
+ | A — terminar o UX | **1–2** | o redesenho inteiro, com acessibilidade validada |
+-| B — destravar a venda | **2,5–3,5** | uma verdade só e cobrança auditável (o banco já é reconstruível) |
++| B — destravar a venda | **2–3** | uma verdade só e cobrança auditável (o banco já é reconstruível) |
+ | C — motor e dívida | **22,5–32,5** | você mede antes de otimizar; as próximas mudanças ficam baratas |
+-| **Total** | **26–38** | |
++| **Total** | **25,5–37,5** | |
+ 
+ ---
+ 
+diff --git a/offline/walkstamp-offline.html b/offline/walkstamp-offline.html
+index 391d384..dd9d640 100644
+--- a/offline/walkstamp-offline.html
++++ b/offline/walkstamp-offline.html
+@@ -9436,7 +9436,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.22-11';
++  const VERSAO = '2026.08.22-12';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+diff --git a/public/app.html b/public/app.html
+index 188065c..7902c87 100644
+--- a/public/app.html
++++ b/public/app.html
+@@ -9039,7 +9039,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.22-11';
++  const VERSAO = '2026.08.22-12';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+diff --git a/src/.build b/src/.build
+index 745df3a..5c385c4 100644
+--- a/src/.build
++++ b/src/.build
+@@ -1 +1 @@
+-2026-08-22 11
++2026-08-22 12
+diff --git a/src/site/bodies/precos.de.html b/src/site/bodies/precos.de.html
+index 16817f0..49dfef3 100644
+--- a/src/site/bodies/precos.de.html
++++ b/src/site/bodies/precos.de.html
+@@ -25,7 +25,7 @@
+ 
+     <div class="plans tres">
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="free">
+         <span class="badge">jetzt verfügbar</span>
+         <h3 style="margin-top:14px">Free</h3>
+         <div class="price">€ 0<span> / für immer</span></div>
+@@ -43,7 +43,7 @@
+         <p class="pe">Alles, was Ihren Nachweis akzeptabel macht, ist hier enthalten.</p>
+       </div>
+ 
+-      <div class="plan hi">
++      <div class="plan hi" data-plano="personal">
+         <span class="badge">14 Tage testen</span>
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">€ 27<span> / Jahr</span></div>
+@@ -61,7 +61,7 @@
+         <p class="pe">Sofort, ohne Karte. Oder <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">schreiben Sie mir</a>.</p>
+       </div>
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="team">
+         <span class="badge">ab 5 Personen</span>
+         <h3 style="margin-top:14px">Team</h3>
+         <div class="price">€ 65<span> / Person / Jahr</span></div>
+@@ -109,10 +109,10 @@
+   </div>
+ </section>
+ 
+-<section id="lista">
++<section id="lista" data-espera="proapi">
+   <div class="wrap">
+-    <h2>Möchten Sie benachrichtigt werden?</h2>
+-    <p class="lead">Hinterlassen Sie eine E-Mail-Adresse, und ich melde mich, wenn der bezahlte Plan erscheint. Eine Nachricht, kein Newsletter.</p>
++    <h2>Möchten Sie über Pro und die API informiert werden?</h2>
++    <p class="lead">Der bezahlte Plan ist <b>bereits verfügbar</b> — was es noch nicht gibt, sind Pro und die API, oben beschrieben. Hinterlassen Sie eine E-Mail-Adresse, und ich melde mich, sobald sie da sind. Eine Nachricht, kein Newsletter.</p>
+     <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+       <input type="email" id="listaEmail" autocomplete="email" placeholder="ihre@email.de" aria-label="Ihre E-Mail-Adresse">
+       <button class="btn" type="submit" id="listaBtn">Bitte benachrichtigen</button>
+diff --git a/src/site/bodies/precos.en.html b/src/site/bodies/precos.en.html
+index ec0fbd9..7154d96 100644
+--- a/src/site/bodies/precos.en.html
++++ b/src/site/bodies/precos.en.html
+@@ -25,7 +25,7 @@
+ 
+     <div class="plans tres">
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="free">
+         <span class="badge">available now</span>
+         <h3 style="margin-top:14px">Free</h3>
+         <div class="price">US$ 0<span> / forever</span></div>
+@@ -43,7 +43,7 @@
+         <p class="pe">Everything that makes your evidence acceptable is in here.</p>
+       </div>
+ 
+-      <div class="plan hi">
++      <div class="plan hi" data-plano="personal">
+         <span class="badge">14-day trial</span>
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">US$ 29<span> / year</span></div>
+@@ -61,7 +61,7 @@
+         <p class="pe">Right away, no card. Or <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">write to me</a>.</p>
+       </div>
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="team">
+         <span class="badge">from 5 people</span>
+         <h3 style="margin-top:14px">Team</h3>
+         <div class="price">US$ 69<span> / person / year</span></div>
+@@ -107,13 +107,13 @@
+   </div>
+ </section>
+ 
+-<section id="lista">
++<section id="lista" data-espera="proapi">
+   <div class="wrap">
+-    <h2>Want to be told?</h2>
+-    <p class="lead">Leave an email and I will tell you when the paid plan is out. One message, not a newsletter.</p>
++    <h2>Want to be told about Pro and the API?</h2>
++    <p class="lead">The paid plan is <b>already live</b> — what does not exist yet is Pro and the API, described above. Leave an email and I will tell you when they land. One message, not a newsletter.</p>
+     <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+       <input type="email" id="listaEmail" autocomplete="email" placeholder="you@email.com" aria-label="Your email">
+-      <button class="btn" type="submit" id="listaBtn">Tell me when it is out</button>
++      <button class="btn" type="submit" id="listaBtn">Tell me when they land</button>
+     </form>
+     <p class="small muted listaMsg" id="listaMsg" role="status"></p>
+     <p class="small muted" style="max-width:640px">The promise of this tool is that <b>your video never leaves your machine</b>, and it still holds: this field has nothing to do with what you process here — the browser sends no video, audio or transcript anywhere. The email sits in a database of mine, is not sold, does not go to any third-party list, and disappears the day you ask. Rather not leave it? No problem — the tool does not change because of that.</p>
+diff --git a/src/site/bodies/precos.es.html b/src/site/bodies/precos.es.html
+index 2c54098..18845a9 100644
+--- a/src/site/bodies/precos.es.html
++++ b/src/site/bodies/precos.es.html
+@@ -25,7 +25,7 @@
+ 
+     <div class="plans tres">
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="free">
+         <span class="badge">disponible ya</span>
+         <h3 style="margin-top:14px">Free</h3>
+         <div class="price">US$ 0<span> / para siempre</span></div>
+@@ -43,7 +43,7 @@
+         <p class="pe">Todo lo que hace que tu evidencia sea aceptada está aquí.</p>
+       </div>
+ 
+-      <div class="plan hi">
++      <div class="plan hi" data-plano="personal">
+         <span class="badge">prueba de 14 días</span>
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">US$ 29<span> / año</span></div>
+@@ -61,7 +61,7 @@
+         <p class="pe">Al instante, sin tarjeta. O <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">escríbeme</a>.</p>
+       </div>
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="team">
+         <span class="badge">desde 5 personas</span>
+         <h3 style="margin-top:14px">Team</h3>
+         <div class="price">US$ 69<span> / persona / año</span></div>
+@@ -108,13 +108,13 @@
+   </div>
+ </section>
+ 
+-<section id="lista">
++<section id="lista" data-espera="proapi">
+   <div class="wrap">
+-    <h2>¿Quieres que te avise?</h2>
+-    <p class="lead">Deja un correo y te aviso cuando salga el plan de pago. Un mensaje, no una newsletter.</p>
++    <h2>¿Quieres que te avise del Pro y de la API?</h2>
++    <p class="lead">El plan de pago <b>ya está disponible</b> — lo que todavía no existe es el Pro y la API, descritos arriba. Deja un correo y te aviso cuando salgan. Un mensaje, no una newsletter.</p>
+     <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+       <input type="email" id="listaEmail" autocomplete="email" placeholder="tu@correo.com" aria-label="Tu correo">
+-      <button class="btn" type="submit" id="listaBtn">Avísame cuando salga</button>
++      <button class="btn" type="submit" id="listaBtn">Avísame cuando salgan</button>
+     </form>
+     <p class="small muted listaMsg" id="listaMsg" role="status"></p>
+     <p class="small muted" style="max-width:640px">La promesa de esta herramienta es que <b>tu vídeo no sale de tu máquina</b>, y sigue en pie: este campo no tiene ninguna relación con lo que procesas aquí — el navegador no manda vídeo, audio ni transcripción a ninguna parte. El correo queda en una base mía, no se vende, no va a ninguna lista de terceros y desaparece el día que lo pidas. ¿Prefieres no dejarlo? Sin problema — la herramienta no cambia por eso.</p>
+diff --git a/src/site/bodies/precos.fr.html b/src/site/bodies/precos.fr.html
+index 640246d..f28f29c 100644
+--- a/src/site/bodies/precos.fr.html
++++ b/src/site/bodies/precos.fr.html
+@@ -25,7 +25,7 @@
+ 
+     <div class="plans tres">
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="free">
+         <span class="badge">disponible</span>
+         <h3 style="margin-top:14px">Free</h3>
+         <div class="price">€ 0<span> / pour toujours</span></div>
+@@ -43,7 +43,7 @@
+         <p class="pe">Tout ce qui fait accepter votre preuve est ici.</p>
+       </div>
+ 
+-      <div class="plan hi">
++      <div class="plan hi" data-plano="personal">
+         <span class="badge">essai de 14 jours</span>
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">€ 27<span> / an</span></div>
+@@ -61,7 +61,7 @@
+         <p class="pe">Tout de suite, sans carte. Ou <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">écrivez-moi</a>.</p>
+       </div>
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="team">
+         <span class="badge">à partir de 5 personnes</span>
+         <h3 style="margin-top:14px">Team</h3>
+         <div class="price">€ 65<span> / personne / an</span></div>
+@@ -107,10 +107,10 @@
+   </div>
+ </section>
+ 
+-<section id="lista">
++<section id="lista" data-espera="proapi">
+   <div class="wrap">
+-    <h2>Vous voulez être prévenu ?</h2>
+-    <p class="lead">Laissez un e-mail et je vous préviens quand l’offre payante sortira. Un message, pas une newsletter.</p>
++    <h2>Vous voulez être prévenu du Pro et de l’API ?</h2>
++    <p class="lead">L’offre payante est <b>déjà disponible</b> — ce qui n’existe pas encore, c’est le Pro et l’API, décrits ci-dessus. Laissez un e-mail et je vous préviens quand ils sortiront. Un message, pas une newsletter.</p>
+     <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+       <input type="email" id="listaEmail" autocomplete="email" placeholder="vous@email.com" aria-label="Votre e-mail">
+       <button class="btn" type="submit" id="listaBtn">Je veux être prévenu</button>
+diff --git a/src/site/bodies/precos.pt.html b/src/site/bodies/precos.pt.html
+index 73fb972..b88e267 100644
+--- a/src/site/bodies/precos.pt.html
++++ b/src/site/bodies/precos.pt.html
+@@ -25,7 +25,7 @@
+ 
+     <div class="plans tres">
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="free">
+         <span class="badge">agora</span>
+         <h3 style="margin-top:14px">Free</h3>
+         <div class="price">R$ 0<span> / para sempre</span></div>
+@@ -43,7 +43,7 @@
+         <p class="pe">Tudo o que faz a sua evidência ser aceita está aqui.</p>
+       </div>
+ 
+-      <div class="plan hi">
++      <div class="plan hi" data-plano="personal">
+         <span class="badge">teste de 14 dias</span>
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">R$ 149<span> / ano</span></div>
+@@ -61,7 +61,7 @@
+         <p class="pe">Na hora, sem cartão. Ou <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">fale comigo</a>.</p>
+       </div>
+ 
+-      <div class="plan">
++      <div class="plan" data-plano="team">
+         <span class="badge">a partir de 5 pessoas</span>
+         <h3 style="margin-top:14px">Team</h3>
+         <div class="price">R$ 349<span> / pessoa / ano</span></div>
+@@ -107,10 +107,10 @@
+   </div>
+ </section>
+ 
+-<section id="lista">
++<section id="lista" data-espera="proapi">
+   <div class="wrap">
+-    <h2>Quer ser avisado?</h2>
+-    <p class="lead">Deixe um e-mail e eu aviso quando o plano pago sair. Uma mensagem, não uma newsletter.</p>
++    <h2>Quer ser avisado do Pro e da API?</h2>
++    <p class="lead">O plano pago <b>já está no ar</b> — o que ainda não existe é o Pro e a API, descritos acima. Deixe um e-mail e eu aviso quando saírem. Uma mensagem, não uma newsletter.</p>
+     <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+       <input type="email" id="listaEmail" autocomplete="email" placeholder="seu@email.com" aria-label="Seu e-mail">
+       <button class="btn" type="submit" id="listaBtn">Quero ser avisado</button>
+diff --git a/testes/planos.mjs b/testes/planos.mjs
+index d728039..235a12c 100644
+--- a/testes/planos.mjs
++++ b/testes/planos.mjs
+@@ -104,5 +104,41 @@ console.log('\n[5] e nada fora dos cartões promete futuro por conta própria');
+   }
+ }
+ 
++console.log('\n[6] UM ESTADO POR PLANO, e a lista espera o que não existe');
++{
++  /* O DEFEITO. A página vendia o Personal com preço, badge de 14 dias e
++     "na hora, sem cartão" — e cinquenta linhas abaixo pedia o e-mail da pessoa
++     para avisar "quando o plano pago sair". As duas coisas na mesma página, e
++     as duas em cinco idiomas.
++
++     Não era erro de texto: era a página não saber que o que ela promete já foi
++     entregue. O mesmo defeito do B1, no outro sentido — lá ela escondia o que
++     existia, aqui ela promete o que já existe. */
++  for (const L of IDIOMAS) {
++    const html = fs.readFileSync(`${RAIZ_WS}/src/site/bodies/precos.${L}.html`, 'utf8');
++
++    const planos = [...html.matchAll(/<div class="plan[^"]*" data-plano="([^"]+)"/g)].map((m) => m[1]);
++    ok(`${L}: os três planos têm identidade`, planos.join() === 'free,personal,team', planos.join());
++
++    /* UMA ação primária por cartão. Dois botões num cartão de preço é a pessoa
++       parada escolhendo entre eles em vez de escolhendo o plano. */
++    /* Cortar no primeiro `</div>` não serve: há `<div>` aninhado dentro do
++       cartão. Dividir pelo próprio marcador dá os três pedaços certos — o
++       último vai até o fim da fileira, e é o que se quer. */
++    const fileira = html.slice(html.indexOf('<div class="plans'));
++    const cartoes = fileira.split(/<div class="plan[^"]*" data-plano=/).slice(1);
++    const botoes = cartoes.map((c) => (c.match(/<a class="btn/g) || []).length);
++    ok(`${L}: uma ação primária em cada`, botoes.length === 3 && botoes.every((n) => n === 1),
++       botoes.join('/'));
++
++    /* E O QUE A LISTA ESPERA NÃO PODE SER O QUE A PÁGINA VENDE. É a afirmação
++       estrutural do defeito: `data-espera` nomeia o que ainda não saiu, e se
++       um dia ele coincidir com um plano que tem preço na tela, isto reprova. */
++    const espera = (html.match(/<section id="lista" data-espera="([^"]+)"/) || [])[1];
++    ok(`${L}: a lista diz o que está esperando`, !!espera, espera || '(nada)');
++    ok(`${L}: e não é algo que a página já vende`, !planos.includes(espera), `${espera} vs ${planos.join()}`);
++  }
++}
++
+ console.log(falhas ? `\n${falhas} FALHA(S)` : '\nCartões e catálogo: uma verdade só.');
+ process.exit(falhas ? 1 : 0);
+-- 
+2.43.0
+

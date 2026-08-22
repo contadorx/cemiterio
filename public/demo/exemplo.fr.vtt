@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.800 --> 00:00:04.000
+J’ai ouvert le système d’achats de l’intranet, sur la liste des demandes de mon service.
+
+00:00:04.600 --> 00:00:08.800
+J’ai cliqué sur Nouvelle demande pour enregistrer l’achat de pièces de maintenance.
+
+00:00:09.200 --> 00:00:14.000
+J’ai rempli le fournisseur, le montant total, la livraison prévue et la justification.
+
+00:00:14.600 --> 00:00:19.500
+J’ai enregistré sans le centre de coût, et le système a refusé : le champ est obligatoire au-dessus de mille.
+
+00:00:20.000 --> 00:00:23.600
+J’ai saisi le centre de coût CC-4420 et enregistré à nouveau.
+
+00:00:24.200 --> 00:00:29.000
+La demande a été enregistrée sous le numéro 48213, en validation, avec le fournisseur TecnoParts.

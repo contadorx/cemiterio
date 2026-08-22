@@ -1,0 +1,134 @@
+<section style="padding-top:66px">
+  <div class="wrap">
+    <h1 style="font-size:34px">Precios</h1>
+    <p class="lead">La herramienta que corre en tu navegador es gratuita y va a seguir siéndolo. No nos
+    cuesta nada: no hay servidor procesando tus vídeos. Lo que se paga es la <b>identidad</b> del documento y
+    la <b>administración</b> de un equipo — nunca la calidad de la evidencia.</p>
+
+    <!-- A tira dos formatos, a mesma da home. A página de preços falava de
+         planos e nunca dizia o que SAI — e o que sai é o que se compra. -->
+    <div class="saidas">
+      <span class="saida"><b>PDF</b></span>
+      <span class="saida"><b>DOCX</b> Word</span>
+      <span class="saida"><b>PPTX</b> PowerPoint</span>
+      <span class="saida"><b>HTML</b></span>
+      <span class="saida"><b>MD</b> Markdown</span>
+      <span class="saida"><b>SCORM</b></span>
+      <span class="saida"><b>CSV</b></span>
+      <span class="saida"><b>JSON</b></span>
+      <span class="saida"><b>ZIP</b></span>
+      <span class="saida"><b>VTT</b></span>
+      <span class="saida"><b>SRT</b></span>
+      <span class="saida"><b>Google&nbsp;Docs</b></span>
+      <span class="saida"><b>Jira</b></span>
+    </div>
+
+    <div class="plans tres">
+
+      <div class="plan" data-plano="free">
+        <span class="badge">disponible ya</span>
+        <h3 style="margin-top:14px">Free</h3>
+        <div class="price">US$ 0<span> / para siempre</span></div>
+        <p class="moedas">R$ 0 &middot; € 0</p>
+        <p class="small muted" style="margin:0">Sin registro, sin tarjeta, sin límite de uso.</p>
+        <ul>
+          <li>Grabar la pantalla o usar un vídeo, de cualquier tamaño</li>
+          <li>Fotogramas por cambio de escena y transcripción en tu dispositivo</li>
+          <li>PDF, Word, HTML, Markdown, hoja de cálculo, ZIP y JSON</li>
+          <li>Tapar, recortar, destacar y el aviso de dato sensible</li>
+          <li><a href="/es/link">Enlace listo</a> para Zephyr, Jira y TestRail</li>
+          <li>Reabrir el documento después para corregir un paso — y paquete SCORM para el LMS</li>
+        </ul>
+        <a class="btn" href="/app?lang=es">Abrir la herramienta</a>
+        <p class="pe">Todo lo que hace que tu evidencia sea aceptada está aquí.</p>
+      </div>
+
+      <div class="plan hi" data-plano="personal">
+        <span class="badge">prueba de 14 días</span>
+        <h3 style="margin-top:14px">Personal</h3>
+        <div class="price">US$ 29<span> / año</span></div>
+        <p class="moedas">R$ 149 &middot; € 27</p>
+        <p class="small muted" style="margin:0">Para cuando son cuarenta casos, y no uno.</p>
+        <ul>
+          <li><b>La ronda entera, y no un documento suelto.</b> Sube la hoja — .xlsx, .csv o pegada desde Excel — y cada caso se convierte en un enlace que abre la herramienta ya rellenada.</li>
+          <li><b>Y vuelve en .xlsx</b>, con situación, cuándo, quién lo ejecutó, el archivo generado y la huella de las pantallas.</li>
+          <li>Recibo por caso: la ficha y la huella de cada pantalla — sin que ninguna imagen salga de tu equipo.</li>
+          <li data-f="modeloProprio">Logotipo y nombre del cliente en el PDF, el Word y el HTML, con tu portada y tus campos — y el perfil vuelve en cualquier equipo</li>
+          <li data-f="termosGuardados"><b>Los términos de tu sistema quedan guardados</b> — la lista sobrevive a la visita y a la máquina, en vez de reescribirse. Aplicarlos ya es gratis; guardarlos es de aquí <span class="soon">pronto</span></li>
+          <li>Todo lo del Free</li>
+        </ul>
+        <a class="btn" href="{{conta}}">Empezar los 14 días</a>
+        <p class="pe">Al instante, sin tarjeta. O <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">escríbeme</a>.</p>
+      </div>
+
+      <div class="plan" data-plano="team">
+        <span class="badge">desde 5 personas</span>
+        <h3 style="margin-top:14px">Team</h3>
+        <div class="price">US$ 69<span> / persona / año</span></div>
+        <p class="moedas">R$ 349 &middot; € 65</p>
+        <p class="small muted" style="margin:0">Para el equipo que necesita el mismo documento en manos de todos.</p>
+        <ul>
+          <li>Se activa por enlace: quien coordina manda una dirección, nadie escribe claves</li>
+          <li data-f="padraoDoTime">Perfil de equipo enviado a todos</li>
+          <li>Panel de asientos: invitar, bloquear y elegir el plazo, de 1 a 90 días</li>
+          <li>Facturas y tickets en tu cuenta</li>
+          <li>Todo lo del Personal</li>
+        </ul>
+        <a class="btn ghost" href="{{time}}">Hablar del Team</a>
+        <p class="pe">Sin inicio de sesión y sin exigir registro que tu TI tenga que aprobar.</p>
+      </div>
+
+    </div>
+
+
+    <!-- A lista completa. O dado mora em src/features.json e a tabela é montada
+         no build: sessenta e poucas linhas em três idiomas, escritas à mão,
+         seriam 195 chances de a versão em espanhol prometer o que a portuguesa
+         não promete. -->
+    <h2 style="margin-top:52px">{{tpH}}</h2>
+    <p class="lead">{{tpP}}</p>
+    {{tabelaPlanos}}
+
+    <p class="small muted" style="margin-top:24px"><b>Sigue sin servidor, también en el pago.</b> La clave se
+    comprueba dentro de tu navegador y funciona sin conexión — <b>no recibimos tu vídeo ni tu audio en
+    ningún plan</b>. En los planes de pago hay una única cosa que puedes elegir guardar en tu cuenta: el
+    archivo completo de una sesión, adjuntado por ti a un caso del guion, y borrable cuando quieras.
+    <a href="{{seguranca}}">Cómo funciona por dentro</a>.</p>
+
+    <p class="small muted" style="margin-top:14px"><b>Pro y API</b> — convertir formatos que el navegador
+    rechaza (HEVC, MKV, ProRes), transcribir en el servidor, procesar por lotes, o una dirección que devuelva
+    fotogramas y transcripción para que tu producto la consuma. Nada de eso existe todavía, y es lo que viene
+    después. <a href="mailto:{{contato}}?subject=Walkstamp%20API">Cuéntame tu caso</a> — así decido el orden.</p>
+
+    <p class="small muted" style="margin-top:24px">Dos honestidades sobre esta página. Lo que está marcado
+    <span class="soon">pronto</span> aún no existe: está listado porque es lo que voy a construir, y quien
+    entre ahora ayuda a decidir el orden y conserva el precio de esta página para siempre. Y el <b>plan
+    gratuito no va a perder funciones</b> cuando los de pago crezcan — la línea de corte es fija: la
+    privacidad y la calidad de la evidencia nunca quedan detrás de un pago.</p>
+  </div>
+</section>
+
+<section id="lista" data-espera="proapi">
+  <div class="wrap">
+    <h2>¿Quieres que te avise del Pro y de la API?</h2>
+    <p class="lead">El plan de pago <b>ya está disponible</b> — lo que todavía no existe es el Pro y la API, descritos arriba. Deja un correo y te aviso cuando salgan. Un mensaje, no una newsletter.</p>
+    <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+      <input type="email" id="listaEmail" autocomplete="email" placeholder="tu@correo.com" aria-label="Tu correo">
+      <button class="btn" type="submit" id="listaBtn">Avísame cuando salgan</button>
+    </form>
+    <p class="small muted listaMsg" id="listaMsg" role="status"></p>
+    <p class="small muted" style="max-width:640px">La promesa de esta herramienta es que <b>tu vídeo no sale de tu máquina</b>, y sigue en pie: este campo no tiene ninguna relación con lo que procesas aquí — el navegador no manda vídeo, audio ni transcripción a ninguna parte. El correo queda en una base mía, no se vende, no va a ninguna lista de terceros y desaparece el día que lo pidas. ¿Prefieres no dejarlo? Sin problema — la herramienta no cambia por eso.</p>
+  </div>
+</section>
+
+<section id="support"></section>
+
+<section>
+  <div class="wrap">
+    <h2>Por qué el plan gratuito no tiene trampa</h2>
+    <p class="lead" style="margin-bottom:0">La pregunta es justa: una herramienta gratuita suele cobrar en
+    otro sitio — datos, anuncios, o un límite que aparece en el peor momento. Aquí el motivo es más simple: tu
+    vídeo lo procesa tu propio ordenador, así que el coste de atenderte es casi cero. No hay nada que
+    subvencionar, y por eso no hay nada que recuperar después.</p>
+  </div>
+</section>

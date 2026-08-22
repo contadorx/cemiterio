@@ -1,0 +1,102 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Der Steps Recorder wurde eingestellt. Was nutzen Sie stattdessen?</h1>
+    <p class="updated">Aktualisiert am 14. August 2026.<br>
+    Ein kurzer Leitfaden für alle, die <code>psr.exe</code> geöffnet und den Hinweis auf die Einstellung gefunden haben — und
+    weiterhin das Dokument liefern müssen, das dieses Programm erzeugt hat.</p>
+
+    <h2>Was geschehen ist</h2>
+    <p>Seit dem Windows-11-Update vom Februar 2024 zeigt die <b>Schrittaufzeichnung</b> (<i>Steps
+    Recorder</i>, <code>psr.exe</code>) beim Öffnen einen Hinweis auf die Einstellung. Auf vielen Rechnern läuft sie
+    noch, aber sie wird nicht mehr weiterentwickelt und steht nicht auf der Roadmap von Microsoft.</p>
+    <p>Die Alternativen, die Microsoft selbst nennt, sind das <b>Snipping Tool</b>, die
+    <b>Xbox Game Bar</b> und <b>Clipchamp</b>. Und hier liegt das Problem: <b>Keines der drei erzeugt ein
+    Dokument mit Schritten.</b> Sie erzeugen Bilder und Videos. Verschwunden ist genau der Teil, auf den es ankam —
+    das automatische Zusammensetzen eines nummerierten Dokuments mit einem Screenshot je Schritt.</p>
+
+    <h2>Wer ohne Werkzeug dasteht</h2>
+    <ul>
+      <li><b>Manuelles Testen und UAT</b>, wo nachgewiesen werden muss, dass getestet wurde, Bildschirm für Bildschirm.</li>
+      <li><b>Support und Service Desk</b>, wo man den Anwender bittet: &bdquo;Reproduzieren Sie den Fehler und schicken Sie mir die Schritte&ldquo;.</li>
+      <li><b>Interne Revision und ITGC</b>, wo diese Nachweise eingehen.</li>
+      <li><b>Schulung und Prozessdokumentation</b>, wo die Schritt-für-Schritt-Anleitung in Word entsteht.</li>
+    </ul>
+    <p>Alle mit derselben Pflichtaufgabe wie eh und je, und ohne das Programm, das sie erledigt hat.</p>
+
+    <h2>Was {{marca}} stattdessen leistet</h2>
+    <p>{{marca}} zeichnet den Bildschirm auf und setzt das Dokument zusammen: ein Schritt je Block, nummeriert, mit Bild, Uhrzeit und
+    Beschreibung. Es kommt als <b>PDF</b>, <b>Word</b>, <b>ZIP mit Bildern</b> oder <b>JSON</b> heraus. Es läuft im Browser, ohne
+    Installation, und <b>das Video verlässt Ihren Rechner nicht</b>.</p>
+    <table class="legal">
+      <tr><th></th><th>Steps Recorder</th><th>{{marca}}</th></tr>
+      <tr><td>Ausgabeformat</td>
+          <td class="nao">MHT — ließ sich gut im Internet Explorer öffnen, den es ebenfalls nicht mehr gibt</td>
+          <td class="sim">PDF, Word (.docx), ZIP mit Bildern, JSON</td></tr>
+      <tr><td>Nummerierte Schritte</td><td class="sim">Ja</td><td class="sim">Ja</td></tr>
+      <tr><td>Beschreibung jedes Schritts</td>
+          <td>Automatisch, aus dem angeklickten Steuerelement: &bdquo;Benutzer hat auf Schaltfläche geklickt&ldquo;</td>
+          <td>Ihre eigene — geschrieben oder <b>laut diktiert</b> und transkribiert</td></tr>
+      <tr><td>Uhrzeit</td><td>Je Schritt</td>
+          <td class="sim">Je Schritt, mit echter Uhrzeit — das, was das Audit verlangt</td></tr>
+      <tr><td>Installation</td><td class="nao">Windows-Programm</td>
+          <td class="sim">Keine: Es ist eine Adresse</td></tr>
+      <tr><td>Betriebssystem</td><td class="nao">Nur Windows</td>
+          <td class="sim">Jeder Rechner mit Browser</td></tr>
+      <tr><td>Begrenzung der Aufnahmen</td><td class="nao">25 in der Voreinstellung</td><td class="sim">Was Sie festlegen</td></tr>
+      <tr><td>Erzählung</td><td class="nao">Nein</td>
+          <td class="sim">Ja, transkribiert und mit den Screenshots synchronisiert</td></tr>
+      <tr><td>Was Ihren Rechner verlässt</td><td class="sim">Nichts</td><td class="sim">Nichts</td></tr>
+      <tr><td>Preis</td><td>War in Windows enthalten</td><td class="sim">Kostenlos</td></tr>
+    </table>
+
+    <h3>Wo der Steps Recorder besser war</h3>
+    <p>Das sei gesagt, weil der Unterschied das Ergebnis verändert: <code>psr.exe</code> sprach mit dem
+    Betriebssystem und wusste, <b>welches Steuerelement</b> Sie angeklickt hatten — den Namen der Schaltfläche, das Feld, das Fenster. Ein
+    Browser hat diesen Zugriff nicht, und kein Web-Werkzeug hat ihn.</p>
+    <p>{{marca}} tauscht in die andere Richtung: Es speichert einen Screenshot, <b>sobald sich der Bildschirm ändert</b>, und die
+    Beschreibung kommt von Ihnen — gesprochen, während Sie testen. Das ist weniger automatisch und dafür erklärender. In der Praxis hat
+    &bdquo;Benutzer hat auf Schaltfläche geklickt&ldquo; noch nie jemandem etwas erklärt; &bdquo;hier habe ich ohne Kostenstelle
+    gespeichert und das System hat es abgelehnt&ldquo; erklärt etwas.</p>
+
+    <h2>So machen Sie, was Sie bisher gemacht haben</h2>
+    <ol class="passos">
+      <li>Öffnen Sie das Werkzeug — es gibt weder Installation noch Registrierung.</li>
+      <li>Wählen Sie in Schritt 3 (Überprüfung) die <b>Ausgabevorlage</b>: <i>Schritt für Schritt</i> für Dokumentation und Schulung,
+      <i>Testnachweis</i> für UAT und Audit.</li>
+      <li>Klicken Sie auf <b>Bildschirm aufzeichnen</b>. Wenn Sie erzählen möchten, was Sie tun, lassen Sie das Mikrofon eingeschaltet —
+      daraus entsteht die Beschreibung jedes Schritts.</li>
+      <li>Tun Sie, was Sie sonst auch tun würden. Das Werkzeug speichert bei jeder Bildschirmänderung einen Screenshot.</li>
+      <li>Beenden Sie die Aufnahme, verwerfen Sie die doppelten Screenshots und klicken Sie auf <b>Gesprochenes als Notiz übernehmen</b>, um
+      die Beschreibung der Schritte mit dem zu füllen, was Sie gesagt haben. Korrigieren Sie, was nötig ist.</li>
+      <li>Erzeugen Sie das <b>PDF</b> oder das <b>Word</b>. Die Datei trägt den Namen des Falls, nicht &bdquo;Bildschirmfoto&ldquo;.</li>
+    </ol>
+    <p><a class="btn" href="{{app}}">Das Werkzeug öffnen</a></p>
+
+    <h2>Und der SAP Solution Manager?</h2>
+    <p>Dieselbe Geschichte, mit einem anderen Datum. Die <b>Test Suite des SAP Solution Manager</b> verlässt Ende
+    <b>2027</b> die Mainstream-Wartung (mit erweiterter Wartung bis 2030). Der Nachfolger, <b>SAP Cloud ALM</b>,
+    hat eine Testverwaltung — aber der visuelle Nachweis bleibt ein <b>von Hand angehängter Screenshot</b>.</p>
+    <p>Es ist genau dieselbe Lücke: Das Verwaltungswerkzeug gibt es, und der teure Teil der Erstellung — die richtigen
+    Screenshots, in der richtigen Reihenfolge, mit Uhrzeit und mit der Erklärung dessen, was gerade getan wurde — ist zurück bei der
+    <code>Druck-Taste</code> und bei Word. Die Vorlage <i>Testnachweis</i> wurde genau dafür gemacht.</p>
+
+    <h2>Fragen, die immer wieder kommen</h2>
+    <h3>Wird das Video auf irgendeinen Server hochgeladen?</h3>
+    <p>Nein. Alles geschieht im Tab des Browsers, und das lässt sich in dreißig Sekunden prüfen, indem Sie den Netzwerk-Tab
+    des Browsers öffnen. Es gibt eine <a href="{{seguranca}}" style="color:var(--accent)">eigene Seite nur dazu</a>,
+    samt der Liste der Zertifizierungen, die wir nicht haben.</p>
+    <h3>Funktioniert es ohne Internet?</h3>
+    <p>Ja: Es gibt eine Fassung als <b>einzelne Datei</b>, die offline läuft und die Ihr Team intern
+    ablegen kann. Ohne Netz entfällt die automatische Transkription, und Sie schreiben die Notizen von Hand.</p>
+    <h3>Muss ich etwas installieren?</h3>
+    <p>Nein. Das ist das ganze Argument: Auf einem per Richtlinie gesperrten Arbeitsplatzrechner ist &bdquo;installieren Sie dieses
+    Programm&ldquo; ein Projekt mit Verantwortlichem und Termin; eine Adresse zu öffnen ist ein Klick.</p>
+    <h3>Und wenn ich die SAP GUI für Windows nutze?</h3>
+    <p>Die Bildschirmaufnahme erfasst jedes Fenster, das das System zum Teilen freigibt, auch die SAP GUI — was der
+    Browser nicht kann, ist <b>die Felder auszulesen</b>, die darin liegen, wie es ein installiertes Werkzeug täte. Für
+    Fiori, S/4 Web, Ariba, SuccessFactors und Concur gibt es keinerlei Unterschied.</p>
+    <h3>Ist es wirklich kostenlos?</h3>
+    <p>Ja. Es gibt keine Serverkosten, weil es keinen Server gibt: Ihr Rechner erledigt die Arbeit.
+    Sehen Sie sich die <a href="{{precos}}" style="color:var(--accent)">Preise</a> an.</p>
+  </div>
+</section>

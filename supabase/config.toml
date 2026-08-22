@@ -1,0 +1,23 @@
+# Configuração do CLI do Supabase.
+#
+# Ela existe para que `supabase link`, `supabase db push` e `supabase db reset`
+# funcionem a partir do repositório, sem ninguém precisar lembrar do id do
+# projeto nem de qual porta usar.
+project_id = "kjlnyyblhanficgpends"
+
+[db]
+# A mesma família do que roda na produção. Reconstruir num Postgres de outra
+# versão e dizer "bateu" seria comparar com outra coisa.
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[api]
+# O PostgREST expõe SÓ `public` — é essa a parede que segura o esquema
+# `walkstamp` fora do alcance do navegador, e ela precisa estar escrita em
+# algum lugar do repositório para não ser desfeita sem querer.
+enabled = true
+schemas = ["public"]
+extra_search_path = ["public"]

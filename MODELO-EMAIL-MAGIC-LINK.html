@@ -1,0 +1,97 @@
+<!-- ===========================================================================
+     Modelo de e-mail do LINK MÁGICO — Walkstamp
+
+     ONDE COLAR
+       Supabase → Authentication → Emails → Magic Link → corpo da mensagem.
+       Cole TUDO daqui para baixo (pode incluir este comentário, ele não aparece).
+
+     O ENDEREÇO, QUE É A PARTE QUE IMPORTA
+
+       {{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink
+
+       `{{ .RedirectTo }}` é o endereço que a própria ferramenta pediu ao mandar
+       o e-mail — e ele já vem com o idioma dentro (`?lang=pt`, `?lang=en`,
+       `?lang=es`). Por isso o `&` e não o `?`: a interrogação já foi usada.
+       É isso que faz o e-mail em espanhol devolver a pessoa em `/es/cuenta`,
+       e não em português.
+
+       Se algum dia o `{{ .RedirectTo }}` vier vazio, troque as duas primeiras
+       partes por `{{ .SiteURL }}/conta/confirmar?` — funciona igual, só perde
+       o idioma.
+
+     ASSUNTO SUGERIDO
+       Entrar na sua conta Walkstamp
+
+     Tudo é tabela e estilo em linha de propósito: cliente de e-mail não lê
+     folha de estilo, não lê flex e o Outlook não lê metade do resto.
+     =========================================================================== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="background:#f5f6f9;margin:0;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <tr>
+    <td align="center">
+
+      <!-- pré-cabeçalho: o trecho que a caixa de entrada mostra ao lado do assunto -->
+      <div style="display:none;max-height:0;overflow:hidden;opacity:0">
+        Um clique e você entra. O link vale por uma hora e serve uma vez só.
+      </div>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:480px;background:#ffffff;border:1px solid #e6e8ee;border-radius:14px">
+        <tr>
+          <td style="padding:30px 32px 26px">
+
+            <!-- A marca em TEXTO, e não em imagem: metade dos clientes de
+                 e-mail bloqueia imagem por padrão, e uma marca que não carrega
+                 é pior do que marca nenhuma. -->
+            <p style="margin:0 0 26px;font-size:23px;font-weight:700;letter-spacing:-.015em;color:#1f2430">
+              Walk<span style="color:#3A3F9E">stamp</span>
+            </p>
+
+            <p style="margin:0 0 10px;font-size:19px;font-weight:650;color:#1f2430">
+              Entrar na sua conta
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#5C6473">
+              Um clique e pronto — não há senha para lembrar. O link vale por
+              <b>uma hora</b> e serve <b>uma vez só</b>.
+            </p>
+
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px">
+              <tr>
+                <td align="center" bgcolor="#3A3F9E" style="border-radius:9px">
+                  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink"
+                     style="display:inline-block;padding:13px 26px;font-size:15.5px;font-weight:650;
+                            color:#ffffff;text-decoration:none;border-radius:9px">
+                    Entrar na minha conta
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- O endereço cru. O botão falha em cliente de e-mail antigo, e
+                 quem está num terminal corporativo às vezes só consegue copiar. -->
+            <p style="margin:0 0 6px;font-size:13px;color:#8A93A3">
+              Se o botão não funcionar, copie este endereço:
+            </p>
+            <p style="margin:0 0 26px;font-size:12.5px;line-height:1.5;word-break:break-all;
+                      color:#3A3F9E;font-family:ui-monospace,Menlo,Consolas,monospace">
+              {{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink
+            </p>
+
+            <p style="margin:0 0 4px;font-size:13.5px;line-height:1.55;color:#5C6473;
+                      border-top:1px solid #eceef4;padding-top:20px">
+              <b>Não foi você que pediu?</b> Ignore este e-mail. Nada acontece
+              sem alguém abrir o link, e ele expira sozinho.
+            </p>
+
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#8A93A3;max-width:480px">
+        Walkstamp · <a href="{{ .SiteURL }}" style="color:#8A93A3">walkstamp.com</a><br>
+        Produtize Produtos e Serviços Inteligentes Ltda. · CNPJ 48.417.292/0001-99
+      </p>
+
+    </td>
+  </tr>
+</table>

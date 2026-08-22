@@ -1,0 +1,54 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Anwendungsfall</p>
+    <h1 style="font-size:32px">Eine Usability-Test-Sitzung, die zum Bericht wird</h1>
+    <p class="updated">Die Sitzung mit der Testperson ist vorbei, geblieben sind eine Aufnahme von einer Stunde und Ihre Erinnerung. Das Dokument enthält die Momente, auf die es ankommt, den Screenshot zu jedem davon und das Gesprochene der Moderation getrennt vom Gesprochenen der Testperson.</p>
+
+    {{figura}}
+
+    <h2>Drei Dinge, die Ihnen einen Nachmittag sparen</h2>
+    <p><b>Fünf Testpersonen, ein Bericht.</b> Exportieren Sie jede Sitzung und führen Sie alle auf einmal zusammen: Jede Testperson wird zu einer Aufgabe im Dokument, mit ihrer Zeit, und das Gesprochene jeder Person steht an der richtigen Stelle.</p>
+    <p><b>Der Ausschnitt des Moments, nicht die ganze Sitzung.</b> Gespeichert werden nur die 15 Sekunden rund um das, was Sie markiert haben, und auch das nur, wenn Sie es einschalten. Der Rest des Videos wird verworfen — und was übrig bleibt, löschen Sie mit einem Klick, der im Dokument vermerkt wird.</p>
+    <p><b>Jeder Moment hat eine Art.</b> Reibung, Abbruch, Lob oder Fehler. Das erscheint in der Tabelle, und darüber erzählen Sie die Geschichte, ohne drei Stunden Aufnahme erneut anzusehen.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=usabilidade&amp;lang=de">Jetzt eine Sitzung aufzeichnen</a>
+      <span class="small muted">kostenlos — und die Aufnahme der Testperson verlässt Ihren Rechner nicht</span>
+    </p>
+
+    <h2>Das Problem</h2>
+    <p>Fünf Testpersonen, je eine Stunde, und die Auswertung dauert länger als die Sitzungen. Erneut anzusehen, um die Minute zu finden, in der die Person nicht weiterkam, ist die eigentliche Arbeit — und der Bericht muss vor dem nächsten Sprint fertig sein, nicht danach.</p>
+    <p><b>Und es gibt ein Problem, das die Research-Werkzeuge nicht lösen: Die Aufnahme ist ein personenbezogenes Datum.</b> Eine Sitzung mit einer externen Testperson, ein Bildschirm mit echten Daten, Gesicht und Stimme einer identifizierbaren Person. Das in die Cloud eines Anbieters hochzuladen bedeutet ein Gespräch mit der Rechtsabteilung, das manche Studie nicht übersteht.</p>
+
+    <h2>Was dabei herauskommt</h2>
+    <p>Ein Sitzungsbericht, in dem sich der Moment finden lässt, ohne das Video erneut zu öffnen:</p>
+    <ul>
+      <li><b>Moderation und Testperson getrennt</b> in der Transkription — die beiden Tonspuren erscheinen gekennzeichnet, und der Bericht weiß, wer worum gebeten hat</li>
+      <li><b>Den Moment während der Sitzung markieren</b>: Die Schaltfläche im schwebenden Steuerungsfenster erzwingt einen Screenshot und markiert ihn, ohne die Person zu unterbrechen</li>
+      <li><b>Die Kennung der Testperson anstelle des Namens</b> — das Feld ist von vornherein so angelegt, denn es ist die Voreinstellung, die zum Anonymisieren erzieht</li>
+      <li><b>Schwärzung zum Anonymisieren</b> dessen, was auf dem Bildschirm erscheint, eingebrannt in das exportierte Bild</li>
+      <li><b>Uhrzeit bei jedem Moment</b>, um sie mit Ihren Notizen auf Papier abzugleichen</li>
+      <li><b>Fertiger Prompt für den Bericht</b>: Reibung, Abbruch und Lob einzeln markiert, Befunde nach Schweregrad geordnet</li>
+    </ul>
+
+    <h2>So gehen Sie vor</h2>
+    <ol class="passos">
+      <li>Wählen Sie in Schritt 1 den Anwendungsfall <b>Usability-Test</b>.</li>
+      <li>Beginnen Sie mit der Aufnahme, bevor die Testperson den Bildschirm teilt, und lassen Sie Ihr Mikrofon eingeschaltet.</li>
+      <li>Nutzen Sie während der Sitzung <b>Bildschirm markieren</b> im schwebenden Steuerungsfenster, sobald etwas Wichtiges geschieht — genau danach suchen Sie später.</li>
+      <li>Behalten Sie am Ende nur die markierten Momente, füllen Sie Studie und Kennung der Testperson aus und erzeugen Sie das Dokument.</li>
+    </ol>
+
+    <h2>Was es nicht leistet — und das sollten Sie vorher wissen</h2>
+    <p><b>Es speichert den Videoausschnitt des markierten Moments noch nicht.</b> Das ist der Baustein, den dieser Anwendungsfall am dringendsten verlangt — zu zeigen, wie ein Nutzer sich abmüht, ist die politische Währung der Research-Arbeit — und genau daran wird gearbeitet: ~15 s rund um jede Markierung, nicht die ganze Sitzung.</p>
+    <p><b>Es zeichnet die Webcam der Testperson nicht auf.</b> Nur den geteilten Bildschirm und die beiden Tonspuren.</p>
+    <p><b>Es wertet nicht über Sitzungen hinweg aus</b> — Tags, Affinitätsdiagramme, fünf Testpersonen gegeneinander. Das ist ein anderes Produkt (Dovetail, Condens), und die Inhalte auf einem Server zu speichern, um Sitzungen zu verknüpfen, würde unseren einzigen Vorteil zunichtemachen. Die Brücke zu diesen Werkzeugen ist der Export als Markdown, CSV und JSON.</p>
+    <p><b>Es ist kein Fragebogen.</b> SUS und NPS sind ein Formular, keine Aufzeichnung — wer sie braucht, hat sie bereits.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=usabilidade&amp;lang=de">Jetzt eine Sitzung aufzeichnen</a>
+      <a class="btn ghost" href="{{precos}}">Die Pläne ansehen</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Eine Agentur mit einer oder zwei Personen passt in <b>Personal</b>; ab drei Personen in <b>Team</b>. Was über die Sitzung entscheidet — die Spuren zu trennen, den Moment zu markieren und zu anonymisieren — ist <b>kostenlos</b>.</p>
+  </div>
+</section>

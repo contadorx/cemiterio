@@ -1,0 +1,53 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Caso de uso</p>
+    <h1 style="font-size:32px">Evidência de teste que a auditoria aceita</h1>
+    <p class="updated">Você executou o teste. Agora precisa provar que executou — com a tela, a hora e o que foi observado. É o caso principal do {{marca}}, e o único em que uma evidência recusada custa o dia inteiro de alguém.</p>
+
+    {{figura}}
+
+    <h2>Três coisas que economizam a tarde</h2>
+    <p><b>Vários casos numa gravação só.</b> Marque onde um caso termina e o próximo começa, e saia com um documento por caso — ou com um só, dividido em capítulos, e o tempo de cada um na planilha.</p>
+    <p><b>Reteste sem regravar tudo.</b> A revisão assistida percorre o documento antigo passo a passo e recaptura só as telas que mudaram. O que continua igual continua igual.</p>
+    <p><b>Tarjar tudo de uma vez.</b> Ele lê o texto das telas, avisa quando acha CPF, e-mail ou cartão, e cobre todas as ocorrências num clique — a tarja é queimada na imagem, não é uma camada por cima.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia">Gravar uma evidência agora</a>
+      <span class="small muted">grátis, sem exigir cadastro, e nada sai do seu computador</span>
+    </p>
+
+    <h2>A dor</h2>
+    <p>Print Screen, colar no Word, escrever a legenda, repetir quarenta vezes. Duas horas de trabalho manual depois de um teste de vinte minutos — e a parte cara não é tirar o print: é lembrar o que estava sendo testado em cada um deles quando você volta ao documento no dia seguinte.</p>
+    <p><b>E a evidência é recusada por detalhe.</b> Falta a hora de relógio, o passo não mostra o resultado, o cabeçalho não diz qual mandante era, a imagem foi cortada e não dá para ler o campo. O auditor não discute o mérito do teste: ele devolve o documento. Quem já teve um pacote devolvido às vésperas do go-live sabe que o problema nunca foi o teste.</p>
+
+    <h2>O que sai</h2>
+    <p>Um PDF (ou Word, HTML, planilha, ZIP) com uma tela por passo, na ordem, e nada que você tenha que digitar duas vezes:</p>
+    <ul>
+      <li><b>Hora de relógio em cada passo</b>, ancorada no início real da gravação — o item que costuma ser eliminatório</li>
+      <li><b>A sua narração vira a anotação do passo.</b> Você fala enquanto testa e o texto sai escrito, pareado com a tela daquele instante</li>
+      <li><b>Cabeçalho de identificação</b>: caso de teste, sistema e mandante, quem executou, chamado e resultado — e o nome do arquivo já sai com o caso dentro</li>
+      <li><b>Tarja e destaque queimados na imagem</b>: o CPF coberto não volta, e a seta que aponta o campo não sai</li>
+      <li><b>Aviso de dado sensível</b>: a ferramenta lê o texto da tela e diz em quais passos apareceu CPF, CNPJ, e-mail, telefone ou cartão — e para aí, porque às vezes o número é a prova</li>
+      <li><b>Hash por imagem e pacote de verificação</b>: quem recebe confere no próprio navegador, em <a href="{{verificar}}">/verificar</a>, se as imagens continuam as mesmas</li>
+    </ul>
+
+    <h2>Como fazer</h2>
+    <ol class="passos">
+      <li>Abra a ferramenta e escolha o cenário <b>Evidência de teste</b> no passo 1.</li>
+      <li>Clique em <b>Gravar a tela</b> e deixe o microfone ligado. Narre o que está fazendo: é o que vira a descrição de cada passo.</li>
+      <li>Execute o teste como você executaria. A ferramenta guarda um quadro a cada mudança de tela e transcreve a sua fala em paralelo.</li>
+      <li>Pare, descarte as telas repetidas, preencha caso e chamado, e gere o <b>PDF</b>. Anexe no Zephyr, no Jira ou no chamado.</li>
+    </ol>
+
+    <h2>O que ele não faz — e é melhor saber antes</h2>
+    <p><b>Não lê campo do SAP GUI para Windows.</b> O navegador recebe uma imagem da tela compartilhada, não a estrutura da aplicação. A captura pega qualquer janela que o sistema operacional deixe compartilhar — Fiori, S/4 web, Ariba, SuccessFactors, Concur e o próprio GUI aparecem como imagem —, mas sem leitura de campo.</p>
+    <p><b>Não garante conformidade.</b> 21 CFR Part 11, SOX, CSV e ISO 9001 não são recursos que se compram: o produto gera o documento com hora, identificação e integridade verificável; a conformidade é do processo da sua empresa. Quem prometer o contrário está vendendo o que não pode entregar.</p>
+    <p><b>Não anexa de volta no seu sistema de teste.</b> Isso exigiria API e permissão da TI. O que existe é o <a href="{{site}}/link">link pré-configurado</a>, que abre a ferramenta já com o caso e o chamado preenchidos — e o caminho de volta continua sendo arrastar o arquivo, que funciona em qualquer ferramenta.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia">Gravar uma evidência agora</a>
+      <a class="btn ghost" href="{{precos}}">Ver os planos</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Tudo acima é do <b>plano gratuito</b>. O que é pago é a marca do cliente no documento e a administração de uma equipe — nunca a qualidade da evidência.</p>
+  </div>
+</section>

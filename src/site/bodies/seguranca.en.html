@@ -1,0 +1,174 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Information security</h1>
+    <p class="updated">Last updated: 15 August 2026.<br>
+    This page is for whoever has to approve {{marca}} inside a company: how it works, what leaves your
+    machine, and what we do <b>not</b> have.</p>
+
+    <p class="lockHint" style="border-left:3px solid var(--accent);padding-left:12px;margin:0 0 26px">
+    <b>In one line:</b> the tool has no processing server and never receives your video, your audio or
+    your frames. That holds on every plan, and you do not have to take our word for it — you can check in
+    thirty seconds, with the browser you already have open. Anyone on a paid plan gets an
+    <b>account</b>, and there is exactly one thing it can store by your choice; it is spelled out
+    below.</p>
+
+    <h2>Why the question has a different shape here</h2>
+    <p>Vendor assessments usually follow a checklist: where is the data held, who can access it, which
+    certification do you hold, which processing agreement do we sign. That checklist assumes the vendor
+    <b>receives</b> something.</p>
+    <p>In {{marca}} the entire process happens in your browser tab. The video is read from your disk by the
+    browser itself, the images are extracted there, the audio is transcribed there, and the PDF, Word, ZIP
+    and JSON files are assembled in the tab's memory and saved by the browser. <b>There is no upload at any
+    step.</b> There is no temporary copy on our side, because there is no side of ours involved in the
+    processing.</p>
+    <p>This does not make {{marca}} automatically approvable — it makes the conversation different. Instead
+    of &ldquo;trust their access controls&rdquo;, the question becomes &ldquo;does this really send
+    nothing?&rdquo;, which is a question <b>you can answer yourself</b>.</p>
+
+    <h2>How to check, without trusting us</h2>
+    <p>This is the most important part of the page, and it takes less time than reading it:</p>
+    <ol class="passos">
+      <li>Open the tool and press <code>F12</code> to open the developer tools.</li>
+      <li>Go to the <b>Network</b> tab and leave it recording.</li>
+      <li>Load a large video — deliberately, a multi-gigabyte one — and generate the PDF.</li>
+      <li>Look at the column for bytes <b>sent</b>. It stays at zero. No request carries the video, the
+      images or the text.</li>
+    </ol>
+    <p>A test your own security team runs is worth more than any statement of ours, which is why it is here
+    instead of a badge.</p>
+
+    <h2>The offline version, for when that is still not enough</h2>
+    <p>There is a <b>single HTML file</b> with the whole tool inside. You download it, disconnect the
+    network, open the file, and it works. Nothing in it talks to any server.</p>
+    <p>And that is not a promise in prose: the process that produces that file <b>fails the build</b> if any
+    measurement address is left inside it. It is a lock in the pipeline, not an intention. You can verify it
+    by searching the downloaded file for &ldquo;supabase&rdquo; or &ldquo;insights&rdquo; — there are no
+    matches.</p>
+    <p>In the offline version you lose automatic transcription (the speech model is downloaded on demand),
+    text recognition from images, and the Google Drive button. Everything else works the same. It can also
+    be stored in an internal repository, scanned by your team, and distributed without depending on us.</p>
+
+    <h2>What leaves your machine, and when</h2>
+    <table class="legal">
+      <tr><th>Connection</th><th>When it happens</th><th>What goes</th><th>What never goes</th></tr>
+      <tr><td>Vercel (hosting)</td><td>Always, when the page loads</td>
+          <td>The request for the page file, with IP and browser — as on any website</td>
+          <td>Your content</td></tr>
+      <tr><td>Vercel Web Analytics</td><td>Always; not sent if the browser signals <i>Do&nbsp;Not&nbsp;Track</i> or <i>Global Privacy Control</i></td>
+          <td>Which page was viewed, with no cookie and no identifier that persists</td>
+          <td>Any person or session identifier</td></tr>
+      <tr><td>Supabase (usage milestones)</td><td>At three moments: tool opened, video opened, output downloaded. Respects DNT and GPC</td>
+          <td>The milestone name, the page language, where the video came from, and the format downloaded</td>
+          <td>File name, size, duration, content, session identifier</td></tr>
+      <tr><td>jsDelivr (public CDN)</td><td>Only when using automatic transcription or text recognition</td>
+          <td>The request for the library</td><td>Your audio, your images, your text</td></tr>
+      <tr><td>Hugging Face</td><td>Only when you start automatic transcription, and once per browser</td>
+          <td>The request for the speech model</td><td>Your audio</td></tr>
+      <tr><td>Google</td><td>Only if you click to open a video from Drive</td>
+          <td>Authentication and the request for the file you pick, with the narrowest scope available (<code>drive.file</code>)</td>
+          <td>The rest of your Drive; and the file goes from Google straight to your browser, never through us</td></tr>
+      <tr><td>Google Docs (upload)</td><td>Only if you click <b>Send to Google Docs</b>, and only after confirming the warning that appears</td>
+          <td>The Word document assembled in your browser — text and images — for Google to convert into a Drive document</td>
+          <td>Anything beyond the document you sent; it goes from your browser straight to Google, never through us</td></tr>
+    </table>
+    <p><b>None of these connections carries video, audio, images or transcripts.</b>
+    The PDF library is served from our own domain, not from a CDN.</p>
+    <p>There is one exception, and it is in the table rather than hidden: the <b>Send to Google Docs</b>
+    button is the only function where the <b>generated document leaves the computer</b>. It exists because
+    many teams review evidence in Drive, and it asks for explicit confirmation before sending — if you do
+    not want it, you do not click it, and nothing changes. If your policy forbids taking the content to
+    Google, note that the button only appears when Drive credentials are configured, and the offline
+    version does not have it.</p>
+    <p>One case tends to surprise people: <b>translation</b> of the transcript does not leave here either.
+    It uses the translator the browser itself embeds, running on your device — not the Google Cloud API,
+    which would require a key of ours in the code and would send your text to a server. Where that
+    translator does not exist, what the tool offers is the speech model translating as it listens, also on
+    your computer. <b>In neither path is the text transmitted.</b></p>
+
+    <h2>The paid account, and the one exception</h2>
+    <p>Using the tool requires no account, and that has not changed: signed out, <code>/app</code>
+    records, transcribes and generates documents exactly the same. Anyone on a paid plan gets an account
+    holding the sign-in e-mail, the invoices, the support tickets, the team seats and — if you use the
+    <b>test run</b> screen — the list of cases to run.</p>
+    <p>On that screen, marking a case done stores a <b>receipt</b>: the case code, the system, the
+    ticket, the date, the name of the generated file and the <b>fingerprint of every frame</b>. Those
+    are numbers. No image, no transcript, no step text. It is what lets you take a PDF months later and
+    check that it is the same one — which is why it exists.</p>
+    <p><b>The exception, and it is yours:</b> when you confirm the case as done, there is an optional
+    field to <b>attach the complete session <code>.json</code></b>. That file has the frame images
+    inside it. Attaching it is the one thing in this product that puts content of yours on a server of
+    ours; it never goes on its own, the field starts closed, and what it means is written next to the
+    field — not in a terms page. Every attachment has a delete button, and deleting removes the file,
+    not just the row pointing at it. <b>Your video and audio still never leave your browser, attachment
+    or no attachment.</b></p>
+
+    <h2>What stays in your browser</h2>
+    <p>None of your content is kept between visits. Of the evidence identification fields, only
+    <b>system</b> and <b>executed by</b> are held in <code>sessionStorage</code> — which the browser clears
+    when the tab closes — so they are not retyped for every case; a button clears them immediately. Test
+    case, ticket, result and the notes are not stored even while the tab lives. None of this is a cookie,
+    none of it is read by us, and none of it leaves your device.</p>
+    <p>Alongside the model there is a <b>configuration</b> note: which combination of library and
+    file format manages to open the model on this machine. Version names, no content — and the
+    button that deletes the model deletes the note with it.</p>
+    <p><b>The screens of a recording in progress</b> are kept in the browser's private storage (OPFS),
+    on your computer, so a tab crash does not erase the work — before this, a crash 110 minutes into a
+    two-hour recording erased the two hours. They are deleted as soon as any document is generated, and
+    after seven days in any case; and the &ldquo;throw it away&rdquo; button, which step 1 offers
+    whenever there is a stored recording, erases whatever is already there, right then. None of it is sent anywhere — the F12
+    test still shows zero bytes sent.</p>
+    <p>Apart from that, what persists is the <b>transcription model</b>, cached by the browser itself so it is
+    not downloaded again. It sits on your device, under your control, and is removed when you clear browsing
+    data. We use no <i>cookies</i> — neither our own nor third-party ones.</p>
+
+    <h2>What we do not have</h2>
+    <p>This is the part almost no vendor writes, and precisely the part your team needs.
+    <b>We hold no security certification, and we are not in the process of obtaining one.</b>
+    Below is what each one means and why it does — or does not — apply to a tool that receives no data.</p>
+    <table class="legal">
+      <tr><th>Standard or certification</th><th>Do we hold it?</th><th>What that means here</th></tr>
+      <tr><td>ISO/IEC 27001</td><td>No</td>
+          <td>It certifies the information security management system of an organisation that <b>holds</b> data. We do not hold yours. If your policy requires ISO&nbsp;27001 from every vendor that receives data, it is worth recording that here there is no receiving — but whether the exception applies is your team's call, not ours.</td></tr>
+      <tr><td>SOC 2 (Type I or II)</td><td>No</td>
+          <td>It audits controls at a service organisation that <b>processes</b> customer data. There is no service processing anything: the processing is on your computer.</td></tr>
+      <tr><td>21 CFR Part 11 (FDA)</td><td>No</td>
+          <td>It requires a validated closed system, an audit trail and electronic signatures. A document generator in a browser <b>does not and cannot meet that on its own</b>. In a Part&nbsp;11 environment {{marca}} can produce the image, but the controlled record has to live in your validated system.</td></tr>
+      <tr><td>CSV / GAMP 5</td><td>No</td>
+          <td>Computerised system validation happens in <b>your</b> environment, for your use. It is not something a vendor hands over finished.</td></tr>
+      <tr><td>SOX / ITGC</td><td>Not applicable as a certification</td>
+          <td>{{marca}} is not an IT control. It <b>produces the evidence</b> that feeds your control. The control is still yours to answer for.</td></tr>
+      <tr><td>HIPAA — business associate agreement</td><td>We do not sign one</td>
+          <td>We receive no data, so the relationship the agreement would formalise does not exist. If your policy requires an agreement with any tool that <b>touches</b> health data, even locally, talk to your compliance team — we are not going to say it is fine when that call is not ours.</td></tr>
+      <tr><td>LGPD / GDPR</td><td>Not a certification</td>
+          <td>There is no such thing as a &ldquo;GDPR certificate&rdquo;. Our position, legal bases and retention periods are described in the <a href="{{privacidade}}" style="color:var(--accent)">Privacy Policy</a>.</td></tr>
+      <tr><td>Penetration test report</td><td>We have none</td>
+          <td>There is no infrastructure to test beyond static file hosting. What exists is the code that runs on your machine — and it is readable.</td></tr>
+      <tr><td>Cyber liability insurance</td><td>No</td>
+          <td>We are a small company and it would not be honest to imply coverage that does not exist.</td></tr>
+    </table>
+
+    <h3>What exists instead</h3>
+    <ul>
+      <li>The code that runs in your browser <b>can be read</b>: it is a page, and <code>Ctrl+U</code> shows all of it. There is no server-side code because there is no server.</li>
+      <li>The <b>offline version</b> can be downloaded, scanned, versioned and distributed by your own team.</li>
+      <li>Verifying that nothing leaves takes thirty seconds and does not depend on believing us.</li>
+    </ul>
+
+    <h2>What remains your responsibility</h2>
+    <ul>
+      <li>The generated document contains whatever was on your screen. If you recorded production data, <b>the file that came out has production data</b> — and where it goes next is your decision.</li>
+      <li>Screen sharing captures everything on screen, including the window you left open behind. Prefer sharing a specific window when the content is sensitive.</li>
+      <li>Automatic transcription downloads a speech model from a public CDN the first time. If your policy forbids external CDNs, use the offline version and type the notes by hand.</li>
+      <li>{{marca}} produces the visual evidence. The approval trail stays in your change management system.</li>
+    </ul>
+
+    <h2>Who answers</h2>
+    <p>{{marca}} is offered by <b>{{empresa}}</b>, Brazilian company registry (CNPJ) <b>{{cnpj}}</b>.</p>
+    <p>To report a security issue, ask for clarification for a vendor assessment, or request the offline
+    version: <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a>. There is no bug
+    bounty programme, but we do answer.</p>
+    <p class="small muted">This page describes how things work as of the date above. If anything changes in a
+    way that affects what is written here, this page changes with it — and the date at the top is how you
+    check that.</p>
+  </div>
+</section>

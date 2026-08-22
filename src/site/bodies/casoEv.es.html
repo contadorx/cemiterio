@@ -1,0 +1,53 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Caso de uso</p>
+    <h1 style="font-size:32px">Evidencia de prueba que la auditoría acepta</h1>
+    <p class="updated">Ejecutaste la prueba. Ahora tienes que demostrar que la ejecutaste — con la pantalla, la hora y lo que se observó. Es el caso principal de {{marca}}, y el único en el que una evidencia rechazada le cuesta el día entero a alguien.</p>
+
+    {{figura}}
+
+    <h2>Tres cosas que te ahorran la tarde</h2>
+    <p><b>Varios casos en una sola grabación.</b> Marca dónde termina un caso y empieza el siguiente, y sal con un documento por caso — o con uno solo dividido en capítulos, y el tiempo de cada uno en la hoja de cálculo.</p>
+    <p><b>Repite la prueba sin volver a grabar todo.</b> La revisión asistida recorre el documento antiguo paso a paso y recaptura solo las pantallas que cambiaron. Lo que sigue igual, sigue igual.</p>
+    <p><b>Tapar todo de una vez.</b> Lee el texto de las pantallas, avisa cuando encuentra un documento de identidad, un correo o una tarjeta, y cubre todas las apariciones con un clic — el tapado se quema en la imagen, no es una capa encima.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia&amp;lang=es">Grabar una evidencia ahora</a>
+      <span class="small muted">gratis, sin exigir registro, y nada sale de tu ordenador</span>
+    </p>
+
+    <h2>El dolor</h2>
+    <p>Print Screen, pegar en Word, escribir el pie, repetir cuarenta veces. Dos horas de trabajo manual después de una prueba de veinte minutos — y la parte cara no es hacer la captura: es acordarse de qué se estaba probando en cada una cuando vuelves al documento al día siguiente.</p>
+    <p><b>Y la evidencia se rechaza por detalles.</b> Falta la hora de reloj, el paso no muestra el resultado, la cabecera no dice qué mandante era, la imagen quedó cortada y no se lee el campo. El auditor no discute el mérito de la prueba: devuelve el documento. Quien ya tuvo un paquete devuelto en vísperas del go-live sabe que el problema nunca fue la prueba.</p>
+
+    <h2>Qué sale</h2>
+    <p>Un PDF (o Word, HTML, hoja de cálculo, ZIP) con una pantalla por paso, en orden, y nada que tengas que escribir dos veces:</p>
+    <ul>
+      <li><b>Hora de reloj en cada paso</b>, anclada al inicio real de la grabación — el punto que suele ser eliminatorio</li>
+      <li><b>Tu narración se convierte en la anotación del paso.</b> Hablas mientras pruebas y el texto sale escrito, junto a la pantalla de ese instante</li>
+      <li><b>Cabecera de identificación</b>: caso de prueba, sistema y mandante, quién lo ejecutó, ticket y resultado — y el nombre del archivo ya sale con el caso dentro</li>
+      <li><b>Tapado y destacado quemados en la imagen</b>: el documento cubierto no vuelve, y la flecha que señala el campo no se quita</li>
+      <li><b>Aviso de dato sensible</b>: la herramienta lee el texto de la pantalla y dice en qué pasos apareció un identificador fiscal, un correo, un teléfono o una tarjeta — y ahí se detiene, porque a veces ese número es la prueba</li>
+      <li><b>Hash por imagen y paquete de comprobación</b>: quien lo recibe verifica en su propio navegador, en <a href="{{verificar}}">/verificar</a>, si las imágenes siguen siendo las mismas</li>
+    </ul>
+
+    <h2>Cómo hacerlo</h2>
+    <ol class="passos">
+      <li>Abre la herramienta y elige el escenario <b>Evidencia de prueba</b> en el paso 1.</li>
+      <li>Pulsa <b>Grabar la pantalla</b> y deja el micrófono encendido. Narra lo que haces: es lo que se convierte en la descripción de cada paso.</li>
+      <li>Ejecuta la prueba como la ejecutarías. La herramienta guarda un fotograma en cada cambio de pantalla y transcribe tu voz en paralelo.</li>
+      <li>Detén, descarta las pantallas repetidas, rellena caso y ticket, y genera el <b>PDF</b>. Adjúntalo en Zephyr, en Jira o en el ticket.</li>
+    </ol>
+
+    <h2>Lo que no hace — mejor saberlo antes</h2>
+    <p><b>No lee campos del SAP GUI para Windows.</b> El navegador recibe una imagen de la pantalla compartida, no la estructura de la aplicación. La captura toma cualquier ventana que el sistema operativo permita compartir — Fiori, S/4 web, Ariba, SuccessFactors, Concur y el propio GUI aparecen como imagen —, pero sin lectura de campo.</p>
+    <p><b>No garantiza conformidad.</b> 21 CFR Part 11, SOX, CSV e ISO 9001 no son funciones que se compren: el producto genera el documento con hora, identificación e integridad verificable; la conformidad es del proceso de tu empresa. Quien prometa lo contrario está vendiendo lo que no puede entregar.</p>
+    <p><b>No adjunta de vuelta en tu sistema de pruebas.</b> Eso exigiría API y permiso de TI. Lo que existe es el <a href="{{site}}/es/link">enlace preconfigurado</a>, que abre la herramienta con el caso y el ticket ya rellenados — y el camino de vuelta sigue siendo arrastrar el archivo, que funciona en cualquier herramienta.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=evidencia&amp;lang=es">Grabar una evidencia ahora</a>
+      <a class="btn ghost" href="{{precos}}">Ver los planes</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Todo lo anterior es del <b>plan gratuito</b>. Lo que se paga es la marca del cliente en el documento y la administración de un equipo — nunca la calidad de la evidencia.</p>
+  </div>
+</section>

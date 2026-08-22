@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Anexo de Tratamento de Dados Pessoais — {{marca}}</title>
+<!-- versao: 2026-08-19 -->
+<!-- A DATA É ESCRITA AQUI, e não `hoje` no build.
+
+     Um documento jurídico cuja versão muda a cada `python3 build.py` não tem
+     versão: duas cópias do mesmo texto assinadas em semanas diferentes sairiam
+     com datas diferentes, e ninguém saberia dizer qual mudou. Esta linha muda
+     quando alguém edita o documento de propósito — que é o que "versão" quer
+     dizer num contrato. -->
+<!-- ESTE ARQUIVO É FONTE, e o que circula é o PDF gerado dele.
+
+     Ele existe aqui, dentro do projeto e com os mesmos marcadores de identidade
+     do resto do site, por um motivo só: um DPA em Word na pasta de alguém
+     envelhece à parte da política. Quando a política ganhar um suboperador
+     novo, este documento tem que ganhar junto — e a maneira de isso acontecer é
+     os dois lerem a mesma identidade (`src/marca.json`, emitido pelo build).
+
+     `testes/terceiros.mjs` cobra que a tabela de suboperadores daqui e a da
+     política digam a MESMA coisa, e que nenhuma das duas esqueça um terceiro
+     que o código conhece. Uma tabela que diverge da política publicada é pior
+     do que não ter tabela: ela vira contradição assinada. -->
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm; }
+  * { box-sizing: border-box }
+  body { font: 10.5pt/1.5 "Aptos", "Segoe UI", system-ui, -apple-system, sans-serif;
+         color: #1f2430; margin: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2mm; letter-spacing: -.2px }
+  h2 { font-size: 11pt; margin: 6mm 0 1.5mm; page-break-after: avoid }
+  p, li { margin: 0 0 2mm; text-align: justify }
+  ol { padding-left: 5mm; margin: 0 0 2mm }
+  ol ol { margin-top: 1.5mm }
+  .sub { color: #5c6473; font-size: 9pt; margin: 0 0 5mm }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 3mm;
+          font-size: 8.6pt; page-break-inside: avoid }
+  th, td { border: .4pt solid #c9ccd4; padding: 1.6mm 2mm; text-align: left; vertical-align: top }
+  th { background: #f2f3f6; font-weight: 600 }
+  .caixa { border-left: 2.5pt solid #3a3f9e; background: #f6f7fb;
+           padding: 2.5mm 3.5mm; margin: 3mm 0 }
+  .assina { margin-top: 8mm; page-break-inside: avoid }
+  .assina td { border: 0; padding: 0 6mm 0 0; width: 50% }
+  .linha { border-bottom: .5pt solid #1f2430; height: 12mm }
+  .pe { color: #8a8a8a; font-size: 8pt; margin-top: 6mm; border-top: .4pt solid #dfe1e7;
+        padding-top: 2mm }
+</style>
+</head>
+<body>
+
+<h1>Anexo de Tratamento de Dados Pessoais</h1>
+<p class="sub">Anexo ao contrato de assinatura do <b>{{marca}}</b> &middot; Lei nº 13.709/2018 (LGPD)
+&middot; versão de {{dataDpa}}</p>
+
+<p>Este Anexo integra o contrato de assinatura celebrado entre <b>{{empresa}}</b>, CNPJ
+{{cnpj}} (&ldquo;<b>Operadora</b>&rdquo;), e o cliente contratante identificado na assinatura
+(&ldquo;<b>Controlador</b>&rdquo;), e regula o tratamento de dados pessoais decorrente do uso do
+{{marca}}.</p>
+
+<div class="caixa">
+  <p style="margin:0"><b>O ponto que muda o alcance deste Anexo.</b> O {{marca}} é uma ferramenta que roda
+  <b>inteiramente no navegador do usuário</b>. O vídeo, o áudio, as imagens de tela e a transcrição
+  <b>nunca são transmitidos à Operadora</b> — não existe servidor de processamento. O tratamento aqui
+  regulado alcança apenas os dados da <b>conta paga</b>, listados no item 2. Perguntas de avaliação de
+  fornecedor sobre guarda, cifra ou destruição do conteúdo audiovisual não se aplicam porque esse conteúdo
+  não chega à Operadora, e isso é verificável pelo próprio Controlador com o inspetor de rede do navegador
+  aberto na aba Rede.</p>
+</div>
+
+<h2>1. Papéis</h2>
+<ol>
+  <li>O <b>Controlador</b> decide as finalidades e os meios do tratamento dos dados descritos no item 2 e
+  responde pela licitude da coleta e pela base legal aplicável.</li>
+  <li>A <b>Operadora</b> trata esses dados <b>exclusivamente</b> conforme as instruções documentadas do
+  Controlador — sendo o contrato de assinatura, este Anexo e o uso normal das funções do produto as
+  instruções documentadas iniciais.</li>
+  <li>A Operadora <b>não</b> usa esses dados para finalidade própria, <b>não</b> os cruza com outras bases,
+  <b>não</b> os cede ou comercializa e <b>não</b> os usa para treinar modelos de inteligência artificial,
+  próprios ou de terceiros.</li>
+  <li>Nos dados de contato comercial, faturamento, medição anônima de uso e registros de acesso ao site, a
+  Operadora atua como <b>controladora</b> em nome próprio, na forma da sua Política de Privacidade. Esses
+  dados estão fora do escopo deste Anexo.</li>
+</ol>
+
+<h2>2. Objeto do tratamento</h2>
+<table>
+  <tr><th>Categorias de dados</th><th>Categorias de titulares</th><th>Natureza e finalidade</th><th>Duração</th></tr>
+  <tr>
+    <td>Lista de casos a executar (roteiro), casos de teste, chamados de suporte, modelos de documento,
+    configuração da conta, assentos do time, recibos, e <b>anexos <code>.json</code> de sessão</b> quando o
+    usuário optar por anexá-los — que podem conter imagens de tela do ambiente do Controlador</td>
+    <td>Empregados, prestadores e usuários do Controlador com assento na conta; e quaisquer titulares cujos
+    dados apareçam nas telas capturadas pelo Controlador</td>
+    <td>Armazenamento, organização e disponibilização, por meio automatizado, com a finalidade única de
+    prestar o serviço contratado</td>
+    <td>Enquanto durar a assinatura, e <b>até 90 dias</b> após o encerramento</td>
+  </tr>
+</table>
+<p>A Operadora <b>não determina</b> o que aparece nas telas capturadas. Cabe ao Controlador não capturar
+dado pessoal desnecessário e usar as funções de tarja e recorte disponíveis na ferramenta antes de anexar
+uma sessão.</p>
+
+<h2>3. Obrigações da Operadora</h2>
+<ol>
+  <li><b>Confidencialidade.</b> Restringir o acesso ao pessoal que dele necessite, sob obrigação de sigilo
+  que sobrevive ao término do vínculo.</li>
+  <li><b>Segurança.</b> Manter as medidas técnicas e administrativas do item 5, aptas a proteger os dados
+  de acessos não autorizados e de situações acidentais ou ilícitas (art. 46 da LGPD).</li>
+  <li><b>Auxílio ao Controlador.</b> Auxiliá-lo, na medida do razoável, a responder a pedidos de titulares
+  (arts. 18 e 19), a realizar relatório de impacto (art. 38) e a atender determinações da ANPD.</li>
+  <li><b>Pedidos de titular recebidos diretamente.</b> Encaminhá-los ao Controlador em até <b>5 dias
+  úteis</b>, sem respondê-los por conta própria.</li>
+  <li><b>Registro.</b> Manter registro das operações de tratamento realizadas por conta do Controlador
+  (art. 37) e disponibilizá-lo mediante pedido.</li>
+  <li><b>Devolução e eliminação.</b> Ao término, eliminar os dados no prazo do item 2, salvo obrigação
+  legal de guarda. A exportação em <code>.json</code> e <code>.csv</code> está disponível ao Controlador a
+  qualquer tempo, dentro do produto, sem depender de pedido.</li>
+</ol>
+
+<h2>4. Suboperadores</h2>
+<p>O Controlador autoriza, de forma geral, os suboperadores abaixo. A relação é a mesma publicada na
+Política de Privacidade e prevalece a versão publicada:</p>
+<table>
+  <tr><th>Suboperador</th><th>Função</th><th>Dado que recebe</th><th>País</th><th>Salvaguarda</th></tr>
+  <tr><td>Supabase</td><td>Banco de dados e armazenamento do anexo</td>
+      <td>Todo o conteúdo da conta paga. Nunca vídeo, áudio ou transcrição</td>
+      <td>Brasil (São Paulo)</td><td>Contrato de tratamento do fornecedor</td></tr>
+  <tr><td>Vercel</td><td>Hospedagem da aplicação</td>
+      <td>Registros técnicos de acesso</td>
+      <td>Rede global</td><td>Cláusulas contratuais padrão (art. 33, II)</td></tr>
+  <tr><td>Stripe</td><td>Cobrança da assinatura</td>
+      <td>Nome, e-mail e dados de pagamento do contratante</td>
+      <td>EUA e União Europeia</td><td>Cláusulas contratuais padrão; PCI-DSS</td></tr>
+  <tr><td>Brevo</td><td>Envio do link de acesso e do convite por e-mail</td>
+      <td>Endereço de e-mail do destinatário e texto da mensagem</td>
+      <td>União Europeia (França)</td><td>Cláusulas contratuais padrão</td></tr>
+</table>
+<p><b>Troca de suboperador.</b> A Operadora comunicará ao Controlador, por e-mail e com <b>30 dias de
+antecedência</b>, a substituição ou o acréscimo de suboperador que trate os dados do item 2. Dentro desse
+prazo o Controlador poderá se opor de forma fundamentada; não sendo possível acomodar a objeção, o
+Controlador poderá rescindir a assinatura sem ônus, com direito à exportação prévia dos dados.</p>
+
+<h2>5. Medidas técnicas e administrativas</h2>
+<ol>
+  <li><b>Em trânsito:</b> TLS em todo o tráfego da aplicação e das chamadas de servidor.</li>
+  <li><b>Em repouso:</b> banco de dados e armazenamento de anexo cifrados em repouso pelo provedor de
+  infraestrutura, na região de São Paulo. A cifra é do provedor; a escolha da região é da Operadora.</li>
+  <li><b>Autenticação:</b> acesso por link de uso único enviado por e-mail, com validade limitada e
+  invalidação após o primeiro uso. Não há senha armazenada.</li>
+  <li><b>Controle de acesso ao banco:</b> as tabelas residem em schema próprio, inacessível ao navegador. A
+  permissão de execução das funções expostas é revogada dos papéis públicos e concedida somente ao papel de
+  serviço, que existe apenas no servidor.</li>
+  <li><b>Anexos:</b> armazenados em repositório privado, sem leitura pública. A entrega é feita pelo
+  servidor após verificação de autorização, por endereço assinado com validade de <b>dois minutos</b>.</li>
+  <li><b>Segregação de credenciais:</b> chaves de serviço mantidas apenas em variáveis de ambiente do
+  servidor, jamais embarcadas no código entregue ao navegador.</li>
+  <li><b>Registros de acesso</b> ao servidor web mantidos por 6 meses (art. 15 do Marco Civil da Internet)
+  e então descartados.</li>
+  <li><b>Minimização por arquitetura:</b> o conteúdo audiovisual não é transmitido à Operadora em nenhum
+  momento — a medida de segurança mais forte deste Anexo é a ausência do dado.</li>
+</ol>
+<p>A Operadora <b>não</b> possui certificação SOC 2 ou ISO 27001 e não declara possuí-las.</p>
+
+<h2>6. Incidentes de segurança</h2>
+<ol>
+  <li>Ciente de incidente que possa acarretar risco ou dano relevante, a Operadora comunicará o Controlador
+  em até <b>48 horas</b>, pelo e-mail de contato da conta.</li>
+  <li>A comunicação indicará: dados afetados, titulares envolvidos ou sua ordem de grandeza, medidas
+  técnicas já adotadas, riscos e recomendações — sendo atualizada conforme a apuração avance, em vez de
+  aguardar estar completa.</li>
+  <li>A Operadora cooperará com o Controlador e com a ANPD na apuração, na mitigação e nas comunicações
+  exigidas pelo art. 48 da LGPD.</li>
+</ol>
+
+<h2>7. Pedidos de autoridade</h2>
+<p>A Operadora somente atenderá a requisições de autoridade pública amparadas em fundamento legal válido,
+entregando apenas o que for expressamente requisitado, e <b>notificará o Controlador</b> para que possa
+exercer sua defesa, salvo vedação legal expressa. A Operadora não dispõe de vídeo, áudio ou transcrição do
+Controlador e, portanto, não tem como entregá-los a autoridade alguma.</p>
+
+<h2>8. Auditoria</h2>
+<p>A Operadora prestará ao Controlador, mediante pedido escrito e no máximo uma vez por ano, as informações
+necessárias para demonstrar o cumprimento deste Anexo, incluindo o questionário de segurança preenchido e a
+descrição das medidas do item 5. Auditoria presencial em instalações de terceiros (provedores de
+infraestrutura) seguirá o que os contratos desses fornecedores permitirem.</p>
+
+<h2>9. Transferência internacional</h2>
+<p>Os dados do item 2 são armazenados <b>no Brasil</b>. Ocorrem transferências internacionais restritas aos
+suboperadores do item 4 cuja operação é global ou estrangeira, amparadas em cláusulas contratuais padrão
+(art. 33, II da LGPD).</p>
+
+<h2>10. Vigência e prevalência</h2>
+<p>Este Anexo vigora enquanto durar a assinatura e, quanto às obrigações de eliminação e sigilo, até o
+cumprimento integral. Em caso de conflito entre este Anexo e o contrato de assinatura quanto a tratamento
+de dados pessoais, <b>prevalece este Anexo</b>.</p>
+
+<table class="assina">
+  <tr>
+    <td><div class="linha"></div><b>{{empresa}}</b><br>CNPJ {{cnpj}} — Operadora<br>
+        Nome:<br>Cargo:<br>Data:</td>
+    <td><div class="linha"></div><b>Cliente contratante</b><br>CNPJ: — Controlador<br>
+        Nome:<br>Cargo:<br>Data:</td>
+  </tr>
+</table>
+
+<p class="pe">{{empresa}} — CNPJ {{cnpj}} &middot; Encarregado pelo tratamento de dados pessoais:
+{{encarregado}} — {{contato}} &middot; Política de Privacidade em {{siteDom}}/privacidade &middot; Este documento é gerado a
+partir da mesma fonte da Política de Privacidade publicada; em caso de divergência, prevalece a versão
+publicada.</p>
+
+</body>
+</html>

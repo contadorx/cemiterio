@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{desc}}">
+<link rel="canonical" href="{{site}}{{selfPath}}">
+<link rel="alternate" hreflang="pt-BR" href="{{site}}/">
+<link rel="alternate" hreflang="en" href="{{site}}/en">
+<link rel="alternate" hreflang="es" href="{{site}}/es">
+<link rel="alternate" hreflang="x-default" href="{{site}}/en">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{ogDesc}}">
+<link rel="icon" href="{{root}}favicon.ico?v={{ICONV}}" sizes="any">
+<link rel="icon" href="{{root}}favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{root}}apple-touch-icon.png?v={{ICONV}}">
+<link rel="stylesheet" href="{{root}}site.css">
+{{analytics}}
+{{redirect}}
+</head>
+<body data-supa-url="{{supaUrl}}" data-supa-key="{{supaKey}}">
+
+{{jsonld}}
+<header>
+  <div class="wrap">
+    <a class="brand" href="{{home}}"><img src="{{root}}logo.svg" alt=""><span>{{marcaA}}<b>{{marcaB}}</b></span></a>
+    <nav>
+      <a href="#como" class="hide-sm">{{navHow}}</a>
+      <a href="{{comparativo}}" class="hide-sm">{{navComp}}</a>
+      <a href="{{precos}}" class="hide-xs">{{navPrice}}</a>
+      <!-- O BLOG ENTRA NO MENU, e antes do botão da ferramenta.
+
+           Ele existia só no rodapé — o lugar onde se procura o que já se sabe
+           que existe. Um blog no rodapé não é lido por quem ainda não sabe que
+           há o que ler; é a mesma conta que trouxe as páginas de caso de uso
+           para lá. E ele vem ANTES do botão: o botão é o fim do caminho, e o
+           que vem depois dele não é lido. -->
+      <a href="{{blog}}" class="hide-sm">{{fBlog}}</a>
+      <a class="btnTop" href="{{app}}">{{navApp}}</a>
+      {{switcher}}
+    </nav>
+  </div>
+</header>
+
+<!-- A dobra principal, em duas colunas.
+
+     O que está à direita é a PÁGINA QUE SAI, e não a gravação entrando. O
+     caminho já é contado duas vezes: pelo vídeo do tour, logo abaixo, e pelo
+     desenho de fluxo no "#como". O resultado não era contado em lugar nenhum —
+     e é ele que faz querer, porque ninguém consegue ver o documento antes de
+     abrir a ferramenta.
+
+     Em tela estreita as duas colunas viram uma e o desenho fica DEPOIS do
+     botão: num telefone, ilustração acima do texto empurra para fora da
+     primeira tela a única coisa que precisa estar nela. -->
+<section style="padding-top:78px">
+  <div class="wrap">
+    <div class="heroDuo">
+      <div class="heroTxt">
+        <p class="eyebrow">{{eyebrow}}</p>
+        <h1>{{h1}}</h1>
+        <p class="lead">{{lead}}</p>
+        <p><a class="btn" href="{{app}}">{{cta}}</a></p>
+        <p class="small muted" style="margin-top:16px">{{ctaSub}}</p>
+      </div>
+      {{figuraDobra}}
+    </div>
+
+    <figure class="tour">
+      <video poster="/demo/tour.{{demoLang}}.jpg" autoplay muted loop playsinline preload="metadata"
+             aria-label="{{tourAlt}}">
+        <source src="/demo/tour.{{demoLang}}.webm" type="video/webm">
+        <source src="/demo/tour.{{demoLang}}.mp4" type="video/mp4">
+        <img src="/demo/tour.{{demoLang}}.jpg" alt="{{tourAlt}}" style="width:100%">
+      </video>
+      <figcaption>{{tourCap}}</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>{{whyH}}</h2>
+    <p class="lead" style="margin-bottom:0">{{whyP}}</p>
+  </div>
+</section>
+
+<!-- As saídas, como fichas.
+
+     Elas eram uma frase no meio de um parágrafo, e são a pergunta que mais
+     aparece: "sai em Word?". Quinze formatos escondidos em prosa é o mesmo que
+     nenhum. Aqui não há link em cada ficha de propósito — elas não são
+     navegação, são a resposta a uma pergunta. -->
+<section>
+  <div class="wrap">
+    <h2>{{saidasH}}</h2>
+    <p class="lead" style="margin-bottom:0">{{saidasP}}</p>
+    <div class="saidas">
+      <span class="saida"><b>PDF</b></span>
+      <span class="saida"><b>DOCX</b> Word</span>
+      <span class="saida"><b>PPTX</b> PowerPoint</span>
+      <span class="saida"><b>HTML</b></span>
+      <span class="saida"><b>MD</b> Markdown</span>
+      <span class="saida"><b>SCORM</b></span>
+      <span class="saida"><b>CSV</b></span>
+      <span class="saida"><b>JSON</b></span>
+      <span class="saida"><b>ZIP</b></span>
+      <span class="saida"><b>VTT</b></span>
+      <span class="saida"><b>SRT</b></span>
+      <span class="saida"><b>Google&nbsp;Docs</b></span>
+      <span class="saida"><b>Jira</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- Os cinco cenários.
+
+     O produto virou isto: uma máquina de captura com cinco documentos na
+     saída. Quem chega procurando "evidência de UAT" e quem chega procurando
+     "como documentar processo" querem a mesma ferramenta e não se reconhecem na
+     mesma frase — por isso cada um tem a sua página, e a home leva às cinco. -->
+<section id="casos">
+  <div class="wrap">
+    <p class="eyebrow">{{casosEyebrow}}</p>
+    <h2>{{casosH}}</h2>
+    <p class="lead">{{casosP}}</p>
+    <div class="casos">
+      <a class="caso" href="{{casoEv}}"><h3>{{casoEvT}}</h3><p>{{casoEvD}}</p><span>{{casosVer}} &rarr;</span></a>
+      <a class="caso" href="{{casoIn}}"><h3>{{casoInT}}</h3><p>{{casoInD}}</p><span>{{casosVer}} &rarr;</span></a>
+      <a class="caso" href="{{casoAta}}"><h3>{{casoAtaT}}</h3><p>{{casoAtaD}}</p><span>{{casosVer}} &rarr;</span></a>
+      <a class="caso" href="{{casoUx}}"><h3>{{casoUxT}}</h3><p>{{casoUxD}}</p><span>{{casosVer}} &rarr;</span></a>
+      <a class="caso" href="{{casoIa}}"><h3>{{casoIaT}}</h3><p>{{casoIaD}}</p><span>{{casosVer}} &rarr;</span></a>
+    </div>
+  </div>
+</section>
+
+<section id="usos">
+  <div class="wrap">
+    <p class="eyebrow">{{duoEyebrow}}</p>
+    <h2>{{duoH}}</h2>
+    <p class="lead">{{duoP}}</p>
+    <div class="duo">
+      <div class="via um">
+        <span class="vtag">{{viaAtag}}</span>
+        <h3>{{viaAh}}</h3>
+        <p>{{viaAp}}</p>
+        <ul><li>{{viaA1}}</li><li>{{viaA2}}</li><li>{{viaA3}}</li><li>{{viaA4}}</li></ul>
+      </div>
+      <div class="via">
+        <span class="vtag">{{viaBtag}}</span>
+        <h3>{{viaBh}}</h3>
+        <p>{{viaBp}}</p>
+        <ul><li>{{viaB1}}</li><li>{{viaB2}}</li><li>{{viaB3}}</li><li>{{viaB4}}</li></ul>
+      </div>
+    </div>
+    <p class="ponte">{{duoPonte}}</p>
+    <p class="small muted" style="margin-top:14px">{{duoCompLinked}}</p>
+  </div>
+</section>
+
+<section id="como">
+  <div class="wrap">
+    <p class="eyebrow">{{howEyebrow}}</p>
+    <h2>{{howH}}</h2>
+    <!-- Os três passos abaixo explicam bem, e continuam. Mas a coisa é
+         ESPACIAL: uma tela entra de um lado e uma página sai do outro, e no
+         meio alguém joga fora o que não mudou. Um parágrafo conta isso; um
+         desenho mostra em meio segundo. -->
+    {{figuraFluxo}}
+    <ol class="steps">
+      <li><h3>{{step1H}}</h3><p>{{step1P}}</p></li>
+      <li><h3>{{step2H}}</h3><p>{{step2P}}</p></li>
+      <li><h3>{{step3H}}</h3><p>{{step3P}}</p></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>{{diffH}}</h2>
+    <div class="cards" style="margin-top:26px">
+      <div class="card"><h3>{{d1H}}</h3><p>{{d1P}}</p></div>
+      <div class="card"><h3>{{d2H}}</h3><p>{{d2P}}</p></div>
+      <div class="card"><h3>{{d3H}}</h3><p>{{d3P}}</p></div>
+      <div class="card"><h3>{{d4H}}</h3><p>{{d4P}}</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="privacidade">
+  <div class="wrap">
+    <p class="eyebrow">{{privEyebrow}}</p>
+    <h2>{{privH}}</h2>
+    <p class="lead">{{privP}}</p>
+    <p class="small muted">{{privP2}} <a href="{{privacidade}}" style="color:var(--accent)">{{privLink}}</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>{{faqH}}</h2>
+    <div class="faq">
+      <details open><summary>{{q1}}</summary><p>{{a1}}</p></details>
+      <details><summary>{{q2}}</summary><p>{{a2}}</p></details>
+      <details><summary>{{q3}}</summary><p>{{a3}}</p></details>
+      <details><summary>{{q4}}</summary><p>{{a4}}</p></details>
+      <details><summary>{{q5}}</summary><p>{{a5}}</p></details>
+      <details><summary>{{q6}}</summary><p>{{a6}}</p></details>
+      <details><summary>{{q7}}</summary><p>{{a7}}</p></details>
+    </div>
+  </div>
+</section>
+
+<section style="text-align:center">
+  <div class="wrap">
+    <h2>{{endH}}</h2>
+    <p class="lead" style="margin:0 auto 26px">{{endP}}</p>
+    <a class="btn" href="{{app}}">{{endCta}}</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <!-- O rodapé virou três colunas com nome. Ele era uma fileira de oito links
+         soltos, e quem procurava "aquela página do teste de usabilidade" não
+         tinha onde procurar: as cinco páginas de caso de uso — que são o produto
+         explicado por quem usa — não estavam nele. -->
+    <div class="rodapeCols">
+      <div>
+        <h3>{{fColProduto}}</h3>
+        <a href="{{app}}">{{navApp}}</a>
+        <a href="{{precos}}">{{navPrice}}</a>
+        <a href="{{ajuda}}">{{fAjuda}}</a>
+        <a href="{{blog}}">{{fBlog}}</a>
+        <a href="{{comparativo}}">{{fComp}}</a>
+        <a href="{{conta}}">{{fConta}}</a>
+      </div>
+      <div>
+        <h3>{{fColCasos}}</h3>
+        <a href="{{casoEv}}">{{casoEvT}}</a>
+        <a href="{{casoIn}}">{{casoInT}}</a>
+        <a href="{{casoAta}}">{{casoAtaT}}</a>
+        <a href="{{casoUx}}">{{casoUxT}}</a>
+        <a href="{{casoIa}}">{{casoIaT}}</a>
+      </div>
+      <div>
+        <h3>{{fColConfianca}}</h3>
+        <a href="{{seguranca}}">{{fSec}}</a>
+        <a href="{{verificar}}">{{fVerif}}</a>
+        <a href="{{privacidade}}">{{fPriv}}</a>
+        <a href="{{termos}}">{{fTerms}}</a>
+        <a href="{{steps}}">{{fPsr}}</a>
+      </div>
+    </div>
+    <div class="rodapeFim">{{fLicense}}</div>
+  </div>
+</footer>
+
+<script src="{{root}}support.js"></script>
+</body>
+</html>

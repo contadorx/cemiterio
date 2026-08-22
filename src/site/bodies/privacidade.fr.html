@@ -1,0 +1,359 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Politique de confidentialité</h1>
+    <p class="updated">Dernière mise à jour : 17 août 2026.<br>
+    Cette politique décrit le fonctionnement actuel de {{marca}} : l’outil ne possède pas de serveur de
+    traitement, et il existe un compte optionnel — décrit plus bas — pour qui souscrit une offre payante.</p>
+
+    <p class="lockHint" style="border-left:3px solid var(--accent);padding-left:12px;margin:0 0 26px">
+    Jusqu’au 14 août 2026, ce service s’appelait <b>ClipContext</b>. Seul le nom a changé — le
+    responsable du traitement, les bases légales et les durées ci-dessous restent exactement les mêmes.</p>
+
+    <h2>Qui est responsable</h2>
+    <p>{{marca}} est proposé par <b>{{empresa}}</b>, immatriculée au CNPJ sous le n° <b>{{cnpj}}</b>,
+    qui agit comme <b>responsable du traitement</b> des quelques données personnelles décrites dans la présente politique, au sens de la
+    loi n° 13.709/2018 (LGPD).</p>
+    <p>Demandes des personnes concernées, questions et réclamations sur la confidentialité :
+    <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a>. C’est aussi le canal du
+    délégué à la protection des données personnelles (art. 41 de la LGPD).</p>
+
+    <h2>Résumé</h2>
+    <p><b>Nous ne recevons ni vos vidéos, ni votre audio, ni vos captures, ni vos transcriptions, ni les documents que vous
+    générez.</b> Cela n’a pas changé, cela vaut dans toutes les offres, et c’est la promesse qui soutient le produit — ce n’est pas
+    un réglage que nous pourrions relâcher plus tard.</p>
+    <p>Ce qui existe, c’est ceci, et c’est détaillé plus bas : un décompte de visites sans cookie et sans
+    identifiant ; un décompte anonyme de trois jalons d’usage ; l’e-mail, si vous le laissez sur la page des
+    tarifs ; et, pour qui souscrit une offre payante, un <b>compte</b> — avec l’e-mail d’accès, les factures, les
+    tickets de support et la <b>liste des cas à exécuter</b>, quand vous utilisez l’écran de liste de cas de test. Utiliser
+    l’outil continue de ne pas exiger de compte : sans identifiant, il enregistre, transcrit et génère le document exactement
+    pareil.</p>
+
+    <h2>Comment le service fonctionne</h2>
+    <p>{{marca}} est une page statique. Quand vous choisissez une vidéo, elle est lue directement depuis votre
+    appareil par le navigateur et y reste. L’extraction des images, la lecture de l’audio, la transcription et le
+    montage du PDF ont lieu entièrement sur votre ordinateur, en utilisant sa capacité de traitement.</p>
+    <p>Il n’y a pas d’envoi du fichier vers nous. Il n’y a pas de copie temporaire dans nos systèmes, parce qu’aucun
+    système à nous n’est impliqué dans le traitement.</p>
+
+    <h2>Données que nous ne collectons pas</h2>
+    <ul>
+      <li>Vidéos, audios, images extraites, transcriptions et PDF générés</li>
+      <li>Nom de fichier, taille, durée ou toute autre caractéristique de ce que vous traitez</li>
+      <li>Nom, téléphone ou identification personnelle — et l’e-mail seulement si vous en saisissez un, par votre choix</li>
+      <li>Identifiants de pistage, profils de comportement ou données à des fins publicitaires</li>
+      <li>Cookies, de quelque type que ce soit</li>
+    </ul>
+
+    <h2>Ce qui est mesuré, et pourquoi</h2>
+    <p>Un outil dont personne ne sait s’il est utilisé n’a aucun moyen de s’améliorer au bon endroit. Il y a donc
+    deux mesures, et les deux ont été conçues pour ne pas savoir qui vous êtes :</p>
+    <ul>
+      <li><strong>Les visites de page</strong>, par Vercel Web Analytics. Sans cookie et sans identifiant qui
+      persiste entre les visites. Cela sert à savoir combien de personnes sont arrivées et par quel chemin.</li>
+      <li><strong>Trois jalons d’usage</strong>, à l’intérieur de l’outil : qu’il a été ouvert, qu’une vidéo a été
+      ouverte avec succès, et qu’un fichier de sortie a été téléchargé. Avec cela partent la langue de la page, l’origine de la
+      vidéo (fichier, Drive, enregistrement ou exemple) et le format téléchargé. <strong>Rien de plus.</strong> Ne partent ni nom
+      de fichier, ni taille, ni durée, ni contenu, ni aucun identifiant de session — il n’y a aucun moyen de relier deux
+      jalons à la même personne, ni cette visite à la suivante.</li>
+    </ul>
+    <p>Si votre navigateur émet <em>Do Not Track</em> ou <em>Global Privacy Control</em>, les trois jalons ne
+    sont pas envoyés. Et la <strong>version hors ligne</strong> — le fichier unique que vous téléchargez — sort du build sans
+    aucune adresse de mesure à l’intérieur : elle ne parle à personne, et cela se vérifie en cherchant
+    &laquo;&nbsp;supabase&nbsp;&raquo; dans le fichier.</p>
+
+    <h2>La liste de notification de l’offre payante</h2>
+    <p>Sur la page des tarifs, il y a un champ e-mail optionnel. Si vous le remplissez, l’adresse et la langue de la page
+    sont conservées dans une base de données à nous, avec la date. C’est la seule donnée personnelle qui existe ici, et elle :</p>
+    <ul>
+      <li>n’est pas croisée avec les mesures ci-dessus — elles n’ont rien avec quoi être croisées ;</li>
+      <li>n’est pas vendue, cédée ni utilisée dans une liste de tiers ;</li>
+      <li>sert à une seule finalité : prévenir quand l’offre payante existera ;</li>
+      <li>est effacée dès que vous le demandez, par le contact en bas de cette page.</li>
+    </ul>
+
+    <h2>Le compte de l’offre payante, et la liste de cas de test</h2>
+    <p>Qui souscrit une offre payante obtient un <b>compte</b>. C’est le seul endroit où nous conservons une donnée
+    à vous, par votre choix, et c’est là que vit la seule fonctionnalité qui écrit du contenu client sur un serveur
+    à nous : l’<b>écran de liste de cas de test</b>. C’est pour cela qu’il est décrit ici champ par champ.</p>
+    <p>Dans le compte sont conservés :</p>
+    <ul>
+      <li>l’<b>e-mail</b> d’accès, qui est l’identité du compte et la destination du lien d’entrée ;</li>
+      <li>les <b>factures</b> et l’état de l’abonnement, venus de Stripe ;</li>
+      <li>les <b>tickets</b> de support que vous ouvrez, avec le texte que vous avez écrit ;</li>
+      <li>dans l’offre Team, les <b>sièges</b> : l’e-mail de chaque personne de l’équipe et ce qu’elle a déjà émis ;</li>
+      <li>les <b>modèles de document</b> et l’identité visuelle que vous configurez (nom de l’entreprise,
+      adresse du logo, libellé, environnement).</li>
+    </ul>
+    <p>Et, si vous utilisez la liste de cas de test, sont conservés <b>les champs de la liste de tâches</b>, et eux
+    seuls : le code du cas, le titre, le système, le numéro du ticket, l’e-mail du responsable, la date à laquelle
+    le cas a été marqué comme fait, qui l’a marqué, le <b>nom</b> du fichier généré, son <b>empreinte</b>
+    et la remarque que vous saisissez.</p>
+    <p>En marquant un cas comme terminé, est aussi conservé un <b>reçu</b> : la fiche de ce qui a été
+    exécuté (cas, scénario, système, ticket, environnement, résultat, date et format) et l’<b>empreinte
+    de chaque capture</b>, dans l’ordre. Ce sont des nombres. Il voyage à l’intérieur du lien de retour lui-même, et c’est
+    ce qui permet de reprendre un document des mois plus tard et de vérifier que c’est bien le même.</p>
+    <p><b>Ce que le reçu ne contient jamais :</b> d’image, de transcription ou le texte des étapes. L’empreinte
+    est calculée à partir des écrans et ne permet <b>pas</b> de reconstruire la moindre image. Le tableur que vous
+    envoyez pour créer la liste est lu, devient les lignes décrites ci-dessus, et <b>le fichier est jeté</b> :
+    nous ne conservons pas le tableur.</p>
+
+    <h2>La pièce jointe de la session — l’unique exception, et elle est à vous</h2>
+    <p>Au moment de confirmer un cas comme terminé, il existe un champ <b>optionnel</b> : joindre le
+    <code>.json</code> complet de cette session. Ce fichier <b>contient les images des captures à l’intérieur</b>,
+    avec le texte des étapes et la transcription, s’il y en a une.</p>
+    <p>Le joindre est la <b>seule</b> chose de ce produit qui place du contenu à vous sur un serveur à nous. Pour
+    cette raison, et sans exception :</p>
+    <ul>
+      <li>il <b>ne part jamais tout seul</b> — le champ arrive fermé et il faut choisir le fichier ;</li>
+      <li>ce que cela signifie est écrit <b>à côté du champ</b>, au moment du choix, et pas seulement ici ;</li>
+      <li>il reste dans un stockage <b>privé</b>, sans adresse publique : qui télécharge passe par notre
+      serveur, qui vérifie votre session et renvoie une adresse signée qui <b>expire en deux minutes</b> ;</li>
+      <li>qui voit le cas voit la pièce jointe — dans une liste d’équipe, c’est toute l’équipe ;</li>
+      <li>il y a un bouton <b>supprimer la pièce jointe</b>, et il supprime le fichier, pas seulement l’enregistrement qui pointe vers lui ;</li>
+      <li>la limite est de 32 MB par cas, et seuls les fichiers <code>.json</code> sont acceptés.</li>
+    </ul>
+    <p><b>La vidéo et l’audio continuent de ne jamais sortir de votre navigateur</b>, avec pièce jointe ou sans pièce jointe. Sans
+    pièce jointe, il ne reste que le reçu — des nombres, sans image.</p>
+    <p>Voyez ce que cela signifie en pratique : une liste est une <b>liste de travail</b>, et un code de
+    cas ou un numéro de ticket peuvent dire ce que votre entreprise est en train de tester. Écrivez dans ces champs ce que
+    vous écririez sur une carte de tableau de tâches — un nom de système et un numéro de ticket, aucun souci ; une donnée
+    personnelle de tiers, non.</p>
+    <p>Une liste marquée <b>&laquo;&nbsp;d’équipe&nbsp;&raquo;</b> est visible pour toutes les personnes ayant un siège dans le
+    même compte ; une liste <b>&laquo;&nbsp;à moi seul&nbsp;&raquo;</b> n’est visible que pour qui l’a créée. Qui a créé la
+    liste peut la supprimer à tout moment, et supprimer emporte tous ses cas — et les fichiers qui y sont
+    joints —, sur-le-champ et sans copie.</p>
+    <p><b>Une fois l’abonnement clos, le contenu du compte est effacé sous 90 jours</b>, par une routine qui
+    tourne tous les jours : listes, cas, reçus, pièces jointes, modèles, configuration, sièges, historique
+    d’émission et tickets. Avant cela, sur demande, par le contact en bas de cette page.</p>
+    <p><b>Une chose n’est pas effacée, et il est juste de dire laquelle :</b> la <b>facture</b>. Une facture a une durée de
+    conservation fiscale supérieure à 90 jours, et la respecter est une obligation légale — ce n’est ni notre choix ni le vôtre. L’enregistrement
+    du client survit avec elle, réduit à ce qui décrit la vente (offre, sièges,
+    durée) : le <b>nom et le numéro d’identification sont effacés</b>, et aucun e-mail, aucune liste et aucun fichier ne subsistent.</p>
+    <p>La session du compte utilise un <b>cookie</b>, et il est nécessaire : c’est ce qui vous garde connecté. Il ne sert
+    pas à la mesure, il n’est lu par aucun script de tiers et il n’existe que sur les pages du compte — l’outil
+    continue de fonctionner sans aucun cookie.</p>
+
+    <h2>Connexions externes</h2>
+    <p>La page fait un nombre réduit de connexions à des services de tiers, et aucune d’elles ne transporte votre
+    contenu :</p>
+    <ul>
+      <li><strong>jsDelivr</strong> — réseau de distribution qui livre les bibliothèques de génération de PDF et de
+      transcription. Il ne reçoit que la requête du fichier de la bibliothèque.</li>
+      <li><strong>Hugging Face</strong> — d’où le modèle de transcription est téléchargé, et seulement si vous déclenchez
+      la transcription automatique. Il reçoit la requête du modèle, jamais votre audio.</li>
+      <li><strong>Supabase</strong> — base de données qui reçoit les trois jalons d’usage et, si vous le remplissez,
+      l’e-mail de la liste de notification. Elle ne reçoit jamais de vidéo, d’audio ou de transcription.</li>
+      <li><strong>Vercel</strong> — l’hébergement de la page et le décompte des visites. Comme tout serveur web, il journalise techniquement les
+      accès au site.</li>
+    </ul>
+    <p>Ces tiers ont leurs propres politiques et peuvent enregistrer des données techniques de connexion, comme l’adresse
+    IP, de la même façon que cela se produit en visitant n’importe quel site.</p>
+
+    <h2>Enregistrement d’écran et microphone</h2>
+    <p>En utilisant l’enregistrement, le navigateur demande votre autorisation pour capturer l’écran et, si vous cochez l’option,
+    le microphone. L’image et les deux canaux audio sont traités sur votre propre ordinateur : les captures
+    sont extraites et l’audio est transcrit sur place. <strong>La vidéo de la session n’est pas enregistrée</strong> — ni
+    de notre côté, qui n’existe pas, ni sur votre disque. Rien de cette capture ne nous est transmis.</p>
+
+    <h2>Webcam dans un coin</h2>
+    <p>Également optionnelle, également <strong>désactivée par défaut dans tous les scénarios</strong>, sans exception : un
+    visage est une donnée personnelle d’un autre ordre qu’un écran, et l’activer nous-mêmes reviendrait à décider à la place de la personne
+    filmée. Avec l’option cochée, le navigateur demande l’autorisation pour la caméra et l’image est dessinée dans un coin
+    des captures et des clips, <strong>sur votre ordinateur</strong> — elle n’en sort pas, comme rien d’autre n’en sort.
+    Si vous allez filmer quelqu’un, demandez-lui son autorisation : nous n’avons aucun moyen de la demander à votre place.</p>
+
+    <h2>Clip des moments marqués</h2>
+    <p>Il y a une exception à cela, et elle est à vous : l’option <em>&laquo;&nbsp;garder un clip des moments marqués&nbsp;&raquo;</em>.
+    Avec elle activée, et <strong>uniquement pour les moments que vous marquez pendant l’enregistrement</strong>, sont
+    conservées environ quinze secondes de vidéo avec le son autour de chaque marque. Le reste de la session continue
+    d’être jeté. L’option naît <strong>désactivée</strong> dans tous les scénarios, sauf celui de la session de
+    test d’utilisabilité, où le clip est le résultat même du travail — et même là, il suffit de la décocher.</p>
+    <p>Ces clips restent <strong>dans la mémoire de cet onglet</strong> : fermer l’onglet les efface. Ils n’arrivent sur
+    votre disque que si vous téléchargez le paquet <code>.zip</code>, et ils continuent de ne passer par aucun serveur. Il y a
+    en plus un bouton <em>&laquo;&nbsp;jeter les vidéos&nbsp;&raquo;</em> qui les efface toutes d’un coup et écrit la date de la
+    destruction dans le document — parce que l’enregistrement d’un participant est une donnée personnelle avec une durée, et qui audite une
+    étude a besoin de voir quand elle a cessé d’exister.</p>
+
+    <h2>Google Drive</h2>
+    <p>Si le bouton d’ouverture de vidéo depuis Google Drive est disponible et que vous l’utilisez, le navigateur se connecte
+    à Google pour s’authentifier et télécharger le fichier que vous choisissez. Le fichier va <strong>de Google directement
+    à votre navigateur</strong>, sans passer par un serveur à nous. Nous demandons l’autorisation la plus restreinte qui
+    existe (<code>drive.file</code>), qui ne donne accès qu’aux fichiers que vous sélectionnez dans la fenêtre de
+    Google — jamais au reste de votre Drive. Tant que vous ne cliquez pas sur ce bouton, aucune connexion avec
+    Google n’est établie.</p>
+    <p>Il existe aussi un bouton <b>Envoyer vers Google Docs</b>. C’est la seule fonction de l’outil où
+    <strong>le document généré sort de votre ordinateur</strong> : le fichier Word monté dans le navigateur est
+    envoyé à Google, qui le convertit en un document Google Docs dans votre Drive. Il va
+    <strong>d’ici directement à Google</strong>, sans passer par un serveur à nous — mais à partir de ce moment
+    le contenu est chez Google, soumis aux politiques de Google, et non aux nôtres. C’est pour cela que le bouton demande une
+    confirmation explicite avant d’envoyer, et c’est pour cela qu’il dit ce qu’il fait. Si la preuve contient une donnée
+    sensible, téléchargez le fichier au lieu de l’envoyer.</p>
+
+    <h2>L’invitation par e-mail</h2>
+    <p>À la fin de l’utilisation, l’outil propose d’envoyer l’<strong>adresse du site</strong> à un
+    collègue. Si vous l’utilisez, <strong>l’adresse e-mail de la personne qui reçoit passe par notre
+    serveur</strong> — c’est le seul point où quelque chose quitte votre machine. Pas de vidéo, pas de
+    transcription, pas de document ; ce que vous avez enregistré ne quitte toujours pas votre
+    ordinateur.</p>
+    <p>Nous en conservons <strong>une empreinte (hash)</strong> de l’adresse et de l’origine de la
+    demande, pas les valeurs. Elle sert uniquement à compter les invitations envoyées et à empêcher
+    que la fonction devienne un outil de nuisance : cinq par heure et par origine, deux par jour vers
+    le même destinataire. Les enregistrements sont effacés au bout de <strong>sept jours</strong>. Il
+    n’y a pas de liste, pas d’inscription, et l’invitation ne se répète pas.</p>
+    <p>Copier l’adresse et partager sur LinkedIn ne passent pas par nous : cela se fait entièrement
+    dans votre navigateur.</p>
+
+    <h2>Stockage dans votre navigateur</h2>
+    <p>La page d’accueil conserve <b>une seule chose</b> : le sigle de la langue que vous avez choisie dans le sélecteur en haut
+    (<code>pt</code>, <code>en</code>, <code>es</code>, <code>de</code> ou <code>fr</code>). Cela sert à ne pas vous renvoyer à la langue du
+    système à la prochaine visite. Ce sont deux lettres, elles n’identifient personne, elles ne sont envoyées nulle part, et
+    elles disparaissent en effaçant les données de navigation.</p>
+    <p>La liste des <b>termes de votre système</b> — les codes et noms propres que la reconnaissance vocale
+    rate — reste dans le <code>sessionStorage</code> avec le reste : elle disparaît à la fermeture de l’onglet, elle n’est pas lue par nous et
+    ne sort pas de votre appareil. La correction a lieu dans votre navigateur, sur le texte qui était déjà ici.</p>
+    <p>L’outil accepte d’être ouvert avec des champs déjà remplis par l’adresse — par exemple
+    <code>?caso=CT-014&amp;chamado=NAT-1234</code>, dans un lien que le coordinateur du test envoie à l’équipe.
+    Un avertissement s’impose : <b>ce qui part dans l’adresse reste dans l’historique de votre navigateur</b> et dans les journaux de qui
+    sert la page. Un nom de système et un numéro de ticket, aucun souci ; une donnée personnelle, non — pour cela, saisissez
+    à l’écran.</p>
+    <p>Qui active l’offre Team conserve aussi la <b>clé de licence</b> — la même ligne qu’il a reçue par
+    e-mail. Elle est vérifiée à l’intérieur du navigateur, contre une clé publique qui se trouve dans le fichier même de la
+    page : <b>il n’y a pas de consultation d’un serveur de licence</b>, cela fonctionne hors ligne, et nous n’apprenons ni qu’elle
+    a été utilisée, ni par qui. Le bouton &laquo;&nbsp;retirer cette licence&nbsp;&raquo; l’efface sur-le-champ. Le logo du
+    client, quand il est utilisé, est lu par le navigateur et dessiné dans le document — lui non plus ne sort pas
+    d’ici.</p>
+    <p>L’outil en conserve <b>une</b> de plus : quelle combinaison de bibliothèque et de format de fichier
+    a réussi à ouvrir le modèle de transcription sur cet ordinateur. C’est une configuration — des noms de version et
+    de fichier —, pas du contenu : elle existe pour que la prochaine visite ne répète pas la recherche, qui sur certaines
+    machines coûte des centaines de mégaoctets de téléchargement. Le bouton <b>effacer le modèle conservé</b>, à
+    côté du diagnostic, efface cette note en même temps que le modèle.</p>
+    <p>Si vous installez l’outil comme application (le raccourci que le navigateur propose), un
+    <i>service worker</i> garde une copie des <b>pages et des fichiers de style</b> pour qu’il s’ouvre sans
+    réseau. Il ne garde que ce que le navigateur téléchargerait de notre adresse de toute façon — <b>jamais de vidéo,
+    d’audio, de transcription ou de document généré</b>, parce que rien de tout cela n’est une requête réseau : ce sont des choses qui
+    vivent et meurent à l’intérieur de l’onglet. Désinstaller l’application, ou effacer les données de navigation, supprime cette
+    copie.</p>
+    <p>Si vous utilisez la transcription automatique, le navigateur garde le modèle téléchargé en cache pour ne pas avoir à
+    le télécharger à nouveau. Ce fichier reste sur votre appareil, sous votre contrôle, et il est supprimé en effaçant les données
+    de navigation. Nous n’y avons pas accès.</p>
+    <p>Les champs d’identification de la preuve que l’outil propose — cas de test, système, qui a
+    exécuté, ticket, résultat — et les annotations par étape <b>ne sont jamais envoyés nulle part</b>. Ils n’apparaissent
+    que dans les documents que vous générez et téléchargez vous-même.</p>
+    <p>Deux d’entre eux, <b>système</b> et <b>exécuté par</b>, sont conservés dans le <code>sessionStorage</code>
+    tant que l’onglet est ouvert, pour que vous ne les retapiez pas à chaque cas de test. Le
+    <code>sessionStorage</code> est effacé par le navigateur lui-même à la fermeture de l’onglet : <b>il ne survit pas entre les
+    visites</b>, ce n’est pas un cookie, il n’est pas lu par nous et il ne sort pas de votre appareil. Il y a un bouton
+    &laquo;&nbsp;Oublier&nbsp;&raquo; à côté des champs qui les efface sur-le-champ. Les autres champs et les annotations ne sont pas
+    conservés, même pas tant que l’onglet vit — cela disparaît au rechargement de la page.</p>
+    <p>Dans le même <code>sessionStorage</code> se trouve le <b>résumé du dernier enregistrement d’écran</b> : combien de
+    captures ont été gardées et pourquoi les autres ne l’ont pas été. Ce sont des compteurs — aucune image, aucun
+    texte — et ils existent pour que le diagnostic reste disponible si la page est rechargée après
+    que quelque chose a mal tourné. Cela disparaît à la fermeture de l’onglet, comme le reste.</p>
+
+    <h2>Les écrans d’un enregistrement en cours</h2>
+    <p>C’est la seule chose que l’outil garde plus longtemps que l’onglet, et elle existe pour une
+    raison concrète : <b>un onglet peut planter</b>. Avant, un plantage à 110 minutes d’un
+    enregistrement de deux heures effaçait les deux heures — et, lors d’une longue attente, fermer
+    l’onglet est justement la décision que prend toute personne raisonnable.</p>
+    <p>C’est pourquoi, pendant que vous enregistrez, chaque écran capturé est aussi écrit dans le
+    <b>stockage privé de votre navigateur</b> (l’<i>Origin Private File System</i>). Cela reste
+    <b>sur votre ordinateur</b>, dans une zone que seule cette page peut lire, et n’est <b>envoyé
+    nulle part</b> — le test du F12 tient toujours : chargez une vidéo de plusieurs gigaoctets et les
+    octets envoyés restent à zéro.</p>
+    <p>Trois choses qui méritent d’être écrites :</p>
+    <ul>
+      <li><b>Cela s’efface tout seul dès qu’un document sort.</b> À l’instant où vous générez le PDF,
+      le Word, le .zip ou toute autre sortie, le travail a quitté l’outil et la copie sur le disque
+      est supprimée.</li>
+      <li><b>Cela s’efface tout seul au bout de sept jours</b>, même si aucun document n’est sorti.</li>
+      <li><b>On peut les jeter à tout moment.</b> Quand un enregistrement est stocké, l’étape 1 le dit
+      clairement et propose &laquo;&nbsp;jeter&nbsp;&raquo; à côté de &laquo;&nbsp;récupérer&nbsp;&raquo;.
+      Jeter efface sur-le-champ — cela ne se contente pas d’arrêter d’écrire ensuite.</li>
+    </ul>
+    <p>Quand un enregistrement est stocké, l’étape 1 le dit franchement — combien d’écrans, de quand,
+    quelle place — et propose les deux seules choses qu’on puisse vouloir : le récupérer ou le
+    jeter.</p>
+
+    <h2>Cookies</h2>
+    <p>Nous n’utilisons ni cookies propres ni cookies de tiers — ni pour le pistage, ni pour la publicité,
+    ni pour la mesure. Le décompte des visites et les trois jalons décrits ci-dessus fonctionnent <b>sans cookie et sans
+    identifiant qui persiste entre les visites</b>, et c’est justement pour cela qu’il n’existe pas de bandeau cookies
+    sur cette page : il n’y aurait rien à consentir.</p>
+
+    <h2>Mineurs</h2>
+    <p>Le service ne s’adresse pas aux moins de 13 ans, et la liste de notification ne doit pas être remplie par
+    eux. Nous n’avons aucun moyen de vérifier l’âge — il n’y a pas d’inscription. Si vous savez qu’un mineur a laissé son e-mail,
+    écrivez à <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a> et il est
+    supprimé. En dehors de cela, il n’y a aucune donnée de mineur en notre pouvoir, parce que nous n’avons les données de personne : la vidéo
+    ne sort jamais de l’appareil.</p>
+
+    <h2>Bases légales, finalités et durées</h2>
+    <p>Ce qui est traité, pourquoi, sur quel fondement et pendant combien de temps :</p>
+    <table class="legal" id="basesLegais">
+      <tr><th>Donnée</th><th>Pour quoi faire</th><th>Base légale</th><th>Durée</th></tr>
+      <tr><td>E-mail de la liste de notification</td><td>Prévenir quand l’offre payante existera</td>
+          <td>Consentement (art. 7, I)</td><td>Jusqu’à votre révocation, ou 24 mois sans usage</td></tr>
+      <tr><td>Les trois jalons d’usage</td><td>Savoir où l’outil échoue et l’améliorer</td>
+          <td>Donnée anonymisée (art. 12) ; en cas de doute, intérêt légitime (art. 7, IX)</td>
+          <td>18 mois</td></tr>
+      <tr><td>Visites de page</td><td>Savoir combien de personnes arrivent et par où</td>
+          <td>Donnée anonymisée (art. 12) ; en cas de doute, intérêt légitime (art. 7, IX)</td>
+          <td>Selon la politique de Vercel</td></tr>
+      <tr><td>Journaux d’accès au serveur web</td><td>Sécurité et obligation légale</td>
+          <td>Exécution d’une obligation légale (art. 7, II) — Marco Civil da Internet, art. 15</td>
+          <td>6 mois</td></tr>
+      <tr><td>Contenu du compte payant — listes, cas, reçus, pièces jointes, modèles, configuration,
+          sièges, tickets</td>
+          <td>Fournir le service souscrit</td>
+          <td>Exécution d’un contrat (art. 7, V)</td>
+          <td>Tant que l’abonnement dure, et <b>jusqu’à 90 jours</b> après sa clôture</td></tr>
+      <tr><td>La facture et l’enregistrement client qui y est lié</td>
+          <td>Obligation fiscale et comptable</td>
+          <td>Exécution d’une obligation légale (art. 7, II)</td>
+          <td>La durée de conservation fiscale applicable. Le nom et le numéro d’identification sont effacés avec le reste du
+          compte, à 90 jours</td></tr>
+    </table>
+    <p class="small muted">Les jalons d’usage et les visites ont été conçus pour n’identifier personne ; si
+    malgré tout ils étaient considérés comme des données personnelles par une autorité, le fondement est l’intérêt légitime
+    à maintenir et à améliorer le service, et vous pouvez vous y opposer par le contact ci-dessus.</p>
+
+    <h2>Où les données se trouvent</h2>
+    <p>L’e-mail de la liste et les jalons d’usage se trouvent dans une base de données hébergée par <b>Supabase dans la région de
+    São Paulo</b> — c’est-à-dire <b>sur le territoire brésilien</b>. L’hébergement du site est assuré par <b>Vercel</b>, dont
+    le réseau est mondial : les journaux techniques d’accès et le décompte des visites peuvent être traités hors du
+    Brésil, ce qui caractérise un transfert international au sens de l’art. 33 de la LGPD, encadré par des
+    clauses contractuelles du fournisseur lui-même.</p>
+    <p><b>Vos vidéos ne sont dans aucun de ces endroits</b>, parce qu’elles ne quittent jamais votre appareil.</p>
+
+    <h2>Vos droits</h2>
+    <p>La LGPD (loi n° 13.709/2018) vous garantit, à tout moment et gratuitement :</p>
+    <ul>
+      <li>la confirmation qu’un traitement existe, et l’accès aux données ;</li>
+      <li>la correction d’une donnée incomplète, inexacte ou périmée ;</li>
+      <li>l’anonymisation, le blocage ou l’effacement d’une donnée inutile ou traitée en non-conformité ;</li>
+      <li>la portabilité vers un autre fournisseur ;</li>
+      <li>l’effacement des données traitées sur la base de votre consentement ;</li>
+      <li>l’information sur les personnes avec qui nous partageons ;</li>
+      <li>l’information sur la possibilité de ne pas consentir, et sur ce que cela implique ;</li>
+      <li>la révocation du consentement, à tout moment.</li>
+    </ul>
+    <p>En pratique, ici cela signifie presque toujours une seule chose : <b>retirer votre e-mail de la liste</b>. Il suffit
+    d’écrire à <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a> — nous répondons sous
+    15 jours, et la suppression est immédiate quand la demande est celle-là. Nous ne demandons ni pièce d’identité ni justification
+    pour supprimer : l’e-mail qui écrit est lui-même la preuve qu’il est le vôtre.</p>
+    <p>Vous pouvez aussi porter réclamation auprès de l’<b>Autoridade Nacional de Proteção de Dados (ANPD)</b> si vous estimez que
+    vos droits n’ont pas été respectés.</p>
+
+    <h2>Modifications</h2>
+    <p>Si cette politique change, la date en haut de page sera mise à jour. Les changements importants — en particulier tout
+    passage à une collecte de données — seront annoncés sur cette page, avec la date en haut mise à jour.</p>
+
+    <h2>Contact</h2>
+    <p>{{empresa}} — CNPJ {{cnpj}}.<br>
+    Confidentialité et demandes des personnes concernées :
+    <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a>.<br>
+    Sujets techniques et rapports de défaut : la même adresse.</p>
+
+
+  </div>
+</section>
