@@ -282,6 +282,42 @@ async function rodar() {
   checar("lote cobre todos os clientes", emLote.size === todos.length,
          `${emLote.size} de ${todos.length}`);
 
+  // ---- O MES TEM DE SER UMA FOTOGRAFIA, NAO UM ESPELHO (auditoria CA-02)
+  //
+  // A home filtrava as limpezas pelo mes escolhido e somava o saldo INTEIRO,
+  // sem corte de data. Abrir julho em setembro mostrava as limpezas de julho ao
+  // lado da divida de setembro, na mesma linha.
+  //
+  // Antonio deve 45 de 30 dias atras e informou 45 ontem (a conferir). Cortar
+  // em 35 dias atras tem de devolver ZERO — naquele dia ele ainda nao devia
+  // nada. Se o corte fosse enfeite, viria -45 igual ao de hoje.
+  const antesDeTudo = diasAtras(35);
+  const fotoAntiga  = await fin.calcularSaldosPorFamilia(["f-ant"], { ate: antesDeTudo });
+  const fotoHoje    = await fin.calcularSaldosPorFamilia(["f-ant"]);
+  checar("saldo numa data passada ignora o que veio depois",
+         fotoAntiga.get("f-ant")!.saldo === 0,
+         `veio ${fotoAntiga.get("f-ant")!.saldo} para ${antesDeTudo}`);
+  checar("saldo de hoje continua vendo tudo",
+         fotoHoje.get("f-ant")!.saldo === -45,
+         `veio ${fotoHoje.get("f-ant")!.saldo}`);
+  checar("a foto antiga e DIFERENTE da de hoje (senao o corte e enfeite)",
+         fotoAntiga.get("f-ant")!.saldo !== fotoHoje.get("f-ant")!.saldo);
+
+  // A familia AVU tem saldo de ABERTURA (origem `abertura`, 5 dias atras).
+  // Ela conta no saldo — so nao conta em relatorio por periodo.
+  const fotoAvu = await fin.calcularSaldosPorFamilia(["f-avu"], { ate: diasAtras(10) });
+  checar("abertura lancada depois do corte fica fora da foto",
+         fotoAvu.get("f-avu")!.saldo === -50,
+         `veio ${fotoAvu.get("f-avu")!.saldo} (esperado -50: so o avulso, sem os 240)`);
+
+  // A regra tem de ser a MESMA das outras duas portas.
+  const porFam = await fin.calcularSaldosPorFamilia(["f-ant"]);
+  const porPessoa = await fin.calcularSaldo("c-ant");
+  checar("familia, lote e ficha dao o mesmo numero",
+         porFam.get("f-ant")!.saldo === porPessoa.saldo &&
+         porFam.get("f-ant")!.aConferir === porPessoa.aConferir,
+         `familia ${JSON.stringify(porFam.get("f-ant"))} x ficha ${JSON.stringify(porPessoa)}`);
+
   console.log("\n=== 2. CAPACIDADE ===");
   const cap = await import("../src/lib/capacidade");
   const c = await cap.calcularCapacidade();

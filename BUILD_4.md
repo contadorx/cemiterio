@@ -1,7 +1,7 @@
 # Build 4 — verdade financeira
 
-**Estado:** decisão tomada em 22/08/2026, implementada no razão. Leituras (11
-arquivos) e escritas (13 funções + 1 lib) migradas. Falta o congelamento.
+**Estado:** concluído em 22/08/2026. Um razão só — `conta_corrente`, por
+família. `movimentos` congelado como histórico.
 
 > **A decisão, nas palavras da responsável:**
 > *"É a família, mas sempre tem um responsável financeiro."*
@@ -558,7 +558,67 @@ antigas) e `sureya_excluir_servico` (limpa os dois). Enquanto as 2 linhas
 legadas existirem, congelar quebraria as duas. O congelamento é o passo
 seguinte, e é pequeno.
 
-### 8.9 O que falta, na ordem
+### 8.9 O congelamento — `migrations/0074_o_razao_antigo_vira_historia.sql`
+
+`movimentos` é somente leitura. **Fim do Build 4.**
+
+Conferido antes de escrever: as 2 linhas restantes estão as duas `confirmado` e
+as duas com par no razão da família. Nada pendente — congelar não deixa ninguém
+preso. E congelar é melhor que apagar: são a primeira limpeza cobrada e o
+primeiro Pix recebido do sistema, e o histórico continua legível.
+
+#### A armadilha que o próprio congelamento cria
+
+A 0072 pôs `conta_corrente.movimento_id` em `ON DELETE CASCADE`, e **estava
+certa**: enquanto o espelho vivia, linha espelhada não tinha vida própria.
+
+Congelado o razão antigo, a mesma chave inverte de sinal. `movimento_id` deixa
+de ser "o original deste reflexo" e vira só **procedência**. Aí o cascade passa
+a ser uma bomba: quem apagar uma linha de `movimentos` leva junto uma linha
+**viva** do razão da família — duas das seis.
+
+A policy impede o delete, mas policy não alcança o service role, que é quem roda
+script de manutenção. Por isso a chave saiu; a coluna ficou.
+
+#### Congelado em duas camadas, porque uma seria teatro
+
+| Camada | Contra quem |
+|---|---|
+| Policy `RESTRICTIVE` (`with check (false)`) | quem passa por RLS |
+| `revoke insert, update, delete, truncate` | o **service role**, que ignora RLS |
+
+O espelho foi aposentado junto: gatilho que nunca dispara é pior que nenhum —
+quem ler o esquema daqui a um ano acharia que os dois razões ainda conversam.
+
+#### O teste reprovou a minha explicação, não o código
+
+A primeira versão da prova rodava como `postgres` e o insert **passou**. Escrevi
+no comentário que superusuário era "mais poderoso que o service role, então se
+travar ali trava em qualquer papel". Errado: superusuário ignora RLS **e**
+privilégio de tabela, então testar por ali não prova nada.
+
+A prova agora roda nos três papéis que o Supabase usa de verdade —
+`service_role`, `authenticated`, `anon` — e cobra que os três sejam recusados.
+
+`testes/espelho.sql` foi substituído por `testes/congelamento.sql`: o que
+precisa ser provado deixou de ser "o reflexo acompanha" e passou a ser "o razão
+antigo não muda mais, e o novo não depende dele". E o harness agora exige que a
+lista de funções que escrevem em `movimentos` esteja **vazia**.
+
+#### Conferido em produção depois de subir
+
+```
+gatilhos de espelho aposentados        0    ✅
+policy RESTRICTIVE                     1    ✅
+escrita revogada de service_role       0    ✅
+cascade desarmado                      0    ✅
+funcoes escrevendo em movimentos       0    ✅
+historico legivel                      2    ✅
+saldo das familias           −170,00 intacto ✅
+linhas do razao da familia             6    ✅
+```
+
+### 8.10 O que falta, na ordem
 
 1. ~~**Migrar os arquivos** que ainda leem `movimentos`~~ — **feito (8.6)**. As
    leituras acabaram. Restam as **escritas**: uma em TypeScript
@@ -572,7 +632,7 @@ seguinte, e é pequeno.
    fechado.
 5. **O resto do glossário** (8.2), por escrito.
 
-### 8.10 Uma pergunta que ficou aberta
+### 8.11 Uma pergunta que ficou aberta
 
 `familias.modo_cobranca` separa dois mundos: `consumo` (cada lavagem vira
 dívida) e `competencia` (o mês vira dívida, a lavagem é só registro).

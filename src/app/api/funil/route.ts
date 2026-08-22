@@ -50,8 +50,18 @@ export async function GET(req: NextRequest) {
     competencia,
     etapas,
     pendencias: pend,
-    podeFechar: etapas.find((e) => e.etapa === "pronto para fechar")?.quantidade === 1,
-    fechado: (etapas.find((e) => e.etapa === "fechado")?.quantidade || 0) > 0,
+    // `Number()` NAO E ZELO EXCESSIVO AQUI.
+    //
+    // `quantidade` e `bigint` e `valor` e `numeric`, e os dois saem da MESMA
+    // funcao. Consultando o banco direto, `numeric` volta como string e bigint
+    // como numero — nao conferi se pelo PostgREST e igual, e essa incerteza e
+    // justamente o problema: um `=== 1` contra "1" deixaria o botao de fechar
+    // desabilitado para sempre, sem erro em lugar nenhum, e a pessoa acharia
+    // que o mes nunca esta pronto.
+    //
+    // `Number()` custa nada e tira a duvida do caminho.
+    podeFechar: Number(etapas.find((e) => e.etapa === "pronto para fechar")?.quantidade) === 1,
+    fechado: Number(etapas.find((e) => e.etapa === "fechado")?.quantidade || 0) > 0,
   });
 }
 

@@ -128,10 +128,41 @@ aparece no dia — aparece quando o número já fechado muda depois.
 
 ---
 
-## 5. O que falta
+## 5. A tela — `src/app/painel/fechamento/Funil.tsx`
 
-- **a tela do funil.** A rota `/api/funil` existe e responde; falta desenhar as
-  cinco etapas em `/painel/fechamento` e ligar o botão de fechar à recusa.
+O funil entra **antes** da cobrança na tela de fechamento, de propósito: a
+primeira pergunta de quem abre essa página é *"posso fechar?"*, não *"quero
+lançar"*. Lançar cobrança sem saber o que está pendente é assinar antes de ler.
+
+Duas decisões de desenho, e o porquê:
+
+**A pendência não é um alerta — é uma linha clicável** que leva à tela onde se
+resolve. Alerta que não diz o que fazer só ensina a ignorar alerta. Etapa
+zerada não vira link: clicar e não achar nada é pior que não poder clicar.
+
+**O botão de fechar fica sempre visível, mesmo bloqueado, com o motivo
+embaixo.** Esconder o botão faz a pessoa procurar; mostrar bloqueado com o
+motivo faz ela resolver. Quando a função recusa, a tela mostra a recusa inteira
+e oferece "fechar mesmo assim" — que grava a pendência na observação.
+
+Botão bloqueado sem motivo é porta trancada sem placa.
+
+E o erro de carregamento aparece com "tentar de novo" em vez de zerar o funil:
+**funil vazio se lê como "está tudo resolvido"**, que é exatamente a leitura
+errada para uma falha. (É também o que a auditoria pede em CA-03.)
+
+### Um detalhe que travaria o botão para sempre, em silêncio
+
+`quantidade` é `bigint` e `valor` é `numeric`, e os dois saem da mesma função.
+Consultando o banco direto, `numeric` volta como string e `bigint` como número —
+**não conferi se pelo PostgREST é igual**, e essa incerteza é o problema: um
+`=== 1` contra `"1"` deixaria o botão de fechar desabilitado para sempre, sem
+erro em lugar nenhum, e a responsável acharia que o mês nunca fica pronto.
+`Number()` custa nada e tira a dúvida do caminho.
+
+---
+
+## 6. O que falta
 - resolver as 2 limpezas sem cobrança de agosto (decisão de operação: cobrar ou
   marcar como cortesia).
 - o resto do glossário (BUILD_4 §8.2).

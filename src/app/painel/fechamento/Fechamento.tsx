@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
+import { Funil } from "./Funil";
 
 /**
  * O FECHAMENTO DO MÊS.
@@ -78,6 +79,11 @@ export function PainelFechamento() {
 
   return (
     <>
+        {/* ---------- como está o mês ----------
+            Vem ANTES da cobrança de propósito: a primeira pergunta de quem abre
+            esta tela é "posso fechar?", não "quero lançar". Lançar cobrança sem
+            saber o que está pendente é como assinar antes de ler. */}
+        <Funil competencia={competencia} />
 
         {/* ---------- gerar a cobrança do período ---------- */}
         <div style={painel.card}>

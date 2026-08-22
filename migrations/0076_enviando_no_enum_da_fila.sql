@@ -1,0 +1,41 @@
+-- =====================================================================
+-- SUREYA — 0076 · 'enviando' COMO ESTADO DA FILA
+--
+-- ESTE ARQUIVO RODA SOZINHO. Não junte com outro.
+-- (`alter type ... add value` não roda dentro de bloco de transação, e o
+--  editor SQL do Supabase envolve o que você cola em uma. Mesma razão da
+--  0047b, da 0065 e da 0069.)
+--
+-- O QUE FOI ENCONTRADO
+-- ---------------------------------------------------------------------
+--   repositório (0050)   aguardando | enviado | descartado
+--   produção             aguardando | enviado | descartado | enviando
+--
+-- `enviando` está em produção e em migration nenhuma — criado à mão no SQL
+-- Editor, como `abertura` foi.
+--
+-- E o código DEPENDE dele. `src/app/api/fila/route.ts` reserva o item antes
+-- de enviar:
+--
+--     const alvo = acao === "enviar" ? "enviando" : "descartado";
+--     .update({ status: alvo, ... }).eq("status", "aguardando")
+--
+-- Essa reserva é o que impede o clique duplo de mandar a mesma foto duas
+-- vezes para a família — e o WhatsApp não tem desfazer.
+--
+-- Num ambiente reconstruído do repositório, esse update falha com
+-- `invalid input value for enum sureya_status_fila: "enviando"`, o erro cai
+-- no `if (eRes) return 500`, e **nenhuma mensagem sai da fila**. Não é
+-- degradação: é a função inteira parada.
+--
+-- É o terceiro enum com essa história (lavagem na 0065, abertura na 0069).
+-- O padrão é sempre o mesmo: alguém acrescenta o valor direto no banco para
+-- destravar o dia, e a migration não é escrita.
+-- =====================================================================
+
+alter type sureya_status_fila add value if not exists 'enviando';
+
+-- Conferência:
+-- select enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid
+--  where t.typname = 'sureya_status_fila' order by e.enumsortorder;
+-- → aguardando | enviado | descartado | enviando

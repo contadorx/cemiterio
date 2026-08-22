@@ -112,6 +112,91 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
 }
 
 /**
+ * O SALDO DE VARIAS FAMILIAS, OPCIONALMENTE COMO ELE ERA NUMA DATA.
+ *
+ * ESTA E A REGRA. As outras funcoes de saldo deste arquivo chamam esta.
+ *
+ * POR QUE O CORTE DE DATA MORA AQUI
+ * ---------------------------------------------------------------------------
+ * A auditoria reprova a home (CA-02) por misturar dois tempos na mesma linha:
+ *
+ *     "falta limpar"  → as lavagens do MES ESCOLHIDO
+ *     "falta pagar"   → o saldo de HOJE
+ *
+ * Escolher julho em setembro mostrava as limpezas de julho ao lado da divida de
+ * setembro. Nao da para chamar isso de fechamento de julho.
+ *
+ * `ate` resolve: o saldo passa a ser o do FIM da competencia escolhida — como a
+ * conta estava naquele dia, inclusive quem devia e depois pagou. E o que torna
+ * o mes uma fotografia em vez de um espelho.
+ *
+ * Sem `ate`, devolve o saldo de agora, que e o que a cobranca e a ficha querem.
+ *
+ * O QUE ESTAVA ACONTECENDO EM TRES LUGARES DIFERENTES
+ * ---------------------------------------------------------------------------
+ * `api/mes` (a home) tinha a sua propria copia da soma, e ela divergia em tres
+ * pontos — cada um capaz de mudar o numero que a responsavel le:
+ *
+ *   1. pulava `origem = 'lavagem'` com o comentario "eles tem valor zero".
+ *      Isso era verdade ate a 0073. Em `modo_cobranca = consumo` — que e o de
+ *      TODAS as 298 familias — a lavagem passou a carregar o valor. A home
+ *      estaria escondendo a divida de cada limpeza;
+ *   2. nao filtrava `status_conc`, entao comprovante nao conferido e ate
+ *      lancamento rejeitado entravam no saldo;
+ *   3. somava com o sinal invertido (debito positivo).
+ *
+ * Tres copias da mesma regra e tres oportunidades de divergir. Agora e uma.
+ */
+export async function calcularSaldosPorFamilia(
+  familiaIds: string[],
+  opts?: { ate?: string },
+): Promise<Map<string, Saldo>> {
+  const fora = new Map<string, Saldo>();
+  const ids = [...new Set(familiaIds.filter(Boolean))];
+  if (!ids.length) return fora;
+
+  const db = supabaseAdmin();
+  let q = db
+    .from("conta_corrente")
+    .select("familia_id,tipo,valor,status_conc")
+    .eq("org_id", env.orgId())
+    .in("familia_id", ids);
+  if (opts?.ate) q = q.lte("data", opts.ate);
+
+  const { data, error } = await q;
+
+  // ERRO DE LEITURA NAO VIRA SALDO ZERO — nem aqui, nem em lote, nem na ficha.
+  // Zero significa "em dia", e uma falha silenciosa calaria a cobranca de uma
+  // familia inadimplente.
+  if (error) throw new Error(`saldo_indisponivel: ${error.message}`);
+
+  for (const fid of ids) fora.set(fid, { saldo: 0, aConferir: 0 });
+
+  for (const m of data || []) {
+    const fid = (m as any).familia_id as string;
+    const acc = fora.get(fid);
+    if (!acc) continue;
+    const st = (m as any).status_conc;
+    const v = Number((m as any).valor) || 0;
+    if (st === "rejeitado") continue;
+    if (st === "a_conferir") {
+      // Comprovante informado e ainda nao batido com o extrato NAO e saldo.
+      if ((m as any).tipo === "credito") acc.aConferir += v;
+      continue;
+    }
+    acc.saldo += (m as any).tipo === "credito" ? v : -v;
+  }
+
+  for (const [fid, acc] of fora) {
+    fora.set(fid, {
+      saldo: Math.round(acc.saldo * 100) / 100,
+      aConferir: Math.round(acc.aConferir * 100) / 100,
+    });
+  }
+  return fora;
+}
+
+/**
  * O MESMO SALDO, PARA UMA LISTA INTEIRA, EM DUAS CONSULTAS.
  *
  * POR QUE ESTA FUNCAO EXISTE
@@ -148,40 +233,13 @@ export async function calcularSaldosEmLote(
   const familiaIds = [...new Set(clientes.map((c) => c.familia_id).filter(Boolean))] as string[];
   if (!familiaIds.length) return fora;
 
-  const db = supabaseAdmin();
-  const { data, error } = await db
-    .from("conta_corrente")
-    .select("familia_id,tipo,valor,status_conc")
-    .eq("org_id", env.orgId())
-    .in("familia_id", familiaIds);
-
-  // MESMA REGRA DA `calcularSaldo()`: erro de leitura nao vira saldo zero.
-  // Numa lista, zero em massa e pior ainda — a tela de "atrasados" voltaria
-  // vazia e a operacao leria isso como "ninguem devendo".
-  if (error) throw new Error(`saldo_indisponivel: ${error.message}`);
-
-  const porFamilia = new Map<string, Saldo>();
-  for (const m of data || []) {
-    const fid = (m as any).familia_id as string;
-    const st = (m as any).status_conc;
-    const v = Number((m as any).valor) || 0;
-    const acc = porFamilia.get(fid) || { saldo: 0, aConferir: 0 };
-    if (st === "rejeitado") { porFamilia.set(fid, acc); continue; }
-    if (st === "a_conferir") {
-      if ((m as any).tipo === "credito") acc.aConferir += v;
-    } else {
-      acc.saldo += (m as any).tipo === "credito" ? v : -v;
-    }
-    porFamilia.set(fid, acc);
-  }
+  // Uma regra so: quem soma e `calcularSaldosPorFamilia`. Esta funcao existe
+  // para traduzir pessoa -> familia, que e o que as telas de lista tem na mao.
+  const porFamilia = await calcularSaldosPorFamilia(familiaIds);
 
   for (const c of clientes) {
     if (!c.familia_id) continue;
-    const acc = porFamilia.get(c.familia_id) || { saldo: 0, aConferir: 0 };
-    fora.set(c.id, {
-      saldo: Math.round(acc.saldo * 100) / 100,
-      aConferir: Math.round(acc.aConferir * 100) / 100,
-    });
+    fora.set(c.id, porFamilia.get(c.familia_id) || { saldo: 0, aConferir: 0 });
   }
   return fora;
 }

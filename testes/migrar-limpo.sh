@@ -122,14 +122,22 @@ fi
 # o valor do teste esta em eles serem a verdade conferida, nao um numero velho.
 # ---------------------------------------------------------------------------
 ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
+# DELTA DELIBERADO DE TABELAS
+#   0075  +1  competencias — um mes fechado passa a ser um FATO, com data e
+#             autor. Antes, "fechado" era so a lembranca de quem apertou o botao.
+TABELAS_DELTA=${TABELAS_DELTA:-1}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
 # DELTA DELIBERADO DE GATILHOS
-#   0058  +1  trg_espelha_plano_no_jazigo   (ja aplicado em producao)
+#   0058  +1  trg_espelha_plano_no_jazigo   (ja contado no 14 de producao)
 #   0071  +2  trg_espelha_movimento_na_conta, trg_espelha_status_movimento
-# O da 0058 ja esta contado no 14 de producao; os dois da 0071 ainda nao.
-GATILHOS_DELTA=${GATILHOS_DELTA:-2}
+#   0074  -2  os dois da 0071 sao APOSENTADOS: com `movimentos` congelado nao ha
+#             mais o que espelhar, e gatilho que nunca dispara engana quem le o
+#             esquema depois.
+# Soma zero. Enquanto a 0074 nao subir, producao tera 2 gatilhos a MAIS que o
+# repositorio — e este numero volta a fechar quando ela subir.
+GATILHOS_DELTA=${GATILHOS_DELTA:-0}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -157,18 +165,25 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 # DELTA DELIBERADO DE POLICIES
 #   0059  +1   quitacoes_org (a tabela e nova no repositorio)
 #   0067  +41  as restritivas que separam campo de administracao
+#   0074  +1   movimentos_congelado (RESTRICTIVE: o razao antigo vira historia)
+#   0075  +2   competencias_org e competencias_so_admin_escreve
 # Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-41}
+POLICIES_DELTA=${POLICIES_DELTA:-44}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
 #   0068  +1  sureya_iniciar_lavagem
 #   0071  +2  sureya_espelha_movimento_na_conta, sureya_espelha_status_movimento
 #   0073  +1  sureya_lancar  (a porta unica do razao da familia)
-# Nenhuma das cinco existe em producao ainda. As demais migrations desta
+#   0074  -2  as duas de espelho da 0071 sao aposentadas junto com os gatilhos
+#   0075  +4  sureya_funil, sureya_pendencias_da_competencia,
+#             sureya_fechar_competencia, sureya_reabrir_competencia
+#   0077  +4  sureya_fila_reservar, sureya_fila_soltar, sureya_fila_concluir,
+#             sureya_fila_destravar
+# Saldo: +11. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-5}
+FUNCOES_DELTA=${FUNCOES_DELTA:-11}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -185,7 +200,7 @@ linha() {
   fi
 }
 echo "PLACAR — repositorio reconstruido x producao (21/08/2026)"
-linha "tabelas"  "$tb" "$ESPERADO_TABELAS"
+linha "tabelas"  "$tb" "$((ESPERADO_TABELAS + TABELAS_DELTA))"
 linha "funcoes"  "$fn" "$((ESPERADO_FUNCOES + FUNCOES_DELTA))"
 linha "gatilhos" "$tg" "$((ESPERADO_GATILHOS + GATILHOS_DELTA))"
 linha "policies" "$((po + POLICIES_DUPLICADAS))" "$((ESPERADO_POLICIES + POLICIES_DELTA))"
@@ -205,18 +220,19 @@ if [ "$divergiu" = "1" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# O ESPELHO ENTRE OS DOIS RAZOES
+# O CONGELAMENTO DO RAZAO ANTIGO
 #
-# O placar prova que os OBJETOS existem. Nao prova que eles se comportam. O
-# espelho da 0071/0072 e a peca em que um erro nao aparece como falha: aparece
-# como numero errado na ficha da familia — e foi assim que o buraco do delete
-# passou pela revisao. Por isso ele tem prova propria, aqui, em banco limpo.
+# O placar prova que os OBJETOS existem. Nao prova que eles se comportam — e
+# "esta congelado" e exatamente o tipo de afirmacao que ninguem percebe estar
+# errada ate alguem escrever dinheiro no lugar errado. Por isso tem prova
+# propria, aqui, em banco limpo, rodando como superusuario (mais poderoso que o
+# service role: se a trava segura ai, segura em qualquer papel).
 # ---------------------------------------------------------------------------
-echo "ESPELHO — movimentos -> conta_corrente"
-if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/espelho.sql 2>&1); then
-  echo "$saida" | grep -E "ESPELHO FALHOU|ERROR" | sed 's/^/  /'
+echo "CONGELAMENTO — o razao antigo virou historia"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/congelamento.sql 2>&1); then
+  echo "$saida" | grep -E "CONGELAMENTO FALHOU|ERROR" | sed 's/^/  /'
   echo
-  echo "O espelho entre os dois razoes esta mentindo."
+  echo "O razao antigo voltou a aceitar escrita, ou o novo parou de aceitar."
   echo "============================================================"
   exit 1
 fi
@@ -242,37 +258,63 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
-# QUEM AINDA ESCREVE NO RAZAO ANTIGO
+# O FUNIL E O FECHAMENTO
 #
-# Depois da 0073 so tres funcoes podem tocar `movimentos`, e as tres de
-# proposito — sao as que precisam manter os dois lados iguais enquanto a tabela
-# nao e congelada. Qualquer nome novo nesta lista significa que alguem escreveu
-# dinheiro no lugar errado, e e melhor descobrir aqui do que no extrato de uma
-# familia.
-#
-# Esta e a condicao do congelamento: quando esta lista couber so nas de espelho,
-# `movimentos` pode virar somente-leitura.
+# O que precisa ser provado aqui nao e "a funcao roda" — e que ela RECUSE. Um
+# fechamento que sempre aceita e decorativo, e o estrago nao aparece no dia:
+# aparece quando o numero ja fechado muda depois.
 # ---------------------------------------------------------------------------
-esperadas="sureya_conciliar_comprovante sureya_espelha_movimento_na_conta sureya_espelha_status_movimento sureya_excluir_servico"
+echo "FECHAMENTO — o funil, e a recusa"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/fechamento.sql 2>&1); then
+  echo "$saida" | grep -E "FECHAMENTO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "O fechamento aceita o que nao deveria, ou recusa o que deveria passar."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O OUTBOX DA FILA
+#
+# O criterio de saida do Build 6 e literal: "envio repetido nao duplica
+# mensagem". Isso nao da para verificar lendo — so exercitando a falha no meio
+# do envio e conferindo de onde a retentativa recomeca.
+# ---------------------------------------------------------------------------
+echo "OUTBOX — a fila lembra o que aconteceu"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/outbox.sql 2>&1); then
+  echo "$saida" | grep -E "OUTBOX FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "A fila pode estar reenviando foto que ja saiu."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# NINGUEM ESCREVE NO RAZAO ANTIGO
+#
+# Depois da 0074 a lista tem de estar VAZIA. Qualquer nome aqui e uma funcao
+# escrevendo dinheiro numa tabela congelada — ela vai falhar em producao com
+# `permission denied`, e o pior caso nao e o erro: e alguem "consertar" o erro
+# devolvendo a escrita ao razao antigo e voltando a ter dois saldos.
+# ---------------------------------------------------------------------------
 achadas=$(psql -q $ALVO -tAc "
   select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public'
      and p.prosrc ~* '(insert into|update|delete from)[[:space:]]+movimentos'
    order by 1;" | tr '\n' ' ')
-echo "ESCREVEM EM \`movimentos\` (esperado: so as de espelho/limpeza)"
-inesperada=0
-for f in $achadas; do
-  case " $esperadas " in
-    *" $f "*) printf "  ok  %s\n" "$f" ;;
-    *)        printf "  !!  %s  <-- NAO DEVERIA ESCREVER NO RAZAO ANTIGO\n" "$f"; inesperada=1 ;;
-  esac
-done
-if [ "$inesperada" = "1" ]; then
+if [ -n "$(echo "$achadas" | tr -d ' ')" ]; then
+  echo "ESCREVEM NO RAZAO ANTIGO (deveria estar vazio):"
+  for f in $achadas; do printf "  !!  %s\n" "$f"; done
   echo
-  echo "Funcao escrevendo dinheiro no razao antigo. Ver DECISOES.md D-01."
+  echo "\`movimentos\` esta congelado desde a 0074. Ver DECISOES.md D-01."
   echo "============================================================"
   exit 1
 fi
+echo "NINGUEM ESCREVE NO RAZAO ANTIGO — congelado desde a 0074."
 echo
 
 echo "O repositorio reconstroi o banco."
