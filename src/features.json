@@ -1,0 +1,919 @@
+{
+  "_leia": [
+    "A lista completa do que a ferramenta faz, e em que plano cada coisa está.",
+    "",
+    "REGRA DE OURO deste arquivo: só entra o que EXISTE. Uma linha aqui vira uma",
+    "marca de visto numa tabela de preço, e uma marca de visto é uma promessa.",
+    "O que ainda não existe entra com \"breve\": true, e sai escrito como tal.",
+    "",
+    "`planos` é uma string com as letras de quem tem: f = Free, p = Personal,",
+    "t = Team. Quase tudo é \"fpt\", e isso é a tese do produto, não um descuido —",
+    "a ferramenta no navegador é gratuita e sempre será. O que é pago é a",
+    "identidade (a marca do cliente no documento), o que sobrevive entre visitas",
+    "(modelos e perfil) e o que é de time (assentos, convite, padrão empurrado)."
+  ],
+  "grupos": [
+    {
+      "id": "entrada",
+      "titulo": {
+        "pt": "De onde vem o vídeo",
+        "en": "Where the video comes from",
+        "es": "De dónde viene el vídeo",
+        "de": "Woher das Video kommt",
+        "fr": "D’où vient la vidéo"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Arquivo de vídeo, arrastando ou escolhendo",
+          "en": "A video file, dragged or picked",
+          "es": "Un archivo de vídeo, arrastrado o elegido",
+          "de": "Videodatei, per Drag-and-drop oder Auswahl",
+          "fr": "Fichier vidéo, glissé ou sélectionné"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Gravar a tela ali mesmo — o vídeo é descartado no fim",
+          "en": "Record the screen right there — the video is discarded at the end",
+          "es": "Grabar la pantalla ahí mismo — el vídeo se descarta al final",
+          "de": "Bildschirm direkt aufnehmen — das Video wird am Ende verworfen",
+          "fr": "Enregistrer l’écran sur place — la vidéo est supprimée à la fin"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Trocar a janela compartilhada no meio da gravação",
+          "en": "Switch the shared window mid-recording",
+          "es": "Cambiar la ventana compartida a mitad de la grabación",
+          "de": "Geteiltes Fenster mitten in der Aufnahme wechseln",
+          "fr": "Changer de fenêtre partagée en cours d’enregistrement"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Rosto da webcam num canto, em 4 posições e 3 tamanhos",
+          "en": "Webcam face in a corner, 4 positions and 3 sizes",
+          "es": "Cara de la webcam en una esquina, 4 posiciones y 3 tamaños",
+          "de": "Webcam-Bild in einer Ecke, 4 Positionen und 3 Größen",
+          "fr": "Visage de la webcam dans un coin, 4 positions et 3 tailles"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Abrir um vídeo do Google Drive",
+          "en": "Open a video from Google Drive",
+          "es": "Abrir un vídeo de Google Drive",
+          "de": "Ein Video aus Google Drive öffnen",
+          "fr": "Ouvrir une vidéo depuis Google Drive"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Reabrir um documento já gerado (.json ou .zip) e continuar",
+          "en": "Reopen a document you already made (.json or .zip) and carry on",
+          "es": "Reabrir un documento ya generado (.json o .zip) y seguir",
+          "de": "Ein bereits erstelltes Dokument (.json oder .zip) wieder öffnen und weiterarbeiten",
+          "fr": "Rouvrir un document déjà généré (.json ou .zip) et poursuivre"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Juntar várias sessões num documento só",
+          "en": "Merge several sessions into a single document",
+          "es": "Juntar varias sesiones en un solo documento",
+          "de": "Mehrere Sitzungen in einem einzigen Dokument zusammenführen",
+          "fr": "Réunir plusieurs sessions dans un seul document"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Colar ou anexar uma imagem solta como passo",
+          "en": "Paste or attach a loose image as a step",
+          "es": "Pegar o adjuntar una imagen suelta como paso",
+          "de": "Ein einzelnes Bild als Schritt einfügen oder anhängen",
+          "fr": "Coller ou joindre une image isolée comme étape"
+        }
+      ]
+    },
+    {
+      "id": "captura",
+      "titulo": {
+        "pt": "Como os quadros são escolhidos",
+        "en": "How the frames get picked",
+        "es": "Cómo se eligen los fotogramas",
+        "de": "Wie die Screenshots ausgewählt werden",
+        "fr": "Comment les captures sont choisies"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Detecção de mudança de tela, com sensibilidade de 1 a 9",
+          "en": "Screen-change detection, sensitivity 1 to 9",
+          "es": "Detección de cambio de pantalla, sensibilidad de 1 a 9",
+          "de": "Bildschirmänderungserkennung, Empfindlichkeit 1 bis 9",
+          "fr": "Détection de changement d’écran, sensibilité de 1 à 9"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Ou N quadros distribuídos, ou um a cada X segundos",
+          "en": "Or N frames spread out, or one every X seconds",
+          "es": "O N fotogramas repartidos, o uno cada X segundos",
+          "de": "Entweder N verteilte Screenshots oder einer alle X Sekunden",
+          "fr": "Soit N captures réparties, soit une toutes les X secondes"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Teto de quadros e trecho de/até",
+          "en": "Frame cap and a from/to stretch",
+          "es": "Tope de fotogramas y tramo desde/hasta",
+          "de": "Obergrenze für Screenshots und Abschnitt von/bis",
+          "fr": "Plafond de captures et segment de/à"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Ignorar a faixa do topo ou do rodapé na detecção",
+          "en": "Ignore the top or bottom strip when detecting",
+          "es": "Ignorar la franja superior o inferior en la detección",
+          "de": "Oberen oder unteren Streifen bei der Erkennung ignorieren",
+          "fr": "Ignorer la bande du haut ou du bas lors de la détection"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Marcar o momento durante a gravação (tecla M)",
+          "en": "Mark the moment while recording (M key)",
+          "es": "Marcar el momento durante la grabación (tecla M)",
+          "de": "Den Moment während der Aufnahme markieren (Taste M)",
+          "fr": "Marquer l’instant pendant l’enregistrement (touche M)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Pausar e retomar sem cortar o documento (tecla P)",
+          "en": "Pause and resume without cutting the document (P key)",
+          "es": "Pausar y reanudar sin cortar el documento (tecla P)",
+          "de": "Pausieren und fortsetzen, ohne das Dokument zu zerschneiden (Taste P)",
+          "fr": "Mettre en pause et reprendre sans couper le document (touche P)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Contagem regressiva de 3 antes de começar",
+          "en": "A 3-count before it starts",
+          "es": "Cuenta atrás de 3 antes de empezar",
+          "de": "Countdown von 3 vor dem Start",
+          "fr": "Compte à rebours de 3 avant de commencer"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Auto-parar depois de N minutos",
+          "en": "Auto-stop after N minutes",
+          "es": "Auto-parar después de N minutos",
+          "de": "Automatischer Stopp nach N Minuten",
+          "fr": "Arrêt automatique après N minutes"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Controle flutuante: relógio, volume dos dois canais e botões",
+          "en": "Floating control: clock, both channel meters and buttons",
+          "es": "Control flotante: reloj, volumen de los dos canales y botones",
+          "de": "Schwebende Steuerung: Uhr, Pegel beider Kanäle und Schaltflächen",
+          "fr": "Contrôle flottant : horloge, niveau des deux canaux et boutons"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Clipe de vídeo dos 15 s de cada momento marcado",
+          "en": "A 15 s video clip around each marked moment",
+          "es": "Clip de vídeo de los 15 s de cada momento marcado",
+          "de": "15-Sekunden-Videoclip zu jedem markierten Moment",
+          "fr": "Clip vidéo de 15 s autour de chaque instant marqué"
+        }
+      ]
+    },
+    {
+      "id": "transcricao",
+      "titulo": {
+        "pt": "A fala",
+        "en": "The speech",
+        "es": "El habla",
+        "de": "Das Gesprochene",
+        "fr": "La parole"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Transcrição no seu aparelho — o áudio não sai da máquina",
+          "en": "Transcription on your device — the audio never leaves your machine",
+          "es": "Transcripción en tu equipo — el audio no sale de tu ordenador",
+          "de": "Transkription auf Ihrem Gerät — der Ton verlässt den Rechner nicht",
+          "fr": "Transcription sur votre appareil — l’audio ne quitte pas la machine"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Três tamanhos de modelo, e aceleração por GPU quando há",
+          "en": "Three model sizes, and GPU acceleration where available",
+          "es": "Tres tamaños de modelo, y aceleración por GPU cuando la hay",
+          "de": "Drei Größen des Spracherkennungsmodells, mit GPU-Beschleunigung, wenn vorhanden",
+          "fr": "Trois tailles de modèle de reconnaissance vocale, et accélération GPU lorsqu’elle existe"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Português, inglês, espanhol ou detecção automática",
+          "en": "Portuguese, English, Spanish or automatic detection",
+          "es": "Portugués, inglés, español o detección automática",
+          "de": "Portugiesisch, Englisch, Spanisch oder automatische Erkennung",
+          "fr": "Portugais, anglais, espagnol ou détection automatique"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Microfone e som do computador separados, e renomeáveis",
+          "en": "Microphone and computer sound kept apart, and renameable",
+          "es": "Micrófono y sonido del ordenador separados, y renombrables",
+          "de": "Mikrofon und Computerton getrennt und umbenennbar",
+          "fr": "Micro et son de l’ordinateur séparés, et renommables"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Corrigir a fala trecho a trecho, na lente do quadro",
+          "en": "Fix the speech stretch by stretch, in the frame's lens",
+          "es": "Corregir el habla tramo a tramo, en la lupa del fotograma",
+          "de": "Das Gesprochene Abschnitt für Abschnitt in der Lupe des Screenshots korrigieren",
+          "fr": "Corriger la parole segment par segment, dans la loupe de la capture"
+        },
+        {
+          "id": "termosAplicados",
+          "planos": "fpt",
+          "pt": "Termos do seu sistema, aplicados de uma vez na transcrição",
+          "en": "Your system's terms, applied to the transcript in one go",
+          "es": "Términos de tu sistema, aplicados de una vez a la transcripción",
+          "de": "Begriffe Ihres Systems, auf einmal auf das Transkript angewendet",
+          "fr": "Les termes de votre système, appliqués en une fois à la transcription"
+        },
+        {
+          "id": "termosGuardados",
+          "breve": true,
+          "planos": "pt",
+          "pt": "E a lista de termos guardada: volta na próxima visita, em qualquer máquina",
+          "en": "And the term list kept: it comes back next visit, on any machine",
+          "es": "Y la lista de términos guardada: vuelve en la próxima visita, en cualquier equipo",
+          "de": "Und die Begriffsliste bleibt: Sie kehrt beim nächsten Besuch zurück, auf jedem Rechner",
+          "fr": "Et la liste de termes conservée : elle revient à la prochaine visite, sur n’importe quelle machine"
+        },
+        {
+          "planos": "pt",
+          "pt": "… e a lista fica GRAVADA: não se redigita a cada visita",
+          "en": "… and the list is SAVED: no retyping on every visit",
+          "es": "… y la lista queda GUARDADA: no se reescribe en cada visita",
+          "de": "… und die Liste bleibt GESPEICHERT: kein erneutes Tippen bei jedem Besuch",
+          "fr": "… et la liste est CONSERVÉE : plus besoin de la retaper à chaque visite"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Remover hesitações (\"é…\", \"tipo\", \"né\")",
+          "en": "Strip fillers (\"um…\", \"like\", \"you know\")",
+          "es": "Quitar muletillas (\"eh…\", \"o sea\")",
+          "de": "Füllwörter entfernen („äh…“, „halt“, „ne“)",
+          "fr": "Supprimer les hésitations (« euh… », « genre », « quoi »)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Colar uma legenda pronta (.srt, .vtt ou texto)",
+          "en": "Paste a ready-made caption (.srt, .vtt or plain text)",
+          "es": "Pegar un subtítulo ya hecho (.srt, .vtt o texto)",
+          "de": "Fertige Untertitel einfügen (.srt, .vtt oder Text)",
+          "fr": "Coller un sous-titre déjà prêt (.srt, .vtt ou texte)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Traduzir no próprio navegador, onde ele souber",
+          "en": "Translate in the browser itself, where it can",
+          "es": "Traducir en el propio navegador, donde sepa",
+          "de": "Im Browser selbst übersetzen, soweit er es kann",
+          "fr": "Traduire dans le navigateur lui-même, quand il en est capable"
+        }
+      ]
+    },
+    {
+      "id": "edicao",
+      "titulo": {
+        "pt": "Arrumar o documento",
+        "en": "Fixing the document up",
+        "es": "Arreglar el documento",
+        "de": "Das Dokument in Form bringen",
+        "fr": "Mettre le document en forme"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Lente: o passo em tamanho de conferir, em 4 tamanhos",
+          "en": "Lens: the step big enough to check, in 4 sizes",
+          "es": "Lupa: el paso en tamaño para revisar, en 4 tamaños",
+          "de": "Lupe: der Schritt groß genug zum Prüfen, in 4 Größen",
+          "fr": "Loupe : l’étape en taille de vérification, en 4 tailles"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Tarjar o que é sensível — e a tarja é queimada na imagem",
+          "en": "Redact what is sensitive — and the redaction is burned into the image",
+          "es": "Tapar lo sensible — y el tapado se quema en la imagen",
+          "de": "Sensibles schwärzen — die Schwärzung wird ins Bild eingebrannt",
+          "fr": "Caviarder ce qui est sensible — le caviardage est gravé dans l’image"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Aviso de dado sensível achado na tela, com tarja de um clique",
+          "en": "A warning for sensitive data spotted on screen, redacted in one click",
+          "es": "Aviso de dato sensible encontrado en pantalla, tapado con un clic",
+          "de": "Warnung bei sensiblen Daten auf dem Bildschirm, Schwärzung mit einem Klick",
+          "fr": "Alerte de donnée sensible repérée à l’écran, caviardage en un clic"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Destacar com retângulo, seta ou caneta, em três cores",
+          "en": "Highlight with a box, an arrow or a pen, in three colours",
+          "es": "Destacar con rectángulo, flecha o lápiz, en tres colores",
+          "de": "Hervorheben mit Rechteck, Pfeil oder Stift, in drei Farben",
+          "fr": "Mettre en évidence avec un rectangle, une flèche ou un stylo, en trois couleurs"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Recortar a área que interessa, e desfazer",
+          "en": "Crop to the area that matters, and undo",
+          "es": "Recortar el área que importa, y deshacer",
+          "de": "Den relevanten Bereich zuschneiden — und rückgängig machen",
+          "fr": "Rogner la zone qui compte, et annuler"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Duplicar um quadro, ou substituir a imagem de um passo",
+          "en": "Duplicate a frame, or replace a step's image",
+          "es": "Duplicar un fotograma, o sustituir la imagen de un paso",
+          "de": "Einen Screenshot duplizieren oder das Bild eines Schritts ersetzen",
+          "fr": "Dupliquer une capture, ou remplacer l’image d’une étape"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Comparar dois quadros sobrepostos, com a diferença em vermelho",
+          "en": "Compare two frames overlaid, with the difference in red",
+          "es": "Comparar dos fotogramas superpuestos, con la diferencia en rojo",
+          "de": "Zwei Screenshots übereinandergelegt vergleichen, mit dem Unterschied in Rot",
+          "fr": "Comparer deux captures superposées, avec la différence en rouge"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Corrigir o instante e a hora de relógio de um quadro",
+          "en": "Fix a frame's instant and clock time",
+          "es": "Corregir el instante y la hora de reloj de un fotograma",
+          "de": "Zeitpunkt und Uhrzeit eines Screenshots korrigieren",
+          "fr": "Corriger l’instant et l’heure d’horloge d’une capture"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Capítulos: uma gravação vira vários casos, cada um com o seu tempo",
+          "en": "Chapters: one recording becomes several cases, each with its own time",
+          "es": "Capítulos: una grabación se vuelve varios casos, cada uno con su tiempo",
+          "de": "Kapitel: Eine Aufnahme wird zu mehreren Fällen, jeder mit eigener Zeit",
+          "fr": "Chapitres : un enregistrement devient plusieurs cas, chacun avec son temps"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Revisão assistida: percorre passo a passo e recaptura só o que mudou",
+          "en": "Guided review: walks step by step and recaptures only what changed",
+          "es": "Revisión asistida: recorre paso a paso y recaptura solo lo que cambió",
+          "de": "Geführte Überprüfung: geht Schritt für Schritt durch und nimmt nur Geändertes neu auf",
+          "fr": "Révision assistée : parcourt étape par étape et recapture uniquement ce qui a changé"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Ler o texto da tela (OCR) para buscar e para a tarja automática",
+          "en": "Read the text on screen (OCR) for search and automatic redaction",
+          "es": "Leer el texto de la pantalla (OCR) para buscar y para el tapado automático",
+          "de": "Bildschirmtext lesen (OCR) — für die Suche und die automatische Schwärzung",
+          "fr": "Lire le texte de l’écran (OCR) pour la recherche et le caviardage automatique"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Descartar repetidos, descartar sem fala, ficar só com os marcados",
+          "en": "Drop duplicates, drop the silent ones, keep only the marked ones",
+          "es": "Descartar repetidos, descartar sin habla, quedarte solo con los marcados",
+          "de": "Doppelte verwerfen, stumme verwerfen, nur die markierten behalten",
+          "fr": "Écarter les doublons, écarter les muettes, ne garder que les marquées"
+        }
+      ]
+    },
+    {
+      "id": "saidas",
+      "titulo": {
+        "pt": "O que sai",
+        "en": "What comes out",
+        "es": "Lo que sale",
+        "de": "Was herauskommt",
+        "fr": "Ce qui sort"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "PDF, em A4 ou Carta",
+          "en": "PDF, in A4 or Letter",
+          "es": "PDF, en A4 o Carta",
+          "de": "PDF, in A4 oder Letter",
+          "fr": "PDF, en A4 ou Letter"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Word (.docx), editável",
+          "en": "Word (.docx), editable",
+          "es": "Word (.docx), editable",
+          "de": "Word (.docx), bearbeitbar",
+          "fr": "Word (.docx), modifiable"
+        },
+        {
+          "planos": "fpt",
+          "pt": "PowerPoint (.pptx), um slide por passo",
+          "en": "PowerPoint (.pptx), one slide per step",
+          "es": "PowerPoint (.pptx), una diapositiva por paso",
+          "de": "PowerPoint (.pptx), eine Folie pro Schritt",
+          "fr": "PowerPoint (.pptx), une diapositive par étape"
+        },
+        {
+          "planos": "fpt",
+          "pt": "HTML de um arquivo só, com as imagens dentro",
+          "en": "A single-file HTML, images inside",
+          "es": "HTML de un solo archivo, con las imágenes dentro",
+          "de": "HTML als einzelne Datei, mit den Bildern darin",
+          "fr": "HTML en un seul fichier, images incluses"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Markdown, para colar onde a sua equipe escreve",
+          "en": "Markdown, to paste wherever your team writes",
+          "es": "Markdown, para pegar donde escribe tu equipo",
+          "de": "Markdown, zum Einfügen dort, wo Ihr Team schreibt",
+          "fr": "Markdown, à coller là où votre équipe écrit"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Pacote SCORM 1.2 para o LMS (no passo a passo)",
+          "en": "A SCORM 1.2 package for the LMS (in the step-by-step)",
+          "es": "Paquete SCORM 1.2 para el LMS (en el paso a paso)",
+          "de": "SCORM-1.2-Paket für das LMS (in der Schritt-für-Schritt-Ansicht)",
+          "fr": "Paquet SCORM 1.2 pour le LMS (dans le pas à pas)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Planilha (.csv), uma linha por passo",
+          "en": "A spreadsheet (.csv), one row per step",
+          "es": "Hoja de cálculo (.csv), una fila por paso",
+          "de": "Tabelle (.csv), eine Zeile pro Schritt",
+          "fr": "Tableur (.csv), une ligne par étape"
+        },
+        {
+          "planos": "fpt",
+          "pt": "JSON com tudo, para reabrir ou para outro sistema ler",
+          "en": "JSON with everything, to reopen or for another system to read",
+          "es": "JSON con todo, para reabrir o para que otro sistema lo lea",
+          "de": "JSON mit allem — zum Wiederöffnen oder für andere Systeme",
+          "fr": "JSON avec tout, pour rouvrir ou pour qu’un autre système le lise"
+        },
+        {
+          "planos": "fpt",
+          "pt": "ZIP com as figuras numeradas, o índice e os clipes",
+          "en": "A ZIP with numbered images, the index and the clips",
+          "es": "ZIP con las imágenes numeradas, el índice y los clips",
+          "de": "ZIP mit nummerierten Bildern, Inhaltsverzeichnis und Clips",
+          "fr": "ZIP avec les images numérotées, l’index et les clips"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Um documento por tarefa, num ZIP (com 2+ capítulos)",
+          "en": "One document per task, in a ZIP (with 2+ chapters)",
+          "es": "Un documento por tarea, en un ZIP (con 2+ capítulos)",
+          "de": "Ein Dokument pro Aufgabe, in einem ZIP (ab 2 Kapiteln)",
+          "fr": "Un document par tâche, dans un ZIP (à partir de 2 chapitres)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Pacote em vários idiomas de uma vez (HTML e Markdown)",
+          "en": "A multi-language package in one go (HTML and Markdown)",
+          "es": "Paquete en varios idiomas de una vez (HTML y Markdown)",
+          "de": "Paket in mehreren Sprachen auf einmal (HTML und Markdown)",
+          "fr": "Paquet en plusieurs langues d’un coup (HTML et Markdown)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Legenda .vtt, .srt ou .txt",
+          "en": "Caption as .vtt, .srt or .txt",
+          "es": "Subtítulo .vtt, .srt o .txt",
+          "de": "Untertitel als .vtt, .srt oder .txt",
+          "fr": "Sous-titres en .vtt, .srt ou .txt"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Enviar direto ao Google Docs (pede confirmação)",
+          "en": "Send straight to Google Docs (asks first)",
+          "es": "Enviar directo a Google Docs (pide confirmación)",
+          "de": "Direkt an Google Docs senden (mit Rückfrage)",
+          "fr": "Envoyer directement vers Google Docs (demande confirmation)"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Resumo em marcação de wiki, pronto para colar no Jira",
+          "en": "A wiki-markup summary, ready to paste into Jira",
+          "es": "Resumen en marcado de wiki, listo para pegar en Jira",
+          "de": "Zusammenfassung in Wiki-Markup, fertig zum Einfügen in Jira",
+          "fr": "Résumé en balisage wiki, prêt à coller dans Jira"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Prompt pronto para colar numa IA",
+          "en": "A ready-made prompt to paste into an AI",
+          "es": "Prompt listo para pegar en una IA",
+          "de": "Fertiger Prompt zum Einfügen in eine KI",
+          "fr": "Prompt prêt à coller dans une IA"
+        }
+      ]
+    },
+    {
+      "id": "roteiro",
+      "titulo": {
+        "pt": "Quando são quarenta casos, não um",
+        "en": "When it is forty cases, not one",
+        "es": "Cuando son cuarenta casos, no uno",
+        "de": "Wenn es vierzig Fälle sind, nicht einer",
+        "fr": "Quand il s’agit de quarante cas, pas d’un"
+      },
+      "itens": [
+        {
+          "planos": "pt",
+          "pt": "Subir a planilha de casos (.xlsx, .csv, ou colar do Excel)",
+          "en": "Upload the case spreadsheet (.xlsx, .csv, or paste from Excel)",
+          "es": "Subir la hoja de casos (.xlsx, .csv, o pegar desde Excel)",
+          "de": "Testfallliste hochladen (.xlsx, .csv oder aus Excel einfügen)",
+          "fr": "Importer la liste de cas de test (.xlsx, .csv, ou coller depuis Excel)"
+        },
+        {
+          "planos": "pt",
+          "pt": "Conferir e corrigir qual coluna é o quê antes de salvar",
+          "en": "Check and fix which column is what before saving",
+          "es": "Comprobar y corregir qué columna es qué antes de guardar",
+          "de": "Vor dem Speichern prüfen und korrigieren, welche Spalte was ist",
+          "fr": "Vérifier et corriger quelle colonne est quoi avant d’enregistrer"
+        },
+        {
+          "planos": "pt",
+          "pt": "Cada caso vira um link que abre a ferramenta já preenchida",
+          "en": "Each case becomes a link that opens the tool already filled in",
+          "es": "Cada caso se convierte en un enlace que abre la herramienta ya rellenada",
+          "de": "Jeder Fall wird zu einem Link, der das Werkzeug ausgefüllt öffnet",
+          "fr": "Chaque cas devient un lien qui ouvre l’outil déjà rempli"
+        },
+        {
+          "planos": "pt",
+          "pt": "Marcar feito com o arquivo gerado e a impressão das telas junto",
+          "en": "Mark done with the generated file and the screen fingerprint attached",
+          "es": "Marcar hecho con el archivo generado y la huella de las pantallas",
+          "de": "Als erledigt markieren, mit erzeugter Datei und Prüfsummen der Screenshots",
+          "fr": "Marquer comme fait, avec le fichier généré et l’empreinte des écrans"
+        },
+        {
+          "planos": "pt",
+          "pt": "A planilha volta com situação, data, quem executou e a impressão",
+          "en": "The spreadsheet comes back with status, date, who ran it and the fingerprint",
+          "es": "La hoja vuelve con situación, fecha, quién lo ejecutó y la huella",
+          "de": "Die Tabelle kommt zurück mit Status, Datum, Ausführendem und Prüfsumme",
+          "fr": "Le tableau revient avec le statut, la date, qui l’a exécuté et l’empreinte"
+        },
+        {
+          "planos": "pt",
+          "pt": "Roteiro só seu, que ninguém do time enxerga",
+          "en": "A run that is yours alone, invisible to the team",
+          "es": "Un guion solo tuyo, que nadie del equipo ve",
+          "de": "Testfallliste nur für Sie, für das Team unsichtbar",
+          "fr": "Liste de cas de test rien qu’à vous, invisible pour l’équipe"
+        },
+        {
+          "planos": "t",
+          "pt": "Roteiro do time: todo mundo com assento enxerga o mesmo",
+          "en": "Team run: everyone with a seat sees the same one",
+          "es": "Guion del equipo: todo el mundo con asiento ve el mismo",
+          "de": "Testfallliste des Teams: Alle mit Lizenzplatz sehen dieselbe",
+          "fr": "Liste de cas de test de l’équipe : toute personne ayant un siège voit la même"
+        },
+        {
+          "planos": "t",
+          "pt": "Atribuir cada caso a uma pessoa, e ver quem fez o quê",
+          "en": "Assign each case to a person, and see who did what",
+          "es": "Asignar cada caso a una persona, y ver quién hizo qué",
+          "de": "Jeden Fall einer Person zuweisen und sehen, wer was gemacht hat",
+          "fr": "Attribuer chaque cas à une personne, et voir qui a fait quoi"
+        },
+        {
+          "planos": "pt",
+          "pt": "Recibo do caso: a ficha e a impressão de cada quadro, sem imagem",
+          "en": "Case receipt: the record and the fingerprint of every frame, no images",
+          "es": "Recibo del caso: la ficha y la huella de cada fotograma, sin imágenes",
+          "de": "Fallbeleg: Datenblatt und Prüfsumme jedes Screenshots, ohne Bild",
+          "fr": "Reçu du cas : la fiche et l’empreinte de chaque capture, sans image"
+        },
+        {
+          "planos": "pt",
+          "pt": "Anexar o .json completo da sessão ao caso, por escolha, e apagar quando quiser",
+          "en": "Attach the complete session .json to a case, by choice, and delete it whenever",
+          "es": "Adjuntar el .json completo de la sesión al caso, por elección, y borrarlo cuando quieras",
+          "de": "Die vollständige .json der Sitzung optional an den Fall anhängen und jederzeit löschen",
+          "fr": "Joindre le .json complet de la session au cas, au choix, et le supprimer quand vous voulez"
+        }
+      ]
+    },
+    {
+      "id": "cenarios",
+      "titulo": {
+        "pt": "Cinco documentos diferentes",
+        "en": "Five different documents",
+        "es": "Cinco documentos distintos",
+        "de": "Fünf verschiedene Dokumente",
+        "fr": "Cinq documents différents"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Evidência de teste: resultado, ambiente, hora e hash por imagem",
+          "en": "Test evidence: result, environment, clock time and a hash per image",
+          "es": "Evidencia de prueba: resultado, entorno, hora y hash por imagen",
+          "de": "Testnachweis: Ergebnis, Umgebung, Uhrzeit und Hash pro Bild",
+          "fr": "Preuve de test : résultat, environnement, heure et hash par image"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Instrução de trabalho: dono do processo, versão e sem carimbo de data",
+          "en": "Work instruction: process owner, version and no date stamp",
+          "es": "Instrucción de trabajo: dueño del proceso, versión y sin sello de fecha",
+          "de": "Arbeitsanweisung: Prozessverantwortlicher, Version und ohne Datumsstempel",
+          "fr": "Mode opératoire : propriétaire du processus, version et sans horodatage"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Ata de reunião: participantes, local e os momentos que importam",
+          "en": "Meeting minutes: attendees, place and the moments that matter",
+          "es": "Acta de reunión: participantes, lugar y los momentos que importan",
+          "de": "Besprechungsprotokoll: Teilnehmende, Ort und die Momente, die zählen",
+          "fr": "Compte rendu de réunion : participants, lieu et les moments qui comptent"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Sessão de usabilidade: moderador e participante, e o tipo de cada momento",
+          "en": "Usability session: moderator and participant, and each moment's type",
+          "es": "Sesión de usabilidad: moderador y participante, y el tipo de cada momento",
+          "de": "Usability-Test: Moderator und Teilnehmer sowie die Art jedes Moments",
+          "fr": "Test d’utilisabilité : modérateur et participant, et le type de chaque instant"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Contexto para IA: ~60 telas em vez de 3.600, com a fala pareada",
+          "en": "Context for AI: ~60 screens instead of 3,600, with the speech paired",
+          "es": "Contexto para IA: ~60 pantallas en vez de 3.600, con el habla emparejada",
+          "de": "Kontext für KI: ~60 Bildschirme statt 3.600, mit zugeordnetem Gesprochenen",
+          "fr": "Contexte pour l’IA : ~60 écrans au lieu de 3 600, avec la parole appariée"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Rótulo do quadro à sua escolha: Passo, Trecho, Momento…",
+          "en": "Frame label of your choosing: Step, Stretch, Moment…",
+          "es": "Etiqueta del fotograma a tu gusto: Paso, Tramo, Momento…",
+          "de": "Screenshot-Bezeichnung nach Ihrer Wahl: Schritt, Abschnitt, Moment…",
+          "fr": "Libellé de la capture à votre choix : Étape, Segment, Instant…"
+        }
+      ]
+    },
+    {
+      "id": "evidencia",
+      "titulo": {
+        "pt": "O que faz a evidência ser aceita",
+        "en": "What makes the evidence stick",
+        "es": "Lo que hace que la evidencia se acepte",
+        "de": "Was den Nachweis belastbar macht",
+        "fr": "Ce qui fait accepter la preuve"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Hash SHA-256 de cada imagem, calculado depois da tarja",
+          "en": "A SHA-256 hash of each image, computed after redaction",
+          "es": "Hash SHA-256 de cada imagen, calculado después del tapado",
+          "de": "SHA-256-Prüfsumme jedes Bildes, nach der Schwärzung berechnet",
+          "fr": "Empreinte SHA-256 de chaque image, calculée après le caviardage"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Página pública para qualquer um conferir a integridade",
+          "en": "A public page for anyone to check the integrity",
+          "es": "Página pública para que cualquiera compruebe la integridad",
+          "de": "Öffentliche Seite, auf der jeder die Integrität prüfen kann",
+          "fr": "Page publique où chacun peut vérifier l’intégrité"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Hora de relógio com fuso escrito por extenso",
+          "en": "Clock time with the time zone spelled out",
+          "es": "Hora de reloj con la zona horaria escrita",
+          "de": "Uhrzeit mit ausgeschriebener Zeitzone",
+          "fr": "Heure d’horloge avec le fuseau horaire en toutes lettres"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Numeração automática EV-001, EV-002…",
+          "en": "Automatic numbering EV-001, EV-002…",
+          "es": "Numeración automática EV-001, EV-002…",
+          "de": "Automatische Nummerierung EV-001, EV-002…",
+          "fr": "Numérotation automatique EV-001, EV-002…"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Link pronto que já abre com o caso e o chamado preenchidos",
+          "en": "A ready-made link that opens with the case and ticket filled in",
+          "es": "Enlace listo que ya abre con el caso y el ticket rellenados",
+          "de": "Fertiger Link, der Fall und Ticket bereits ausgefüllt öffnet",
+          "fr": "Lien prêt à l’emploi qui s’ouvre avec le cas et le ticket déjà remplis"
+        }
+      ]
+    },
+    {
+      "id": "marca",
+      "titulo": {
+        "pt": "O documento com a sua cara",
+        "en": "The document with your face on it",
+        "es": "El documento con tu cara",
+        "de": "Das Dokument in Ihrer Handschrift",
+        "fr": "Le document à votre image"
+      },
+      "itens": [
+        {
+          "planos": "pt",
+          "pt": "Logotipo e nome do cliente no PDF, no Word e no HTML",
+          "en": "Client logo and name in the PDF, the Word file and the HTML",
+          "es": "Logotipo y nombre del cliente en el PDF, el Word y el HTML",
+          "de": "Logo und Kundenname in PDF, Word und HTML",
+          "fr": "Logo et nom du client dans le PDF, le Word et le HTML"
+        },
+        {
+          "id": "modeloProprio",
+          "planos": "pt",
+          "pt": "Salvar o que está na tela como modelo seu, e reaplicar em um clique",
+          "en": "Save what is on screen as your own template, and reapply it in one click",
+          "es": "Guardar lo que está en pantalla como plantilla tuya, y reaplicarla en un clic",
+          "de": "Das Angezeigte als eigene Vorlage speichern und mit einem Klick erneut anwenden",
+          "fr": "Enregistrer ce qui est à l’écran comme votre modèle, et le réappliquer en un clic"
+        },
+        {
+          "id": "perfilVolta",
+          "planos": "pt",
+          "pt": "Perfil que volta ao entrar, em qualquer máquina",
+          "en": "A profile that comes back when you sign in, on any machine",
+          "es": "Perfil que vuelve al entrar, en cualquier equipo",
+          "de": "Profil, das bei der Anmeldung zurückkehrt — auf jedem Rechner",
+          "fr": "Profil qui revient à la connexion, sur n’importe quelle machine"
+        },
+        {
+          "planos": "pt",
+          "pt": "Licença conferida dentro do navegador — funciona sem rede",
+          "en": "A licence checked inside the browser — works with no network",
+          "es": "Licencia comprobada dentro del navegador — funciona sin red",
+          "de": "Lizenzprüfung im Browser — funktioniert ohne Netz",
+          "fr": "Licence vérifiée dans le navigateur — fonctionne sans réseau"
+        }
+      ]
+    },
+    {
+      "id": "time",
+      "titulo": {
+        "pt": "Quando é uma equipe",
+        "en": "When it is a team",
+        "es": "Cuando es un equipo",
+        "de": "Wenn es ein Team ist",
+        "fr": "Quand c’est une équipe"
+      },
+      "itens": [
+        {
+          "planos": "t",
+          "pt": "Assentos: convidar por e-mail, sem ninguém digitar chave",
+          "en": "Seats: invite by email, nobody types a key",
+          "es": "Asientos: invitar por correo, sin que nadie teclee una clave",
+          "de": "Lizenzplätze: per E-Mail einladen, niemand tippt einen Schlüssel",
+          "fr": "Sièges : inviter par e-mail, sans que personne saisisse de clé"
+        },
+        {
+          "planos": "t",
+          "pt": "Bloquear e liberar quem sai e quem entra",
+          "en": "Block and unblock people as they come and go",
+          "es": "Bloquear y liberar a quien sale y a quien entra",
+          "de": "Zugänge sperren und freigeben, wenn jemand geht oder kommt",
+          "fr": "Bloquer et débloquer ceux qui partent et ceux qui arrivent"
+        },
+        {
+          "planos": "t",
+          "pt": "Prazo da licença escolhido por você, de 1 a 90 dias",
+          "en": "Licence term of your choosing, from 1 to 90 days",
+          "es": "Plazo de la licencia elegido por ti, de 1 a 90 días",
+          "de": "Lizenzlaufzeit nach Ihrer Wahl, von 1 bis 90 Tagen",
+          "fr": "Durée de licence de votre choix, de 1 à 90 jours"
+        },
+        {
+          "id": "padraoDoTime",
+          "planos": "t",
+          "pt": "Padrão do time empurrado para todo mundo",
+          "en": "The team's defaults pushed to everyone",
+          "es": "El estándar del equipo empujado a todos",
+          "de": "Team-Voreinstellungen an alle verteilt",
+          "fr": "Réglages par défaut de l’équipe poussés à tous"
+        },
+        {
+          "planos": "t",
+          "pt": "Entrada automática por domínio de e-mail",
+          "en": "Automatic enrolment by email domain",
+          "es": "Entrada automática por dominio de correo",
+          "de": "Automatischer Beitritt über die E-Mail-Domain",
+          "fr": "Adhésion automatique par domaine e-mail"
+        }
+      ]
+    },
+    {
+      "id": "conta",
+      "titulo": {
+        "pt": "A sua conta",
+        "en": "Your account",
+        "es": "Tu cuenta",
+        "de": "Ihr Konto",
+        "fr": "Votre compte"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "Entrar por link no e-mail — não existe senha para vazar",
+          "en": "Sign in by emailed link — there is no password to leak",
+          "es": "Entrar por enlace en el correo — no hay contraseña que filtrar",
+          "de": "Anmeldung per E-Mail-Link — kein Passwort, das durchsickern kann",
+          "fr": "Connexion par lien envoyé par e-mail — aucun mot de passe à fuiter"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Abrir chamado com o diagnóstico junto, e acompanhar a resposta",
+          "en": "Open a ticket with the diagnostics attached, and follow the reply",
+          "es": "Abrir un ticket con el diagnóstico adjunto, y seguir la respuesta",
+          "de": "Ticket mit angehängter Diagnose eröffnen und die Antwort verfolgen",
+          "fr": "Ouvrir un ticket avec le diagnostic joint, et suivre la réponse"
+        },
+        {
+          "planos": "pt",
+          "pt": "Faturas para baixar, e a nota fiscal quando sai",
+          "en": "Invoices to download, and the tax receipt when it is issued",
+          "es": "Facturas para descargar, y la factura fiscal cuando sale",
+          "de": "Rechnungen zum Herunterladen und der Steuerbeleg, sobald er vorliegt",
+          "fr": "Factures à télécharger, et le justificatif fiscal dès son émission"
+        },
+        {
+          "planos": "pt",
+          "pt": "Licença que se renova sozinha, sem colar chave nenhuma",
+          "en": "A licence that renews itself, with no key to paste",
+          "es": "Licencia que se renueva sola, sin pegar ninguna clave",
+          "de": "Lizenz, die sich selbst verlängert — ohne Schlüssel einzufügen",
+          "fr": "Licence qui se renouvelle toute seule, sans coller aucune clé"
+        }
+      ]
+    },
+    {
+      "id": "privacidade",
+      "titulo": {
+        "pt": "O que nunca sai da sua máquina",
+        "en": "What never leaves your machine",
+        "es": "Lo que nunca sale de tu equipo",
+        "de": "Was Ihren Rechner nie verlässt",
+        "fr": "Ce qui ne quitte jamais votre machine"
+      },
+      "itens": [
+        {
+          "planos": "fpt",
+          "pt": "O vídeo, o áudio, a transcrição e o documento",
+          "en": "The video, the audio, the transcript and the document",
+          "es": "El vídeo, el audio, la transcripción y el documento",
+          "de": "Das Video, der Ton, die Transkription und das Dokument",
+          "fr": "La vidéo, l’audio, la transcription et le document"
+        },
+        {
+          "planos": "fpt",
+          "pt": "A gravação de tela é descartada — só ficam os quadros e a fala",
+          "en": "The screen recording is discarded — only frames and speech remain",
+          "es": "La grabación de pantalla se descarta — solo quedan fotogramas y habla",
+          "de": "Die Bildschirmaufnahme wird verworfen — es bleiben nur Screenshots und Gesprochenes",
+          "fr": "L’enregistrement d’écran est supprimé — il ne reste que les captures et la parole"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Funciona com a internet desligada, depois que a página abre",
+          "en": "Works with the internet switched off, once the page has loaded",
+          "es": "Funciona con internet apagada, una vez que la página ha cargado",
+          "de": "Funktioniert ohne Internet, sobald die Seite geladen ist",
+          "fr": "Fonctionne sans internet, une fois la page chargée"
+        },
+        {
+          "planos": "fpt",
+          "pt": "Nenhum cadastro exigido para usar nada disso",
+          "en": "No sign-up required to use any of it",
+          "es": "Ningún registro exigido para usar nada de esto",
+          "de": "Keine Registrierung nötig, um all das zu nutzen",
+          "fr": "Aucune inscription exigée pour utiliser tout cela"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Einen Nachweis prüfen</h1>
+    <p class="updated">Ziehen Sie die von {{marca}} erzeugte <code>.zip</code>- oder <code>.json</code>-Datei
+    hierher, und diese Seite berechnet die Prüfsumme jedes Bildes neu und sagt, was übereinstimmt und was nicht.<br>
+    <b>Die Datei verlässt Ihren Rechner nicht.</b> Gerechnet wird in diesem Tab, wie alles andere auch.</p>
+
+    <div class="verDrop" id="verDrop" role="button" tabindex="0">
+      <strong>Datei auswählen oder hierher ziehen</strong>
+      <span>.zip mit den Bildern und dem Index, oder .json des Nachweises</span>
+    </div>
+    <input type="file" id="verArq" accept=".zip,.json,application/json,application/zip">
+    <div id="verSaida" class="verSaida"></div>
+
+    <h2>Was das beweist — und was nicht</h2>
+    <p><b>Es beweist</b>, dass jedes Bild des Pakets Byte für Byte dasselbe ist, das {{marca}} in dem Moment
+    erzeugt hat, in dem die Prüfsumme berechnet wurde. Würde jemand das JPEG in einem Editor öffnen, eine
+    Zeile des Bildschirms löschen und darüber speichern, änderte sich die Zahl, und diese Seite würde es sagen.</p>
+    <p><b>Es beweist nicht</b>, wer es erzeugt hat, noch wann, noch dass der Inhalt des Bildschirms wahr ist.
+    Eine Prüfsumme ist eine Kontrollsumme, keine Signatur: Wer das Bild ändern <i>und</i> die Liste der
+    Hashes neu berechnen würde, käme hier ohne Alarm durch. Um Urheberschaft und Datum zu binden, gibt es die
+    elektronische Signatur, und die ist etwas anderes — und {{marca}} <a href="{{seguranca}}" style="color:var(--accent)">bietet sie
+    weder an noch tut es so</a>.</p>
+    <p class="small muted">In der Praxis löst sie den häufigen Fall: nachzuweisen, dass der Anhang, der bei
+    der prüfenden Person angekommen ist, derselbe ist, der den Rechner der testenden Person verlassen hat, ohne dass jemand jemandem glauben muss.</p>
+
+    <h2>Wie Sie ein Paket mit Prüfsumme erzeugen</h2>
+    <ol class="passos">
+      <li>Wählen Sie im Werkzeug die Ausgabevorlage <b>Testnachweis</b>.</li>
+      <li>Markieren Sie unter <b>Daten des Nachweises</b> die Option <b>Die SHA-256-Prüfsumme jedes Bildes einschließen</b>.</li>
+      <li>Laden Sie das <b>Zip der Bilder</b> herunter (es enthält eine <code>indice.txt</code>) oder das <b>JSON</b>.</li>
+    </ol>
+    <p><a class="btn" href="{{app}}">Werkzeug öffnen</a></p>
+  </div>
+</section>
+
+<style>
+.verDrop{border:2px dashed var(--line);border-radius:10px;padding:34px 20px;text-align:center;
+  cursor:pointer;transition:.15s;margin:26px 0 0}
+.verDrop:hover,.verDrop.over{border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.verDrop strong{display:block;font-size:16px;margin-bottom:4px}
+.verDrop span{color:var(--muted);font-size:13px}
+#verArq{display:none}
+.verSaida{margin-top:18px}
+.verSaida .cabeca{font-size:16px;font-weight:600;margin-bottom:10px}
+.verSaida table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+.verSaida th,.verSaida td{border:1px solid var(--line);padding:7px 9px;text-align:left;
+  vertical-align:top;color:var(--muted)}
+.verSaida th{background:var(--panel);color:var(--ink);font-size:12.5px}
+.verSaida td.h{font:11px ui-monospace,Menlo,monospace;word-break:break-all}
+.verSaida .bate{color:var(--accent);font-weight:600}
+.verSaida .falha{color:var(--err);font-weight:600}
+</style>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const drop = $('verDrop'), arq = $('verArq'), saida = $('verSaida');
+  if (!drop) return;
+
+  const T = {
+    lendo:    'Die Datei wird gelesen…',
+    semHash:  'Dieses Paket enthält keine Prüfsummen. Erzeugen Sie es erneut mit markiertem Kästchen „Die SHA-256-Prüfsumme jedes Bildes einschließen“.',
+    naoServe: 'Diese Datei habe ich nicht erkannt. Es muss die .zip- oder die .json-Datei sein, die das Werkzeug erzeugt.',
+    tudoBate: '{0} von {0} Bildern stimmen überein. Das Paket ist unversehrt.',
+    divergiu: '{0} von {1} Bildern stimmen NICHT überein. Sehen Sie unten, welche.',
+    colImg:   'Bild', colSit: 'Status', colHash: 'Erfasste Prüfsumme',
+    bate:     'stimmt überein', falha: 'stimmt nicht überein', ausente: 'Bild im Paket nicht gefunden'
+  };
+  const diz = (s, ...a) => s.replace(/\{(\d)\}/g, (_, i) => a[i]);
+
+  ['dragenter','dragover'].forEach(e => drop.addEventListener(e, ev => {
+    ev.preventDefault(); drop.classList.add('over');
+  }));
+  ['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => {
+    ev.preventDefault(); drop.classList.remove('over');
+  }));
+  drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f) ler(f); });
+  drop.onclick = () => arq.click();
+  drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); arq.click(); } };
+  arq.onchange = e => { const f = e.target.files[0]; if (f) ler(f); };
+
+  const hex = buf => [...new Uint8Array(buf)]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  const sha = async bytes => hex(await crypto.subtle.digest('SHA-256', bytes));
+
+  /* Os pacotes desta ferramenta são gravados sem compressão (método 0), então
+     ler as entradas é percorrer os cabeçalhos locais e copiar os bytes. */
+  function lerZip(buf) {
+    const b = new Uint8Array(buf), dv = new DataView(buf), saida = {};
+    for (let i = 0; i + 30 < b.length; ) {
+      if (dv.getUint32(i, true) !== 0x04034b50) { i++; continue; }
+      const metodo = dv.getUint16(i + 8, true);
+      const n = dv.getUint32(i + 18, true);
+      const nl = dv.getUint16(i + 26, true), el = dv.getUint16(i + 28, true);
+      const nome = new TextDecoder().decode(b.subarray(i + 30, i + 30 + nl));
+      const ini = i + 30 + nl + el;
+      if (metodo === 0) saida[nome] = b.subarray(ini, ini + n);
+      i = ini + n;
+    }
+    return saida;
+  }
+
+  function tabela(linhas) {
+    return '<table><tr><th>' + T.colImg + '</th><th>' + T.colSit + '</th><th>' + T.colHash +
+      '</th></tr>' + linhas.map(l =>
+        '<tr><td>' + l.nome + '</td><td class="' + l.classe + '">' + l.sit +
+        '</td><td class="h">' + (l.hash || '—') + '</td></tr>').join('') + '</table>';
+  }
+
+  function mostrar(linhas) {
+    if (!linhas.length) { saida.innerHTML = '<p class="err">' + T.semHash + '</p>'; return; }
+    const ok = linhas.filter(l => l.classe === 'bate').length;
+    const cabeca = ok === linhas.length
+      ? '<p class="cabeca bate">' + diz(T.tudoBate, linhas.length) + '</p>'
+      : '<p class="cabeca falha">' + diz(T.divergiu, linhas.length - ok, linhas.length) + '</p>';
+    saida.innerHTML = cabeca + tabela(linhas);
+  }
+
+  async function ler(file) {
+    saida.innerHTML = '<p class="muted">' + T.lendo + '</p>';
+    try {
+      if (/\.json$/i.test(file.name)) return await verJson(JSON.parse(await file.text()));
+      return await verZip(await file.arrayBuffer());
+    } catch (e) {
+      saida.innerHTML = '<p class="err">' + T.naoServe + '</p>';
+    }
+  }
+
+  async function verJson(j) {
+    const linhas = [];
+    for (const f of (j.frames || [])) {
+      if (!f.sha256 || !f.imagemBase64) continue;
+      const bin = atob(String(f.imagemBase64).split(',')[1] || '');
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const calc = await sha(u8);
+      linhas.push({ nome: 'Schritt ' + (f.passo || f.indice), hash: f.sha256,
+                    classe: calc === f.sha256 ? 'bate' : 'falha',
+                    sit: calc === f.sha256 ? T.bate : T.falha });
+    }
+    mostrar(linhas);
+  }
+
+  async function verZip(buf) {
+    const z = lerZip(buf);
+    const idx = z['indice.txt'];
+    if (!idx) return mostrar([]);
+    const texto = new TextDecoder().decode(idx);
+    /* O índice guarda o nome do arquivo numa linha e o SHA-256 na linha
+       seguinte, indentado. É esse par que amarra hash e imagem. */
+    const linhas = [];
+    const partes = texto.split(/\r?\n/);
+    for (let i = 0; i < partes.length; i++) {
+      const nome = (partes[i].split('\t')[0] || '').trim();
+      if (!/\.jpg$/i.test(nome)) continue;
+      const seg = (partes[i + 1] || '');
+      const m = seg.match(/([0-9a-f]{64})/i);
+      if (!m) continue;
+      const dados = z[nome];
+      if (!dados) { linhas.push({ nome, hash: m[1], classe: 'falha', sit: T.ausente }); continue; }
+      const calc = await sha(dados);
+      linhas.push({ nome, hash: m[1], classe: calc === m[1].toLowerCase() ? 'bate' : 'falha',
+                    sit: calc === m[1].toLowerCase() ? T.bate : T.falha });
+    }
+    mostrar(linhas);
+  }
+})();
+</script>

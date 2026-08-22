@@ -1,0 +1,185 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">A ready-made link for your test management tool</h1>
+    <p class="updated">Build an address that opens {{marca}} with the test case, the ticket and the system
+    already filled in. Paste it into <b>Zephyr</b>, <b>Jira</b>, <b>Xray</b>, <b>TestRail</b>,
+    <b>Azure DevOps</b>, <b>qTest</b> — or a spreadsheet.<br>
+    <b>This is not an integration and it needs nobody's IT department.</b> It is a link. Any tool that can
+    show a link will do, and that is the point: a real integration depends on an API, on permissions and on
+    an approved project; a link works on Monday.</p>
+
+    <div class="linkBox">
+      <div class="lgrid">
+        <label>Test case<input id="lkCaso" placeholder="CT-014 Criar pedido de compra"></label>
+        <label>Ticket / change<input id="lkChamado" placeholder="NAT-1234"></label>
+        <label>System / client<input id="lkSistema" placeholder="S4P / 100"></label>
+        <label>Executed by<input id="lkQuem" placeholder="leave empty for the tester to fill in"></label>
+        <label>Output model
+          <select id="lkModelo">
+            <option value="evidencia">Test evidence</option>
+            <option value="tutorial">Step-by-step</option>
+            <option value="ata">Meeting minutes</option>
+            <option value="ia">Context for AI</option>
+          </select>
+        </label>
+        <label>Language
+          <select id="lkLang">
+            <option value="pt">Português</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="fr">Français</option>
+          </select>
+        </label>
+      </div>
+
+      <details class="lkTime" id="lkTimeCx">
+        <summary><b>Team plan</b> — activate from the link itself <span class="small muted">(optional)</span></summary>
+        <p class="small muted" style="margin:10px 0 12px">Paste the key you were sent. The link then
+        <b>activates the Team plan</b> in the browser of whoever opens it, and arrives with the client name
+        already in the document — nobody on the team has to paste a key. The key is read here in your own
+        browser and is never sent anywhere.</p>
+        <div class="lgrid">
+          <label>Team plan key<input id="lkLic" placeholder="WS1..." spellcheck="false" autocomplete="off"></label>
+          <label>Client name in the document<input id="lkMarca" placeholder="Your company Ltd."></label>
+        </div>
+        <p class="row" style="gap:9px;margin:12px 0 0">
+          <button class="btn ghost" id="lkLicEsquecer" type="button">Forget the key in this browser</button>
+          <span class="small muted" id="lkLicMsg" role="status"></span>
+        </p>
+        <p class="small muted" style="margin:12px 0 0"><b>Where not to paste this link:</b> in a ticket
+        anyone in the company can open, in a public channel, in a document shared with the client. Whoever
+        holds the link holds the plan. For those places use the link without the key — it still fills in
+        the test case and the ticket.</p>
+        <p class="small muted" style="margin:8px 0 0">The <b>logo</b> does not travel in the link: an
+        address cannot carry a file, and fetching an image off the internet into the document would break
+        the promise that nothing comes in and nothing goes out. It is chosen once, in the tool.</p>
+      </details>
+
+      <p class="small muted" style="margin:14px 0 6px"><b>The link:</b></p>
+      <div class="lkSaida"><code id="lkUrl"></code></div>
+      <p class="row" style="gap:9px;margin-top:12px">
+        <button class="btn" id="lkCopiar">Copy the link</button>
+        <a class="btn ghost" id="lkAbrir" href="{{app}}" target="_blank" rel="noopener">Try the link</a>
+        <span class="small muted" id="lkMsg" role="status"></span>
+      </p>
+    </div>
+
+    <h2>How this fits into Zephyr</h2>
+    <p>Two ways, and both take under a minute per case:</p>
+    <ol class="passos">
+      <li><b>In the test case itself.</b> Paste the link into a <i>test script</i> step or into the
+      description — something like &ldquo;record the evidence here&rdquo;. Whoever runs it clicks, records,
+      generates the PDF and attaches it to the execution. The file name already carries the case and the
+      ticket, so it explains itself in the attachment list.</li>
+      <li><b>In an automation.</b> If test cycle creation is automated, build the link from the case's own
+      fields. This is the pattern, and it does not change:
+      <code>{{site}}/app?modelo=evidencia&amp;caso=CT-014&amp;chamado=NAT-1234&amp;sistema=S4P/100</code></li>
+    </ol>
+    <p>It works the same for <b>Xray</b>, the same for plain <b>Jira</b>, and the same for a shared
+    spreadsheet. That is the advantage of not being an integration.</p>
+
+    <h2>What the link does and what it does not</h2>
+    <p><b>It does:</b> open the tool with the fields filled in, in the right language and output model.
+    Whoever runs the test types nothing and chooses nothing — which is why the whole team's evidence comes
+    out in the same shape, with nobody being trained.</p>
+    <p><b>It does not:</b> attach anything back into your system, because that would need an API and
+    permissions. The way back is still dragging the file — three seconds, and it works in any tool,
+    including the ones your company will not let you integrate with.</p>
+    <p class="small muted"><b>One caution.</b> Whatever goes in the address stays in the browser history of whoever opens it
+    and in the logs of whoever serves the page. System names and ticket numbers are fine; a person's name,
+    an email or any personal data is better left empty and typed on screen.</p>
+
+    <h2>What it costs</h2>
+    <p>Nothing. This is part of the <b>free plan</b> and will stay that way — it is what makes the tool fit
+    into the process your team already has, and a tool that only works on its own is no use to any team.
+    What is paid is on the <a href="{{precos}}" style="color:var(--accent)">pricing page</a>: client brand
+    in the document and shared vocabulary.</p>
+  </div>
+</section>
+
+<style>
+.linkBox{border:1px solid var(--line);border-radius:12px;padding:22px;margin:26px 0 8px;background:var(--panel)}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.lgrid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+.lgrid input,.lgrid select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);color:var(--ink);font-size:14.5px;font-family:inherit;width:100%}
+.lkTime{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.lkTime summary{cursor:pointer;font-size:14.5px}
+.lkTime[open] summary{margin-bottom:4px}
+.lkSaida{border:1px solid var(--line);border-radius:8px;padding:12px 13px;background:var(--bg);
+  overflow-x:auto}
+.lkSaida code{font:12.5px ui-monospace,Menlo,Consolas,monospace;color:var(--ink);white-space:pre-wrap;
+  word-break:break-all}
+</style>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  if (!$('lkUrl')) return;
+  const campos = { caso:'lkCaso', chamado:'lkChamado', sistema:'lkSistema', quem:'lkQuem' };
+
+  /* A chave do plano fica guardada no navegador de QUEM MONTA o link — não no
+     de quem recebe. É a mesma pessoa que monta dezenas de links por semana, e
+     pedir a chave toda vez transformaria o recurso em incômodo. O botão de
+     esquecer existe porque uma máquina emprestada acontece. */
+  const LIC_LOCAL = 'walkstamp.lic.construtor';
+  try { const g = localStorage.getItem(LIC_LOCAL); if (g && $('lkLic')) $('lkLic').value = g; } catch (e) {}
+  if ($('lkLic') && $('lkLic').value) $('lkTimeCx').open = true;
+
+  function montar(){
+    const q = new URLSearchParams();
+    const lang = $('lkLang').value;
+    if (lang !== 'pt') q.set('lang', lang);
+    q.set('modelo', $('lkModelo').value);
+    for (const k in campos) {
+      const v = ($(campos[k]).value || '').trim();
+      if (v) q.set(k, v);
+    }
+    /* URLSearchParams escapa a barra de "S4P/100" como %2F. Funciona, mas um
+       link que a pessoa vai LER e colar num chamado não pode parecer lixo — e a
+       barra é segura na query string. */
+    /* A licença por último, e nunca abreviada: ela é o objeto assinado
+       inteiro, e um caractere a menos deixa de conferir. */
+    const lic = (($('lkLic') && $('lkLic').value) || '').trim();
+    const mk  = (($('lkMarca') && $('lkMarca').value) || '').trim();
+    if (mk)  q.set('marca', mk);
+    if (lic) { q.set('lic', lic); try { localStorage.setItem(LIC_LOCAL, lic); } catch (e) {} }
+    const url = location.origin + '/app?' + q.toString().replace(/%2F/g, '/');
+    if ($('lkLicMsg') && lic && !$('lkLicMsg').dataset.travado) $('lkLicMsg').textContent = 'The key travels in the link.';
+    $('lkUrl').textContent = url;
+    $('lkAbrir').href = url;
+    return url;
+  }
+
+  $('lkLicEsquecer').onclick = () => {
+    $('lkLic').value = '';
+    try { localStorage.removeItem(LIC_LOCAL); } catch (e) {}
+    $('lkLicMsg').textContent = 'Key forgotten in this browser.';
+    $('lkLicMsg').dataset.travado = '1';
+    setTimeout(() => { delete $('lkLicMsg').dataset.travado; }, 2500);
+    montar();
+  };
+
+  Object.values(campos).concat(['lkModelo','lkLang','lkLic','lkMarca']).forEach(id => {
+    $(id).addEventListener('input', montar);
+    $(id).addEventListener('change', montar);
+  });
+
+  $('lkCopiar').onclick = async () => {
+    const url = montar();
+    try {
+      await navigator.clipboard.writeText(url);
+      $('lkMsg').textContent = 'Copied. Paste it into the test case.';
+    } catch (e) {
+      /* Sem permissão de área de transferência: seleciona para a pessoa copiar
+         com Ctrl+C, que é pior mas não deixa ninguém sem o link. */
+      const r = document.createRange(); r.selectNodeContents($('lkUrl'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      $('lkMsg').textContent = 'I selected the link — copy it with Ctrl+C.';
+    }
+  };
+
+  montar();
+})();
+</script>

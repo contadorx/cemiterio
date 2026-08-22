@@ -1,0 +1,55 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Use case</p>
+    <h1 style="font-size:32px">Work instructions without forty screenshots pasted by hand</h1>
+    <p class="updated">The step-by-step the key user will run every week — produced from the same recording you would make anyway. On an implementation project, end-user documentation is usually a contractual deliverable: not an end-of-project courtesy, but a line on the go-live checklist.</p>
+
+    {{figura}}
+
+    <h2>Three things that save you an afternoon</h2>
+    <p><b>It comes out as PowerPoint too.</b> One slide per step, with the screen and the text, for whoever trains in a room. And as SCORM, for whoever trains in the LMS — there the client’s LMS is what records completion.</p>
+    <p><b>Update the instruction when the system changes.</b> Reopen the document, let the guided review lead, and swap only the screens that changed. The new version comes out with the new date and the rest untouched.</p>
+    <p><b>No date stamp on every step.</b> A work instruction is not evidence: here the clock time is left out on purpose, because a procedure that looks like it is from 2024 is a procedure nobody follows.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=en">Record an instruction now</a>
+      <span class="small muted">free, nothing to install</span>
+    </p>
+
+    <h2>The pain</h2>
+    <p>It is the same <code>Print Screen → Word → arrow → caption</code> as the evidence, with one aggravation: the instruction is written <b>after</b> the project, by someone already assigned to the next one. It is born late, and it is the task that falls to whoever has the least power to refuse.</p>
+    <p><b>A bad instruction is not rejected by anyone — it simply is not used</b>, and the key user goes back to phoning the consultant. The reasons are always the same four: a missing step, a screen that no longer matches reality, language written by someone who already knows, and no indication of which field to look at. The last two are a writing problem — and writing is exactly what spoken narration solves, because someone narrating while doing explains like someone teaching.</p>
+
+    <h2>What comes out</h2>
+    <p>A procedure document, not a historical record. The difference is in the details:</p>
+    <ul>
+      <li><b>No date stamp on each step.</b> In evidence the time is mandatory; in an instruction it makes the document look expired the day it is born. The step number stays, the clock goes</li>
+      <li><b>Your note becomes the step heading</b>, and the speech from that stretch becomes the description</li>
+      <li><b>Procedure header</b>: title, system, author and version</li>
+      <li><b>A prompt ready for the AI to rewrite in the imperative</b>: "so then I go into ME21N and raise the order" becomes "Go to ME21N and raise the order". The AI you already use does the writing; the document and the screens are ours</li>
+      <li><b>Domain vocabulary</b>: ME21N, KI235 and Fiori stop coming out spelled in words in the transcript</li>
+      <li><b>Word to edit, PDF to hand out, HTML for the wiki</b> — and Markdown to paste into Confluence with no separate attachment</li>
+      <li><b>A SCORM 1.2 package</b> to upload to the company LMS (SuccessFactors, Cornerstone, Moodle, TalentLMS) — the client's LMS records who read it, not us</li>
+      <li><b>Reopen the document six months later</b>: load the <code>.json</code> or the <code>.zip</code>, replace the image on the step that changed and generate again — without re-recording the other forty</li>
+    </ul>
+
+    <h2>How to do it</h2>
+    <ol class="passos">
+      <li>Pick the <b>Step-by-step guide</b> use case in step 1.</li>
+      <li>Record the process once, narrating what you do and why. Say the field names out loud: that is what the key user will be looking for.</li>
+      <li>In the review, discard what does not matter, reorder with the arrows, and fix the acronyms with your system’s term list.</li>
+      <li>Produce the Word file to edit, or the PDF directly. If you are training in a room, the same material becomes the script.</li>
+    </ol>
+
+    <h2>What it does not do — better to know up front</h2>
+    <p><b>It does not refresh the screenshots on its own when the system changes.</b> That is called <i>replay</i>, it is what ClickLearn sells, and it requires driving the application — impossible in a tab that only receives an image of a shared screen. Pretending we compete there would be this product’s first lie.</p>
+    <p><b>It does not walk you through the review on its own.</b> Reopening the document and replacing a step's image already exists; what does not exist yet is the tool guiding you through it asking <i>&ldquo;is this screen still like this?&rdquo;</i> — that is the next item, and it is our honest answer to <i>replay</i>.</p>
+    <p><b>It does not host the content or tell you who read it.</b> Your company’s LMS answers that. We hand over the SCORM package and we still do not know who opened what.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=tutorial&amp;lang=en">Record an instruction now</a>
+      <a class="btn ghost" href="{{precos}}">See the plans</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">It is the same consultant who recorded the UAT evidence in June writing the key user’s instruction in August, with the same transactions. That is why this case is a <b>model inside the product</b>, not another tool.</p>
+  </div>
+</section>

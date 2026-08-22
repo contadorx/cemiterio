@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<!--
+  O SISTEMA DE MENTIRA que aparece no vídeo de exemplo.
+
+  Ele existe porque o exemplo anterior era a gravação de um relatório
+  trimestral — slides passando. Aquilo mostrava a ferramenta funcionando e
+  mostrava o produto ERRADO: quem procura "evidência de teste" ou "instrução de
+  trabalho" não grava slides, grava um sistema. Um exemplo que não parece o
+  trabalho de quem chega faz a pessoa concluir que a ferramenta é para outra
+  coisa.
+
+  Então aqui está um pedido de compra numa intranet qualquer, com o percurso que
+  todo mundo que já homologou alguma coisa reconhece: preencher, salvar,
+  levar uma recusa do sistema, corrigir, e sair com um número de protocolo.
+  A recusa é de propósito — é o quadro que interessa numa evidência, e é o
+  momento que o comentário da marcação existe para explicar.
+
+  Nada de marca real: "Intranet · Compras" e um fornecedor inventado. Um vídeo
+  de demonstração com o logo de outra empresa é um problema jurídico à espera.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Intranet · Compras</title>
+<style>
+  *{box-sizing:border-box;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+  body{background:#eef0f4;color:#1c2230;font-size:15px}
+  .topo{background:#243056;color:#fff;height:52px;display:flex;align-items:center;
+        padding:0 22px;gap:14px}
+  .topo b{font-size:16px;font-weight:650;letter-spacing:.2px}
+  .topo .sep{opacity:.45}
+  .topo .quem{margin-left:auto;font-size:13.5px;opacity:.85}
+  .corpo{display:flex;min-height:calc(100vh - 52px)}
+  .lado{width:210px;background:#fff;border-right:1px solid #dde1e9;padding:16px 0}
+  .lado a{display:block;padding:10px 22px;color:#4a5468;text-decoration:none;font-size:14px}
+  .lado a.on{background:#eef1fa;color:#243056;font-weight:650;
+        box-shadow:inset 3px 0 0 #3d55b8}
+  .tela{flex:1;padding:26px 30px}
+  h1{font-size:21px;font-weight:650;margin-bottom:4px}
+  .sub{color:#6b7488;font-size:13.5px;margin-bottom:20px}
+  .cartao{background:#fff;border:1px solid #dde1e9;border-radius:8px;padding:22px 24px;
+        max-width:760px}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #dde1e9;
+        border-radius:8px;overflow:hidden;max-width:860px}
+  th{background:#f6f7fa;text-align:left;padding:11px 14px;font-size:12.5px;color:#6b7488;
+        font-weight:650;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:12px 14px;border-top:1px solid #eceef4;font-size:14px}
+  .selo{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:650}
+  .s-ap{background:#fdf0d5;color:#8a5a00}
+  .s-ok{background:#e2f4e9;color:#1a7040}
+  .linha{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap}
+  .campo{flex:1;min-width:210px}
+  label{display:block;font-size:12.5px;font-weight:650;color:#4a5468;margin-bottom:5px}
+  input,select{width:100%;padding:9px 11px;border:1px solid #ccd2de;border-radius:6px;
+        font-size:14px;background:#fff;color:#1c2230}
+  input:focus,select:focus{outline:2px solid #3d55b8;outline-offset:-1px;border-color:#3d55b8}
+  input.ruim,select.ruim{border-color:#c0392b;background:#fdf3f2}
+  .botoes{display:flex;gap:10px;margin-top:22px}
+  button{padding:10px 20px;border:0;border-radius:6px;font-size:14px;font-weight:650;
+        cursor:pointer;background:#3d55b8;color:#fff}
+  button.sec{background:#fff;color:#4a5468;border:1px solid #ccd2de}
+  .erro{background:#fdecea;border:1px solid #f0b7b0;color:#a02b1c;border-radius:6px;
+        padding:12px 15px;margin-bottom:20px;font-size:14px;display:none}
+  .erro.ver{display:block}
+  .erro b{display:block;margin-bottom:3px}
+  .ok{background:#e7f6ed;border:1px solid #a8ddbd;color:#14653c;border-radius:6px;
+        padding:16px 18px;max-width:760px;display:none}
+  .ok.ver{display:block}
+  .ok .num{font-size:26px;font-weight:700;letter-spacing:-.5px;margin:6px 0 4px;
+        font-family:ui-monospace,Menlo,Consolas,monospace}
+  .secTit{font-size:14.5px;font-weight:650;color:#1c2230;margin:22px 0 9px}
+  .esconde{display:none}
+</style>
+</head>
+<body>
+  <div class="topo">
+    <b>Intranet</b><span class="sep">·</span><span id="mod">Compras</span>
+    <span class="quem" id="quem">m.almeida · Suprimentos</span>
+  </div>
+  <div class="corpo">
+    <nav class="lado">
+      <a href="#" id="n1">Painel</a>
+      <a href="#" class="on" id="n2">Pedidos de compra</a>
+      <a href="#" id="n3">Fornecedores</a>
+      <a href="#" id="n4">Centros de custo</a>
+      <a href="#" id="n5">Relatórios</a>
+    </nav>
+    <main class="tela">
+      <!-- lista -->
+      <section id="lista">
+        <h1 id="t1">Pedidos de compra</h1>
+        <p class="sub" id="s1">Últimos pedidos do seu departamento</p>
+        <table>
+          <thead><tr><th id="c1">Número</th><th id="c2">Fornecedor</th><th id="c3">Valor</th><th id="c4">Situação</th></tr></thead>
+          <tbody>
+            <tr><td>48 209</td><td>Papelaria Rio Verde</td><td>R$ 1.240,00</td><td><span class="selo s-ok" id="e1">Aprovado</span></td></tr>
+            <tr><td>48 210</td><td>TecnoParts Ltda.</td><td>R$ 8.900,00</td><td><span class="selo s-ap" id="e2">Em aprovação</span></td></tr>
+            <tr><td>48 211</td><td>Móveis Aurora</td><td>R$ 3.150,00</td><td><span class="selo s-ok" id="e3">Aprovado</span></td></tr>
+            <tr><td>48 212</td><td>Limpeza Total ME</td><td>R$ 690,00</td><td><span class="selo s-ok" id="e4">Aprovado</span></td></tr>
+            <tr><td>48 208</td><td>Gráfica Bandeirantes</td><td>R$ 2.470,00</td><td><span class="selo s-ok" id="e5">Aprovado</span></td></tr>
+            <tr><td>48 207</td><td>Ferramentas Delta</td><td>R$ 15.300,00</td><td><span class="selo s-ok" id="e6">Aprovado</span></td></tr>
+            <tr><td>48 206</td><td>Uniformes São Jorge</td><td>R$ 4.120,00</td><td><span class="selo s-ok" id="e7">Aprovado</span></td></tr>
+            <tr><td>48 205</td><td>Café e Cia Distribuidora</td><td>R$ 880,00</td><td><span class="selo s-ok" id="e8">Aprovado</span></td></tr>
+          </tbody>
+        </table>
+        <div class="botoes"><button id="novo">Novo pedido</button></div>
+      </section>
+
+      <!-- formulário -->
+      <section id="form" class="esconde">
+        <h1 id="t2">Novo pedido de compra</h1>
+        <p class="sub" id="s2">Os campos marcados são obrigatórios</p>
+        <div class="erro" id="erro">
+          <b id="erroT">Não foi possível salvar o pedido.</b>
+          <span id="erroM">O campo Centro de custo é obrigatório para valores acima de R$ 1.000,00.</span>
+        </div>
+        <div class="cartao">
+          <div class="linha">
+            <div class="campo"><label id="l1">Fornecedor</label><input id="f1" value=""></div>
+            <div class="campo"><label id="l2">Valor total</label><input id="f2" value=""></div>
+          </div>
+          <div class="linha">
+            <div class="campo"><label id="l3">Centro de custo</label><input id="f3" value=""></div>
+            <div class="campo"><label id="l4">Entrega prevista</label><input id="f4" value=""></div>
+          </div>
+          <div class="linha">
+            <div class="campo" style="min-width:100%"><label id="l5">Justificativa</label><input id="f5" value=""></div>
+          </div>
+        </div>
+        <p class="secTit" id="itT">Itens do pedido</p>
+        <table style="max-width:760px">
+          <thead><tr><th id="i1">Item</th><th id="i2">Qtd.</th><th id="i3">Unitário</th><th id="i4">Subtotal</th></tr></thead>
+          <tbody>
+            <tr><td id="im1">Rolamento 6204-2RS</td><td>40</td><td>R$ 68,00</td><td>R$ 2.720,00</td></tr>
+            <tr><td id="im2">Correia dentada HTD-8M</td><td>12</td><td>R$ 210,00</td><td>R$ 2.520,00</td></tr>
+            <tr><td id="im3">Sensor indutivo PNP M18</td><td>18</td><td>R$ 147,00</td><td>R$ 2.646,00</td></tr>
+            <tr><td id="im4">Kit de vedação hidráulica</td><td>4</td><td>R$ 253,50</td><td>R$ 1.014,00</td></tr>
+          </tbody>
+        </table>
+        <div class="botoes" style="max-width:760px">
+          <button id="salvar">Salvar pedido</button>
+          <button class="sec" id="cancelar">Cancelar</button>
+        </div>
+      </section>
+
+      <!-- confirmação -->
+      <section id="fim" class="esconde">
+        <h1 id="t3">Pedido registrado</h1>
+        <p class="sub" id="s3">Ele segue para aprovação do gestor do centro de custo</p>
+        <div class="ok ver">
+          <span id="o1">Número do pedido</span>
+          <div class="num">48 213</div>
+          <span id="o2">Situação: Em aprovação · Fornecedor: TecnoParts Ltda.</span>
+        </div>
+      </section>
+    </main>
+  </div>
+<script>
+/* Os textos em cinco idiomas. O sistema é de mentira, mas a tela que aparece no
+   vídeo precisa estar no idioma da página do Walkstamp — senão o exemplo em
+   alemão mostra um documento alemão de um sistema em português, e a costura
+   aparece. */
+const T = {
+  pt: { mod:'Compras', quem:'m.almeida · Suprimentos',
+    n:['Painel','Pedidos de compra','Fornecedores','Centros de custo','Relatórios'],
+    t1:'Pedidos de compra', s1:'Últimos pedidos do seu departamento',
+    c:['Número','Fornecedor','Valor','Situação'], ap:'Em aprovação', okS:'Aprovado',
+    novo:'Novo pedido', t2:'Novo pedido de compra', s2:'Os campos marcados são obrigatórios',
+    erroT:'Não foi possível salvar o pedido.',
+    erroM:'O campo Centro de custo é obrigatório para valores acima de R$ 1.000,00.',
+    l:['Fornecedor','Valor total','Centro de custo','Entrega prevista','Justificativa'],
+    salvar:'Salvar pedido', cancelar:'Cancelar',
+    t3:'Pedido registrado', s3:'Ele segue para aprovação do gestor do centro de custo',
+    o1:'Número do pedido', o2:'Situação: Em aprovação · Fornecedor: TecnoParts Ltda.',
+    v:['TecnoParts Ltda.','R$ 8.900,00','CC-4420 · Suprimentos','30/09/2026','Reposição de peças de manutenção'],
+    itT:'Itens do pedido', i:['Item','Qtd.','Unitário','Subtotal'],
+    im:['Rolamento 6204-2RS','Correia dentada HTD-8M','Sensor indutivo PNP M18','Kit de vedação hidráulica'] },
+  en: { mod:'Purchasing', quem:'m.almeida · Supply',
+    n:['Dashboard','Purchase orders','Suppliers','Cost centres','Reports'],
+    t1:'Purchase orders', s1:'Latest orders from your department',
+    c:['Number','Supplier','Amount','Status'], ap:'Awaiting approval', okS:'Approved',
+    novo:'New order', t2:'New purchase order', s2:'Marked fields are required',
+    erroT:'The order could not be saved.',
+    erroM:'Cost centre is required for amounts above 1,000.00.',
+    l:['Supplier','Total amount','Cost centre','Expected delivery','Justification'],
+    salvar:'Save order', cancelar:'Cancel',
+    t3:'Order registered', s3:'It goes to the cost centre manager for approval',
+    o1:'Order number', o2:'Status: Awaiting approval · Supplier: TecnoParts Ltd.',
+    v:['TecnoParts Ltd.','8,900.00','CC-4420 · Supply','30/09/2026','Replacement of maintenance parts'],
+    itT:'Order items', i:['Item','Qty.','Unit','Subtotal'],
+    im:['Bearing 6204-2RS','Timing belt HTD-8M','Inductive sensor PNP M18','Hydraulic seal kit'] },
+  es: { mod:'Compras', quem:'m.almeida · Suministros',
+    n:['Panel','Pedidos de compra','Proveedores','Centros de coste','Informes'],
+    t1:'Pedidos de compra', s1:'Últimos pedidos de tu departamento',
+    c:['Número','Proveedor','Importe','Situación'], ap:'En aprobación', okS:'Aprobado',
+    novo:'Nuevo pedido', t2:'Nuevo pedido de compra', s2:'Los campos marcados son obligatorios',
+    erroT:'No se pudo guardar el pedido.',
+    erroM:'El campo Centro de coste es obligatorio para importes superiores a 1.000,00.',
+    l:['Proveedor','Importe total','Centro de coste','Entrega prevista','Justificación'],
+    salvar:'Guardar pedido', cancelar:'Cancelar',
+    t3:'Pedido registrado', s3:'Pasa a la aprobación del responsable del centro de coste',
+    o1:'Número de pedido', o2:'Situación: En aprobación · Proveedor: TecnoParts Ltda.',
+    v:['TecnoParts Ltda.','8.900,00','CC-4420 · Suministros','30/09/2026','Reposición de piezas de mantenimiento'],
+    itT:'Líneas del pedido', i:['Artículo','Cant.','Unitario','Subtotal'],
+    im:['Rodamiento 6204-2RS','Correa dentada HTD-8M','Sensor inductivo PNP M18','Kit de juntas hidráulicas'] },
+  de: { mod:'Einkauf', quem:'m.almeida · Beschaffung',
+    n:['Übersicht','Bestellanforderungen','Lieferanten','Kostenstellen','Berichte'],
+    t1:'Bestellanforderungen', s1:'Letzte Anforderungen Ihrer Abteilung',
+    c:['Nummer','Lieferant','Betrag','Status'], ap:'In Genehmigung', okS:'Genehmigt',
+    novo:'Neue Anforderung', t2:'Neue Bestellanforderung', s2:'Markierte Felder sind Pflichtfelder',
+    erroT:'Die Anforderung konnte nicht gespeichert werden.',
+    erroM:'Die Kostenstelle ist bei Beträgen über 1.000,00 ein Pflichtfeld.',
+    l:['Lieferant','Gesamtbetrag','Kostenstelle','Liefertermin','Begründung'],
+    salvar:'Anforderung speichern', cancelar:'Abbrechen',
+    t3:'Anforderung erfasst', s3:'Sie geht zur Genehmigung an die Kostenstellenleitung',
+    o1:'Nummer der Anforderung', o2:'Status: In Genehmigung · Lieferant: TecnoParts GmbH',
+    v:['TecnoParts GmbH','8.900,00','KST-4420 · Beschaffung','30.09.2026','Ersatz von Wartungsteilen'],
+    itT:'Positionen der Anforderung', i:['Position','Menge','Einzelpreis','Zwischensumme'],
+    im:['Wälzlager 6204-2RS','Zahnriemen HTD-8M','Induktiver Sensor PNP M18','Hydraulik-Dichtsatz'] },
+  fr: { mod:'Achats', quem:'m.almeida · Approvisionnement',
+    n:['Tableau de bord','Demandes d’achat','Fournisseurs','Centres de coût','Rapports'],
+    t1:'Demandes d’achat', s1:'Dernières demandes de votre service',
+    c:['Numéro','Fournisseur','Montant','Statut'], ap:'En validation', okS:'Validée',
+    novo:'Nouvelle demande', t2:'Nouvelle demande d’achat', s2:'Les champs marqués sont obligatoires',
+    erroT:'Impossible d’enregistrer la demande.',
+    erroM:'Le centre de coût est obligatoire pour les montants supérieurs à 1 000,00.',
+    l:['Fournisseur','Montant total','Centre de coût','Livraison prévue','Justification'],
+    salvar:'Enregistrer la demande', cancelar:'Annuler',
+    t3:'Demande enregistrée', s3:'Elle part en validation chez le responsable du centre de coût',
+    o1:'Numéro de la demande', o2:'Statut : En validation · Fournisseur : TecnoParts SARL',
+    v:['TecnoParts SARL','8 900,00','CC-4420 · Approvisionnement','30/09/2026','Remplacement de pièces de maintenance'],
+    itT:'Lignes de la demande', i:['Article','Qté','Unitaire','Sous-total'],
+    im:['Roulement 6204-2RS','Courroie crantée HTD-8M','Capteur inductif PNP M18','Kit de joints hydrauliques'] },
+};
+const L = new URLSearchParams(location.search).get('lang') || 'pt';
+const t = T[L] || T.pt;
+const $ = i => document.getElementById(i);
+document.documentElement.lang = L === 'pt' ? 'pt-BR' : L;
+$('mod').textContent = t.mod; $('quem').textContent = t.quem;
+t.n.forEach((v, i) => $('n' + (i + 1)).textContent = v);
+$('t1').textContent = t.t1; $('s1').textContent = t.s1;
+t.c.forEach((v, i) => $('c' + (i + 1)).textContent = v);
+$('e1').textContent = t.okS; $('e2').textContent = t.ap;
+$('e3').textContent = t.okS; $('e4').textContent = t.okS;
+$('novo').textContent = t.novo;
+$('t2').textContent = t.t2; $('s2').textContent = t.s2;
+$('erroT').textContent = t.erroT; $('erroM').textContent = t.erroM;
+t.l.forEach((v, i) => $('l' + (i + 1)).textContent = v);
+$('salvar').textContent = t.salvar; $('cancelar').textContent = t.cancelar;
+$('t3').textContent = t.t3; $('s3').textContent = t.s3;
+$('o1').textContent = t.o1; $('o2').textContent = t.o2;
+$('itT').textContent = t.itT;
+t.i.forEach((v, i) => $('i' + (i + 1)).textContent = v);
+t.im.forEach((v, i) => $('im' + (i + 1)).textContent = v);
+window.__V = t.v;
+</script>
+</body>
+</html>

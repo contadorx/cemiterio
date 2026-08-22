@@ -1,0 +1,54 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Cas d’usage</p>
+    <h1 style="font-size:32px">Une session de test d’utilisabilité qui devient un rapport</h1>
+    <p class="updated">La session avec le participant est terminée et il ne reste qu’un enregistrement d’une heure et votre mémoire. Le document sort avec les moments qui comptent, l’écran de chacun, et la parole du modérateur séparée de celle du participant.</p>
+
+    {{figura}}
+
+    <h2>Trois choses qui vous font gagner l’après-midi</h2>
+    <p><b>Cinq participants, un rapport.</b> Exportez chaque session et réunissez-les toutes d’un coup : chaque participant devient une tâche du document, avec son temps, et la parole de chacun à la bonne place.</p>
+    <p><b>L’extrait du moment, pas la session entière.</b> Seules les 15 secondes autour de ce que vous avez marqué sont conservées, et seulement si vous l’activez. Le reste de la vidéo est écarté — et ce qui est resté, vous l’effacez d’un clic, ce qui est consigné dans le document.</p>
+    <p><b>Chaque moment a un type.</b> Friction, abandon, éloge ou défaut. Cela sort dans le tableur, et c’est par là que l’on raconte l’histoire sans réécouter trois heures d’enregistrement.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=usabilidade&amp;lang=fr">Enregistrer une session maintenant</a>
+      <span class="small muted">gratuit — et l’enregistrement du participant ne sort pas de votre ordinateur</span>
+    </p>
+
+    <h2>Le problème</h2>
+    <p>Cinq participants, une heure chacun, et l’analyse prend plus de temps que les sessions. Réécouter pour retrouver la minute où la personne a bloqué, c’est cela le travail — et le rapport doit sortir avant le prochain sprint, pas après.</p>
+    <p><b>Et il y a un problème que les outils de recherche ne résolvent pas : l’enregistrement est une donnée personnelle.</b> Session avec un participant externe, écran avec des données réelles, visage et voix de quelqu’un d’identifiable. Envoyer cela dans le cloud d’un fournisseur, c’est une conversation avec le juridique à laquelle beaucoup d’études ne survivent pas.</p>
+
+    <h2>Ce qui sort</h2>
+    <p>Un rapport de session dans lequel on retrouve le moment sans rouvrir la vidéo :</p>
+    <ul>
+      <li><b>Modérateur et participant séparés</b> dans la transcription — les deux canaux audio sortent étiquetés, et le rapport sait qui a demandé quoi</li>
+      <li><b>Marquer le moment pendant la session</b> : le bouton de la fenêtre de contrôle flottante force une capture et la marque, sans interrompre la personne</li>
+      <li><b>Code du participant à la place du nom</b> — le champ arrive déjà ainsi, parce que c’est la valeur par défaut qui apprend à anonymiser</li>
+      <li><b>Caviardage pour anonymiser</b> ce qui apparaît à l’écran, gravé dans l’image exportée</li>
+      <li><b>L’heure de l’horloge à chaque moment</b>, pour recouper avec vos notes papier</li>
+      <li><b>Prompt prêt pour le rapport</b> : friction, abandon et éloge marqués un par un, constats classés par ordre de gravité</li>
+    </ul>
+
+    <h2>Comment faire</h2>
+    <ol class="passos">
+      <li>Choisissez le cas d’usage <b>Test d’utilisabilité</b> à l’étape 1.</li>
+      <li>Commencez à enregistrer avant que le participant ne partage son écran, avec votre microphone activé.</li>
+      <li>Pendant la session, utilisez <b>marquer l’écran</b> dans la fenêtre de contrôle flottante chaque fois que quelque chose d’important se produit — c’est cela que vous chercherez ensuite.</li>
+      <li>À la fin, ne gardez que les moments marqués, renseignez l’étude et le code du participant, et générez le document.</li>
+    </ol>
+
+    <h2>Ce qu’il ne fait pas — et mieux vaut le savoir avant</h2>
+    <p><b>Il ne conserve pas encore l’extrait vidéo du moment marqué.</b> C’est la pièce que ce cas réclame le plus — montrer l’utilisateur en difficulté est la monnaie politique de la recherche — et c’est ce qui est en construction : ~15 s autour de chaque marque, et non la session entière.</p>
+    <p><b>Il n’enregistre pas la webcam du participant.</b> Seulement l’écran partagé et les deux canaux audio.</p>
+    <p><b>Il ne fait pas d’analyse entre sessions</b> — tags, affinité, recouper cinq participants. C’est un autre produit (Dovetail, Condens) et garder le contenu sur un serveur pour recouper les sessions effacerait notre seul avantage. Le pont vers ces outils, c’est l’export en Markdown, CSV et JSON.</p>
+    <p><b>Ce n’est pas un questionnaire.</b> SUS et NPS relèvent du formulaire, pas de la capture — qui en a besoin en a déjà.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=usabilidade&amp;lang=fr">Enregistrer une session maintenant</a>
+      <a class="btn ghost" href="{{precos}}">Voir les offres</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">Une agence d’une ou deux personnes tient dans <b>Personal</b> ; à partir de trois, dans <b>Team</b>. Ce qui décide de la session — séparer les canaux, marquer le moment et anonymiser — est <b>gratuit</b>.</p>
+  </div>
+</section>

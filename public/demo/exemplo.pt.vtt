@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.800 --> 00:00:04.000
+Abri o sistema de compras da intranet, na lista de pedidos do meu departamento.
+
+00:00:04.600 --> 00:00:08.800
+Cliquei em Novo pedido para registrar a compra de peças de manutenção.
+
+00:00:09.200 --> 00:00:14.000
+Preenchi o fornecedor, o valor total, a entrega prevista e a justificativa.
+
+00:00:14.600 --> 00:00:19.500
+Salvei sem preencher o centro de custo, e o sistema recusou: o campo é obrigatório acima de mil reais.
+
+00:00:20.000 --> 00:00:23.600
+Preenchi o centro de custo CC-4420 e salvei de novo.
+
+00:00:24.200 --> 00:00:29.000
+O pedido foi registrado com o número 48213, em aprovação, com o fornecedor TecnoParts.

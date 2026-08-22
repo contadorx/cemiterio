@@ -1,0 +1,396 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Base de conocimiento</h1>
+    <p class="updated">Base de conocimiento de {{marca}}, por tema. Cada bloque se abre con un clic.<br>
+    Si lo que buscas no está aquí, usa el botón <b>Hablar con nosotros</b> en la esquina de la
+    herramienta — problema, idea o elogio llegan al mismo sitio.</p>
+
+    <p class="lockHint" style="border-left:3px solid var(--accent);padding-left:12px;margin:0 0 30px">
+    <b>Antes de nada:</b> {{marca}} funciona entero en la pestaña de tu navegador. El vídeo no sube a
+    ningún sitio, y por eso casi todo lo de aquí depende de tu máquina y de tu navegador — no de nuestra
+    red. Eso explica la mitad de las preguntas de esta página. La otra mitad está en
+    <a href="{{seguranca}}">Seguridad de la información</a>.</p>
+
+    <!-- ================================================================= -->
+    <h2>1 · Lo básico</h2>
+    <div class="faq">
+      <details>
+        <summary>Qué hace la herramienta, en una frase</summary>
+        <p>Mira una grabación de pantalla, guarda solo los momentos en que la pantalla cambió de verdad,
+        transcribe lo que se dijo, y junta las dos cosas en un documento — PDF, Word, HTML, Markdown,
+        diapositivas, SCORM, CSV o JSON. Lo que era un vídeo de cuarenta minutos que nadie mira se
+        convierte en doce pantallas con el texto de lo que se estaba diciendo en cada una.</p>
+      </details>
+      <details>
+        <summary>Qué no hace</summary>
+        <p>No guarda el vídeo. Después de generar el documento, el vídeo ya no existe dentro de la
+        herramienta — y no existió en ningún servidor en ningún momento. Tampoco edita vídeo, no corta fragmentos
+        para volver a publicarlos y no hace subtítulos para vídeo: el producto final es siempre un documento.</p>
+      </details>
+      <details>
+        <summary>Por qué nada sube a internet</summary>
+        <p>Porque no hay adónde subirlo. El navegador lee el archivo de tu disco, extrae las imágenes,
+        ejecuta el modelo de voz y monta el PDF en la memoria de la propia pestaña. No hay subida en ningún
+        paso, y eso se puede comprobar en treinta segundos con el F12 abierto en la pestaña Red — el total
+        enviado sigue en cero incluso con un vídeo de varios gigabytes. El paso a paso está en
+        <a href="{{seguranca}}">Seguridad de la información</a>.</p>
+      </details>
+      <details>
+        <summary>¿Tengo que instalar algo? ¿Registrarme?</summary>
+        <p>No y no. Abre <a href="{{app}}">la herramienta</a> y úsala. No hay instalación, ni extensión ni
+        registro. Existe una versión en <b>archivo único</b> que descargas y abres sin nada de internet,
+        para cuando la red de la empresa lo bloquea todo — está en la página de
+        <a href="{{precos}}">precios</a>.</p>
+      </details>
+      <details>
+        <summary>Qué navegador funciona</summary>
+        <p>Chrome y Edge actuales, en el ordenador, es donde funciona todo. Firefox y Safari abren la
+        herramienta y generan el documento a partir de un vídeo, pero no tienen la captura de pantalla con el
+        audio del sistema ni la ventana de control. En el móvil se puede leer y revisar, pero grabar la
+        pantalla de un ordenador es cosa de ordenador.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>2 · Grabar la pantalla</h2>
+    <div class="faq">
+      <details>
+        <summary>Pantalla completa, ventana o pestaña: cuál elegir</summary>
+        <p><b>Pantalla completa.</b> Compartir una <i>ventana</i> tiene dos trampas: el navegador no
+        entrega el sonido del ordenador en ese modo, y todo lo que ocurre fuera de esa ventana desaparece de
+        la evidencia — incluido el aviso de error que apareció en la esquina. Por eso el selector ya abre en
+        la pestaña de la pantalla completa, y la casilla <b>“compartir audio”</b> ya viene marcada. Olvidarse
+        de marcar esa casilla es la causa más común de grabación sin sonido.</p>
+      </details>
+      <details>
+        <summary>La cuenta atrás 3, 2, 1</summary>
+        <p>Son tres segundos entre que eliges la pantalla y que empieza la grabación. Sin ellos, el primer
+        fotograma es casi siempre el propio selector de pantalla del navegador — la ventana que acabas de
+        cerrar — y eso solo lo descubres en la revisión. Se puede desactivar en las opciones.</p>
+      </details>
+      <details>
+        <summary>Marcar un paso, y comentar la marca</summary>
+        <p>“Marcar este paso” guarda la pantalla en ese instante, aunque no haya cambiado lo
+        suficiente como para que el detector automático la guarde solo. Justo debajo del botón hay una caja de
+        texto: lo que escribas ahí se convierte en la anotación de <b>ese</b> fotograma. Siempre comenta la
+        última marca, nunca la siguiente — nadie describe un problema antes de verlo. El motivo de
+        existir es simple: en la revisión, media hora después, siete fotogramas marcados sin que ninguno
+        diga el porqué sirven de poco.</p>
+      </details>
+      <details>
+        <summary>La pausa no detiene el reloj — y es a propósito</summary>
+        <p>La pausa deja de guardar pantallas y de transcribir, pero el tiempo transcurrido sigue corriendo.
+        Si la prueba esperó treinta minutos por un procesamiento, la evidencia tiene que mostrar treinta
+        minutos. Lo que la pausa evita es llenar el documento de fotogramas iguales y de conversación paralela.
+        Al reanudar, se guarda una pantalla al instante: después de una espera, lo que cambió es exactamente lo
+        que querías documentar.</p>
+      </details>
+      <details>
+        <summary>La ventana de control</summary>
+        <p>Durante la grabación, la pestaña de {{marca}} queda detrás de la pantalla que estás compartiendo —
+        es decir, fuera de tu alcance. La ventana de control es una ventana pequeña que se queda por encima de
+        todo, con el reloj, los medidores de audio, y los botones de marcar, pausar, cerrar el micrófono y
+        detener. La caja de comentario también está ahí. Existe en Chrome y en Edge; donde no existe, todo
+        sigue funcionando desde la pestaña.</p>
+      </details>
+      <details>
+        <summary>Por qué la grabación no se convierte en un archivo de vídeo</summary>
+        <p>Porque guardar vídeo es lo contrario de lo que hace la herramienta. Mientras grabas, ya está
+        extrayendo los fotogramas y transcribiendo — cuando pulsas detener, el material ya está listo.
+        Guardar el vídeo en el disco significaría escribir gigabytes para después tirarlos.</p>
+      </details>
+      <details>
+        <summary>“Terminando de transcribir lo que faltaba”</summary>
+        <p>Cuando paras, queda un resto de audio que todavía no completó una ventana de
+        transcripción. Esa es la barra que aparece. Mientras corre, los pasos 3 y 4 quedan cerrados a
+        propósito: la lista de fotogramas todavía está cambiando, y editar una lista que cambia debajo de ti
+        es como se pierde un fotograma. Si no quieres esperar, el botón pasa a ser <b>No esperar</b>.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>3 · Abrir un vídeo que ya existe</h2>
+    <div class="faq">
+      <details>
+        <summary>Qué formatos lee</summary>
+        <p>MP4, MOV y WebM. El tamaño no importa — el archivo no sube, así que no hay límite de subida
+        que reventar. Lo que limita es la memoria de tu ordenador, y los vídeos muy largos conviene abrirlos
+        por partes.</p>
+      </details>
+      <details>
+        <summary>Google Drive y YouTube</summary>
+        <p>Puedes elegir un vídeo directamente de tu Drive: el navegador descarga el archivo <b>a tu
+        máquina</b> y el trabajo ocurre ahí, como con cualquier otro archivo. Para YouTube, el
+        camino es la transcripción — pega en la caja de la transcripción el texto que el propio YouTube genera.</p>
+      </details>
+      <details>
+        <summary>Juntar varias grabaciones en un solo documento</summary>
+        <p>Selecciona dos o más archivos <code>.json</code> generados antes y se convierten en capítulos de
+        un único documento, en el orden en que los elegiste. Es así como una tarde de pruebas con cuatro
+        casos se convierte en un informe. El tiempo dentro de cada sesión sigue siendo verdadero; el intervalo
+        entre ellas no se inventa.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>4 · Transcripción, vocabulario e idiomas</h2>
+    <div class="faq">
+      <details>
+        <summary>De dónde viene la transcripción</summary>
+        <p>De un modelo de voz que se ejecuta dentro de tu navegador. La primera vez se descarga — de
+        77 MB a unos 400 MB, según la calidad elegida — y queda guardado en el navegador para las
+        siguientes. El audio no sale de la máquina en ningún momento.</p>
+      </details>
+      <details>
+        <summary>Ya tengo la transcripción de la reunión. ¿Se puede usar?</summary>
+        <p>Sí, y es el camino más rápido: quien tiene el <code>.vtt</code> o el <code>.srt</code> de una
+        reunión de Teams, de Meet o de Zoom no necesita descargar ningún modelo. Arrastra el archivo sobre
+        la caja de la transcripción, pega el texto, o usa el botón <b>Abrir una transcripción ya hecha</b>
+        justo debajo de ella. También funciona el texto suelto sin marcas de tiempo — solo que entonces las
+        intervenciones no quedan casadas con cada pantalla.</p>
+      </details>
+      <details>
+        <summary>El micrófono y el sonido del ordenador aparecen por separado</summary>
+        <p>Los dos canales se capturan y se transcriben por separado, y el documento dice quién dijo
+        qué. En una sesión de pruebas con un usuario, esa es la diferencia entre “alguien dijo” y “el
+        participante dijo”.</p>
+      </details>
+      <details>
+        <summary>El vocabulario del dominio</summary>
+        <p>Los nombres de sistema, las siglas internas y los nombres propios son donde más falla el modelo de
+        voz — y son justamente las palabras que importan en un documento corporativo. El vocabulario es una
+        lista tuya de términos que la herramienta aplica sobre la transcripción una vez hecha. Está
+        justo debajo de la caja de texto, que es donde aparece el error.</p>
+      </details>
+      <details>
+        <summary>Traducir</summary>
+        <p>La traducción también se ejecuta en tu navegador, donde este tenga el traductor incorporado. Puedes
+        traducir a un idioma por vez y después generar el PDF, el Word o el Markdown como siempre — o
+        marcar varios idiomas de una vez y recibir un <code>.zip</code> con el mismo documento en HTML
+        en cada uno de ellos.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>5 · Los fotogramas</h2>
+    <div class="faq">
+      <details>
+        <summary>Reducir o mantener: qué descarta la herramienta sola</summary>
+        <p>Compara cada pantalla con la anterior y solo la guarda cuando el cambio es lo bastante grande.
+        Un cursor que se movió no es un cambio; un campo que se puso rojo sí. En la revisión ves todas las
+        que guardó y descartas las que no sirven — el descarte es tuyo, la herramienta solo evita que
+        empieces con trescientas pantallas iguales.</p>
+      </details>
+      <details>
+        <summary>Zonas tachadas: esconder lo que no puede aparecer</summary>
+        <p>Puedes tachar una región de la imagen — un documento de identidad, un nombre, un importe. La zona
+        tachada se aplica sobre la imagen que va al documento, no es una capa por encima: en el archivo
+        entregado, lo que estaba debajo ya no existe.</p>
+      </details>
+      <details>
+        <summary>Destacar, recortar, duplicar y comparar</summary>
+        <p>Dentro de la lupa de cada fotograma: rectángulo, flecha y lápiz para señalar lo que interesa;
+        recorte para quitar la parte inútil de la pantalla; duplicar cuando la misma pantalla prueba dos cosas
+        (antes y después de una acción); y comparar, que superpone dos fotogramas con un control de mezcla
+        — es la respuesta a “¿qué cambió entre estos dos?”, que el ojo no encuentra solo cuando un
+        botón se movió ocho píxeles.</p>
+      </details>
+      <details>
+        <summary>Cambiar la imagen de un paso</summary>
+        <p>Es el gesto más repetido de quien <b>mantiene</b> un documento: la pantalla cambió, el procedimiento
+        no. En vez de adjuntar, mover con las flechas y descartar la antigua, hay un botón que cambia la imagen
+        de ese paso y conserva todo lo demás.</p>
+      </details>
+      <details>
+        <summary>Capítulos</summary>
+        <p>Un documento largo se puede dividir en tareas con nombre, y cada tarea se convierte en un capítulo
+        con sus pasos debajo. También se puede generar un documento aparte por capítulo, de una sola captura.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>6 · Generar el documento</h2>
+    <div class="faq">
+      <details>
+        <summary>Cada formato sirve para una cosa</summary>
+        <p><b>PDF</b> es lo que quiere casi todo el mundo: se cierra, se imprime y se adjunta. <b>Word</b> es
+        para quien va a seguir escribiendo encima. <b>HTML</b> es un solo archivo, con las imágenes dentro, que
+        abre en cualquier navegador. <b>Markdown</b> es para pegar en una wiki. <b>Diapositivas</b> para
+        presentar. <b>SCORM</b> para subir a un LMS de formación. <b>CSV</b> y <b>JSON</b> son
+        datos: el CSV va a la hoja de cálculo, y el JSON es lo que trae el documento de vuelta aquí después.</p>
+      </details>
+      <details>
+        <summary>Escenario de uso: por qué la misma grabación se convierte en documentos distintos</summary>
+        <p>Una evidencia de prueba, una instrucción de trabajo, un acta y una sesión de usabilidad
+        piden campos distintos y hablan con lectores distintos. El escenario elegido cambia las etiquetas
+        de la identificación, qué campos aparecen, y los objetivos que ofrece el prompt. “Contexto para
+        IA” no pide ninguna identificación: el lector es una máquina.</p>
+      </details>
+      <details>
+        <summary>Qué escenario para qué material</summary>
+        <p>Elegir mal aquí es el error que más documentos estropea — y no avisa. Una reunión registrada
+        como “evidencia de prueba” sale con el título equivocado, con la palabra “Paso” donde debería
+        decir “Momento”, y con una pantalla guardada cada vez que el recuadro de quien hablaba cambió
+        de sitio. Según lo que grabaste:</p>
+        <table class="legal">
+          <tr><th>Lo que grabaste</th><th>Escenario</th><th>Qué cambia en el documento</th></tr>
+          <tr><td>Ejecuté un caso de prueba y necesito probar que pasó</td>
+              <td><b>Evidencia de prueba</b></td>
+              <td>Campos de caso, sistema, incidencia y resultado; huella SHA-256 de cada imagen;
+                  la unidad es “Paso”</td></tr>
+          <tr><td>Le enseñé a alguien a hacer una tarea en el sistema</td>
+              <td><b>Instrucción de trabajo</b></td>
+              <td>Título, versión y autor; la anotación se vuelve el título del paso; habilita la
+                  salida SCORM para el LMS</td></tr>
+          <tr><td>Una reunión, una llamada, una demostración para el cliente</td>
+              <td><b>Acta de reunión</b></td>
+              <td>Asunto, lugar, quién la condujo y participantes; la unidad pasa a “Momento”; el
+                  habla pesa más que la pantalla</td></tr>
+          <tr><td>Observé a alguien usar el producto y quiero los hallazgos</td>
+              <td><b>Sesión de usabilidad</b></td>
+              <td>Estudio, tarea, moderador y el <b>código</b> del participante — nunca el nombre; la
+                  pantalla del participante sale grande, porque es el dato</td></tr>
+          <tr><td>Voy a adjuntar esto en una conversación con un modelo de IA</td>
+              <td><b>Contexto para IA</b></td>
+              <td>Ninguna identificación: el lector es una máquina. El prompt sale junto</td></tr>
+          <tr><td>Auditoría, peritaje, formación de proveedores — nada de lo anterior</td>
+              <td><b>Otro</b></td>
+              <td>El genérico: secuencia con el habla, sin encabezado de oficio</td></tr>
+        </table>
+        <p>Se puede cambiar después: vuelve al paso 1, elige otro escenario y genera de nuevo. Las
+        pantallas, las anotaciones y la transcripción siguen donde estaban.</p>
+      </details>
+      <details>
+        <summary>Formato: diseño y papel</summary>
+        <p>El <b>diseño</b> decide cómo se distribuyen las pantallas — automático, una por página con el habla
+        de ese tramo, o cuadrícula compacta de seis por página. El <b>papel</b> es A4 o Carta. Los dos están
+        en la sección <b>Formato</b>, antes de los botones que producen el archivo. En una cuenta de pago, los
+        dos pueden venir configurados desde la cuenta, y la pantalla dice de dónde vinieron — cambiarlo ahí
+        vale solo para ese documento.</p>
+      </details>
+      <details>
+        <summary>Identificación: caso, sistema, ticket, resultado</summary>
+        <p>Son los campos que convierten un montón de pantallas en una evidencia: de qué caso de prueba es, en
+        qué sistema, cuál es el ticket, y si pasó o no. Son gratuitos. Lo que se paga es que lleguen
+        <b>rellenados</b> desde la configuración de tu cuenta.</p>
+      </details>
+      <details>
+        <summary>Huella digital y numeración</summary>
+        <p>La huella digital (SHA-256) de cada imagen va impresa junto a ella, en el escenario de
+        evidencia. Sirve para demostrar después que esa imagen no fue cambiada. La numeración automática
+        da un número secuencial al caso.</p>
+      </details>
+      <details>
+        <summary>El prompt para la IA</summary>
+        <p>Adjuntar el PDF en una conversación con un modelo no basta: necesita saber cómo está organizado el
+        documento, si no ignora los instantes y mezcla lo que vio con lo que se dijo. El texto del
+        prompt se genera solo, ajustado a tu vídeo y al objetivo elegido. Nace plegado —
+        el gesto normal es copiar y pegar, no leer.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>7 · Reabrir, corregir y comprobar</h2>
+    <div class="faq">
+      <details>
+        <summary>Corregir un paso sin volver a grabar</summary>
+        <p>Para eso sirve el <code>.json</code>. Guárdalo junto al PDF: trae el documento
+        entero de vuelta a la herramienta — fotogramas, transcripción, anotaciones, zonas tachadas — y corriges
+        lo que haga falta y lo generas de nuevo. Sin él, una errata en una anotación cuesta volver a
+        grabar.</p>
+      </details>
+      <details>
+        <summary>¿Y el .zip?</summary>
+        <p>El <code>.zip</code> lleva el documento en varios formatos a la vez, con las imágenes sueltas
+        — es el paquete para archivar o para entregar a quien va a trabajar las imágenes fuera de aquí. También
+        vuelve a la herramienta.</p>
+      </details>
+      <details>
+        <summary>El verificador</summary>
+        <p>Hay una página que comprueba si un documento generado coincide con las huellas digitales que él
+        mismo declara — <a href="{{verificar}}">verificar un documento</a>. Sirve para quien recibe la
+        evidencia y quiere saber si la han tocado.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>8 · Cuenta, planes y equipo</h2>
+    <div class="faq">
+      <details>
+        <summary>Qué se paga, al final</summary>
+        <p>La herramienta en el navegador es gratuita y lo sigue siendo. Lo que paga el plan es la <b>cuenta</b>:
+        tu marca en el documento, los valores por defecto que llegan rellenados (empresa, entorno, etiqueta,
+        diseño, papel), las plantillas de documento del equipo, el guion de casos y el vocabulario. La lista
+        completa y los precios están en <a href="{{precos}}">precios</a>.</p>
+      </details>
+      <details>
+        <summary>Cómo funciona la licencia sin servidor de licencias</summary>
+        <p>La clave se comprueba <b>dentro</b> de tu navegador. No hay consulta a ningún servidor: funciona
+        sin conexión, y nosotros no nos enteramos de cuándo ni dónde se usa. El camino normal
+        es entrar por el enlace que llega por correo; pegar la clave a mano sigue existiendo para quien la
+        recibió por otra vía.</p>
+      </details>
+      <details>
+        <summary>Los valores por defecto de la cuenta llegan, pero no mandan</summary>
+        <p>Lo que la empresa configura en la cuenta llega rellenado en la herramienta — y deja de valer en el
+        instante en que la persona que tiene el caso en la mano cambia algo. Quien sabe que
+        <i>este</i> documento necesita otro diseño es quien lo está mirando. Un valor por defecto es un valor
+        por defecto, no una camisa de fuerza.</p>
+      </details>
+      <details>
+        <summary>Guion de casos</summary>
+        <p>En una cuenta de equipo se puede subir una hoja de cálculo de casos de prueba y repartir los
+        enlaces: cada persona recibe una dirección que abre la herramienta ya rellenada con su caso, y al
+        terminar lo marca como hecho. La pantalla de control muestra qué se hizo, quién lo hizo y cuándo — con
+        el recibo del documento generado.</p>
+      </details>
+      <details>
+        <summary>Cuánto tiempo se guardan las cosas</summary>
+        <p>Los plazos están escritos en la <a href="{{privacidade}}">política de privacidad</a>, y hay
+        código detrás de ellos: una rutina diaria borra lo que pasó del plazo, archivo por archivo. Las
+        facturas se quedan durante el plazo de conservación fiscal — eso está dicho allí, con el motivo.</p>
+      </details>
+    </div>
+
+    <!-- ================================================================= -->
+    <h2>9 · Cuando sale mal</h2>
+    <div class="faq">
+      <details>
+        <summary>Grabé y no vino sonido</summary>
+        <p>Casi siempre es una de dos cosas. La primera: compartiste una <b>ventana</b> — el
+        navegador no entrega el sonido del ordenador en ese modo, solo en pestaña o pantalla completa. La
+        segunda: la casilla “compartir audio” del selector quedó sin marcar. La herramienta avisa cuál de las
+        dos fue, y la pantalla final dice si algún canal quedó mudo todo el tiempo.</p>
+      </details>
+      <details>
+        <summary>Grabé y no vino ningún fotograma</summary>
+        <p>Pasó que la pantalla no cambió lo suficiente — la lectura de un documento, por ejemplo. En ese
+        caso, marca los pasos a mano durante la grabación. La herramienta también guarda los motivos de cada
+        fotograma descartado y lo muestra en el informe técnico, que va junto cuando hablas con
+        nosotros.</p>
+      </details>
+      <details>
+        <summary>El modelo de voz no se descarga</summary>
+        <p>Viene de una dirección pública de CDN, y algunas redes corporativas la bloquean. Dos
+        caminos: usar una transcripción ya hecha (apartado 4), o pedirle a TI que desbloquee el dominio. Si ya
+        lo descargaste antes y quieres recuperar el espacio, está el botón <b>borrar el modelo de voz
+        descargado</b>, al lado del selector de voz.</p>
+      </details>
+      <details>
+        <summary>La pestaña se colgó o se puso lenta con un vídeo grande</summary>
+        <p>Todo se ejecuta en la memoria de la pestaña, así que un vídeo muy largo con muchas pantallas pesa.
+        Lo que ayuda: bajar la calidad de las imágenes, generar el documento en capítulos separados, o dividir
+        la grabación en dos y juntar los <code>.json</code> después.</p>
+      </details>
+      <details>
+        <summary>Encontré un error, o me gustaría que existiera algo</summary>
+        <p>El botón <b>Hablar con nosotros</b>, en la esquina de la herramienta, manda problema, idea o elogio.
+        Junto va un informe técnico de tu navegador — versiones, funciones disponibles, lo que registró la
+        grabación — y <b>ves el informe antes de mandarlo</b>. Ningún vídeo, imagen ni transcripción va
+        en él.</p>
+      </details>
+    </div>
+
+    <p style="margin-top:44px"><a class="btn" href="{{app}}">Abrir la herramienta</a></p>
+  </div>
+</section>

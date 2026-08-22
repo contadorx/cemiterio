@@ -1,0 +1,86 @@
+{
+  "linkedin": [
+    {
+      "arquivo": "linkedin-logo-empresa-400.png",
+      "largura": 400,
+      "altura": 400
+    },
+    {
+      "arquivo": "linkedin-capa-empresa-1128x191.png",
+      "largura": 1128,
+      "altura": 191
+    },
+    {
+      "arquivo": "linkedin-foto-perfil-400.png",
+      "largura": 400,
+      "altura": 400
+    },
+    {
+      "arquivo": "linkedin-capa-perfil-1584x396.png",
+      "largura": 1584,
+      "altura": 396
+    }
+  ],
+  "x": [
+    {
+      "arquivo": "x-perfil-400.png",
+      "largura": 400,
+      "altura": 400
+    },
+    {
+      "arquivo": "x-header-1500x500.png",
+      "largura": 1500,
+      "altura": 500
+    }
+  ],
+  "instagram": [
+    {
+      "arquivo": "instagram-perfil-1080.png",
+      "largura": 1080,
+      "altura": 1080
+    }
+  ],
+  "facebook": [
+    {
+      "arquivo": "facebook-perfil-1000.png",
+      "largura": 1000,
+      "altura": 1000
+    },
+    {
+      "arquivo": "facebook-capa-1640x624.png",
+      "largura": 1640,
+      "altura": 624
+    }
+  ],
+  "youtube": [
+    {
+      "arquivo": "youtube-perfil-800.png",
+      "largura": 800,
+      "altura": 800
+    },
+    {
+      "arquivo": "youtube-banner-2560x1440.png",
+      "largura": 2560,
+      "altura": 1440
+    }
+  ],
+  "bluesky": [
+    {
+      "arquivo": "bluesky-perfil-1000.png",
+      "largura": 1000,
+      "altura": 1000
+    },
+    {
+      "arquivo": "bluesky-banner-3000x1000.png",
+      "largura": 3000,
+      "altura": 1000
+    }
+  ],
+  "tiktok": [
+    {
+      "arquivo": "tiktok-perfil-1000.png",
+      "largura": 1000,
+      "altura": 1000
+    }
+  ]
+}

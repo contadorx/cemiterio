@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.800 --> 00:00:04.000
+I opened the intranet purchasing system, on my department's list of orders.
+
+00:00:04.600 --> 00:00:08.800
+I clicked New order to register the purchase of maintenance parts.
+
+00:00:09.200 --> 00:00:14.000
+I filled in the supplier, the total amount, the expected delivery and the justification.
+
+00:00:14.600 --> 00:00:19.500
+I saved without the cost centre, and the system refused: the field is required above one thousand.
+
+00:00:20.000 --> 00:00:23.600
+I filled in cost centre CC-4420 and saved again.
+
+00:00:24.200 --> 00:00:29.000
+The order was registered as number 48213, awaiting approval, with supplier TecnoParts.

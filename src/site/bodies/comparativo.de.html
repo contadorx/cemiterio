@@ -1,0 +1,100 @@
+<section style="padding-top:60px">
+  <div class="wrap doc" style="max-width:860px">
+    <h1 style="font-size:32px">{{marca}} und die Alternativen</h1>
+    <p class="updated">Aktualisiert am 14. August 2026.<br>
+    Diese Seite haben wir selbst geschrieben, lesen Sie sie also mit dieser Brille. Zum Ausgleich enthält sie
+    zwei Dinge, die ein Anbietervergleich nie enthält: die Listenpreise der Wettbewerber und den Abschnitt
+    <a href="#perdemos" style="color:var(--accent)">wo jeder von ihnen besser ist als wir</a>.</p>
+
+    <h2>Die fünf Gruppen</h2>
+    <p>Alle Werkzeuge, die Arbeit am Bildschirm in ein Dokument verwandeln, fallen in eine dieser Gruppen:</p>
+    <ul>
+      <li><b>Was mit Windows mitkam</b> — der Steps Recorder (<code>psr.exe</code>), 2024 eingestellt.
+      <a href="{{steps}}" style="color:var(--accent)">Dazu gibt es eine eigene Seite</a>.</li>
+      <li><b>Schritt für Schritt in der Cloud</b> — Scribe, Tango, Guidde und ähnliche: Sie klicken, und sie
+      bauen die Anleitung auf einer Website von sich.</li>
+      <li><b>Auf dem PC installiert</b> — FlowShare, Folge: Desktop-Programme, die lokal aufzeichnen.</li>
+      <li><b>Test-Suiten</b> — Tricentis Tosca, Worksoft Certify, qTest: Regressionsautomatisierung, die auch
+      dokumentiert, was sie ausführt.</li>
+      <li><b>{{marca}}</b> — Aufnahme und Dokument im Browser, ohne Installation und ohne Upload.</li>
+    </ul>
+
+    <h2>Gegenüberstellung</h2>
+    <table class="legal">
+      <tr><th></th><th>{{marca}}</th><th>Steps Recorder</th><th>Cloud<br><span style="font-weight:400">(Scribe, Tango, Guidde)</span></th><th>Installiert<br><span style="font-weight:400">(FlowShare, Folge)</span></th><th>Suiten<br><span style="font-weight:400">(Tosca, Worksoft, qTest)</span></th></tr>
+      <tr><td>Installation</td>
+          <td class="sim">Keine — es ist eine Adresse</td><td>Kam mit Windows</td>
+          <td class="sim">Browser-Erweiterung</td><td class="nao">Programm auf dem PC, mit Freigabe der IT</td>
+          <td class="nao">Einführungsprojekt</td></tr>
+      <tr><td>Verlassen Ihre Inhalte den Rechner?</td>
+          <td class="sim">Nein — Verarbeitung im Browser-Tab</td><td class="sim">Nein</td>
+          <td class="nao">Ja: Die Bildschirminhalte gehen auf deren Server</td><td class="sim">Nein</td>
+          <td>Hängt von der Installation ab</td></tr>
+      <tr><td>Gesprochener Kommentar wird zu Text</td>
+          <td class="sim">Ja, transkribiert und synchronisiert</td><td class="nao">Nein</td>
+          <td class="nao">Nein</td><td class="nao">Nein</td><td class="nao">Nein</td></tr>
+      <tr><td>Uhrzeit pro Schritt</td>
+          <td class="sim">Ja</td><td>Ja</td><td class="nao">Nein</td><td class="nao">Nein</td>
+          <td class="sim">Ja</td></tr>
+      <tr><td>Nachweis-Kopfzeile<br><span style="font-weight:400;font-size:12.5px">Fall, System, Ticket, Ergebnis</span></td>
+          <td class="sim">Ja</td><td class="nao">Nein</td><td class="nao">Nein</td><td class="nao">Nein</td>
+          <td class="sim">Ja, im Format der Suite</td></tr>
+      <tr><td>Prüfsumme der Bilder (SHA-256)</td>
+          <td class="sim">Optional</td><td class="nao">Nein</td><td class="nao">Nein</td><td class="nao">Nein</td>
+          <td>Eigener Prüfpfad</td></tr>
+      <tr><td>Ausgaben</td>
+          <td class="sim">PDF, Word, ZIP, JSON</td><td class="nao">MHT</td>
+          <td>Link, PDF in den bezahlten Plänen</td><td class="sim">PDF, Word, HTML, PPT</td>
+          <td>Berichte der Suite</td></tr>
+      <tr><td>Funktioniert offline</td>
+          <td class="sim">Ja — eine einzige Datei</td><td class="sim">Ja</td><td class="nao">Nein</td>
+          <td class="sim">Ja</td><td>Kommt darauf an</td></tr>
+      <tr><td>Listenpreis</td>
+          <td class="sim">Kostenlos</td><td>Eingestellt</td>
+          <td>US$ 13–38 pro Nutzer/Monat</td><td>Folge: €75–130 einmalig<br>FlowShare: €450/Nutzer/Jahr</td>
+          <td class="nao">Nicht öffentlich; Berichte von €10–20 Tausend pro Lizenz/Jahr</td></tr>
+      <tr><td>Gemacht für</td>
+          <td>Testnachweis und Kontext für KI, ohne etwas hochzuladen</td>
+          <td>Das, was heute verwaist ist</td><td>Anleitungen für Onboarding und Support</td>
+          <td>Handbücher und Schulung</td><td>Automatisierte Regression</td></tr>
+    </table>
+    <p class="small muted">Listenpreise, die im August 2026 auf den Websites der Anbieter öffentlich waren;
+    die der Suiten stammen aus Kundenberichten (PeerSpot), weil es keine öffentliche Preisliste gibt. Prüfen
+    Sie sie, bevor Sie entscheiden — Preise ändern sich, und diese Seite wird nur von Zeit zu Zeit aktualisiert.</p>
+
+    <h2 id="perdemos">Wo jeder von ihnen besser ist als wir</h2>
+    <p>Der Teil, der in den Vergleichen der anderen fehlt:</p>
+    <ul>
+      <li><b>FlowShare</b> liest die Felder der <b>SAP GUI for Windows</b> — es weiß, welche Transaktion und
+      welche Schaltfläche Sie angeklickt haben, und schreibt das von selbst auf. Ein Browser hat diesen Zugriff
+      nicht, und {{marca}} hat ihn ebenso wenig. Wenn Ihr Arbeitstag nur aus klassischer SAP GUI besteht und
+      Ihre IT die Installation freigibt, ist es das beste Werkzeug für diese Arbeit.</li>
+      <li><b>Scribe, Tango und Guidde</b> erzeugen die Beschreibung jedes Klicks automatisch, haben eine
+      umfangreiche Bearbeitung und legen die Anleitung unter einen Link, der sich aktualisiert. Wenn das Ziel
+      eine lebendige Anleitungssammlung für das Team ist — und die Bildschirminhalte keine sensiblen Daten
+      enthalten —, lösen sie ein Problem, das wir gar nicht zu lösen versuchen.</li>
+      <li><b>Tosca, Worksoft und qTest</b> <b>führen</b> den Regressionstest für Sie aus, tausendfach,
+      und dokumentieren jede Ausführung. {{marca}} dokumentiert einen Test, den ein Mensch einmal gemacht hat.
+      Das sind verschiedene Probleme; wenn Ihres das erste ist, gehört es dorthin.</li>
+      <li><b>Der Steps Recorder</b> war auf allen Rechnern der Unternehmenswelt installiert — eine Verbreitung,
+      die niemand mehr erreichen wird. Deshalb ist seine Seite unsere Eingangstür und keine Trophäe.</li>
+    </ul>
+
+    <h2>Wo {{marca}} gewinnt</h2>
+    <ul>
+      <li><b>Reibung.</b> Keine Installation, kein Konto, kein Ticket an die IT. An einem per Richtlinie
+      gesperrten Arbeitsplatz ist das der Unterschied zwischen heute nutzen und im nächsten Quartal nutzen.</li>
+      <li><b>Struktureller Datenschutz.</b> Das ist kein Versprechen im Vertrag: Es gibt keinen Server, auf den
+      etwas hochgeladen werden könnte.
+      <a href="{{seguranca}}" style="color:var(--accent)">Die Seite zur Sicherheit</a> zeigt, wie Sie das
+      in dreißig Sekunden prüfen.</li>
+      <li><b>Die Sprache.</b> Sie kommentieren den Test laut, und der Kommentar wird zur schriftlichen
+      Beschreibung jedes Schritts. Keine der Alternativen hört zu.</li>
+      <li><b>Das Dokument für das Audit.</b> Uhrzeit, Kopfzeile zur Identifikation, Schrittnummerierung und
+      optionaler Hash — in dem Format, das man an ein Ticket anhängt, mit dem richtigen Namen in der Datei.</li>
+      <li><b>Preis.</b> Kostenlos, weil Ihr Rechner die Arbeit macht.</li>
+    </ul>
+
+    <p style="margin-top:34px"><a class="btn" href="{{app}}">Werkzeug öffnen</a></p>
+  </div>
+</section>

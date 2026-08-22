@@ -1,0 +1,1067 @@
+diff --git a/offline/walkstamp-offline.html b/offline/walkstamp-offline.html
+index 7f14906..e37ca52 100644
+--- a/offline/walkstamp-offline.html
++++ b/offline/walkstamp-offline.html
+@@ -606,6 +606,13 @@
+     border-color:var(--accent);font-weight:650}
+   .compCx #compCopiar:hover{filter:brightness(1.06)}
+   .saidaGrupo{margin-top:16px}
++  /* A saída recomendada usa o acento: aqui HÁ o que decidir, e a decisão já vem
++     tomada esperando confirmação. */
++  .saidaRec{padding:14px 16px;border:1px solid var(--accent);border-radius:11px;
++      background:color-mix(in srgb,var(--accent) 4%,var(--panel))}
++  .saidaRec .saidaTit{color:var(--accent)}
++  /* O PORQUÊ, e não só o quê. */
++  .recPor{margin:4px 0 0;font-size:13.5px;color:var(--muted);line-height:1.5}
+   .saidaTit{display:block;font:600 12px/1 ui-sans-serif,system-ui;letter-spacing:.06em;
+     text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+   .sbFim{margin-top:14px}
+@@ -2460,6 +2467,37 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+          e um controle que muda sem explicação é o jeito mais rápido de a pessoa
+          parar de confiar no que vê. A nota diz de onde veio, e diz que dá para
+          trocar. -->
++    <!-- ---- A SAÍDA RECOMENDADA, PRIMEIRO ----
++
++         Onze botões com o mesmo peso são onze decisões — PDF, Word, HTML,
++         Markdown, PowerPoint, SCORM, Jira, Google Docs, JSON, CSV, ZIP —
++         cobradas de quem acabou de conferir trinta telas e só quer entregar o
++         trabalho. E o produto SABE o caso: a pessoa escolheu o cenário no
++         passo 1.
++
++         Uma evidência se anexa a um chamado e não pode ser editada pelo
++         destinatário: PDF. Um tutorial e uma ata são textos que alguém vai
++         continuar escrevendo: Word. Isso não é gosto nosso, é o que o formato
++         faz — e a tela diz o porquê, em uma linha. Um "recomendado" sem motivo
++         é uma ordem; com o motivo é um conselho, e de conselho a pessoa
++         consegue discordar.
++
++         Os outros não somem: ficam a um clique, com o estado lembrado.
++         Recolher capacidade é diferente de remover capacidade, e a diferença é
++         justamente esse botão. -->
++    <div class="saidaRec hide" id="recCx">
++      <span class="saidaTit" id="recTit"></span>
++      <p class="recPor" id="recPor"></p>
++      <div class="row" style="margin-top:9px">
++        <button id="recPrim"></button>
++        <button class="ghost" id="recSeg"></button>
++      </div>
++    </div>
++    <div class="row" style="margin:14px 0 4px">
++      <button class="ghost sm" id="recTodos" aria-expanded="false" aria-controls="saidasTodas"></button>
++    </div>
++
++    <div id="saidasTodas" class="hide">
+     <div class="saidaGrupo">
+       <span class="saidaTit" data-i18n="grFormato"></span>
+       <div class="row" style="gap:16px;align-items:center">
+@@ -2550,6 +2588,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       </div>
+       <p class="note" data-i18n="grDadosNota" style="margin:6px 0 0"></p>
+     </div>
++    </div><!-- /saidasTodas -->
+     <div class="row" style="margin-top:12px">
+       <span class="status" id="pdfStatus"></span>
+     </div>
+@@ -3809,7 +3848,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+       grFormato:'Formato', fmtLayout:'Layout', fmtPapel:'Papel',
+       fmtConta:'O formato padrão vem da configuração de {0} — trocar aqui vale só para este documento.', htmlPeso:'O HTML vai sair com cerca de {0} MB: ele carrega as imagens dentro do próprio arquivo, em texto, e isso pesa um terço a mais que o PDF. Acima de 10 MB a maioria dos e-mails recusa o anexo — se for mandar por e-mail, use o .zip, que leva as imagens ao lado.',
+       grDoc:'O documento', grEntregar:'Entregar em outro sistema', grDados:'Dados e recuperação',
+-      jsonBtn:'Guardar para recuperar depois (.json)', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
++      jsonBtn:'Guardar para recuperar depois (.json)', recTit:'Recomendado para o seu caso', recTodosBtn:'Ver todos os formatos', recMenos:'Recolher os outros formatos', recPor_go:'PDF: ninguém edita depois, e todo mundo abre. É o que se anexa a um chamado.', recPor_docx:'Word: dá para continuar escrevendo em cima — o texto ainda vai crescer.', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
+       quietN:'{0} frame(s) sem fala foram descartados.',
+       quiet0:'Todos os frames têm fala no trecho correspondente.',
+       quietAudio:'Analisando o áudio para achar os trechos sem fala…',
+@@ -4418,7 +4457,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Paper',
+       fmtConta:"The default format comes from {0}'s settings — changing it here applies to this document only.", htmlPeso:'The HTML will come out at about {0} MB: it carries the images inside the file itself, as text, and that weighs a third more than the PDF. Above 10 MB most mail servers refuse the attachment — if you are sending it by e-mail, use the .zip, which keeps the images alongside.',
+       grDoc:'The document', grEntregar:'Deliver to another system', grDados:'Data and recovery',
+-      jsonBtn:'Save to reopen later (.json)', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
++      jsonBtn:'Save to reopen later (.json)', recTit:'Recommended for your case', recTodosBtn:'See all formats', recMenos:'Collapse the other formats', recPor_go:'PDF: nobody edits it afterwards, and everyone can open it. It is what you attach to a ticket.', recPor_docx:'Word: you can keep writing on top of it — the text is still going to grow.', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
+       quietN:'{0} frame(s) with no speech were discarded.',
+       quiet0:'Every frame has speech in its interval.',
+       quietAudio:'Analysing the audio to find the silent stretches…',
+@@ -5021,7 +5060,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+       grFormato:'Formato', fmtLayout:'Diseño', fmtPapel:'Papel',
+       fmtConta:'El formato predeterminado viene de la configuración de {0} — cambiarlo aquí vale solo para este documento.', htmlPeso:'El HTML saldrá con unos {0} MB: lleva las imágenes dentro del propio archivo, como texto, y eso pesa un tercio más que el PDF. Por encima de 10 MB la mayoría de los correos rechaza el adjunto — si lo vas a enviar por correo, usa el .zip, que lleva las imágenes al lado.',
+       grDoc:'El documento', grEntregar:'Entregar a otro sistema', grDados:'Datos y recuperación',
+-      jsonBtn:'Guardar para recuperar después (.json)', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
++      jsonBtn:'Guardar para recuperar después (.json)', recTit:'Recomendado para tu caso', recTodosBtn:'Ver todos los formatos', recMenos:'Recoger los otros formatos', recPor_go:'PDF: nadie lo edita después, y todo el mundo lo abre. Es lo que se adjunta a un ticket.', recPor_docx:'Word: puedes seguir escribiendo encima — el texto todavía va a crecer.', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
+       quietN:'{0} fotograma(s) sin habla fueron descartados.',
+       quiet0:'Todos los fotogramas tienen habla en su tramo.',
+       quietAudio:'Analizando el audio para encontrar los tramos en silencio…',
+@@ -5623,7 +5662,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Papierformat',
+       fmtConta:'Das Standardformat stammt aus den Einstellungen von {0} — eine Änderung hier gilt nur für dieses Dokument.', htmlPeso:'Die HTML-Datei wird etwa {0} MB groß: Sie trägt die Bilder als Text in der Datei selbst, und das wiegt ein Drittel mehr als das PDF. Über 10 MB lehnen die meisten Mailserver den Anhang ab — wenn Sie sie per E-Mail versenden, nehmen Sie die .zip, die die Bilder daneben legt.',
+       grDoc:'Das Dokument', grEntregar:'In ein anderes System übergeben', grDados:'Daten und Wiederherstellung',
+-      jsonBtn:'Zum späteren Öffnen speichern (.json)', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
++      jsonBtn:'Zum späteren Öffnen speichern (.json)', recTit:'Für Ihren Fall empfohlen', recTodosBtn:'Alle Formate anzeigen', recMenos:'Andere Formate einklappen', recPor_go:'PDF: Niemand bearbeitet es nachträglich, und jeder kann es öffnen. Das hängt man an ein Ticket.', recPor_docx:'Word: Sie können darauf weiterschreiben — der Text wird noch wachsen.', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
+       quietN:'{0} Screenshot(s) ohne Sprache wurden verworfen.',
+       quiet0:'Alle Screenshots haben Sprache im zugehörigen Abschnitt.',
+       quietAudio:'Der Ton wird analysiert, um die Abschnitte ohne Sprache zu finden…',
+@@ -6231,7 +6270,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+       grFormato:'Format', fmtLayout:'Mise en page', fmtPapel:'Format de papier',
+       fmtConta:'Le format par défaut vient des réglages de {0} — le changer ici ne vaut que pour ce document.', htmlPeso:'Le HTML fera environ {0} Mo : il porte les images à l’intérieur du fichier lui-même, en texte, ce qui pèse un tiers de plus que le PDF. Au-delà de 10 Mo, la plupart des messageries refusent la pièce jointe — pour un envoi par courriel, utilisez le .zip, qui garde les images à côté.',
+       grDoc:'Le document', grEntregar:'Livrer dans un autre système', grDados:'Données et récupération',
+-      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
++      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', recTit:'Recommandé pour votre cas', recTodosBtn:'Voir tous les formats', recMenos:'Replier les autres formats', recPor_go:'PDF : personne ne le modifie ensuite, et tout le monde l’ouvre. C’est ce qu’on joint à un ticket.', recPor_docx:'Word : vous pouvez continuer à écrire dessus — le texte va encore grandir.', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
+       quietN:'{0} capture(s) sans parole ont été écartées.',
+       quiet0:'Toutes les captures ont de la parole dans le segment correspondant.',
+       quietAudio:'Analyse de l’audio pour repérer les passages sans parole…',
+@@ -7109,6 +7148,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+      deixou de travar e nenhum erro apareceu no console. Quem pegou foi o
+      `passos.mjs`. */
+   function passos(){
++    /* A recomendação repinta na mesma batida das travas. Ela ESPELHA o estado
++       do botão original — desligada enquanto não há quadro —, e um espelho
++       pintado só na carga mostraria para sempre o estado do primeiro instante. */
++    try { pintarRecomendado(); } catch (e) {}
+     const modo = modoAtual();
+     const trancar = (id, aberto) => {
+       const el = $(id); if (!el) return;
+@@ -7518,6 +7561,72 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+     if ($('goal')) setTimeout(() => $('goal').focus(), 300);
+   };
+ 
++  /* ================= A SAÍDA RECOMENDADA =========================
++
++     Qual formato resolve o trabalho de cada cenário. Não é gosto: é o que o
++     formato FAZ. A segunda opção é sempre a resposta ao "mas eu preciso mexer"
++     ou "mas eu preciso publicar".
++
++     O `id` aponta para o botão QUE JÁ EXISTE. Nenhuma lógica de geração é
++     duplicada aqui — duas funções produzindo o mesmo arquivo é como dois
++     formatos divergirem sem ninguém notar. */
++  const RECOMENDA = {
++    evidencia:   { prim: 'go',   seg: 'docx' },
++    tutorial:    { prim: 'docx', seg: 'html' },
++    ata:         { prim: 'docx', seg: 'go'   },
++    usabilidade: { prim: 'docx', seg: 'go'   },
++    ia:          { prim: 'go',   seg: 'docx' },
++    outro:       { prim: 'go',   seg: 'docx' },
++  };
++  const SAIDAS_CHAVE = 'Walkstamp.saidasAbertas';
++
++  function pintarRecomendado(){
++    const cx = $('recCx'); if (!cx) return;
++    const cen = ($('modelo') && $('modelo').value) || '';
++    const r = RECOMENDA[cen] || RECOMENDA.outro;
++    const rot = id => { const b = $(id); return (b && b.textContent) || ''; };
++    cx.classList.remove('hide');
++    $('recTit').textContent = t('recTit');
++    $('recPor').textContent = t('recPor_' + r.prim);
++    $('recPrim').textContent = rot(r.prim);
++    $('recSeg').textContent  = rot(r.seg);
++    $('recPrim').dataset.alvo = r.prim;
++    $('recSeg').dataset.alvo  = r.seg;
++    /* Desligados pelo mesmo motivo que os originais: sem quadro não há
++       documento. Espelhar o estado evita um botão que promete e não cumpre. */
++    $('recPrim').disabled = !!($(r.prim) && $(r.prim).disabled);
++    $('recSeg').disabled  = !!($(r.seg)  && $(r.seg).disabled);
++  }
++
++  function abrirSaidas(abrir){
++    const cx = $('saidasTodas'), bt = $('recTodos');
++    if (!cx || !bt) return;
++    cx.classList.toggle('hide', !abrir);
++    bt.setAttribute('aria-expanded', abrir ? 'true' : 'false');
++    bt.textContent = abrir ? t('recMenos') : t('recTodosBtn');
++    try { abrir ? localStorage.setItem(SAIDAS_CHAVE, '1')
++                : localStorage.removeItem(SAIDAS_CHAVE); } catch (e) {}
++  }
++
++  if ($('recPrim')) {
++    /* Clicar no botão de verdade, e não chamar a função dele: assim qualquer
++       trava, aviso ou confirmação que o original tenha vale igual aqui. */
++    const proxy = e => { const b = $(e.currentTarget.dataset.alvo || ''); if (b) b.click(); };
++    $('recPrim').onclick = proxy;
++    $('recSeg').onclick  = proxy;
++  }
++  if ($('recTodos')) {
++    $('recTodos').onclick = () => abrirSaidas($('saidasTodas').classList.contains('hide'));
++    /* Quem abriu uma vez quase sempre é quem mexe sempre — o mesmo argumento da
++       gaveta de ajustes. */
++    let abre = false;
++    try { abre = localStorage.getItem(SAIDAS_CHAVE) === '1'; } catch (e) {}
++    abrirSaidas(abre);
++  }
++  if ($('modelo')) $('modelo').addEventListener('change', () => {
++    try { pintarRecomendado(); } catch (e) {}
++  });
++
+   if ($('novoFluxo')) $('novoFluxo').onclick = () => {
+     if (frames.filter(f => f.keep).length && !confirm(t('novoFluxoConf'))) return;
+     medir('novo_fluxo', {});
+@@ -9029,7 +9138,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.21-32';
++  const VERSAO = '2026.08.21-34';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+@@ -13367,6 +13476,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+        pode trocar — senão o padrão do time vira ordem em vez de padrão. */
+     if ($('fmtConta')) {
+       const quem = cf.empresa || pf.cliente;
++      /* Se o padrão do time mexeu no papel, a gaveta ABRE. Um controle que
++         mudou sozinho e ficou escondido é a forma mais rápida de a pessoa
++         parar de confiar no que a tela mostra. */
++      if (formatoVeio) { try { abrirSaidas(true); } catch (e) {} }
+       $('fmtConta').textContent = formatoVeio ? t('fmtConta', quem) : '';
+       $('fmtConta').classList.toggle('hide', !formatoVeio);
+     }
+@@ -16660,6 +16773,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+     } catch (e) {}
+     lerDaUrl();
+     pintarPerfil();
++    try { pintarRecomendado(); } catch (e) {}
+   }
+ 
+   /* ---- link já preenchido ----
+diff --git a/public/app.html b/public/app.html
+index 4a38a1c..a5d6bea 100644
+--- a/public/app.html
++++ b/public/app.html
+@@ -612,6 +612,13 @@
+     border-color:var(--accent);font-weight:650}
+   .compCx #compCopiar:hover{filter:brightness(1.06)}
+   .saidaGrupo{margin-top:16px}
++  /* A saída recomendada usa o acento: aqui HÁ o que decidir, e a decisão já vem
++     tomada esperando confirmação. */
++  .saidaRec{padding:14px 16px;border:1px solid var(--accent);border-radius:11px;
++      background:color-mix(in srgb,var(--accent) 4%,var(--panel))}
++  .saidaRec .saidaTit{color:var(--accent)}
++  /* O PORQUÊ, e não só o quê. */
++  .recPor{margin:4px 0 0;font-size:13.5px;color:var(--muted);line-height:1.5}
+   .saidaTit{display:block;font:600 12px/1 ui-sans-serif,system-ui;letter-spacing:.06em;
+     text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+   .sbFim{margin-top:14px}
+@@ -2466,6 +2473,37 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+          e um controle que muda sem explicação é o jeito mais rápido de a pessoa
+          parar de confiar no que vê. A nota diz de onde veio, e diz que dá para
+          trocar. -->
++    <!-- ---- A SAÍDA RECOMENDADA, PRIMEIRO ----
++
++         Onze botões com o mesmo peso são onze decisões — PDF, Word, HTML,
++         Markdown, PowerPoint, SCORM, Jira, Google Docs, JSON, CSV, ZIP —
++         cobradas de quem acabou de conferir trinta telas e só quer entregar o
++         trabalho. E o produto SABE o caso: a pessoa escolheu o cenário no
++         passo 1.
++
++         Uma evidência se anexa a um chamado e não pode ser editada pelo
++         destinatário: PDF. Um tutorial e uma ata são textos que alguém vai
++         continuar escrevendo: Word. Isso não é gosto nosso, é o que o formato
++         faz — e a tela diz o porquê, em uma linha. Um "recomendado" sem motivo
++         é uma ordem; com o motivo é um conselho, e de conselho a pessoa
++         consegue discordar.
++
++         Os outros não somem: ficam a um clique, com o estado lembrado.
++         Recolher capacidade é diferente de remover capacidade, e a diferença é
++         justamente esse botão. -->
++    <div class="saidaRec hide" id="recCx">
++      <span class="saidaTit" id="recTit"></span>
++      <p class="recPor" id="recPor"></p>
++      <div class="row" style="margin-top:9px">
++        <button id="recPrim"></button>
++        <button class="ghost" id="recSeg"></button>
++      </div>
++    </div>
++    <div class="row" style="margin:14px 0 4px">
++      <button class="ghost sm" id="recTodos" aria-expanded="false" aria-controls="saidasTodas"></button>
++    </div>
++
++    <div id="saidasTodas" class="hide">
+     <div class="saidaGrupo">
+       <span class="saidaTit" data-i18n="grFormato"></span>
+       <div class="row" style="gap:16px;align-items:center">
+@@ -2556,6 +2594,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       </div>
+       <p class="note" data-i18n="grDadosNota" style="margin:6px 0 0"></p>
+     </div>
++    </div><!-- /saidasTodas -->
+     <div class="row" style="margin-top:12px">
+       <span class="status" id="pdfStatus"></span>
+     </div>
+@@ -3417,7 +3456,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Formato', fmtLayout:'Layout', fmtPapel:'Papel',
+       fmtConta:'O formato padrão vem da configuração de {0} — trocar aqui vale só para este documento.', htmlPeso:'O HTML vai sair com cerca de {0} MB: ele carrega as imagens dentro do próprio arquivo, em texto, e isso pesa um terço a mais que o PDF. Acima de 10 MB a maioria dos e-mails recusa o anexo — se for mandar por e-mail, use o .zip, que leva as imagens ao lado.',
+       grDoc:'O documento', grEntregar:'Entregar em outro sistema', grDados:'Dados e recuperação',
+-      jsonBtn:'Guardar para recuperar depois (.json)', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
++      jsonBtn:'Guardar para recuperar depois (.json)', recTit:'Recomendado para o seu caso', recTodosBtn:'Ver todos os formatos', recMenos:'Recolher os outros formatos', recPor_go:'PDF: ninguém edita depois, e todo mundo abre. É o que se anexa a um chamado.', recPor_docx:'Word: dá para continuar escrevendo em cima — o texto ainda vai crescer.', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
+       quietN:'{0} frame(s) sem fala foram descartados.',
+       quiet0:'Todos os frames têm fala no trecho correspondente.',
+       quietAudio:'Analisando o áudio para achar os trechos sem fala…',
+@@ -4026,7 +4065,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Paper',
+       fmtConta:"The default format comes from {0}'s settings — changing it here applies to this document only.", htmlPeso:'The HTML will come out at about {0} MB: it carries the images inside the file itself, as text, and that weighs a third more than the PDF. Above 10 MB most mail servers refuse the attachment — if you are sending it by e-mail, use the .zip, which keeps the images alongside.',
+       grDoc:'The document', grEntregar:'Deliver to another system', grDados:'Data and recovery',
+-      jsonBtn:'Save to reopen later (.json)', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
++      jsonBtn:'Save to reopen later (.json)', recTit:'Recommended for your case', recTodosBtn:'See all formats', recMenos:'Collapse the other formats', recPor_go:'PDF: nobody edits it afterwards, and everyone can open it. It is what you attach to a ticket.', recPor_docx:'Word: you can keep writing on top of it — the text is still going to grow.', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
+       quietN:'{0} frame(s) with no speech were discarded.',
+       quiet0:'Every frame has speech in its interval.',
+       quietAudio:'Analysing the audio to find the silent stretches…',
+@@ -4629,7 +4668,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Formato', fmtLayout:'Diseño', fmtPapel:'Papel',
+       fmtConta:'El formato predeterminado viene de la configuración de {0} — cambiarlo aquí vale solo para este documento.', htmlPeso:'El HTML saldrá con unos {0} MB: lleva las imágenes dentro del propio archivo, como texto, y eso pesa un tercio más que el PDF. Por encima de 10 MB la mayoría de los correos rechaza el adjunto — si lo vas a enviar por correo, usa el .zip, que lleva las imágenes al lado.',
+       grDoc:'El documento', grEntregar:'Entregar a otro sistema', grDados:'Datos y recuperación',
+-      jsonBtn:'Guardar para recuperar después (.json)', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
++      jsonBtn:'Guardar para recuperar después (.json)', recTit:'Recomendado para tu caso', recTodosBtn:'Ver todos los formatos', recMenos:'Recoger los otros formatos', recPor_go:'PDF: nadie lo edita después, y todo el mundo lo abre. Es lo que se adjunta a un ticket.', recPor_docx:'Word: puedes seguir escribiendo encima — el texto todavía va a crecer.', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
+       quietN:'{0} fotograma(s) sin habla fueron descartados.',
+       quiet0:'Todos los fotogramas tienen habla en su tramo.',
+       quietAudio:'Analizando el audio para encontrar los tramos en silencio…',
+@@ -5231,7 +5270,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Papierformat',
+       fmtConta:'Das Standardformat stammt aus den Einstellungen von {0} — eine Änderung hier gilt nur für dieses Dokument.', htmlPeso:'Die HTML-Datei wird etwa {0} MB groß: Sie trägt die Bilder als Text in der Datei selbst, und das wiegt ein Drittel mehr als das PDF. Über 10 MB lehnen die meisten Mailserver den Anhang ab — wenn Sie sie per E-Mail versenden, nehmen Sie die .zip, die die Bilder daneben legt.',
+       grDoc:'Das Dokument', grEntregar:'In ein anderes System übergeben', grDados:'Daten und Wiederherstellung',
+-      jsonBtn:'Zum späteren Öffnen speichern (.json)', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
++      jsonBtn:'Zum späteren Öffnen speichern (.json)', recTit:'Für Ihren Fall empfohlen', recTodosBtn:'Alle Formate anzeigen', recMenos:'Andere Formate einklappen', recPor_go:'PDF: Niemand bearbeitet es nachträglich, und jeder kann es öffnen. Das hängt man an ein Ticket.', recPor_docx:'Word: Sie können darauf weiterschreiben — der Text wird noch wachsen.', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
+       quietN:'{0} Screenshot(s) ohne Sprache wurden verworfen.',
+       quiet0:'Alle Screenshots haben Sprache im zugehörigen Abschnitt.',
+       quietAudio:'Der Ton wird analysiert, um die Abschnitte ohne Sprache zu finden…',
+@@ -5839,7 +5878,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Mise en page', fmtPapel:'Format de papier',
+       fmtConta:'Le format par défaut vient des réglages de {0} — le changer ici ne vaut que pour ce document.', htmlPeso:'Le HTML fera environ {0} Mo : il porte les images à l’intérieur du fichier lui-même, en texte, ce qui pèse un tiers de plus que le PDF. Au-delà de 10 Mo, la plupart des messageries refusent la pièce jointe — pour un envoi par courriel, utilisez le .zip, qui garde les images à côté.',
+       grDoc:'Le document', grEntregar:'Livrer dans un autre système', grDados:'Données et récupération',
+-      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
++      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', recTit:'Recommandé pour votre cas', recTodosBtn:'Voir tous les formats', recMenos:'Replier les autres formats', recPor_go:'PDF : personne ne le modifie ensuite, et tout le monde l’ouvre. C’est ce qu’on joint à un ticket.', recPor_docx:'Word : vous pouvez continuer à écrire dessus — le texte va encore grandir.', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
+       quietN:'{0} capture(s) sans parole ont été écartées.',
+       quiet0:'Toutes les captures ont de la parole dans le segment correspondant.',
+       quietAudio:'Analyse de l’audio pour repérer les passages sans parole…',
+@@ -6717,6 +6756,10 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+      deixou de travar e nenhum erro apareceu no console. Quem pegou foi o
+      `passos.mjs`. */
+   function passos(){
++    /* A recomendação repinta na mesma batida das travas. Ela ESPELHA o estado
++       do botão original — desligada enquanto não há quadro —, e um espelho
++       pintado só na carga mostraria para sempre o estado do primeiro instante. */
++    try { pintarRecomendado(); } catch (e) {}
+     const modo = modoAtual();
+     const trancar = (id, aberto) => {
+       const el = $(id); if (!el) return;
+@@ -7126,6 +7169,72 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+     if ($('goal')) setTimeout(() => $('goal').focus(), 300);
+   };
+ 
++  /* ================= A SAÍDA RECOMENDADA =========================
++
++     Qual formato resolve o trabalho de cada cenário. Não é gosto: é o que o
++     formato FAZ. A segunda opção é sempre a resposta ao "mas eu preciso mexer"
++     ou "mas eu preciso publicar".
++
++     O `id` aponta para o botão QUE JÁ EXISTE. Nenhuma lógica de geração é
++     duplicada aqui — duas funções produzindo o mesmo arquivo é como dois
++     formatos divergirem sem ninguém notar. */
++  const RECOMENDA = {
++    evidencia:   { prim: 'go',   seg: 'docx' },
++    tutorial:    { prim: 'docx', seg: 'html' },
++    ata:         { prim: 'docx', seg: 'go'   },
++    usabilidade: { prim: 'docx', seg: 'go'   },
++    ia:          { prim: 'go',   seg: 'docx' },
++    outro:       { prim: 'go',   seg: 'docx' },
++  };
++  const SAIDAS_CHAVE = 'Walkstamp.saidasAbertas';
++
++  function pintarRecomendado(){
++    const cx = $('recCx'); if (!cx) return;
++    const cen = ($('modelo') && $('modelo').value) || '';
++    const r = RECOMENDA[cen] || RECOMENDA.outro;
++    const rot = id => { const b = $(id); return (b && b.textContent) || ''; };
++    cx.classList.remove('hide');
++    $('recTit').textContent = t('recTit');
++    $('recPor').textContent = t('recPor_' + r.prim);
++    $('recPrim').textContent = rot(r.prim);
++    $('recSeg').textContent  = rot(r.seg);
++    $('recPrim').dataset.alvo = r.prim;
++    $('recSeg').dataset.alvo  = r.seg;
++    /* Desligados pelo mesmo motivo que os originais: sem quadro não há
++       documento. Espelhar o estado evita um botão que promete e não cumpre. */
++    $('recPrim').disabled = !!($(r.prim) && $(r.prim).disabled);
++    $('recSeg').disabled  = !!($(r.seg)  && $(r.seg).disabled);
++  }
++
++  function abrirSaidas(abrir){
++    const cx = $('saidasTodas'), bt = $('recTodos');
++    if (!cx || !bt) return;
++    cx.classList.toggle('hide', !abrir);
++    bt.setAttribute('aria-expanded', abrir ? 'true' : 'false');
++    bt.textContent = abrir ? t('recMenos') : t('recTodosBtn');
++    try { abrir ? localStorage.setItem(SAIDAS_CHAVE, '1')
++                : localStorage.removeItem(SAIDAS_CHAVE); } catch (e) {}
++  }
++
++  if ($('recPrim')) {
++    /* Clicar no botão de verdade, e não chamar a função dele: assim qualquer
++       trava, aviso ou confirmação que o original tenha vale igual aqui. */
++    const proxy = e => { const b = $(e.currentTarget.dataset.alvo || ''); if (b) b.click(); };
++    $('recPrim').onclick = proxy;
++    $('recSeg').onclick  = proxy;
++  }
++  if ($('recTodos')) {
++    $('recTodos').onclick = () => abrirSaidas($('saidasTodas').classList.contains('hide'));
++    /* Quem abriu uma vez quase sempre é quem mexe sempre — o mesmo argumento da
++       gaveta de ajustes. */
++    let abre = false;
++    try { abre = localStorage.getItem(SAIDAS_CHAVE) === '1'; } catch (e) {}
++    abrirSaidas(abre);
++  }
++  if ($('modelo')) $('modelo').addEventListener('change', () => {
++    try { pintarRecomendado(); } catch (e) {}
++  });
++
+   if ($('novoFluxo')) $('novoFluxo').onclick = () => {
+     if (frames.filter(f => f.keep).length && !confirm(t('novoFluxoConf'))) return;
+     medir('novo_fluxo', {});
+@@ -8637,7 +8746,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.21-32';
++  const VERSAO = '2026.08.21-34';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+@@ -12975,6 +13084,10 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+        pode trocar — senão o padrão do time vira ordem em vez de padrão. */
+     if ($('fmtConta')) {
+       const quem = cf.empresa || pf.cliente;
++      /* Se o padrão do time mexeu no papel, a gaveta ABRE. Um controle que
++         mudou sozinho e ficou escondido é a forma mais rápida de a pessoa
++         parar de confiar no que a tela mostra. */
++      if (formatoVeio) { try { abrirSaidas(true); } catch (e) {} }
+       $('fmtConta').textContent = formatoVeio ? t('fmtConta', quem) : '';
+       $('fmtConta').classList.toggle('hide', !formatoVeio);
+     }
+@@ -16268,6 +16381,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+     } catch (e) {}
+     lerDaUrl();
+     pintarPerfil();
++    try { pintarRecomendado(); } catch (e) {}
+   }
+ 
+   /* ---- link já preenchido ----
+diff --git a/src/.build b/src/.build
+index 2a00d61..ec2b1a1 100644
+--- a/src/.build
++++ b/src/.build
+@@ -1 +1 @@
+-2026-08-21 32
++2026-08-21 34
+diff --git a/src/template.html b/src/template.html
+index 4ee5c48..8931429 100644
+--- a/src/template.html
++++ b/src/template.html
+@@ -607,6 +607,13 @@
+     border-color:var(--accent);font-weight:650}
+   .compCx #compCopiar:hover{filter:brightness(1.06)}
+   .saidaGrupo{margin-top:16px}
++  /* A saída recomendada usa o acento: aqui HÁ o que decidir, e a decisão já vem
++     tomada esperando confirmação. */
++  .saidaRec{padding:14px 16px;border:1px solid var(--accent);border-radius:11px;
++      background:color-mix(in srgb,var(--accent) 4%,var(--panel))}
++  .saidaRec .saidaTit{color:var(--accent)}
++  /* O PORQUÊ, e não só o quê. */
++  .recPor{margin:4px 0 0;font-size:13.5px;color:var(--muted);line-height:1.5}
+   .saidaTit{display:block;font:600 12px/1 ui-sans-serif,system-ui;letter-spacing:.06em;
+     text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+   .sbFim{margin-top:14px}
+@@ -2461,6 +2468,37 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+          e um controle que muda sem explicação é o jeito mais rápido de a pessoa
+          parar de confiar no que vê. A nota diz de onde veio, e diz que dá para
+          trocar. -->
++    <!-- ---- A SAÍDA RECOMENDADA, PRIMEIRO ----
++
++         Onze botões com o mesmo peso são onze decisões — PDF, Word, HTML,
++         Markdown, PowerPoint, SCORM, Jira, Google Docs, JSON, CSV, ZIP —
++         cobradas de quem acabou de conferir trinta telas e só quer entregar o
++         trabalho. E o produto SABE o caso: a pessoa escolheu o cenário no
++         passo 1.
++
++         Uma evidência se anexa a um chamado e não pode ser editada pelo
++         destinatário: PDF. Um tutorial e uma ata são textos que alguém vai
++         continuar escrevendo: Word. Isso não é gosto nosso, é o que o formato
++         faz — e a tela diz o porquê, em uma linha. Um "recomendado" sem motivo
++         é uma ordem; com o motivo é um conselho, e de conselho a pessoa
++         consegue discordar.
++
++         Os outros não somem: ficam a um clique, com o estado lembrado.
++         Recolher capacidade é diferente de remover capacidade, e a diferença é
++         justamente esse botão. -->
++    <div class="saidaRec hide" id="recCx">
++      <span class="saidaTit" id="recTit"></span>
++      <p class="recPor" id="recPor"></p>
++      <div class="row" style="margin-top:9px">
++        <button id="recPrim"></button>
++        <button class="ghost" id="recSeg"></button>
++      </div>
++    </div>
++    <div class="row" style="margin:14px 0 4px">
++      <button class="ghost sm" id="recTodos" aria-expanded="false" aria-controls="saidasTodas"></button>
++    </div>
++
++    <div id="saidasTodas" class="hide">
+     <div class="saidaGrupo">
+       <span class="saidaTit" data-i18n="grFormato"></span>
+       <div class="row" style="gap:16px;align-items:center">
+@@ -2551,6 +2589,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       </div>
+       <p class="note" data-i18n="grDadosNota" style="margin:6px 0 0"></p>
+     </div>
++    </div><!-- /saidasTodas -->
+     <div class="row" style="margin-top:12px">
+       <span class="status" id="pdfStatus"></span>
+     </div>
+@@ -3412,7 +3451,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Formato', fmtLayout:'Layout', fmtPapel:'Papel',
+       fmtConta:'O formato padrão vem da configuração de {0} — trocar aqui vale só para este documento.', htmlPeso:'O HTML vai sair com cerca de {0} MB: ele carrega as imagens dentro do próprio arquivo, em texto, e isso pesa um terço a mais que o PDF. Acima de 10 MB a maioria dos e-mails recusa o anexo — se for mandar por e-mail, use o .zip, que leva as imagens ao lado.',
+       grDoc:'O documento', grEntregar:'Entregar em outro sistema', grDados:'Dados e recuperação',
+-      jsonBtn:'Guardar para recuperar depois (.json)', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
++      jsonBtn:'Guardar para recuperar depois (.json)', recTit:'Recomendado para o seu caso', recTodosBtn:'Ver todos os formatos', recMenos:'Recolher os outros formatos', recPor_go:'PDF: ninguém edita depois, e todo mundo abre. É o que se anexa a um chamado.', recPor_docx:'Word: dá para continuar escrevendo em cima — o texto ainda vai crescer.', fimTit:'✓ Documento pronto', fimResumo:'{0} telas', fimFalaOk:'{0} trechos de fala', fimFalaNao:'sem fala', fimFalaIndo:'fala ainda sendo transcrita', fimDoc:'Documento baixado.', fimProjSim:'Projeto guardado — dá para reabrir e corrigir depois.', fimProjNao:'Projeto ainda não guardado. Fechar esta aba encerra a possibilidade de reabrir.', fimVideo:'O vídeo nunca saiu deste computador.', fimDeNovo:'Baixar de novo', fimProjBtn:'Guardar projeto para editar depois', fimProjDeNovo:'Guardar projeto de novo', fimDepoisTit:'Próximos passos', fimPromptBtn:'Preparar instrução para uma IA',
+       quietN:'{0} frame(s) sem fala foram descartados.',
+       quiet0:'Todos os frames têm fala no trecho correspondente.',
+       quietAudio:'Analisando o áudio para achar os trechos sem fala…',
+@@ -4021,7 +4060,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Paper',
+       fmtConta:"The default format comes from {0}'s settings — changing it here applies to this document only.", htmlPeso:'The HTML will come out at about {0} MB: it carries the images inside the file itself, as text, and that weighs a third more than the PDF. Above 10 MB most mail servers refuse the attachment — if you are sending it by e-mail, use the .zip, which keeps the images alongside.',
+       grDoc:'The document', grEntregar:'Deliver to another system', grDados:'Data and recovery',
+-      jsonBtn:'Save to reopen later (.json)', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
++      jsonBtn:'Save to reopen later (.json)', recTit:'Recommended for your case', recTodosBtn:'See all formats', recMenos:'Collapse the other formats', recPor_go:'PDF: nobody edits it afterwards, and everyone can open it. It is what you attach to a ticket.', recPor_docx:'Word: you can keep writing on top of it — the text is still going to grow.', fimTit:'✓ Document ready', fimResumo:'{0} screens', fimFalaOk:'{0} speech segments', fimFalaNao:'no speech', fimFalaIndo:'speech still being transcribed', fimDoc:'Document downloaded.', fimProjSim:'Project saved — you can reopen and fix it later.', fimProjNao:'Project not saved yet. Closing this tab ends the chance to reopen it.', fimVideo:'The video never left this computer.', fimDeNovo:'Download again', fimProjBtn:'Save project to edit later', fimProjDeNovo:'Save project again', fimDepoisTit:'Next steps', fimPromptBtn:'Prepare a prompt for an AI',
+       quietN:'{0} frame(s) with no speech were discarded.',
+       quiet0:'Every frame has speech in its interval.',
+       quietAudio:'Analysing the audio to find the silent stretches…',
+@@ -4624,7 +4663,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Formato', fmtLayout:'Diseño', fmtPapel:'Papel',
+       fmtConta:'El formato predeterminado viene de la configuración de {0} — cambiarlo aquí vale solo para este documento.', htmlPeso:'El HTML saldrá con unos {0} MB: lleva las imágenes dentro del propio archivo, como texto, y eso pesa un tercio más que el PDF. Por encima de 10 MB la mayoría de los correos rechaza el adjunto — si lo vas a enviar por correo, usa el .zip, que lleva las imágenes al lado.',
+       grDoc:'El documento', grEntregar:'Entregar a otro sistema', grDados:'Datos y recuperación',
+-      jsonBtn:'Guardar para recuperar después (.json)', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
++      jsonBtn:'Guardar para recuperar después (.json)', recTit:'Recomendado para tu caso', recTodosBtn:'Ver todos los formatos', recMenos:'Recoger los otros formatos', recPor_go:'PDF: nadie lo edita después, y todo el mundo lo abre. Es lo que se adjunta a un ticket.', recPor_docx:'Word: puedes seguir escribiendo encima — el texto todavía va a crecer.', fimTit:'✓ Documento listo', fimResumo:'{0} pantallas', fimFalaOk:'{0} fragmentos de voz', fimFalaNao:'sin voz', fimFalaIndo:'la voz aún se está transcribiendo', fimDoc:'Documento descargado.', fimProjSim:'Proyecto guardado — puedes reabrirlo y corregirlo después.', fimProjNao:'Proyecto aún sin guardar. Cerrar esta pestaña termina la posibilidad de reabrirlo.', fimVideo:'El vídeo nunca salió de este ordenador.', fimDeNovo:'Descargar de nuevo', fimProjBtn:'Guardar proyecto para editar después', fimProjDeNovo:'Guardar proyecto otra vez', fimDepoisTit:'Próximos pasos', fimPromptBtn:'Preparar una instrucción para una IA',
+       quietN:'{0} fotograma(s) sin habla fueron descartados.',
+       quiet0:'Todos los fotogramas tienen habla en su tramo.',
+       quietAudio:'Analizando el audio para encontrar los tramos en silencio…',
+@@ -5226,7 +5265,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Layout', fmtPapel:'Papierformat',
+       fmtConta:'Das Standardformat stammt aus den Einstellungen von {0} — eine Änderung hier gilt nur für dieses Dokument.', htmlPeso:'Die HTML-Datei wird etwa {0} MB groß: Sie trägt die Bilder als Text in der Datei selbst, und das wiegt ein Drittel mehr als das PDF. Über 10 MB lehnen die meisten Mailserver den Anhang ab — wenn Sie sie per E-Mail versenden, nehmen Sie die .zip, die die Bilder daneben legt.',
+       grDoc:'Das Dokument', grEntregar:'In ein anderes System übergeben', grDados:'Daten und Wiederherstellung',
+-      jsonBtn:'Zum späteren Öffnen speichern (.json)', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
++      jsonBtn:'Zum späteren Öffnen speichern (.json)', recTit:'Für Ihren Fall empfohlen', recTodosBtn:'Alle Formate anzeigen', recMenos:'Andere Formate einklappen', recPor_go:'PDF: Niemand bearbeitet es nachträglich, und jeder kann es öffnen. Das hängt man an ein Ticket.', recPor_docx:'Word: Sie können darauf weiterschreiben — der Text wird noch wachsen.', fimTit:'✓ Dokument fertig', fimResumo:'{0} Bildschirme', fimFalaOk:'{0} Sprachabschnitte', fimFalaNao:'ohne Sprache', fimFalaIndo:'Sprache wird noch transkribiert', fimDoc:'Dokument heruntergeladen.', fimProjSim:'Projekt gesichert — Sie können es später erneut öffnen und korrigieren.', fimProjNao:'Projekt noch nicht gesichert. Wird dieser Tab geschlossen, lässt es sich nicht mehr öffnen.', fimVideo:'Das Video hat diesen Rechner nie verlassen.', fimDeNovo:'Erneut herunterladen', fimProjBtn:'Projekt zum späteren Bearbeiten sichern', fimProjDeNovo:'Projekt erneut sichern', fimDepoisTit:'Nächste Schritte', fimPromptBtn:'Anweisung für eine KI vorbereiten',
+       quietN:'{0} Screenshot(s) ohne Sprache wurden verworfen.',
+       quiet0:'Alle Screenshots haben Sprache im zugehörigen Abschnitt.',
+       quietAudio:'Der Ton wird analysiert, um die Abschnitte ohne Sprache zu finden…',
+@@ -5834,7 +5873,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+       grFormato:'Format', fmtLayout:'Mise en page', fmtPapel:'Format de papier',
+       fmtConta:'Le format par défaut vient des réglages de {0} — le changer ici ne vaut que pour ce document.', htmlPeso:'Le HTML fera environ {0} Mo : il porte les images à l’intérieur du fichier lui-même, en texte, ce qui pèse un tiers de plus que le PDF. Au-delà de 10 Mo, la plupart des messageries refusent la pièce jointe — pour un envoi par courriel, utilisez le .zip, qui garde les images à côté.',
+       grDoc:'Le document', grEntregar:'Livrer dans un autre système', grDados:'Données et récupération',
+-      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
++      jsonBtn:'Enregistrer pour rouvrir plus tard (.json)', recTit:'Recommandé pour votre cas', recTodosBtn:'Voir tous les formats', recMenos:'Replier les autres formats', recPor_go:'PDF : personne ne le modifie ensuite, et tout le monde l’ouvre. C’est ce qu’on joint à un ticket.', recPor_docx:'Word : vous pouvez continuer à écrire dessus — le texte va encore grandir.', fimTit:'✓ Document prêt', fimResumo:'{0} écrans', fimFalaOk:'{0} passages de parole', fimFalaNao:'sans parole', fimFalaIndo:'la parole est encore en transcription', fimDoc:'Document téléchargé.', fimProjSim:'Projet enregistré — vous pourrez le rouvrir et le corriger plus tard.', fimProjNao:'Projet pas encore enregistré. Fermer cet onglet met fin à la possibilité de le rouvrir.', fimVideo:'La vidéo n’a jamais quitté cet ordinateur.', fimDeNovo:'Télécharger à nouveau', fimProjBtn:'Enregistrer le projet pour l’éditer plus tard', fimProjDeNovo:'Enregistrer le projet à nouveau', fimDepoisTit:'Étapes suivantes', fimPromptBtn:'Préparer une instruction pour une IA',
+       quietN:'{0} capture(s) sans parole ont été écartées.',
+       quiet0:'Toutes les captures ont de la parole dans le segment correspondant.',
+       quietAudio:'Analyse de l’audio pour repérer les passages sans parole…',
+@@ -6712,6 +6751,10 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+      deixou de travar e nenhum erro apareceu no console. Quem pegou foi o
+      `passos.mjs`. */
+   function passos(){
++    /* A recomendação repinta na mesma batida das travas. Ela ESPELHA o estado
++       do botão original — desligada enquanto não há quadro —, e um espelho
++       pintado só na carga mostraria para sempre o estado do primeiro instante. */
++    try { pintarRecomendado(); } catch (e) {}
+     const modo = modoAtual();
+     const trancar = (id, aberto) => {
+       const el = $(id); if (!el) return;
+@@ -7121,6 +7164,72 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+     if ($('goal')) setTimeout(() => $('goal').focus(), 300);
+   };
+ 
++  /* ================= A SAÍDA RECOMENDADA =========================
++
++     Qual formato resolve o trabalho de cada cenário. Não é gosto: é o que o
++     formato FAZ. A segunda opção é sempre a resposta ao "mas eu preciso mexer"
++     ou "mas eu preciso publicar".
++
++     O `id` aponta para o botão QUE JÁ EXISTE. Nenhuma lógica de geração é
++     duplicada aqui — duas funções produzindo o mesmo arquivo é como dois
++     formatos divergirem sem ninguém notar. */
++  const RECOMENDA = {
++    evidencia:   { prim: 'go',   seg: 'docx' },
++    tutorial:    { prim: 'docx', seg: 'html' },
++    ata:         { prim: 'docx', seg: 'go'   },
++    usabilidade: { prim: 'docx', seg: 'go'   },
++    ia:          { prim: 'go',   seg: 'docx' },
++    outro:       { prim: 'go',   seg: 'docx' },
++  };
++  const SAIDAS_CHAVE = '__MARCA__.saidasAbertas';
++
++  function pintarRecomendado(){
++    const cx = $('recCx'); if (!cx) return;
++    const cen = ($('modelo') && $('modelo').value) || '';
++    const r = RECOMENDA[cen] || RECOMENDA.outro;
++    const rot = id => { const b = $(id); return (b && b.textContent) || ''; };
++    cx.classList.remove('hide');
++    $('recTit').textContent = t('recTit');
++    $('recPor').textContent = t('recPor_' + r.prim);
++    $('recPrim').textContent = rot(r.prim);
++    $('recSeg').textContent  = rot(r.seg);
++    $('recPrim').dataset.alvo = r.prim;
++    $('recSeg').dataset.alvo  = r.seg;
++    /* Desligados pelo mesmo motivo que os originais: sem quadro não há
++       documento. Espelhar o estado evita um botão que promete e não cumpre. */
++    $('recPrim').disabled = !!($(r.prim) && $(r.prim).disabled);
++    $('recSeg').disabled  = !!($(r.seg)  && $(r.seg).disabled);
++  }
++
++  function abrirSaidas(abrir){
++    const cx = $('saidasTodas'), bt = $('recTodos');
++    if (!cx || !bt) return;
++    cx.classList.toggle('hide', !abrir);
++    bt.setAttribute('aria-expanded', abrir ? 'true' : 'false');
++    bt.textContent = abrir ? t('recMenos') : t('recTodosBtn');
++    try { abrir ? localStorage.setItem(SAIDAS_CHAVE, '1')
++                : localStorage.removeItem(SAIDAS_CHAVE); } catch (e) {}
++  }
++
++  if ($('recPrim')) {
++    /* Clicar no botão de verdade, e não chamar a função dele: assim qualquer
++       trava, aviso ou confirmação que o original tenha vale igual aqui. */
++    const proxy = e => { const b = $(e.currentTarget.dataset.alvo || ''); if (b) b.click(); };
++    $('recPrim').onclick = proxy;
++    $('recSeg').onclick  = proxy;
++  }
++  if ($('recTodos')) {
++    $('recTodos').onclick = () => abrirSaidas($('saidasTodas').classList.contains('hide'));
++    /* Quem abriu uma vez quase sempre é quem mexe sempre — o mesmo argumento da
++       gaveta de ajustes. */
++    let abre = false;
++    try { abre = localStorage.getItem(SAIDAS_CHAVE) === '1'; } catch (e) {}
++    abrirSaidas(abre);
++  }
++  if ($('modelo')) $('modelo').addEventListener('change', () => {
++    try { pintarRecomendado(); } catch (e) {}
++  });
++
+   if ($('novoFluxo')) $('novoFluxo').onclick = () => {
+     if (frames.filter(f => f.keep).length && !confirm(t('novoFluxoConf'))) return;
+     medir('novo_fluxo', {});
+@@ -12970,6 +13079,10 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+        pode trocar — senão o padrão do time vira ordem em vez de padrão. */
+     if ($('fmtConta')) {
+       const quem = cf.empresa || pf.cliente;
++      /* Se o padrão do time mexeu no papel, a gaveta ABRE. Um controle que
++         mudou sozinho e ficou escondido é a forma mais rápida de a pessoa
++         parar de confiar no que a tela mostra. */
++      if (formatoVeio) { try { abrirSaidas(true); } catch (e) {} }
+       $('fmtConta').textContent = formatoVeio ? t('fmtConta', quem) : '';
+       $('fmtConta').classList.toggle('hide', !formatoVeio);
+     }
+@@ -16263,6 +16376,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+     } catch (e) {}
+     lerDaUrl();
+     pintarPerfil();
++    try { pintarRecomendado(); } catch (e) {}
+   }
+ 
+   /* ---- link já preenchido ----
+diff --git a/testes/_navegador.mjs b/testes/_navegador.mjs
+index a172abc..bdb36a1 100644
+--- a/testes/_navegador.mjs
++++ b/testes/_navegador.mjs
+@@ -19,7 +19,7 @@
+  * sai com um `addInitScript` que abre os painéis antes de a página carregar.
+  *
+  * O QUE ISTO NÃO PODE VIRAR: um jeito de a régua não ver a tela que a pessoa
+- * vê. Ele abre painéis, e mais nada — não mexe em estado, não preenche campo,
++ * vê. Ele abre painéis e a gaveta das saídas, e mais nada — não mexe em estado, não preenche campo,
+  * não muda o produto. E o estado recolhido continua sendo cobrado, em
+  * `testes/perna.mjs`, que importa o Playwright direto justamente para
+  * enxergá-lo. Um atalho que apagasse a única régua do próprio atalho seria o
+@@ -32,6 +32,18 @@ import { chromium as verdadeiro } from 'playwright';
+ function abrirPaineis(){
+   const abre = () => {
+     document.querySelectorAll('details.sub').forEach((d) => { d.open = true; });
++    /* E a gaveta das saídas, pelo mesmo argumento e no mesmo lugar. Onze
++       botões com o mesmo peso eram onze decisões; agora a recomendação
++       responde e o catálogo fica atrás de um clique. Trinta e nove arquivos
++       desta régua clicam em `#pptx`, `#zip`, `#papel` — e um botão dentro de
++       um `hide` não tem caixa, então `click()` recusa.
++
++       Ela abre pelo BOTÃO da pessoa, e não mexendo na classe à mão: assim o
++       `aria-expanded` e a memória em `localStorage` andam junto, e a régua não
++       vê um estado que a tela nunca produz. */
++    const cx = document.getElementById('saidasTodas');
++    const bt = document.getElementById('recTodos');
++    if (cx && bt && cx.classList.contains('hide')) bt.click();
+   };
+   if (document.readyState === 'loading') {
+     document.addEventListener('DOMContentLoaded', abre);
+diff --git a/testes/anotacao.mjs b/testes/anotacao.mjs
+index cff597f..1b7f91e 100644
+--- a/testes/anotacao.mjs
++++ b/testes/anotacao.mjs
+@@ -20,7 +20,7 @@
+  *
+  *   node testes/anotacao.mjs
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs'; import path from 'path';
+ 
+ import { CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/comentario.mjs b/testes/comentario.mjs
+index 176a6e6..71d12dc 100644
+--- a/testes/comentario.mjs
++++ b/testes/comentario.mjs
+@@ -19,7 +19,7 @@
+  * cartão nem na janelinha. Uma remoção pela metade deixaria um campo órfão
+  * escrevendo num quadro que ninguém mais aponta.
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ 
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/comparar.mjs b/testes/comparar.mjs
+index 6b41005..bd159d7 100644
+--- a/testes/comparar.mjs
++++ b/testes/comparar.mjs
+@@ -1,5 +1,5 @@
+ /* Comparar dois quadros: sobreposição, piscada e diferença calculada. */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ const html = fs.readFileSync(`${RAIZ_WS}/public/app.html`,'utf8');
+diff --git a/testes/compartilhar.mjs b/testes/compartilhar.mjs
+index edccb2d..ae99ae6 100644
+--- a/testes/compartilhar.mjs
++++ b/testes/compartilhar.mjs
+@@ -8,7 +8,7 @@
+  * compartilha é o ENDEREÇO DA FERRAMENTA. O documento não sai desta máquina, e
+  * é a promessa que o produto inteiro vende.
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ 
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/conclusao.mjs b/testes/conclusao.mjs
+index d9767ee..8d15fc8 100644
+--- a/testes/conclusao.mjs
++++ b/testes/conclusao.mjs
+@@ -24,7 +24,7 @@
+  *
+  *   node testes/conclusao.mjs
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ 
+diff --git a/testes/destaque.mjs b/testes/destaque.mjs
+index c779a4a..7ca953f 100644
+--- a/testes/destaque.mjs
++++ b/testes/destaque.mjs
+@@ -1,4 +1,4 @@
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ 
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/espelho.mjs b/testes/espelho.mjs
+index a3eff2d..455e77f 100644
+--- a/testes/espelho.mjs
++++ b/testes/espelho.mjs
+@@ -25,7 +25,7 @@
+  * E uma sexta, que é a razão de o índice ser append-only: um travamento deixa a
+  * última linha pela metade. Uma linha quebrada se joga fora; o resto volta.
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http';
+ import fs from 'fs';
+ 
+diff --git a/testes/formato.mjs b/testes/formato.mjs
+index 2c69d61..1d54f9c 100644
+--- a/testes/formato.mjs
++++ b/testes/formato.mjs
+@@ -193,8 +193,15 @@ console.log('\n[7] o formato vem ANTES dos botões que produzem o arquivo');
+      ordem.pos.papel < ordem.pos.go && ordem.pos.layout < ordem.pos.go, JSON.stringify(ordem.pos));
+   ok('e os dados de recuperação vêm por último',
+      ordem.pos.json > ordem.pos.docx && ordem.pos.zip > ordem.pos.json, JSON.stringify(ordem.pos));
+-  ok('as seções estão nomeadas, formato primeiro',
+-     ordem.tit.length === 4 && /formato/i.test(ordem.tit[0]) && /recupera/i.test(ordem.tit[3]),
++  /* CINCO agora, e a primeira é a recomendação. Onze botões com o mesmo peso
++     eram onze decisões cobradas de quem só queria entregar o trabalho; a
++     recomendação responde a pergunta e o catálogo fica atrás dela, recolhido.
++     Dentro do catálogo a ordem antiga continua valendo: forma primeiro,
++     recuperação por último. */
++  ok('a recomendação abre a seção',
++     ordem.tit.length === 5 && /recomendado/i.test(ordem.tit[0]), ordem.tit.join(' | '));
++  ok('e o catálogo mantém a ordem: formato primeiro, recuperação por último',
++     /formato/i.test(ordem.tit[1]) && /recupera/i.test(ordem.tit[4]),
+      ordem.tit.join(' | '));
+   await ctx.close();
+ }
+diff --git a/testes/idiomas.mjs b/testes/idiomas.mjs
+index 150f4d7..8a3ffcc 100644
+--- a/testes/idiomas.mjs
++++ b/testes/idiomas.mjs
+@@ -1,4 +1,4 @@
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ 
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/passomulti.mjs b/testes/passomulti.mjs
+index c3a838d..2d66d7b 100644
+--- a/testes/passomulti.mjs
++++ b/testes/passomulti.mjs
+@@ -20,7 +20,7 @@
+  *
+  *   node testes/passomulti.mjs
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http';
+ import fs from 'fs';
+ import { execSync } from 'child_process';
+diff --git a/testes/retrato.mjs b/testes/retrato.mjs
+index e5450e4..a06c45b 100644
+--- a/testes/retrato.mjs
++++ b/testes/retrato.mjs
+@@ -1,4 +1,4 @@
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ const html=fs.readFileSync(`${RAIZ_WS}/public/app.html`,'utf8');
+diff --git a/testes/revisao.mjs b/testes/revisao.mjs
+index 027bef0..b6642c8 100644
+--- a/testes/revisao.mjs
++++ b/testes/revisao.mjs
+@@ -1,5 +1,5 @@
+ /* Revisão assistida: a ferramenta conduz passo a passo e recaptura só o que mudou. */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ const html = fs.readFileSync(`${RAIZ_WS}/public/app.html`,'utf8');
+diff --git a/testes/rodar.sh b/testes/rodar.sh
+index 5f82d77..5340195 100644
+--- a/testes/rodar.sh
++++ b/testes/rodar.sh
+@@ -34,7 +34,7 @@ TESTES="smoke.mjs saidas.mjs passos.mjs evidencia.mjs modelos.mjs cenarios.mjs
+          venda.mjs vitrine.mjs fluxo.mjs roteiro.mjs faxina.mjs formato.mjs comentario.mjs
+          travado.mjs promptcx.mjs cabec.mjs ajuda.mjs cinco.mjs appidioma.mjs gravando.mjs janelinha.mjs marca.mjs figuras.mjs dobrafig.mjs
+          compartilhar.mjs contradicao.mjs negocio.mjs celular.mjs barraapp.mjs paridade.mjs teto.mjs ritmo.mjs rolar.mjs isca.mjs blog.mjs cenario1.mjs organiza.mjs acabamento.mjs convite.mjs email.mjs tourvid.mjs semmarca.mjs lente2.mjs
+-         memoria.mjs pesagem.mjs espelho.mjs grade.mjs varredura.mjs audio.mjs plano.mjs faixa.mjs reuniao.mjs diagchamado.mjs modelo.mjs espera.mjs passomulti.mjs pessoas.mjs matriz.mjs espera2.mjs anotacao.mjs roteirojanela.mjs quedaplaca.mjs conclusao.mjs parar.mjs entrada.mjs indice.mjs figura.mjs resumo.mjs perna.mjs chaves.mjs"
++         memoria.mjs pesagem.mjs espelho.mjs grade.mjs varredura.mjs audio.mjs plano.mjs faixa.mjs reuniao.mjs diagchamado.mjs modelo.mjs espera.mjs passomulti.mjs pessoas.mjs matriz.mjs espera2.mjs anotacao.mjs roteirojanela.mjs quedaplaca.mjs conclusao.mjs parar.mjs entrada.mjs indice.mjs figura.mjs resumo.mjs perna.mjs saidarec.mjs chaves.mjs"
+ falhou=""
+ for t in $TESTES; do
+   [ -f "$t" ] || { echo "??  $t não existe"; continue; }
+diff --git a/testes/roteirojanela.mjs b/testes/roteirojanela.mjs
+index 16a9284..e97499a 100644
+--- a/testes/roteirojanela.mjs
++++ b/testes/roteirojanela.mjs
+@@ -15,7 +15,7 @@
+  *
+  *   node testes/roteirojanela.mjs
+  */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs'; import path from 'path';
+ 
+ import { CHROME_WS } from './_caminhos.mjs';
+diff --git a/testes/saidarec.mjs b/testes/saidarec.mjs
+new file mode 100644
+index 0000000..0670c3c
+--- /dev/null
++++ b/testes/saidarec.mjs
+@@ -0,0 +1,166 @@
++/* A SAÍDA RECOMENDADA — uma decisão em vez de onze.
++ *
++ * O cartão das saídas oferecia PDF, Word, HTML, Markdown, PowerPoint, SCORM,
++ * Jira, Google Docs, JSON, CSV e ZIP com o mesmo peso. São onze botões e,
++ * portanto, onze decisões — cobradas de quem acabou de conferir trinta telas e
++ * só quer entregar o trabalho.
++ *
++ * E o produto SABE o caso: a pessoa escolheu o cenário no passo 1. Uma
++ * evidência se anexa a um chamado e não pode ser editada pelo destinatário —
++ * PDF. Um tutorial e uma ata são textos que alguém vai continuar escrevendo —
++ * Word. Isso não é gosto nosso, é o que o formato faz.
++ *
++ * O que este arquivo cobra:
++ *
++ *   1. a recomendação existe, muda com o cenário, e diz POR QUÊ;
++ *   2. ela não duplica lógica: o botão recomendado aciona o botão que já
++ *      existe, e o arquivo que sai é o mesmo;
++ *   3. os outros formatos ficam recolhidos — e a um clique, não removidos;
++ *   4. a gaveta LEMBRA de quem a abriu;
++ *   5. layout e papel moram lá dentro: são decisões de forma, e não se
++ *      pergunta o tamanho do papel a quem ainda não escolheu PDF.
++ *
++ *   node testes/saidarec.mjs
++ */
++/* O Playwright CRU, e não o `_navegador.mjs` — pelo mesmo motivo do
++   `perna.mjs`: este arquivo mede a gaveta FECHADA, e o atalho a abre. Um
++   teste que usasse o atalho estaria medindo o atalho. */
++import { chromium } from 'playwright';
++import http from 'http'; import fs from 'fs';
++import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
++
++const html = fs.readFileSync(RAIZ_WS + '/public/app.html', 'utf8');
++const jspdf = fs.readFileSync(RAIZ_WS + '/vendor/jspdf.umd.min.js', 'utf8');
++const srv = http.createServer((q, r) => {
++  if (q.url.startsWith('/_vercel/')) { r.writeHead(200,{'Content-Type':'text/javascript'}); return r.end(''); }
++  r.writeHead(200, { 'Content-Type':'text/html' }); r.end(html);
++});
++await new Promise(r => srv.listen(8985, r));
++
++let falhas = 0;
++const ok = (n, c, e) => { console.log((c ? '  ok   ' : '  FALHA') + '  ' + n + (e ? '  → ' + e : '')); if (!c) falhas++; };
++
++const br = await chromium.launch({ executablePath: CHROME_WS });
++const ctx = await br.newContext({ viewport: { width: 1250, height: 980 }, acceptDownloads: true });
++const pg = await ctx.newPage();
++const erros = []; pg.on('pageerror', e => erros.push(e.message));
++await pg.route('**/rpc/*stamp_*', r => r.fulfill({ status:200, headers:{'access-control-allow-origin':'*'}, body:'null' }));
++await pg.route('**/jspdf**', r => r.fulfill({ status:200,
++  headers:{'content-type':'text/javascript','access-control-allow-origin':'*'}, body:jspdf }));
++await pg.goto('http://localhost:8985/app.html?lang=pt');
++await pg.waitForTimeout(400);
++
++const rec = () => pg.evaluate(() => {
++  const g = id => document.getElementById(id) || {};
++  const cx = document.getElementById('saidasTodas');
++  return {
++    visivel: !document.getElementById('recCx').classList.contains('hide'),
++    titulo: g('recTit').textContent || '',
++    porque: g('recPor').textContent || '',
++    prim: { txt: g('recPrim').textContent || '', alvo: (g('recPrim').dataset || {}).alvo || '' },
++    seg:  { txt: g('recSeg').textContent  || '', alvo: (g('recSeg').dataset  || {}).alvo || '' },
++    aberta: !!cx && !cx.classList.contains('hide'),
++    rotuloGaveta: g('recTodos').textContent || '',
++    expandido: (g('recTodos').getAttribute && g('recTodos').getAttribute('aria-expanded')) || '',
++  };
++});
++
++console.log('[1] a recomendação segue o cenário');
++{
++  await pg.selectOption('#modelo', 'evidencia');
++  await pg.waitForTimeout(250);
++  const r = await rec();
++  console.log('     evidência  →  ' + r.prim.txt + '  |  ' + r.seg.txt);
++  console.log('     porque: ' + r.porque);
++  ok('a recomendação está na tela', r.visivel === true);
++  /* Evidência se anexa a um chamado, e ninguém deve conseguir editá-la depois. */
++  ok('evidência recomenda o PDF', r.prim.alvo === 'go', r.prim.alvo);
++  ok('e oferece o Word como segunda', r.seg.alvo === 'docx', r.seg.alvo);
++  /* Um "recomendado" sem motivo é uma ordem; com o motivo é um conselho, e de
++     conselho a pessoa consegue discordar. */
++  ok('e diz por quê', r.porque.length > 25, r.porque);
++
++  await pg.selectOption('#modelo', 'tutorial');
++  await pg.waitForTimeout(250);
++  const r2 = await rec();
++  console.log('     tutorial   →  ' + r2.prim.txt + '  |  ' + r2.seg.txt);
++  /* Um tutorial é um texto que alguém vai continuar escrevendo. */
++  ok('tutorial recomenda o Word', r2.prim.alvo === 'docx', r2.prim.alvo);
++  ok('e a razão muda junto', r2.porque !== r.porque, r2.porque);
++
++  await pg.selectOption('#modelo', 'ata');
++  await pg.waitForTimeout(250);
++  ok('ata também recomenda o Word', (await rec()).prim.alvo === 'docx');
++}
++
++/* Daqui para baixo é preciso ter material: o cartão das saídas é `inert` até
++   existir quadro, e está certo — não se escolhe formato sem documento. */
++await pg.selectOption('#modelo', 'evidencia');
++await pg.waitForTimeout(200);
++await pg.setInputFiles('#file', '/tmp/amostra.webm');
++await pg.waitForFunction(() => !document.getElementById('extract').disabled, null, { timeout: 60000 });
++await pg.locator('#extract').click();
++await pg.waitForFunction(() => document.querySelectorAll('#thumbs figure').length >= 3,
++                         null, { timeout: 120000 });
++
++console.log('\n[2] os outros formatos ficam recolhidos, não removidos');
++{
++  const r = await rec();
++  ok('a gaveta nasce fechada', r.aberta === false);
++  ok('e se anuncia como fechada para o teclado', r.expandido === 'false', r.expandido);
++  ok('o rótulo oferece ver todos', /todos os formatos/i.test(r.rotuloGaveta), r.rotuloGaveta);
++  /* Recolher é diferente de remover, e a diferença é este botão. */
++  ok('o PowerPoint continua existindo', await pg.locator('#pptx').count() === 1);
++  ok('mas não está à vista', !(await pg.locator('#pptx').isVisible()));
++  /* Não se pergunta o tamanho do papel a quem ainda não escolheu PDF. */
++  ok('o papel também não está à vista', !(await pg.locator('#papel').isVisible()));
++
++  await pg.locator('#recTodos').click();
++  await pg.waitForTimeout(200);
++  const r2 = await rec();
++  ok('um clique abre', r2.aberta === true);
++  ok('o PowerPoint aparece', await pg.locator('#pptx').isVisible());
++  ok('e o papel também', await pg.locator('#papel').isVisible());
++  ok('o rótulo passa a oferecer recolher', /recolher/i.test(r2.rotuloGaveta), r2.rotuloGaveta);
++  ok('e o teclado sabe que abriu', r2.expandido === 'true', r2.expandido);
++}
++
++console.log('\n[3] o botão recomendado aciona o que já existe');
++{
++  const r = await rec();
++  ok('o rótulo é o do botão original', r.prim.txt.length > 2, r.prim.txt);
++
++  const dl = pg.waitForEvent('download', { timeout: 90000 });
++  await pg.locator('#recPrim').click();
++  const d = await dl; await d.saveAs('/tmp/rec.pdf');
++  /* Nenhuma lógica duplicada: duas funções produzindo o mesmo arquivo é como
++     dois formatos divergirem sem ninguém notar. O que sai é o PDF de sempre. */
++  ok('sai um PDF de verdade',
++     fs.readFileSync('/tmp/rec.pdf').subarray(0, 5).toString() === '%PDF-');
++  ok('com o nome que o botão original daria', /\.pdf$/.test(d.suggestedFilename()),
++     d.suggestedFilename());
++}
++
++console.log('\n[4] a gaveta lembra de quem a abriu');
++{
++  /* Quem abriu uma vez quase sempre é quem mexe sempre — o mesmo argumento da
++     gaveta de ajustes. Fechar de novo a cada recarga faria essa pessoa
++     procurar todo dia o que ela usa todo dia.
++
++     Recarregada, a página não tem material e o cartão volta a ser `inert`; o
++     clique aqui é programático de propósito, porque o que se está medindo é a
++     MEMÓRIA e não o gesto — o gesto já foi medido em [2]. */
++  await pg.reload();
++  await pg.waitForTimeout(500);
++  ok('depois de recarregar, continua aberta', (await rec()).aberta === true);
++  await pg.evaluate(() => document.getElementById('recTodos').click());
++  await pg.waitForTimeout(150);
++  await pg.reload();
++  await pg.waitForTimeout(500);
++  ok('e fechada continua fechada', (await rec()).aberta === false);
++}
++
++ok('sem erro de página', erros.length === 0, erros[0]);
++await br.close(); srv.close();
++console.log(falhas ? `\n  ${falhas} falha(s)` : '\n  tudo certo');
++process.exit(falhas ? 1 : 0);
+diff --git a/testes/tarjaauto.mjs b/testes/tarjaauto.mjs
+index 3dbd96e..f848318 100644
+--- a/testes/tarjaauto.mjs
++++ b/testes/tarjaauto.mjs
+@@ -4,7 +4,7 @@
+    OCR entra pela porta pública que existe para isso: um documento reaberto, com
+    `textoNaTela` e `palavrasNaTela` — exatamente os campos que o próprio produto
+    grava quando o leitor roda de verdade. */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ const html = fs.readFileSync(`${RAIZ_WS}/public/app.html`,'utf8');
+diff --git a/testes/trocar.mjs b/testes/trocar.mjs
+index 482773a..be7290d 100644
+--- a/testes/trocar.mjs
++++ b/testes/trocar.mjs
+@@ -1,5 +1,5 @@
+ /* Trocar a imagem de um passo e duplicar um quadro. */
+-import { chromium } from 'playwright';
++import { chromium } from './_navegador.mjs';   // abre os painéis e a gaveta das saídas
+ import http from 'http'; import fs from 'fs';
+ import { RAIZ_WS, CHROME_WS } from './_caminhos.mjs';
+ const html = fs.readFileSync(`${RAIZ_WS}/public/app.html`,'utf8');

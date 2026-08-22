@@ -1,0 +1,326 @@
+From abb78e4c8970383b301cb95e0d2aa2cae27075dd Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 22 Aug 2026 01:41:33 +0000
+Subject: [PATCH] B5: o Personal vendia logotipo; agora vende a rodada de
+ quarenta casos
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O cartao liderava pela identidade visual. A chamada era "Para quem entrega
+documento com o proprio nome — ou com o do cliente", a primeira bala era o
+logotipo, e o roteiro vinha em segundo, numa linha so: "suba a planilha, execute
+um a um, e ela volta preenchida".
+
+"Colocar logotipo" se compara com editar um Word. O que substitui um PROCESSO ja
+estava no codigo ha tempo, e nao estava no cartao. Medido antes de escrever:
+
+  suba a planilha (.xlsx, .csv, colada do Excel)   roteiro_salvar(), Importar.tsx
+  cada caso vira um link que abre ja preenchida    o `caso=` no template.html
+  volta em .xlsx com situacao, quando, quem,       app/conta/planilha/route.ts,
+  arquivo e impressao                              onze colunas
+  recibo por caso, sem imagem sair da maquina      roteiro_caso.recibo, de 16/08
+
+Nenhuma frase nova foi escrita sem eu ter aberto o arquivo que a sustenta. A
+promessa da planilha de volta, em particular, eu conferi coluna por coluna no
+`cab` da rota antes de prometer as cinco.
+
+A MARCA CONTINUA NO PAGO, na quarta bala, junto com o modelo e o perfil — como
+prova visivel do plano, e nao como a justificativa dele. Era isso que o plano
+pedia, e nao tirar a identidade da lista.
+
+UMA RESTRICAO REAL MOLDOU O RESULTADO. O `cenarios.mjs` cobra cartoes de no
+maximo seis balas e no maximo uma de diferenca entre eles. A primeira tentativa
+saiu com sete e teria reprovado; a identidade e o perfil passaram a dividir uma
+linha para as DUAS metades da tese do roteiro caberem — a entrada (a planilha
+vira links) e a volta (o .xlsx preenchido). Os tres cartoes seguem 6/6/5.
+
+A TRAVA amarra promessa a entrega, que sao arquivos diferentes e podem divergir
+em silencio: tirar uma coluna do export nao faz a pagina parar de prometer.
+`planos.mjs` afirma que as cinco colunas nomeadas existem no `cab`, que o export
+sai em `.xlsx`, e que a primeira bala do Personal fala da planilha nos cinco
+idiomas. Provei as duas direcoes — tirar `rotColImp` reprova nomeando a coluna, e
+o logotipo voltar a liderar reprova nomeando a bala.
+
+E as cinco colunas sao conferidas UMA A UMA, e nao por `every` sobre a lista: um
+`every` diria "sim" com quatro presentes e a quinta trocada por outra.
+
+Um susto no caminho, e ele vale a nota: usei `git checkout --` para desfazer a
+prova do gate e apaguei junto as edicoes do proprio B5 no arquivo portugues, que
+ainda nao estavam comitadas. Refeito e conferido. A licao e a de sempre — desfazer
+por `git checkout` num arquivo com trabalho nao comitado apaga os dois.
+
+Com isto a trilha B fecha inteira.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01SLmPMaXsHaVpudHTw6nJDS
+---
+ PLANO.md                       | 41 ++++++++++++++++++++++++++--------
+ offline/walkstamp-offline.html |  2 +-
+ public/app.html                |  2 +-
+ src/.build                     |  2 +-
+ src/site/bodies/precos.de.html | 10 ++++-----
+ src/site/bodies/precos.en.html | 10 ++++-----
+ src/site/bodies/precos.es.html | 10 ++++-----
+ src/site/bodies/precos.fr.html | 10 ++++-----
+ src/site/bodies/precos.pt.html | 10 ++++-----
+ testes/planos.mjs              | 33 +++++++++++++++++++++++++++
+ 10 files changed, 93 insertions(+), 37 deletions(-)
+
+diff --git a/PLANO.md b/PLANO.md
+index 62c05b5..263973a 100644
+--- a/PLANO.md
++++ b/PLANO.md
+@@ -140,7 +140,7 @@ medido — `aria-current`, o foco indo para o cabeçalho, o rótulo acessível c
+ número e a palavra "feita", a frase de status que não se repete, e as duas
+ guardas da travessia.
+ 
+-### Trilha B — o que trava a venda (2–3 d)
++### Trilha B — o que trava a venda: **FEITA**
+ 
+ **B1. Verdade única entre página, catálogo e código — FEITO**
+ 
+@@ -291,13 +291,36 @@ o que a lista espera **não pode ser algo que a página vende** — mais uma aç
+ primária por cartão. Provado nas duas direções: apontar a lista para `personal`
+ reprova, e um segundo botão num cartão reprova.
+ 
+-**B5. Reposicionar o Personal em torno do roteiro (2–3 d)**
++**B5. Reposicionar o Personal em torno do roteiro — FEITO**
+ 
+-A página vende identidade visual; o valor econômico real é a orquestração de casos.
+-"Colocar logotipo" se compara com editar um Word. "Importar 40 casos, executar cada um
+-pelo link, e receber status, executor, data, hash e arquivo de volta" substitui um
+-processo inteiro. Marca própria continua no pago — como prova visível do plano, não como
+-a justificativa.
++O cartão liderava pela identidade visual. A chamada era *"Para quem entrega
++documento com o próprio nome — ou com o do cliente"*, a primeira bala era o
++logotipo, e o roteiro vinha em segundo, numa linha: *"suba a planilha, execute um
++a um, e ela volta preenchida"*.
++
++"Colocar logotipo" se compara com editar um Word. O que substitui um processo
++está medido no código, e agora está escrito no cartão:
++
++| o cartão promete | onde isso vive |
++|---|---|
++| suba a planilha (.xlsx, .csv, colada do Excel) | `roteiro_salvar()`, `Importar.tsx` |
++| cada caso vira um link que abre a ferramenta preenchida | o `caso=` no `template.html` |
++| volta em .xlsx com situação, quando, quem, arquivo e impressão | `app/conta/planilha/route.ts` — as 11 colunas |
++| recibo por caso, sem imagem sair | `roteiro_caso.recibo`, do build de 16/08 |
++
++A marca **continua no pago**, na quarta bala, junto com o modelo e o perfil — como
++prova visível do plano, e não como a justificativa dele.
++
++Uma restrição real do `cenarios.mjs` moldou o resultado: cartões de no máximo
++seis balas, e no máximo uma de diferença entre eles. Os três seguem **6/6/5** —
++a identidade e o perfil dividem uma linha para o roteiro caber com as duas metades
++da tese.
++
++**A trava** entrou no `planos.mjs` e amarra promessa a entrega: as cinco colunas
++que o cartão nomeia têm que existir no `cab` da rota da planilha, o export tem que
++sair em `.xlsx`, e a primeira bala do Personal tem que falar da planilha nos cinco
++idiomas. Provado nas duas direções — tirar `rotColImp` do export reprova, e o
++logotipo voltar a liderar reprova.
+ 
+ ### Trilha C — motor e dívida (22,5–32,5 d)
+ 
+@@ -328,9 +351,9 @@ fonte, medir o pico de memória, medir WER antes de tocar na compactação de si
+ | Trilha | Dias | O que você tem no fim |
+ |---|---:|---|
+ | A — terminar o UX | **1–2** | o redesenho inteiro, com acessibilidade validada |
+-| B — destravar a venda | **2–3** | uma verdade só e cobrança auditável (o banco já é reconstruível) |
++| B — destravar a venda | **feita** | uma verdade só, cobrança auditável, banco reconstruível |
+ | C — motor e dívida | **22,5–32,5** | você mede antes de otimizar; as próximas mudanças ficam baratas |
+-| **Total** | **25,5–37,5** | |
++| **Total** | **23,5–34,5** | |
+ 
+ ---
+ 
+diff --git a/offline/walkstamp-offline.html b/offline/walkstamp-offline.html
+index dd9d640..7e93e52 100644
+--- a/offline/walkstamp-offline.html
++++ b/offline/walkstamp-offline.html
+@@ -9436,7 +9436,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.22-12';
++  const VERSAO = '2026.08.22-13';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+diff --git a/public/app.html b/public/app.html
+index 7902c87..5ab63ab 100644
+--- a/public/app.html
++++ b/public/app.html
+@@ -9039,7 +9039,7 @@ Com marcação de tempo, cada frame sai no PDF junto do que é dito naquele trec
+      depois, e não tem como se atualizar sozinho. Sem carimbo, "estou com um
+      problema no offline" é uma conversa sem chão — ninguém sabe de qual build
+      se fala nem se o defeito já foi consertado. */
+-  const VERSAO = '2026.08.22-12';
++  const VERSAO = '2026.08.22-13';
+   window.__versao = () => VERSAO;
+ 
+   const PIP_CSS = `
+diff --git a/src/.build b/src/.build
+index 5c385c4..cfb5941 100644
+--- a/src/.build
++++ b/src/.build
+@@ -1 +1 @@
+-2026-08-22 12
++2026-08-22 13
+diff --git a/src/site/bodies/precos.de.html b/src/site/bodies/precos.de.html
+index 49dfef3..d25217b 100644
+--- a/src/site/bodies/precos.de.html
++++ b/src/site/bodies/precos.de.html
+@@ -48,12 +48,12 @@
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">€ 27<span> / Jahr</span></div>
+         <p class="moedas">R$ 149 &middot; US$ 29</p>
+-        <p class="small muted" style="margin:0">Für alle, die ein Dokument unter eigenem Namen übergeben — oder unter dem des Kunden.</p>
++        <p class="small muted" style="margin:0">Für vierzig Fälle, nicht für einen.</p>
+         <ul>
+-          <li><b>Das Dokument kennzeichnen:</b> Kundenlogo und Kundenname im PDF, im Word-Dokument und im HTML</li>
+-          <li><b>Testfallliste:</b> Tabelle laden, Fall für Fall ausführen, und sie kommt ausgefüllt zurück</li>
+-          <li data-f="modeloProprio">Eigene Dokumentvorlage: Deckblatt und Felder in Ihrem Standard</li>
+-          <li data-f="perfilVolta">Ein Profil, das Besuche und Rechnerwechsel übersteht</li>
++          <li><b>Die ganze Runde, kein Einzeldokument.</b> Laden Sie die Tabelle — .xlsx, .csv oder aus Excel eingefügt — und jeder Fall wird zu einem Link, der das Werkzeug bereits ausgefüllt öffnet.</li>
++          <li><b>Und sie kommt als .xlsx zurück</b>, mit Status, Zeitpunkt, wer ausgeführt hat, der erzeugten Datei und dem Fingerabdruck der Bildschirme.</li>
++          <li>Ein Beleg pro Fall: die Angaben und der Fingerabdruck jedes Bildschirms — ohne dass ein Bild Ihren Rechner verlässt.</li>
++          <li data-f="modeloProprio">Kundenlogo und Kundenname im PDF, im Word-Dokument und im HTML, mit Ihrem Deckblatt und Ihren Feldern — und das Profil kehrt auf jedem Rechner zurück</li>
+           <li data-f="termosGuardados"><b>Die Begriffe Ihres Systems bleiben gespeichert</b> — die Liste überlebt den Besuch und den Rechner, statt neu getippt zu werden. Anwenden ist bereits kostenlos; Speichern gibt es hier <span class="soon">demnächst</span></li>
+           <li>Alles aus Free</li>
+         </ul>
+diff --git a/src/site/bodies/precos.en.html b/src/site/bodies/precos.en.html
+index 7154d96..756ba27 100644
+--- a/src/site/bodies/precos.en.html
++++ b/src/site/bodies/precos.en.html
+@@ -48,12 +48,12 @@
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">US$ 29<span> / year</span></div>
+         <p class="moedas">R$ 149 &middot; € 27</p>
+-        <p class="small muted" style="margin:0">For whoever hands over a document under their own name — or the client’s.</p>
++        <p class="small muted" style="margin:0">For when there are forty cases to run, not one.</p>
+         <ul>
+-          <li><b>Identify the document:</b> client logo and name in the PDF, the Word file and the HTML</li>
+-          <li><b>Case list:</b> upload the spreadsheet, run them one by one, and it comes back filled in</li>
+-          <li data-f="modeloProprio">Your own document template: cover and fields in your standard</li>
+-          <li data-f="perfilVolta">A profile that survives between visits and between machines</li>
++          <li><b>The whole round, not a one-off document.</b> Upload the spreadsheet — .xlsx, .csv or pasted from Excel — and each case becomes a link that opens the tool already filled in.</li>
++          <li><b>And it comes back as .xlsx</b>, with status, when, who ran it, the file produced and the fingerprint of the screens.</li>
++          <li>A receipt per case: the record and the fingerprint of every screen — with no image leaving your machine.</li>
++          <li data-f="modeloProprio">Client logo and name in the PDF, the Word file and the HTML, with your cover and your fields — and the profile comes back on any machine</li>
+           <li data-f="termosGuardados"><b>Your system terms are saved</b> — the list survives the visit and the machine instead of being retyped. Applying them is free; keeping them is from here <span class="soon">soon</span></li>
+           <li>Everything in Free</li>
+         </ul>
+diff --git a/src/site/bodies/precos.es.html b/src/site/bodies/precos.es.html
+index 18845a9..a367919 100644
+--- a/src/site/bodies/precos.es.html
++++ b/src/site/bodies/precos.es.html
+@@ -48,12 +48,12 @@
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">US$ 29<span> / año</span></div>
+         <p class="moedas">R$ 149 &middot; € 27</p>
+-        <p class="small muted" style="margin:0">Para quien entrega documentos con su propio nombre — o con el del cliente.</p>
++        <p class="small muted" style="margin:0">Para cuando son cuarenta casos, y no uno.</p>
+         <ul>
+-          <li><b>Identificar el documento:</b> logotipo y nombre del cliente en el PDF, el Word y el HTML</li>
+-          <li><b>Lista de casos:</b> sube la hoja, ejecútalos uno a uno, y vuelve rellenada</li>
+-          <li data-f="modeloProprio">Plantilla de documento propia: portada y campos con tu estándar</li>
+-          <li data-f="perfilVolta">Perfil que sobrevive entre visitas y entre máquinas</li>
++          <li><b>La ronda entera, y no un documento suelto.</b> Sube la hoja — .xlsx, .csv o pegada desde Excel — y cada caso se convierte en un enlace que abre la herramienta ya rellenada.</li>
++          <li><b>Y vuelve en .xlsx</b>, con situación, cuándo, quién lo ejecutó, el archivo generado y la huella de las pantallas.</li>
++          <li>Recibo por caso: la ficha y la huella de cada pantalla — sin que ninguna imagen salga de tu equipo.</li>
++          <li data-f="modeloProprio">Logotipo y nombre del cliente en el PDF, el Word y el HTML, con tu portada y tus campos — y el perfil vuelve en cualquier equipo</li>
+           <li data-f="termosGuardados"><b>Los términos de tu sistema quedan guardados</b> — la lista sobrevive a la visita y a la máquina, en vez de reescribirse. Aplicarlos ya es gratis; guardarlos es de aquí <span class="soon">pronto</span></li>
+           <li>Todo lo del Free</li>
+         </ul>
+diff --git a/src/site/bodies/precos.fr.html b/src/site/bodies/precos.fr.html
+index f28f29c..370e477 100644
+--- a/src/site/bodies/precos.fr.html
++++ b/src/site/bodies/precos.fr.html
+@@ -48,12 +48,12 @@
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">€ 27<span> / an</span></div>
+         <p class="moedas">R$ 149 &middot; US$ 29</p>
+-        <p class="small muted" style="margin:0">Pour qui livre un document sous son propre nom — ou sous celui du client.</p>
++        <p class="small muted" style="margin:0">Pour quarante cas à exécuter, pas un seul.</p>
+         <ul>
+-          <li><b>Identifier le document :</b> logo et nom du client dans le PDF, dans le Word et dans le HTML</li>
+-          <li><b>Liste de cas de test :</b> importez le tableur, exécutez-les un par un, et il revient rempli</li>
+-          <li data-f="modeloProprio">Votre propre modèle de document : couverture et champs à votre standard</li>
+-          <li data-f="perfilVolta">Un profil qui survit entre les visites et entre les machines</li>
++          <li><b>La série entière, et pas un document isolé.</b> Chargez le tableur — .xlsx, .csv ou collé depuis Excel — et chaque cas devient un lien qui ouvre l’outil déjà rempli.</li>
++          <li><b>Et il revient en .xlsx</b>, avec l’état, la date, qui l’a exécuté, le fichier produit et l’empreinte des écrans.</li>
++          <li>Un reçu par cas : la fiche et l’empreinte de chaque écran — sans qu’aucune image ne quitte votre machine.</li>
++          <li data-f="modeloProprio">Logo et nom du client dans le PDF, dans le Word et dans le HTML, avec votre couverture et vos champs — et le profil revient sur n’importe quelle machine</li>
+           <li data-f="termosGuardados"><b>Les termes de votre système sont conservés</b> — la liste survit à la visite et à la machine, au lieu d’être retapée. Les appliquer est déjà gratuit ; les conserver, c’est ici <span class="soon">bientôt</span></li>
+           <li>Tout ce qu’il y a dans Free</li>
+         </ul>
+diff --git a/src/site/bodies/precos.pt.html b/src/site/bodies/precos.pt.html
+index b88e267..7208099 100644
+--- a/src/site/bodies/precos.pt.html
++++ b/src/site/bodies/precos.pt.html
+@@ -48,12 +48,12 @@
+         <h3 style="margin-top:14px">Personal</h3>
+         <div class="price">R$ 149<span> / ano</span></div>
+         <p class="moedas">US$ 29 &middot; € 27</p>
+-        <p class="small muted" style="margin:0">Para quem entrega documento com o próprio nome — ou com o do cliente.</p>
++        <p class="small muted" style="margin:0">Para quem tem quarenta casos para executar, e não um.</p>
+         <ul>
+-          <li><b>Identificar o documento:</b> logotipo e nome do cliente no PDF, no Word e no HTML</li>
+-          <li><b>Roteiro de casos:</b> suba a planilha, execute um a um, e ela volta preenchida</li>
+-          <li data-f="modeloProprio">Modelo de documento próprio: capa e campos no seu padrão</li>
+-          <li data-f="perfilVolta">Perfil que sobrevive entre visitas e entre máquinas</li>
++          <li><b>A rodada inteira, e não um documento avulso.</b> Suba a planilha — .xlsx, .csv ou colada do Excel — e cada caso vira um link que abre a ferramenta já preenchida.</li>
++          <li><b>E ela volta em .xlsx</b>, com situação, quando, quem executou, o arquivo gerado e a impressão digital das telas.</li>
++          <li>Recibo por caso: a ficha e a impressão de cada quadro — sem nenhuma imagem sair da sua máquina.</li>
++          <li data-f="modeloProprio">Logotipo e nome do cliente no PDF, no Word e no HTML, com a sua capa e os seus campos — e o perfil volta em qualquer máquina</li>
+           <li data-f="termosGuardados"><b>Os termos do seu sistema ficam gravados</b> — a lista sobrevive à visita e à máquina, em vez de ser redigitada. Aplicar já é de graça; guardar é daqui <span class="soon">em breve</span></li>
+           <li>Tudo do Free</li>
+         </ul>
+diff --git a/testes/planos.mjs b/testes/planos.mjs
+index 235a12c..f8226dd 100644
+--- a/testes/planos.mjs
++++ b/testes/planos.mjs
+@@ -140,5 +140,38 @@ console.log('\n[6] UM ESTADO POR PLANO, e a lista espera o que não existe');
+   }
+ }
+ 
++console.log('\n[7] o que o Personal PROMETE é o que a planilha DEVOLVE');
++{
++  /* O cartão do Personal parou de vender identidade visual e passou a vender a
++     rodada de casos: "suba a planilha, cada caso vira um link, e ela volta em
++     .xlsx com situação, quando, quem executou, o arquivo e a impressão".
++     "Colocar logotipo" se compara com editar um Word; isto substitui um
++     processo.
++     
++     A promessa e a entrega moram em arquivos diferentes, então elas podem
++     divergir em silêncio: tirar uma coluna do export não faz a página parar de
++     prometê-la. Esta afirmação amarra as duas. */
++  const rota = fs.readFileSync(`${RAIZ_WS}/app/conta/planilha/route.ts`, 'utf8');
++  const cab = (rota.match(/const cab = \[([\s\S]*?)\]/) || [])[1] || '';
++  const colunas = [...cab.matchAll(/t\.(rot[A-Za-z]+)/g)].map((m) => m[1]);
++  /* As cinco que o cartão nomeia, uma a uma. Um `every` sobre a lista inteira
++     diria "sim" com quatro delas presentes e a quinta trocada por outra. */
++  for (const c of ['rotColSit', 'rotColQuando', 'rotColQuem', 'rotColArq', 'rotColImp']) {
++    ok(`a planilha devolve ${c}`, colunas.includes(c), colunas.join(' '));
++  }
++  ok('e sai em .xlsx, como o cartão diz', /montarXlsx/.test(rota));
++
++  /* E o cartão continua liderando pelo roteiro. A primeira bala é a que a
++     pessoa lê; se ela voltar a ser o logotipo, o reposicionamento se desfez
++     sem ninguém mexer numa linha de código. */
++  for (const L of IDIOMAS) {
++    const html = fs.readFileSync(`${RAIZ_WS}/src/site/bodies/precos.${L}.html`, 'utf8');
++    const card = html.slice(html.indexOf('data-plano="personal"'));
++    const primeira = (card.match(/<li[^>]*>([\s\S]*?)<\/li>/) || [])[1] || '';
++    ok(`${L}: a primeira bala do Personal é a rodada de casos`,
++       /xlsx|csv|Excel/i.test(primeira), primeira.replace(/<[^>]*>/g, '').slice(0, 70));
++  }
++}
++
+ console.log(falhas ? `\n${falhas} FALHA(S)` : '\nCartões e catálogo: uma verdade só.');
+ process.exit(falhas ? 1 : 0);
+-- 
+2.43.0
+

@@ -1,40 +1,26 @@
 {
-  "name": "sureya-app",
-  "version": "0.1.0",
+  "name": "walkstamp",
   "private": true,
   "scripts": {
+    "ferramenta": "python3 build.py",
     "dev": "next dev",
-    "build": "next build",
+    "build": "python3 build.py && next build",
     "start": "next start",
-    "checar": "node testes/checar-render.js && node testes/checar-enums.js",
-    "tipos": "tsc --noEmit && tsc --noEmit -p testes/tsconfig.real.json",
-    "contraprova": "tsx --tsconfig testes/tsconfig.real.json testes/contraprova-autorizacao.ts",
-    "ci": "npm run checar && npm run tipos && npm run testar && npm run build",
-    "auditar": "bash testes/auditar.sh",
-    "testar": "tsx --tsconfig testes/tsconfig.json testes/simular.ts"
+    "stripe:conferir": "node conferir-stripe.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "@vercel/functions": "^3.7.5",
-    "lucide-react": "^1.31.0",
-    "next": "14.2.33",
-    "qrcode": "^1.5.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "web-push": "^3.6.7"
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
+    "next": "^16.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "stripe": "^22.5.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/qrcode": "^1.5.6",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@types/web-push": "^3.6.4",
-    "autoprefixer": "^10.5.4",
-    "postcss": "^8.5.26",
-    "tailwindcss": "^3.4.19",
-    "tsx": "4.19.2",
-    "typescript": "^5"
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "playwright": "^1.62.1",
+    "typescript": "^7.0.2"
   }
 }

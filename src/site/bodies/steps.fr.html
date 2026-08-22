@@ -1,0 +1,102 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Steps Recorder, c’est fini. Quoi utiliser à la place ?</h1>
+    <p class="updated">Mis à jour le 14 août 2026.<br>
+    Un guide court pour qui a ouvert <code>psr.exe</code> et est tombé sur l’avis d’abandon — et doit
+    encore livrer le document qu’il produisait.</p>
+
+    <h2>Ce qui s’est passé</h2>
+    <p>Depuis la mise à jour de Windows 11 de février 2024, l’<b>Enregistreur d’actions utilisateur</b> (<i>Steps
+    Recorder</i>, <code>psr.exe</code>) affiche un avis d’abandon à l’ouverture. Il fonctionne encore sur
+    beaucoup de machines, mais il ne reçoit plus de développement et ne figure pas dans la feuille de route de Microsoft.</p>
+    <p>Les alternatives que Microsoft indique elle-même sont l’<b>Outil Capture d’écran</b>, la
+    <b>Xbox Game Bar</b> et <b>Clipchamp</b>. Et voici le problème : <b>aucune des trois ne produit un
+    document d’étapes.</b> Elles font de l’image et de la vidéo. Ce qui a disparu, c’est exactement la partie qui comptait —
+    le montage automatique d’un document numéroté, avec un écran par étape.</p>
+
+    <h2>Qui s’est retrouvé sans outil</h2>
+    <ul>
+      <li><b>Le test manuel et l’UAT</b>, qui doivent prouver qu’ils ont testé, écran par écran.</li>
+      <li><b>Le support et le service desk</b>, qui demandent à l’utilisateur &laquo; reproduisez l’erreur et envoyez-moi les étapes &raquo;.</li>
+      <li><b>L’audit interne et les ITGC</b>, qui reçoivent ces preuves.</li>
+      <li><b>La formation et la documentation de processus</b>, qui montent le pas à pas dans Word.</li>
+    </ul>
+    <p>Tous avec la même tâche obligatoire qu’avant, et sans le programme qui la réglait.</p>
+
+    <h2>Ce que {{marca}} fait à la place</h2>
+    <p>{{marca}} enregistre l’écran et monte le document : une étape par bloc, numérotée, avec l’image, l’heure et la
+    description. Il sort en <b>PDF</b>, <b>Word</b>, <b>ZIP d’images</b> ou <b>JSON</b>. Il tourne dans le navigateur, sans
+    rien installer, et <b>la vidéo ne sort pas de votre ordinateur</b>.</p>
+    <table class="legal">
+      <tr><th></th><th>Steps Recorder</th><th>{{marca}}</th></tr>
+      <tr><td>Format de sortie</td>
+          <td class="nao">MHT — s’ouvrait bien dans Internet Explorer, qui a disparu lui aussi</td>
+          <td class="sim">PDF, Word (.docx), ZIP d’images, JSON</td></tr>
+      <tr><td>Étapes numérotées</td><td class="sim">Oui</td><td class="sim">Oui</td></tr>
+      <tr><td>Description de chaque étape</td>
+          <td>Automatique, d’après le contrôle cliqué : &laquo; l’utilisateur a cliqué sur Bouton &raquo;</td>
+          <td>La vôtre — écrite, ou <b>dictée à voix haute</b> et transcrite</td></tr>
+      <tr><td>Heure</td><td>Par étape</td>
+          <td class="sim">Par étape, avec une vraie heure d’horloge — ce que l’audit demande</td></tr>
+      <tr><td>Installation</td><td class="nao">Programme Windows</td>
+          <td class="sim">Aucune : c’est une adresse</td></tr>
+      <tr><td>Système</td><td class="nao">Windows uniquement</td>
+          <td class="sim">N’importe quel ordinateur avec un navigateur</td></tr>
+      <tr><td>Limite de captures</td><td class="nao">25 par défaut</td><td class="sim">Ce que vous définissez</td></tr>
+      <tr><td>Narration</td><td class="nao">Non</td>
+          <td class="sim">Oui, transcrite et synchronisée avec les écrans</td></tr>
+      <tr><td>Ce qui sort de votre machine</td><td class="sim">Rien</td><td class="sim">Rien</td></tr>
+      <tr><td>Prix</td><td>Livré avec Windows</td><td class="sim">Gratuit</td></tr>
+    </table>
+
+    <h3>Là où Steps Recorder était meilleur</h3>
+    <p>Cela mérite d’être dit, parce que la différence change le résultat : <code>psr.exe</code> dialoguait avec le système
+    d’exploitation et savait <b>quel contrôle</b> vous aviez cliqué — le nom du bouton, le champ, la fenêtre. Un
+    navigateur n’a pas cet accès, et aucun outil web ne l’a.</p>
+    <p>{{marca}} fait l’échange dans l’autre sens : il garde une capture <b>chaque fois que l’écran change</b>, et la
+    description vient de vous — en parlant pendant que vous testez. C’est moins automatique et plus explicatif. En pratique,
+    &laquo; l’utilisateur a cliqué sur Bouton &raquo; n’a jamais rien expliqué à personne ; &laquo; ici j’ai enregistré sans centre de
+    coûts et le système a refusé &raquo; explique.</p>
+
+    <h2>Comment faire ce que vous faisiez</h2>
+    <ol class="passos">
+      <li>Ouvrez l’outil — il n’y a ni installation ni inscription.</li>
+      <li>À l’étape 3 (Révision), choisissez le <b>modèle de sortie</b> : <i>Pas à pas</i> pour la documentation et la formation,
+      <i>Preuve de test</i> pour l’UAT et l’audit.</li>
+      <li>Cliquez sur <b>Enregistrer l’écran</b>. Si vous voulez raconter ce que vous faites, laissez le microphone activé —
+      c’est ce qui devient la description de chaque étape.</li>
+      <li>Faites ce que vous feriez normalement. L’outil garde une capture à chaque changement d’écran.</li>
+      <li>Arrêtez l’enregistrement, écartez les écrans répétés et cliquez sur <b>utiliser la parole comme annotation</b> pour
+      remplir la description des étapes avec ce que vous avez dit. Corrigez ce qu’il faut.</li>
+      <li>Générez le <b>PDF</b> ou le <b>Word</b>. Le fichier sort avec le nom du cas, pas avec &laquo; capture d’écran &raquo;.</li>
+    </ol>
+    <p><a class="btn" href="{{app}}">Ouvrir l’outil</a></p>
+
+    <h2>Et SAP Solution Manager ?</h2>
+    <p>Même histoire, avec une autre date. La <b>Test Suite de SAP Solution Manager</b> sort de la maintenance
+    principale fin <b>2027</b> (avec une maintenance étendue jusqu’en 2030). Le successeur, <b>SAP Cloud ALM</b>,
+    a la gestion des tests — mais la preuve visuelle reste une <b>capture d’écran jointe à la main</b>.</p>
+    <p>C’est exactement le même trou : l’outil de gestion existe, et la partie coûteuse à produire — les bons écrans,
+    dans l’ordre, avec l’heure et avec l’explication de ce qui était fait — est retournée au
+    <code>Print Screen</code> et à Word. Le modèle <i>Preuve de test</i> a été fait pour cela.</p>
+
+    <h2>Questions qui reviennent toujours</h2>
+    <h3>La vidéo est-elle envoyée sur un serveur ?</h3>
+    <p>Non. Tout se passe dans l’onglet du navigateur, et cela se vérifie en trente secondes en ouvrant l’onglet Réseau
+    du navigateur. Il y a une <a href="{{seguranca}}" style="color:var(--accent)">page consacrée à cela</a>,
+    avec notamment la liste des certifications que nous n’avons pas.</p>
+    <h3>Est-ce que cela fonctionne sans internet ?</h3>
+    <p>Oui : il existe une version en <b>fichier unique</b> qui tourne hors ligne, et que votre équipe peut conserver
+    en interne. Sans réseau, vous perdez la transcription automatique et vous écrivez les annotations à la main.</p>
+    <h3>Dois-je installer quelque chose ?</h3>
+    <p>Non. C’est tout l’argument : sur un poste de travail verrouillé par la politique interne, &laquo; installez ce
+    programme &raquo; est un projet avec un responsable et un délai ; ouvrir une adresse est un clic.</p>
+    <h3>Et si j’utilise SAP GUI pour Windows ?</h3>
+    <p>La capture d’écran prend n’importe quelle fenêtre que le système laisse partager, y compris SAP GUI — ce que le
+    navigateur ne peut pas faire, c’est <b>lire les champs</b> à l’intérieur, comme le ferait un outil installé. Pour
+    Fiori, S/4 web, Ariba, SuccessFactors et Concur, il n’y a aucune différence.</p>
+    <h3>Est-ce vraiment gratuit ?</h3>
+    <p>Oui. Il n’y a pas de coût de serveur parce qu’il n’y a pas de serveur : c’est votre ordinateur qui fait le travail.
+    Voyez les <a href="{{precos}}" style="color:var(--accent)">tarifs</a>.</p>
+  </div>
+</section>

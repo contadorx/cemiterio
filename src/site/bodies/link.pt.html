@@ -1,0 +1,185 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Um link pronto para o seu sistema de teste</h1>
+    <p class="updated">Monte aqui um endereço que abre o {{marca}} já com o caso de teste, o chamado e o
+    sistema preenchidos. Cole no <b>Zephyr</b>, no <b>Jira</b>, no <b>Xray</b>, no <b>TestRail</b>, no
+    <b>Azure DevOps</b>, no <b>qTest</b> — ou numa planilha.<br>
+    <b>Não é integração e não precisa da TI de ninguém.</b> É um link. Qualquer ferramenta que mostre um
+    link serve, e isso é de propósito: integração de verdade depende de API, de permissão e de projeto
+    aprovado; um link funciona na segunda-feira.</p>
+
+    <div class="linkBox">
+      <div class="lgrid">
+        <label>Caso de teste<input id="lkCaso" placeholder="CT-014 Criar pedido de compra"></label>
+        <label>Chamado / mudança<input id="lkChamado" placeholder="NAT-1234"></label>
+        <label>Sistema / mandante<input id="lkSistema" placeholder="S4P / 100"></label>
+        <label>Executado por<input id="lkQuem" placeholder="deixe vazio para quem for testar preencher"></label>
+        <label>Modelo de saída
+          <select id="lkModelo">
+            <option value="evidencia">Evidência de teste</option>
+            <option value="tutorial">Passo a passo</option>
+            <option value="ata">Ata de reunião</option>
+            <option value="ia">Contexto para IA</option>
+          </select>
+        </label>
+        <label>Idioma
+          <select id="lkLang">
+            <option value="pt">Português</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="fr">Français</option>
+          </select>
+        </label>
+      </div>
+
+      <details class="lkTime" id="lkTimeCx">
+        <summary><b>Plano Time</b> — ativar pelo próprio link <span class="small muted">(opcional)</span></summary>
+        <p class="small muted" style="margin:10px 0 12px">Cole aqui a chave que você recebeu. O link passa a
+        <b>ativar o plano Time</b> no navegador de quem abrir, e já traz o nome do cliente no documento —
+        ninguém do time precisa colar chave nenhuma. A chave é lida aqui no seu navegador e não é enviada
+        para lugar nenhum.</p>
+        <div class="lgrid">
+          <label>Chave do plano Time<input id="lkLic" placeholder="WS1..." spellcheck="false" autocomplete="off"></label>
+          <label>Nome do cliente no documento<input id="lkMarca" placeholder="Sua empresa S.A."></label>
+        </div>
+        <p class="row" style="gap:9px;margin:12px 0 0">
+          <button class="btn ghost" id="lkLicEsquecer" type="button">Esquecer a chave deste navegador</button>
+          <span class="small muted" id="lkLicMsg" role="status"></span>
+        </p>
+        <p class="small muted" style="margin:12px 0 0"><b>Onde não colar este link:</b> num chamado que
+        qualquer um da empresa abre, num canal público, num documento compartilhado com o cliente. Quem
+        tem o link tem o plano. Para esses lugares, use o link sem a chave — ele continua preenchendo o
+        caso e o chamado.</p>
+        <p class="small muted" style="margin:8px 0 0">O <b>logotipo</b> não vem no link: um endereço não
+        carrega um arquivo, e buscar uma imagem na internet para dentro do documento quebraria a promessa
+        de que nada entra e nada sai. Ele é escolhido uma vez, na ferramenta.</p>
+      </details>
+
+      <p class="small muted" style="margin:14px 0 6px"><b>O link:</b></p>
+      <div class="lkSaida"><code id="lkUrl"></code></div>
+      <p class="row" style="gap:9px;margin-top:12px">
+        <button class="btn" id="lkCopiar">Copiar o link</button>
+        <a class="btn ghost" id="lkAbrir" href="{{app}}" target="_blank" rel="noopener">Testar o link</a>
+        <span class="small muted" id="lkMsg" role="status"></span>
+      </p>
+    </div>
+
+    <h2>Como isso entra no Zephyr</h2>
+    <p>Duas formas, e as duas levam menos de um minuto por caso:</p>
+    <ol class="passos">
+      <li><b>No próprio caso de teste.</b> Cole o link num passo do <i>test script</i> ou na descrição —
+      algo como &ldquo;grave a evidência aqui&rdquo;. Quem executar clica, grava, gera o PDF e anexa na
+      execução. O nome do arquivo já sai com o caso e o chamado dentro, então ele se explica sozinho na
+      lista de anexos.</li>
+      <li><b>Numa automação.</b> Se a criação do ciclo de teste é automatizada, monte o link com os
+      campos do próprio caso. O padrão é este, e não muda:
+      <code>{{site}}/app?modelo=evidencia&amp;caso=CT-014&amp;chamado=NAT-1234&amp;sistema=S4P/100</code></li>
+    </ol>
+    <p>Vale para o <b>Xray</b> igual, para o <b>Jira</b> puro igual, e para uma planilha compartilhada
+    igual. É a vantagem de não ser integração.</p>
+
+    <h2>O que o link faz e o que ele não faz</h2>
+    <p><b>Faz:</b> abre a ferramenta com os campos preenchidos, no idioma e no modelo de saída certos.
+    Quem executa não digita nada e não escolhe nada — e por isso a evidência do time inteiro sai no mesmo
+    padrão, sem ninguém ser treinado.</p>
+    <p><b>Não faz:</b> não anexa nada de volta no seu sistema, porque isso exigiria API e permissão. O
+    caminho de volta continua sendo arrastar o arquivo — três segundos, e funciona em qualquer ferramenta,
+    inclusive nas que a sua empresa não deixa integrar.</p>
+    <p class="small muted"><b>Um cuidado.</b> O que vai no endereço fica no histórico do navegador de quem
+    abrir e nos registros de quem servir a página. Nome de sistema e número de chamado, tudo bem; nome de
+    pessoa, e-mail ou qualquer dado pessoal, é melhor deixar vazio e digitar na tela.</p>
+
+    <h2>Quanto custa</h2>
+    <p>Nada. Isto é do <b>plano gratuito</b> e vai continuar sendo — é o que faz a ferramenta caber no
+    processo que a sua equipe já tem, e uma ferramenta que só funciona sozinha não serve para equipe
+    nenhuma. O que é pago está na <a href="{{precos}}" style="color:var(--accent)">página de preços</a>:
+    marca do cliente no documento e vocabulário compartilhado.</p>
+  </div>
+</section>
+
+<style>
+.linkBox{border:1px solid var(--line);border-radius:12px;padding:22px;margin:26px 0 8px;background:var(--panel)}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.lgrid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+.lgrid input,.lgrid select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);color:var(--ink);font-size:14.5px;font-family:inherit;width:100%}
+.lkTime{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.lkTime summary{cursor:pointer;font-size:14.5px}
+.lkTime[open] summary{margin-bottom:4px}
+.lkSaida{border:1px solid var(--line);border-radius:8px;padding:12px 13px;background:var(--bg);
+  overflow-x:auto}
+.lkSaida code{font:12.5px ui-monospace,Menlo,Consolas,monospace;color:var(--ink);white-space:pre-wrap;
+  word-break:break-all}
+</style>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  if (!$('lkUrl')) return;
+  const campos = { caso:'lkCaso', chamado:'lkChamado', sistema:'lkSistema', quem:'lkQuem' };
+
+  /* A chave do plano fica guardada no navegador de QUEM MONTA o link — não no
+     de quem recebe. É a mesma pessoa que monta dezenas de links por semana, e
+     pedir a chave toda vez transformaria o recurso em incômodo. O botão de
+     esquecer existe porque uma máquina emprestada acontece. */
+  const LIC_LOCAL = 'walkstamp.lic.construtor';
+  try { const g = localStorage.getItem(LIC_LOCAL); if (g && $('lkLic')) $('lkLic').value = g; } catch (e) {}
+  if ($('lkLic') && $('lkLic').value) $('lkTimeCx').open = true;
+
+  function montar(){
+    const q = new URLSearchParams();
+    const lang = $('lkLang').value;
+    if (lang !== 'pt') q.set('lang', lang);
+    q.set('modelo', $('lkModelo').value);
+    for (const k in campos) {
+      const v = ($(campos[k]).value || '').trim();
+      if (v) q.set(k, v);
+    }
+    /* URLSearchParams escapa a barra de "S4P/100" como %2F. Funciona, mas um
+       link que a pessoa vai LER e colar num chamado não pode parecer lixo — e a
+       barra é segura na query string. */
+    /* A licença por último, e nunca abreviada: ela é o objeto assinado
+       inteiro, e um caractere a menos deixa de conferir. */
+    const lic = (($('lkLic') && $('lkLic').value) || '').trim();
+    const mk  = (($('lkMarca') && $('lkMarca').value) || '').trim();
+    if (mk)  q.set('marca', mk);
+    if (lic) { q.set('lic', lic); try { localStorage.setItem(LIC_LOCAL, lic); } catch (e) {} }
+    const url = location.origin + '/app?' + q.toString().replace(/%2F/g, '/');
+    if ($('lkLicMsg') && lic && !$('lkLicMsg').dataset.travado) $('lkLicMsg').textContent = 'A chave vai no link.';
+    $('lkUrl').textContent = url;
+    $('lkAbrir').href = url;
+    return url;
+  }
+
+  $('lkLicEsquecer').onclick = () => {
+    $('lkLic').value = '';
+    try { localStorage.removeItem(LIC_LOCAL); } catch (e) {}
+    $('lkLicMsg').textContent = 'Chave esquecida neste navegador.';
+    $('lkLicMsg').dataset.travado = '1';
+    setTimeout(() => { delete $('lkLicMsg').dataset.travado; }, 2500);
+    montar();
+  };
+
+  Object.values(campos).concat(['lkModelo','lkLang','lkLic','lkMarca']).forEach(id => {
+    $(id).addEventListener('input', montar);
+    $(id).addEventListener('change', montar);
+  });
+
+  $('lkCopiar').onclick = async () => {
+    const url = montar();
+    try {
+      await navigator.clipboard.writeText(url);
+      $('lkMsg').textContent = 'Copiado. Cole no caso de teste.';
+    } catch (e) {
+      /* Sem permissão de área de transferência: seleciona para a pessoa copiar
+         com Ctrl+C, que é pior mas não deixa ninguém sem o link. */
+      const r = document.createRange(); r.selectNodeContents($('lkUrl'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      $('lkMsg').textContent = 'Selecionei o link — copie com Ctrl+C.';
+    }
+  };
+
+  montar();
+})();
+</script>

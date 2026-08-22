@@ -1,0 +1,133 @@
+<section style="padding-top:66px">
+  <div class="wrap">
+    <h1 style="font-size:34px">Tarifs</h1>
+    <p class="lead">L’outil qui tourne dans votre navigateur est gratuit et le restera. Il ne nous coûte
+    rien : il n’y a aucun serveur qui traite vos vidéos. Ce qui est payant, c’est l’<b>identité</b> du
+    document et l’<b>administration</b> d’une équipe — jamais la qualité de la preuve.</p>
+
+    <!-- A tira dos formatos, a mesma da home. A página de preços falava de
+         planos e nunca dizia o que SAI — e o que sai é o que se compra. -->
+    <div class="saidas">
+      <span class="saida"><b>PDF</b></span>
+      <span class="saida"><b>DOCX</b> Word</span>
+      <span class="saida"><b>PPTX</b> PowerPoint</span>
+      <span class="saida"><b>HTML</b></span>
+      <span class="saida"><b>MD</b> Markdown</span>
+      <span class="saida"><b>SCORM</b></span>
+      <span class="saida"><b>CSV</b></span>
+      <span class="saida"><b>JSON</b></span>
+      <span class="saida"><b>ZIP</b></span>
+      <span class="saida"><b>VTT</b></span>
+      <span class="saida"><b>SRT</b></span>
+      <span class="saida"><b>Google&nbsp;Docs</b></span>
+      <span class="saida"><b>Jira</b></span>
+    </div>
+
+    <div class="plans tres">
+
+      <div class="plan" data-plano="free">
+        <span class="badge">disponible</span>
+        <h3 style="margin-top:14px">Free</h3>
+        <div class="price">€ 0<span> / pour toujours</span></div>
+        <p class="moedas">R$ 0 &middot; US$ 0</p>
+        <p class="small muted" style="margin:0">Sans inscription, sans carte, sans limite d’usage.</p>
+        <ul>
+          <li>Enregistrer l’écran ou utiliser une vidéo, de n’importe quelle taille</li>
+          <li>Captures au changement de scène et transcription sur votre appareil</li>
+          <li>PDF, Word, HTML, Markdown, tableur, ZIP et JSON</li>
+          <li>Caviarder, rogner, surligner, et l’alerte de donnée sensible</li>
+          <li><a href="/fr/link">Lien prêt à l’emploi</a> pour Zephyr, Jira et TestRail</li>
+          <li>Rouvrir le document plus tard pour corriger une étape — et un paquet SCORM pour le LMS</li>
+        </ul>
+        <a class="btn" href="/app?lang=fr">Ouvrir l’outil</a>
+        <p class="pe">Tout ce qui fait accepter votre preuve est ici.</p>
+      </div>
+
+      <div class="plan hi" data-plano="personal">
+        <span class="badge">essai de 14 jours</span>
+        <h3 style="margin-top:14px">Personal</h3>
+        <div class="price">€ 27<span> / an</span></div>
+        <p class="moedas">R$ 149 &middot; US$ 29</p>
+        <p class="small muted" style="margin:0">Pour quarante cas à exécuter, pas un seul.</p>
+        <ul>
+          <li><b>La série entière, et pas un document isolé.</b> Chargez le tableur — .xlsx, .csv ou collé depuis Excel — et chaque cas devient un lien qui ouvre l’outil déjà rempli.</li>
+          <li><b>Et il revient en .xlsx</b>, avec l’état, la date, qui l’a exécuté, le fichier produit et l’empreinte des écrans.</li>
+          <li>Un reçu par cas : la fiche et l’empreinte de chaque écran — sans qu’aucune image ne quitte votre machine.</li>
+          <li data-f="modeloProprio">Logo et nom du client dans le PDF, dans le Word et dans le HTML, avec votre couverture et vos champs — et le profil revient sur n’importe quelle machine</li>
+          <li data-f="termosGuardados"><b>Les termes de votre système sont conservés</b> — la liste survit à la visite et à la machine, au lieu d’être retapée. Les appliquer est déjà gratuit ; les conserver, c’est ici <span class="soon">bientôt</span></li>
+          <li>Tout ce qu’il y a dans Free</li>
+        </ul>
+        <a class="btn" href="{{conta}}">Démarrer les 14 jours</a>
+        <p class="pe">Tout de suite, sans carte. Ou <a href="mailto:{{contato}}?subject=Walkstamp%20Personal">écrivez-moi</a>.</p>
+      </div>
+
+      <div class="plan" data-plano="team">
+        <span class="badge">à partir de 5 personnes</span>
+        <h3 style="margin-top:14px">Team</h3>
+        <div class="price">€ 65<span> / personne / an</span></div>
+        <p class="moedas">R$ 349 &middot; US$ 69</p>
+        <p class="small muted" style="margin:0">Pour l’équipe qui a besoin du même document entre toutes les mains.</p>
+        <ul>
+          <li>L’activation passe par un lien : la personne qui coordonne envoie une adresse, personne ne saisit de clé</li>
+          <li data-f="padraoDoTime">Un profil d’équipe poussé à tout le monde</li>
+          <li>Tableau des sièges : inviter, bloquer et choisir la durée, de 1 à 90 jours</li>
+          <li>Factures et tickets dans votre compte</li>
+          <li>Tout ce qu’il y a dans Personal</li>
+        </ul>
+        <a class="btn ghost" href="{{time}}">Parler de Team</a>
+        <p class="pe">Sans identifiant, et sans inscription à faire approuver par votre DSI.</p>
+      </div>
+
+    </div>
+
+
+    <!-- A lista completa. O dado mora em src/features.json e a tabela é montada
+         no build: sessenta e poucas linhas em três idiomas, escritas à mão,
+         seriam 195 chances de a versão em espanhol prometer o que a portuguesa
+         não promete. -->
+    <h2 style="margin-top:52px">{{tpH}}</h2>
+    <p class="lead">{{tpP}}</p>
+    {{tabelaPlanos}}
+
+    <p class="small muted" style="margin-top:24px"><b>Toujours sans serveur, y compris dans les offres payantes.</b> La clé est
+    vérifiée à l’intérieur de votre navigateur et fonctionne hors ligne — <b>nous ne recevons ni votre vidéo ni votre
+    audio, dans aucune offre</b>. Dans les offres payantes, il y a une seule chose que vous pouvez choisir de conserver dans votre compte : le
+    fichier complet d’une session, joint par vous à un cas de la liste, et supprimable à tout moment. <a href="{{seguranca}}">Comment cela fonctionne à l’intérieur</a>.</p>
+
+    <p class="small muted" style="margin-top:14px"><b>Pro et API</b> — convertir les formats que le navigateur
+    refuse (HEVC, MKV, ProRes), transcrire sur un serveur, traiter par lots, ou une adresse qui renvoie
+    captures et transcription pour que votre propre produit les consomme. Rien de tout cela n’existe encore, et c’est ce qui vient ensuite.
+    <a href="mailto:{{contato}}?subject=Walkstamp%20API">Racontez-moi votre cas</a> — c’est comme ça que je décide de l’ordre.</p>
+
+    <p class="small muted" style="margin-top:24px">Deux honnêtetés au sujet de cette page. Ce qui est marqué
+    <span class="soon">bientôt</span> n’existe pas encore : c’est listé parce que c’est ce que je vais construire, et qui
+    entre maintenant aide à décider de l’ordre et garde pour toujours le prix de cette page. Et l’<b>offre gratuite ne
+    perdra pas de fonctions</b> quand les payantes grandiront — la ligne de partage est fixe : la confidentialité et la qualité
+    de la preuve ne passent jamais derrière un paiement.</p>
+  </div>
+</section>
+
+<section id="lista" data-espera="proapi">
+  <div class="wrap">
+    <h2>Vous voulez être prévenu du Pro et de l’API ?</h2>
+    <p class="lead">L’offre payante est <b>déjà disponible</b> — ce qui n’existe pas encore, c’est le Pro et l’API, décrits ci-dessus. Laissez un e-mail et je vous préviens quand ils sortiront. Un message, pas une newsletter.</p>
+    <form class="lista" id="listaForm" data-url="{{supaUrl}}" data-key="{{supaKey}}" novalidate>
+      <input type="email" id="listaEmail" autocomplete="email" placeholder="vous@email.com" aria-label="Votre e-mail">
+      <button class="btn" type="submit" id="listaBtn">Je veux être prévenu</button>
+    </form>
+    <p class="small muted listaMsg" id="listaMsg" role="status"></p>
+    <p class="small muted" style="max-width:640px">La promesse de cet outil, c’est que <b>votre vidéo ne quitte pas votre machine</b>, et elle tient toujours : ce champ n’a aucun rapport avec ce que vous traitez ici — le navigateur n’envoie ni vidéo, ni audio, ni transcription nulle part. L’e-mail reste dans une base à moi, il n’est pas vendu, il ne part dans aucune liste de tiers et il disparaît le jour où vous le demandez. Vous préférez ne pas le laisser ? Aucun problème — l’outil ne change pas pour autant.</p>
+  </div>
+</section>
+
+<section id="support"></section>
+
+<section>
+  <div class="wrap">
+    <h2>Pourquoi le gratuit est sans piège</h2>
+    <p class="lead" style="margin-bottom:0">La question est légitime : un outil gratuit se paie en général ailleurs
+    — des données, de la publicité, ou une limite qui apparaît au mauvais moment. Ici la raison est plus simple : votre vidéo
+    est traitée par votre propre ordinateur, donc le coût de vous servir est quasiment nul. Il n’y a rien à subventionner,
+    et donc rien à récupérer ensuite.</p>
+  </div>
+</section>

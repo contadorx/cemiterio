@@ -1,0 +1,98 @@
+<section style="padding-top:60px">
+  <div class="wrap doc" style="max-width:860px">
+    <h1 style="font-size:32px">{{marca}} and the alternatives</h1>
+    <p class="updated">Updated 14 August 2026.<br>
+    We wrote this page, so read it with that lens. To compensate, it has two things vendor comparisons
+    never have: the competitors' list prices and a section on
+    <a href="#welose" style="color:var(--accent)">where each of them beats us</a>.</p>
+
+    <h2>The five groups</h2>
+    <p>Every tool that turns on-screen work into a document falls into one of these groups:</p>
+    <ul>
+      <li><b>What came with Windows</b> — Steps Recorder (<code>psr.exe</code>), deprecated in 2024.
+      <a href="{{steps}}" style="color:var(--accent)">There is a whole page about it</a>.</li>
+      <li><b>Cloud step capture</b> — Scribe, Tango, Guidde and the like: you click, they assemble the guide
+      on their site.</li>
+      <li><b>Installed on the PC</b> — FlowShare, Folge: desktop programs that capture locally.</li>
+      <li><b>Test suites</b> — Tricentis Tosca, Worksoft Certify, qTest: regression automation that also
+      documents what it executes.</li>
+      <li><b>{{marca}}</b> — recording and document in the browser, no install, no upload.</li>
+    </ul>
+
+    <h2>Side by side</h2>
+    <table class="legal">
+      <tr><th></th><th>{{marca}}</th><th>Steps Recorder</th><th>Cloud<br><span style="font-weight:400">(Scribe, Tango, Guidde)</span></th><th>Installed<br><span style="font-weight:400">(FlowShare, Folge)</span></th><th>Suites<br><span style="font-weight:400">(Tosca, Worksoft, qTest)</span></th></tr>
+      <tr><td>Installation</td>
+          <td class="sim">None — it is a web address</td><td>Came with Windows</td>
+          <td class="sim">Browser extension</td><td class="nao">A PC program, with IT approval</td>
+          <td class="nao">An implementation project</td></tr>
+      <tr><td>Does your content leave the machine?</td>
+          <td class="sim">No — processing in the tab</td><td class="sim">No</td>
+          <td class="nao">Yes: the screens go to their servers</td><td class="sim">No</td>
+          <td>Depends on the installation</td></tr>
+      <tr><td>Spoken narration becomes text</td>
+          <td class="sim">Yes, transcribed and synced</td><td class="nao">No</td>
+          <td class="nao">No</td><td class="nao">No</td><td class="nao">No</td></tr>
+      <tr><td>Clock time per step</td>
+          <td class="sim">Yes</td><td>Yes</td><td class="nao">No</td><td class="nao">No</td>
+          <td class="sim">Yes</td></tr>
+      <tr><td>Evidence header<br><span style="font-weight:400;font-size:12.5px">case, system, ticket, result</span></td>
+          <td class="sim">Yes</td><td class="nao">No</td><td class="nao">No</td><td class="nao">No</td>
+          <td class="sim">Yes, in the suite's format</td></tr>
+      <tr><td>Image fingerprint (SHA-256)</td>
+          <td class="sim">Optional</td><td class="nao">No</td><td class="nao">No</td><td class="nao">No</td>
+          <td>Own audit trail</td></tr>
+      <tr><td>Outputs</td>
+          <td class="sim">PDF, Word, ZIP, JSON</td><td class="nao">MHT</td>
+          <td>Link; PDF on paid plans</td><td class="sim">PDF, Word, HTML, PPT</td>
+          <td>Suite reports</td></tr>
+      <tr><td>Works offline</td>
+          <td class="sim">Yes — single file</td><td class="sim">Yes</td><td class="nao">No</td>
+          <td class="sim">Yes</td><td>Depends</td></tr>
+      <tr><td>List price</td>
+          <td class="sim">Free</td><td>Gone</td>
+          <td>US$ 13–38 per user/month</td><td>Folge: €75–130 once<br>FlowShare: €450/user/year</td>
+          <td class="nao">Not public; customer reports of €10–20k per licence/year</td></tr>
+      <tr><td>Built for</td>
+          <td>Test evidence and AI context, with nothing uploaded</td>
+          <td>What is now orphaned</td><td>Onboarding and support guides</td>
+          <td>Manuals and training</td><td>Automated regression</td></tr>
+    </table>
+    <p class="small muted">Public list prices as of August 2026, from the vendors' sites; suite figures come
+    from customer reports (PeerSpot), as there is no public price list. Check before deciding — prices
+    change, and this page is only updated from time to time.</p>
+
+    <h2 id="welose">Where each of them beats us</h2>
+    <p>The part other people's comparisons leave out:</p>
+    <ul>
+      <li><b>FlowShare</b> reads the fields of <b>SAP GUI for Windows</b> — it knows which transaction and
+      which button you clicked, and writes that by itself. A browser has no such access, and neither does
+      {{marca}}. If your day is classic SAP GUI only and IT approves the install, it is the best tool for
+      that job.</li>
+      <li><b>Scribe, Tango and Guidde</b> generate each click's description automatically, have rich editing,
+      and host the guide at a link that stays current. If the goal is a living guide base for the team — and
+      the screens hold nothing sensitive — they solve a problem we do not try to solve.</li>
+      <li><b>Tosca, Worksoft and qTest</b> <b>execute</b> the regression test for you, thousands of times,
+      and document every run. {{marca}} documents a test a person ran once. Different problems; if yours is
+      the first one, that is where it lives.</li>
+      <li><b>Steps Recorder</b> came pre-installed on every corporate machine in the world — distribution
+      nobody will have again. That is why its page is our front door, not a trophy.</li>
+    </ul>
+
+    <h2>Where {{marca}} wins</h2>
+    <ul>
+      <li><b>Friction.</b> No install, no account, no IT ticket. On a locked-down workstation, that is the
+      difference between using it today and using it next quarter.</li>
+      <li><b>Structural privacy.</b> Not a contractual promise: there is no server to upload to.
+      <a href="{{seguranca}}" style="color:var(--accent)">The security page</a> shows how to verify that in
+      thirty seconds.</li>
+      <li><b>Speech.</b> You narrate the test out loud and the narration becomes each step's written
+      description. None of the alternatives listens.</li>
+      <li><b>The audit document.</b> Clock time, identification header, step numbering and optional hash —
+      in the format you attach to a ticket, with the right name on the file.</li>
+      <li><b>Price.</b> Free, because your computer does the work.</li>
+    </ul>
+
+    <p style="margin-top:34px"><a class="btn" href="{{app}}">Open the tool</a></p>
+  </div>
+</section>

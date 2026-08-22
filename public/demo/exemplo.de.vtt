@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.800 --> 00:00:04.000
+Ich habe das Einkaufssystem im Intranet geöffnet, in der Anforderungsliste meiner Abteilung.
+
+00:00:04.600 --> 00:00:08.800
+Ich habe auf Neue Anforderung geklickt, um den Kauf von Wartungsteilen zu erfassen.
+
+00:00:09.200 --> 00:00:14.000
+Ich habe Lieferant, Gesamtbetrag, Liefertermin und Begründung ausgefüllt.
+
+00:00:14.600 --> 00:00:19.500
+Ich habe ohne Kostenstelle gespeichert, und das System hat abgelehnt: das Feld ist über tausend Pflicht.
+
+00:00:20.000 --> 00:00:23.600
+Ich habe die Kostenstelle KST-4420 eingetragen und erneut gespeichert.
+
+00:00:24.200 --> 00:00:29.000
+Die Anforderung wurde unter der Nummer 48213 erfasst, in Genehmigung, mit dem Lieferanten TecnoParts.

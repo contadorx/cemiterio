@@ -1,0 +1,188 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Segurança da informação</h1>
+    <p class="updated">Última atualização: 15 de agosto de 2026.<br>
+    Esta página é para quem precisa aprovar o uso do {{marca}} dentro de uma empresa: como ele funciona,
+    o que sai da sua máquina, e o que nós <b>não</b> temos.</p>
+
+    <p class="lockHint" style="border-left:3px solid var(--accent);padding-left:12px;margin:0 0 26px">
+    <b>Em uma linha:</b> a ferramenta não tem servidor de processamento e não recebe o seu vídeo, o seu
+    áudio nem os seus quadros. Isso vale em todos os planos, e você não precisa acreditar — dá para
+    conferir em trinta segundos, com o navegador que você já tem aberto. Quem contrata um plano pago
+    ganha uma <b>conta</b>, e há uma única coisa que ela pode guardar por escolha sua; está descrita
+    abaixo, com todas as letras.</p>
+
+    <h2>Por que a pergunta muda de forma aqui</h2>
+    <p>A avaliação de um fornecedor de software costuma seguir uma lista: onde ficam os dados, quem tem
+    acesso, qual a certificação, qual o contrato de tratamento. Essa lista pressupõe que o fornecedor
+    <b>recebe</b> alguma coisa.</p>
+    <p>No {{marca}} o processamento inteiro acontece na aba do seu navegador. O vídeo é lido do seu disco
+    pelo próprio navegador, as imagens são extraídas ali, o áudio é transcrito ali, e o PDF, o Word, o ZIP e
+    o JSON são montados na memória da aba e salvos pelo navegador. <b>Não existe upload em nenhum passo.</b>
+    Não há cópia temporária do lado de cá, porque não há um lado de cá envolvido no processamento.</p>
+    <p>Isso não torna o {{marca}} automaticamente aprovável — torna a conversa diferente. Em vez de
+    &ldquo;confie no controle de acesso deles&rdquo;, a pergunta vira &ldquo;isto realmente não envia nada?&rdquo;,
+    que é uma pergunta que <b>você pode responder sozinho</b>.</p>
+
+    <h2>Como conferir, sem precisar confiar em nós</h2>
+    <p>É a parte mais importante desta página. Leva menos tempo do que lê-la:</p>
+    <ol class="passos">
+      <li>Abra a ferramenta e pressione <code>F12</code> para abrir as ferramentas do desenvolvedor.</li>
+      <li>Vá até a aba <b>Rede</b> (<i>Network</i>) e deixe-a gravando.</li>
+      <li>Carregue um vídeo grande — de propósito, um de vários gigabytes — e gere o PDF.</li>
+      <li>Olhe a coluna do que foi <b>enviado</b>. Ela continua em zero. Nenhuma requisição carrega o vídeo,
+      as imagens ou o texto.</li>
+    </ol>
+    <p>Um teste que a própria equipe de segurança executa vale mais do que qualquer declaração nossa, e é por
+    isso que ele está aqui em vez de um selo.</p>
+
+    <h2>A versão offline, para quando nem isso basta</h2>
+    <p>Existe um <b>arquivo único de HTML</b> com a ferramenta inteira dentro. Você baixa, desconecta a rede,
+    abre o arquivo e ele funciona. Nada nele fala com servidor nenhum.</p>
+    <p>E isso não é uma promessa de texto: o processo que gera esse arquivo <b>falha</b> se sobrar qualquer
+    endereço de medição dentro dele. É uma trava no build, não uma intenção. Dá para conferir procurando por
+    &ldquo;supabase&rdquo; ou &ldquo;insights&rdquo; no arquivo baixado — não há ocorrência.</p>
+    <p>Na versão offline você perde a transcrição automática (o modelo de voz é baixado sob demanda), a
+    leitura de texto da imagem e o botão do Google Drive. O resto funciona igual. Ela também pode ser
+    guardada num repositório interno, escaneada pela sua equipe e distribuída sem depender de nós.</p>
+
+    <h2>O que sai da sua máquina, e quando</h2>
+    <table class="legal">
+      <tr><th>Conexão</th><th>Quando acontece</th><th>O que vai</th><th>O que nunca vai</th></tr>
+      <tr><td>Vercel (hospedagem)</td><td>Sempre, ao abrir a página</td>
+          <td>O pedido do arquivo da página, com IP e navegador — como em qualquer site</td>
+          <td>Seu conteúdo</td></tr>
+      <tr><td>Vercel Web Analytics</td><td>Sempre; não envia se o navegador manda <i>Do&nbsp;Not&nbsp;Track</i> ou <i>Global Privacy Control</i></td>
+          <td>Qual página foi vista, sem cookie e sem identificador que persista</td>
+          <td>Identificador de pessoa ou de sessão</td></tr>
+      <tr><td>Supabase (marcos de uso)</td><td>Em três momentos: abriu a ferramenta, abriu um vídeo, baixou um arquivo. Respeita DNT e GPC</td>
+          <td>O nome do marco, o idioma da página, a origem do vídeo e o formato baixado</td>
+          <td>Nome de arquivo, tamanho, duração, conteúdo, identificador de sessão</td></tr>
+      <tr><td>jsDelivr (CDN público)</td><td>Só ao usar transcrição automática ou leitura de texto da imagem</td>
+          <td>O pedido da biblioteca</td><td>Seu áudio, sua imagem, seu texto</td></tr>
+      <tr><td>Hugging Face</td><td>Só ao acionar a transcrição automática, e uma vez por navegador</td>
+          <td>O pedido do modelo de voz</td><td>Seu áudio</td></tr>
+      <tr><td>Google</td><td>Só se você clicar em abrir um vídeo do Drive</td>
+          <td>Autenticação e o pedido do arquivo que você escolher, com o escopo mais restrito que existe (<code>drive.file</code>)</td>
+          <td>O restante do seu Drive; e o arquivo vai do Google direto para o seu navegador, sem passar por nós</td></tr>
+      <tr><td>Google Docs (envio)</td><td>Só se você clicar em <b>Enviar para o Google Docs</b>, e só depois de confirmar o aviso que aparece</td>
+          <td>O documento do Word montado no seu navegador — texto e imagens —, para o Google converter em documento do Drive</td>
+          <td>Nada além do documento que você mandou; ele vai do seu navegador direto ao Google, sem passar por nós</td></tr>
+    </table>
+    <p><b>Nenhuma dessas conexões carrega vídeo, áudio, imagem ou transcrição.</b>
+    A biblioteca de PDF é servida do nosso próprio domínio, e não de CDN.</p>
+    <p>Há uma exceção, e ela está na tabela em vez de escondida: o botão <b>Enviar para o Google Docs</b>
+    é a única função em que o <b>documento gerado sai do computador</b>. Ele existe porque muita equipe
+    revisa evidência no Drive, e ele pede confirmação explícita antes de enviar — quem não quer isso não
+    clica, e nada muda. Se a sua política proíbe levar o conteúdo para o Google, o botão só aparece quando
+    as credenciais do Drive estão configuradas, e a versão offline não o tem.</p>
+    <p>Vale um caso que costuma surpreender: a <b>tradução</b> da transcrição também não sai daqui.
+    Ela usa o tradutor que o próprio navegador embute e que roda no seu aparelho — não a API do Google
+    Cloud, que exigiria uma chave nossa no código e enviaria o seu texto para um servidor. Onde esse
+    tradutor não existe, o que a ferramenta oferece é o modelo de voz traduzindo enquanto ouve, também
+    no seu computador. <b>Em nenhum dos dois caminhos o texto é transmitido.</b></p>
+
+    <h2>A conta paga, e a única exceção</h2>
+    <p>Usar a ferramenta não exige conta, e isso não mudou: sem login, <code>/app</code> grava,
+    transcreve e gera documento exatamente igual. Quem contrata um plano pago passa a ter uma conta, e
+    nela ficam o e-mail de acesso, as faturas, os chamados de suporte, os assentos do time e — se você
+    usar a tela de <b>roteiro de casos</b> — a lista de casos a executar.</p>
+    <p>Nessa tela, marcar um caso como concluído guarda um <b>recibo</b>: o código do caso, o sistema, o
+    chamado, a data, o nome do arquivo gerado e a <b>impressão digital de cada quadro</b>. São números.
+    Não há imagem, não há transcrição, não há o texto dos passos. É o que permite pegar um PDF meses
+    depois e conferir se é aquele mesmo — e é por isso que ele existe.</p>
+    <p><b>A exceção, e ela é sua:</b> ao confirmar o concluído, existe um campo opcional para
+    <b>anexar o <code>.json</code> completo da sessão</b>. Esse arquivo tem as imagens dos quadros
+    dentro. Anexá-lo é a única coisa deste produto que coloca conteúdo seu num servidor nosso, ele nunca
+    vai sozinho, o campo vem fechado, e o aviso do que ele significa está do lado do campo — não numa
+    página de termos. Cada anexo tem botão de apagar, e apagar apaga o arquivo, não só a linha que
+    aponta para ele. <b>O vídeo e o áudio continuam nunca saindo do seu navegador, com anexo ou sem.</b></p>
+
+    <h2>O que fica no seu navegador</h2>
+    <p>Nada do seu conteúdo é guardado entre visitas. Dos dados de identificação da evidência, só
+    <b>sistema</b> e <b>executado por</b> ficam em <code>sessionStorage</code> — que o navegador apaga ao
+    fechar a aba — para não redigitar a cada caso; há um botão que apaga na hora. Caso de teste, chamado,
+    resultado e as anotações não são guardados nem enquanto a aba vive. Nada disso é um cookie, nada disso é
+    lido por nós, e nada disso sai do seu dispositivo.</p>
+    <p>Junto do modelo fica uma anotação de <b>configuração</b>: qual combinação de biblioteca e
+    formato de arquivo consegue abrir o modelo nesta máquina. Nomes de versão, nada de conteúdo — e
+    o botão que apaga o modelo apaga a anotação junto.</p>
+    <p><b>As telas de uma gravação em curso</b> ficam no armazenamento privado do navegador (OPFS),
+    no seu computador, para que um travamento da aba não apague o trabalho — antes disso, um travamento
+    aos 110 minutos de uma gravação de duas horas apagava as duas horas. Elas são apagadas assim que
+    qualquer documento é gerado, e de qualquer jeito depois de sete dias; e o botão &ldquo;jogar fora&rdquo;, que o passo 1
+    oferece sempre que há uma gravação guardada, apaga na hora o que já estiver lá.
+    Nada disso é enviado a lugar nenhum — o teste do F12 continua dando zero byte enviado.</p>
+    <p>Fora isso, o que persiste é o <b>modelo de transcrição</b>, guardado pelo próprio navegador em cache
+    para não ser baixado de novo. Fica no seu dispositivo, sob seu controle, e some ao limpar os dados de
+    navegação. Não usamos <i>cookies</i> — nem próprios, nem de terceiros.</p>
+
+    <h2>O que nós não temos</h2>
+    <p>Esta é a parte que quase nenhum fornecedor escreve, e é justamente a que a sua equipe precisa.
+    <b>Não possuímos nenhuma certificação de segurança, e não estamos em processo de obter nenhuma.</b>
+    Abaixo, o que cada uma significa e por que ela se aplica — ou não — a uma ferramenta que não recebe dados.</p>
+    <table class="legal">
+      <tr><th>Norma ou certificação</th><th>Temos?</th><th>O que isso quer dizer aqui</th></tr>
+      <tr><td>ISO/IEC 27001</td><td>Não</td>
+          <td>Certifica o sistema de gestão de segurança de uma organização que <b>guarda</b> dados. Não guardamos os seus. Se a sua política exige ISO&nbsp;27001 de todo fornecedor que recebe dados, vale registrar que aqui não há recebimento — mas quem decide se a exceção cabe é o seu time, não nós.</td></tr>
+      <tr><td>SOC 2 (Tipo I ou II)</td><td>Não</td>
+          <td>Audita os controles de uma prestadora de serviço que <b>processa</b> dados do cliente. Não há serviço processando nada: o processamento é no seu computador.</td></tr>
+      <tr><td>21 CFR Part 11 (FDA)</td><td>Não</td>
+          <td>Exige sistema fechado e validado, trilha de auditoria e assinatura eletrônica. Um gerador de documento no navegador <b>não atende e não pode atender sozinho</b>. Em ambiente regulado por Part&nbsp;11, o {{marca}} pode produzir a imagem, mas o registro controlado tem que viver no seu sistema validado.</td></tr>
+      <tr><td>CSV / GAMP 5</td><td>Não</td>
+          <td>Validação de sistema computadorizado acontece no <b>seu</b> ambiente, sobre o seu uso. Não é algo que um fornecedor entregue pronto.</td></tr>
+      <tr><td>SOX / ITGC</td><td>Não se aplica como certificação</td>
+          <td>O {{marca}} não é um controle de TI. Ele <b>produz a evidência</b> que entra no seu controle. Quem responde pelo controle continua sendo você.</td></tr>
+      <tr><td>HIPAA — acordo de <i>business associate</i></td><td>Não assinamos</td>
+          <td>Não recebemos dados, então não existe a relação que o acordo formalizaria. Se a sua política exige acordo com qualquer ferramenta que <b>toque</b> dado de saúde, mesmo localmente, converse com o seu time de conformidade — não vamos dizer que está tudo bem numa decisão que não é nossa.</td></tr>
+      <tr><td>LGPD / GDPR</td><td>Não é certificação</td>
+          <td>Não existe &ldquo;certificado de LGPD&rdquo;. A nossa posição, as bases legais e os prazos estão descritos na <a href="{{privacidade}}" style="color:var(--accent)">Política de Privacidade</a>.</td></tr>
+      <tr><td>Relatório de teste de intrusão</td><td>Não temos</td>
+          <td>Não há infraestrutura a testar além de hospedagem de arquivos estáticos. O que existe é o código que roda na sua máquina — e ele é legível.</td></tr>
+      <tr><td>Seguro de responsabilidade cibernética</td><td>Não</td>
+          <td>Somos uma empresa pequena e não seria honesto sugerir cobertura que não existe.</td></tr>
+    </table>
+
+    <h3>O que existe no lugar</h3>
+    <ul>
+      <li>O código que roda no seu navegador <b>pode ser lido</b>: é uma página, e <code>Ctrl+U</code> mostra tudo. Não há código do lado do servidor porque não há servidor.</li>
+      <li>A <b>versão offline</b> pode ser baixada, escaneada, versionada e distribuída pela sua equipe.</li>
+      <li>A verificação de que nada sai leva trinta segundos e não depende de acreditar em nós.</li>
+    </ul>
+
+    <h2>O que continua sendo responsabilidade sua</h2>
+    <ul>
+      <li>O documento gerado contém o que estava na sua tela. Se você gravou dado de produção, <b>o arquivo que saiu tem dado de produção</b> — e para onde ele vai depois é decisão sua.</li>
+      <li>Compartilhar a tela captura tudo o que está nela, inclusive a janela que ficou aberta atrás. Prefira compartilhar uma janela específica quando o conteúdo for sensível.</li>
+      <li>A transcrição automática baixa um modelo de voz de um CDN público na primeira vez. Se a sua política proíbe CDN externo, use a versão offline e escreva as anotações à mão.</li>
+      <li>O {{marca}} produz a evidência visual. A trilha de aprovação continua no seu sistema de mudanças.</li>
+    </ul>
+
+    <h2>Documentos para a avaliação de fornecedor</h2>
+    <p>Se você é de compras, de jurídico ou de segurança da informação e precisa anexar isto a um processo,
+    está tudo aqui — sem reunião, sem pedir por e-mail e sem cadastro:</p>
+    <ul>
+      <li><b><a href="/dpa-walkstamp.pdf" style="color:var(--accent)">Anexo de Tratamento de Dados
+      Pessoais (DPA)</a></b> — PDF pronto para assinar, com a divisão de papéis, a lista de suboperadores
+      com país e salvaguarda, as medidas técnicas, o prazo de comunicação de incidente e a cláusula de
+      pedido de autoridade. Quatro páginas, e não quarenta: a maior parte do que um DPA longo regula é a
+      guarda do seu conteúdo por nós, e ela não existe aqui.</li>
+      <li><b><a href="{{privacidade}}" style="color:var(--accent)">Política de Privacidade</a></b> — com a
+      tabela de bases legais por finalidade, os prazos de guarda e a tabela de suboperadores. É a versão
+      que prevalece em caso de divergência.</li>
+    </ul>
+    <p class="small muted">O que <b>não</b> temos, e não vamos escrever que temos: certificação SOC 2 ou
+    ISO 27001. O que oferecemos no lugar é a arquitetura — a maior parte do que uma certificação dessas
+    protege é o conteúdo do cliente parado no servidor do fornecedor, e esse conteúdo não chega até nós.
+    Boa parte de um questionário de segurança, aqui, se responde com &ldquo;não aplicável, porque o dado
+    não chega até nós&rdquo; — e essa resposta é verificável com o F12 aberto.</p>
+
+    <h2>Quem responde</h2>
+    <p>O {{marca}} é oferecido por <b>{{empresa}}</b>, CNPJ <b>{{cnpj}}</b>.</p>
+    <p>Para relatar um problema de segurança, pedir esclarecimento para uma avaliação de fornecedor, ou
+    solicitar a versão offline: <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a>.
+    Não há programa de recompensa por vulnerabilidade, mas respondemos.</p>
+    <p class="small muted">Esta página descreve o funcionamento na data acima. Se algo mudar de forma que
+    afete o que está escrito aqui, esta página muda junto — e a data no topo é como você verifica isso.</p>
+  </div>
+</section>

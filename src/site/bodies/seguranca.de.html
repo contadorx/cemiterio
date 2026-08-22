@@ -1,0 +1,177 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <h1 style="font-size:32px">Informationssicherheit</h1>
+    <p class="updated">Letzte Aktualisierung: 15. August 2026.<br>
+    Diese Seite richtet sich an alle, die den Einsatz von {{marca}} in einem Unternehmen freigeben müssen: wie
+    es funktioniert, was Ihren Rechner verlässt und was wir <b>nicht</b> haben.</p>
+
+    <p class="lockHint" style="border-left:3px solid var(--accent);padding-left:12px;margin:0 0 26px">
+    <b>In einem Satz:</b> Das Werkzeug hat keinen Verarbeitungsserver und erhält weder Ihr Video noch Ihr
+    Audio noch Ihre Screenshots. Das gilt in allen Plänen, und Sie müssen es nicht glauben — Sie können es
+    in dreißig Sekunden prüfen, mit dem Browser, den Sie ohnehin offen haben. Wer einen bezahlten Plan
+    abschließt, erhält ein <b>Konto</b>, und es gibt genau eine Sache, die es nach Ihrer Wahl speichern kann;
+    sie ist unten in aller Ausführlichkeit beschrieben.</p>
+
+    <h2>Warum die Frage hier eine andere Form annimmt</h2>
+    <p>Die Prüfung eines Softwareanbieters folgt meist einer Liste: wo die Daten liegen, wer Zugriff hat,
+    welche Zertifizierung vorliegt, welcher Vertrag zur Verarbeitung gilt. Diese Liste setzt voraus, dass der
+    Anbieter überhaupt etwas <b>erhält</b>.</p>
+    <p>Bei {{marca}} findet die gesamte Verarbeitung im Tab Ihres Browsers statt. Das Video wird vom Browser
+    selbst von Ihrer Festplatte gelesen, die Bilder werden dort extrahiert, das Audio wird dort transkribiert,
+    und PDF, Word, ZIP und JSON werden im Speicher des Tabs zusammengesetzt und vom Browser gespeichert.
+    <b>Es gibt in keinem Schritt einen Upload.</b>
+    Auf unserer Seite entsteht keine temporäre Kopie, weil an der Verarbeitung keine Seite von uns beteiligt ist.</p>
+    <p>Das macht {{marca}} nicht automatisch genehmigungsfähig — es verändert das Gespräch. Statt
+    &bdquo;vertrauen Sie deren Zugriffskontrolle&ldquo; lautet die Frage nun &bdquo;sendet das wirklich nichts?&ldquo;,
+    und das ist eine Frage, die <b>Sie selbst beantworten können</b>.</p>
+
+    <h2>Wie Sie das prüfen, ohne uns vertrauen zu müssen</h2>
+    <p>Das ist der wichtigste Teil dieser Seite. Es dauert weniger lang, als ihn zu lesen:</p>
+    <ol class="passos">
+      <li>Öffnen Sie das Werkzeug und drücken Sie <code>F12</code>, um die Entwicklerwerkzeuge zu öffnen.</li>
+      <li>Wechseln Sie zum Reiter <b>Netzwerk</b> (<i>Network</i>) und lassen Sie ihn aufzeichnen.</li>
+      <li>Laden Sie ein großes Video — absichtlich eines mit mehreren Gigabyte — und erzeugen Sie das PDF.</li>
+      <li>Sehen Sie sich die Spalte mit dem an, was <b>gesendet</b> wurde. Sie bleibt bei null. Keine Anfrage
+      überträgt das Video, die Bilder oder den Text.</li>
+    </ol>
+    <p>Ein Test, den Ihr eigenes Sicherheitsteam ausführt, wiegt mehr als jede Erklärung von uns, und deshalb
+    steht er hier anstelle eines Siegels.</p>
+
+    <h2>Die Offline-Version, für den Fall, dass selbst das nicht genügt</h2>
+    <p>Es gibt eine <b>einzelne HTML-Datei</b>, in der das gesamte Werkzeug steckt. Sie laden sie herunter,
+    trennen die Netzwerkverbindung, öffnen die Datei, und sie funktioniert. Nichts darin spricht mit einem Server.</p>
+    <p>Und das ist kein Versprechen im Text: Der Prozess, der diese Datei erzeugt, <b>bricht ab</b>, wenn darin
+    noch irgendeine Messadresse übrig ist. Es ist eine Sperre im Build, keine Absicht. Sie können es prüfen,
+    indem Sie in der heruntergeladenen Datei nach &bdquo;supabase&ldquo; oder &bdquo;insights&ldquo; suchen — es gibt keinen Treffer.</p>
+    <p>In der Offline-Version entfallen die automatische Transkription (das Spracherkennungsmodell wird bei
+    Bedarf heruntergeladen), das Auslesen von Text aus dem Bild und die Schaltfläche für Google Drive. Der Rest
+    funktioniert gleich. Sie kann auch in einem internen Repository abgelegt, von Ihrem Team geprüft und ohne
+    Abhängigkeit von uns verteilt werden.</p>
+
+    <h2>Was Ihren Rechner verlässt, und wann</h2>
+    <table class="legal">
+      <tr><th>Verbindung</th><th>Wann es geschieht</th><th>Was übertragen wird</th><th>Was nie übertragen wird</th></tr>
+      <tr><td>Vercel (Hosting)</td><td>Immer, beim Öffnen der Seite</td>
+          <td>Die Anfrage nach der Datei der Seite, mit IP und Browser — wie auf jeder Website</td>
+          <td>Ihre Inhalte</td></tr>
+      <tr><td>Vercel Web Analytics</td><td>Immer; sendet nichts, wenn der Browser <i>Do&nbsp;Not&nbsp;Track</i> oder <i>Global Privacy Control</i> übermittelt</td>
+          <td>Welche Seite aufgerufen wurde, ohne Cookie und ohne dauerhafte Kennung</td>
+          <td>Eine Kennung für Person oder Sitzung</td></tr>
+      <tr><td>Supabase (Nutzungsmeilensteine)</td><td>Zu drei Zeitpunkten: Werkzeug geöffnet, Video geöffnet, Datei heruntergeladen. Beachtet DNT und GPC</td>
+          <td>Der Name des Meilensteins, die Sprache der Seite, die Herkunft des Videos und das heruntergeladene Format</td>
+          <td>Dateiname, Größe, Dauer, Inhalt, Sitzungskennung</td></tr>
+      <tr><td>jsDelivr (öffentliches CDN)</td><td>Nur bei Nutzung der automatischen Transkription oder des Auslesens von Text aus dem Bild</td>
+          <td>Die Anfrage nach der Bibliothek</td><td>Ihr Audio, Ihr Bild, Ihr Text</td></tr>
+      <tr><td>Hugging Face</td><td>Nur beim Auslösen der automatischen Transkription, und einmal pro Browser</td>
+          <td>Die Anfrage nach dem Spracherkennungsmodell</td><td>Ihr Audio</td></tr>
+      <tr><td>Google</td><td>Nur wenn Sie darauf klicken, ein Video aus Drive zu öffnen</td>
+          <td>Die Authentifizierung und die Anfrage nach der Datei, die Sie auswählen, mit dem engsten Berechtigungsumfang, den es gibt (<code>drive.file</code>)</td>
+          <td>Der Rest Ihres Drive; und die Datei geht von Google direkt in Ihren Browser, ohne über uns zu laufen</td></tr>
+      <tr><td>Google Docs (Übertragung)</td><td>Nur wenn Sie auf <b>An Google Docs senden</b> klicken, und erst nachdem Sie den erscheinenden Hinweis bestätigt haben</td>
+          <td>Das in Ihrem Browser zusammengesetzte Word-Dokument — Text und Bilder —, damit Google es in ein Dokument in Drive umwandelt</td>
+          <td>Nichts außer dem Dokument, das Sie gesendet haben; es geht von Ihrem Browser direkt an Google, ohne über uns zu laufen</td></tr>
+    </table>
+    <p><b>Keine dieser Verbindungen überträgt Video, Audio, Bild oder Transkription.</b>
+    Die PDF-Bibliothek wird von unserer eigenen Domain ausgeliefert und nicht von einem CDN.</p>
+    <p>Es gibt eine Ausnahme, und sie steht in der Tabelle, statt versteckt zu sein: Die Schaltfläche
+    <b>An Google Docs senden</b> ist die einzige Funktion, bei der das <b>erzeugte Dokument den Rechner
+    verlässt</b>. Sie existiert, weil viele Teams Nachweise in Drive prüfen, und sie verlangt vor dem Senden
+    eine ausdrückliche Bestätigung — wer das nicht will, klickt nicht, und nichts ändert sich. Wenn Ihre
+    Richtlinie verbietet, Inhalte zu Google zu bringen: Die Schaltfläche erscheint nur, wenn die Zugangsdaten
+    für Drive konfiguriert sind, und die Offline-Version hat sie nicht.</p>
+    <p>Ein Fall, der oft überrascht, ist erwähnenswert: Auch die <b>Übersetzung</b> der Transkription geht
+    nicht von hier weg. Sie nutzt den Übersetzer, den der Browser selbst mitbringt und der auf Ihrem Gerät
+    läuft — nicht die API von Google Cloud, die einen Schlüssel von uns im Code verlangen und Ihren Text an
+    einen Server senden würde. Wo es diesen Übersetzer nicht gibt, bietet das Werkzeug das
+    Spracherkennungsmodell an, das beim Zuhören übersetzt, ebenfalls auf Ihrem Rechner.
+    <b>Auf keinem der beiden Wege wird der Text übertragen.</b></p>
+
+    <h2>Das bezahlte Konto und die einzige Ausnahme</h2>
+    <p>Die Nutzung des Werkzeugs verlangt kein Konto, und daran hat sich nichts geändert: Ohne Login nimmt
+    <code>/app</code> auf, transkribiert und erzeugt das Dokument genau gleich. Wer einen bezahlten Plan
+    abschließt, erhält damit ein Konto, und darin liegen die E-Mail-Adresse für den Zugang, die Rechnungen,
+    die Support-Tickets, die Plätze des Teams und — wenn Sie den Bildschirm <b>Testfallliste</b>
+    nutzen — die Liste der auszuführenden Fälle.</p>
+    <p>Auf diesem Bildschirm speichert das Markieren eines Falls als erledigt eine <b>Quittung</b>: der Code
+    des Falls, das System, das Ticket, das Datum, der Name der erzeugten Datei und die <b>Prüfsumme jedes
+    Screenshots</b>. Das sind Zahlen. Es gibt kein Bild, keine Transkription, keinen Text der Schritte. Genau
+    das erlaubt es, Monate später ein PDF zu nehmen und zu prüfen, ob es dasselbe ist — und deshalb
+    existiert sie.</p>
+    <p><b>Die Ausnahme, und sie liegt bei Ihnen:</b> Beim Bestätigen des Abschlusses gibt es ein optionales
+    Feld, um <b>die vollständige <code>.json</code>-Datei der Sitzung anzuhängen</b>. Diese Datei enthält die
+    Bilder der Screenshots. Sie anzuhängen ist das Einzige an diesem Produkt, das Inhalte von Ihnen auf einen
+    Server von uns legt; es geschieht nie von allein, das Feld ist zugeklappt voreingestellt, und der Hinweis
+    darauf, was es bedeutet, steht direkt neben dem Feld — nicht auf einer Seite mit Bedingungen. Jeder Anhang
+    hat eine Schaltfläche zum Löschen, und Löschen löscht die Datei, nicht nur die Zeile, die auf sie verweist.
+    <b>Video und Audio verlassen Ihren Browser weiterhin nie, mit Anhang oder ohne.</b></p>
+
+    <h2>Was in Ihrem Browser bleibt</h2>
+    <p>Nichts von Ihren Inhalten wird zwischen zwei Besuchen gespeichert. Von den Identifikationsdaten des
+    Nachweises bleiben nur <b>System</b> und <b>ausgeführt von</b> im <code>sessionStorage</code> — den der
+    Browser beim Schließen des Tabs löscht —, damit Sie sie nicht bei jedem Fall neu tippen; eine Schaltfläche
+    löscht sie sofort. Testfall, Ticket, Ergebnis und die Notizen werden nicht einmal gespeichert, solange der
+    Tab lebt. Nichts davon ist ein Cookie, nichts davon wird von uns gelesen, und nichts davon verlässt Ihr Gerät.</p>
+    <p>Neben dem Modell liegt ein Vermerk zur <b>Konfiguration</b>: welche Kombination aus Bibliothek und
+    Dateiformat das Modell auf diesem Rechner öffnen kann. Versionsnamen, keine Inhalte — und
+    die Schaltfläche, die das Modell löscht, löscht den Vermerk mit.</p>
+    <p><b>Die Bildschirme einer laufenden Aufnahme</b> liegen im privaten Speicher des Browsers (OPFS),
+    auf Ihrem Computer, damit ein Absturz des Tabs die Arbeit nicht löscht — zuvor löschte ein Absturz
+    nach 110 Minuten einer zweistündigen Aufnahme die vollen zwei Stunden. Sie werden gelöscht, sobald
+    irgendein Dokument erzeugt wird, und ohnehin nach sieben Tagen; und die Schaltfläche &bdquo;wegwerfen&ldquo;, die
+    Schritt 1 anbietet, sobald eine Aufnahme gespeichert ist, löscht sofort, was bereits da ist. Nichts davon wird irgendwohin gesendet — der F12-Test zeigt weiterhin
+    null gesendete Bytes.</p>
+    <p>Davon abgesehen bleibt dauerhaft das <b>Transkriptionsmodell</b>, das der Browser selbst im Cache
+    ablegt, damit es nicht erneut heruntergeladen wird. Es bleibt auf Ihrem Gerät, unter Ihrer Kontrolle, und
+    verschwindet, wenn Sie die Browserdaten löschen. Wir verwenden keine <i>Cookies</i> — weder eigene noch von Dritten.</p>
+
+    <h2>Was wir nicht haben</h2>
+    <p>Das ist der Teil, den fast kein Anbieter schreibt, und genau der, den Ihr Team braucht.
+    <b>Wir besitzen keine Sicherheitszertifizierung, und wir sind auch nicht dabei, eine zu erwerben.</b>
+    Nachfolgend, was jede einzelne bedeutet und warum sie auf ein Werkzeug, das keine Daten erhält, zutrifft — oder nicht.</p>
+    <table class="legal">
+      <tr><th>Norm oder Zertifizierung</th><th>Haben wir?</th><th>Was das hier bedeutet</th></tr>
+      <tr><td>ISO/IEC 27001</td><td>Nein</td>
+          <td>Zertifiziert das Managementsystem für Informationssicherheit einer Organisation, die Daten <b>speichert</b>. Wir speichern Ihre nicht. Wenn Ihre Richtlinie ISO&nbsp;27001 von jedem Anbieter verlangt, der Daten erhält, ist festzuhalten, dass hier kein Empfang stattfindet — aber ob die Ausnahme trägt, entscheidet Ihr Team, nicht wir.</td></tr>
+      <tr><td>SOC 2 (Typ I oder II)</td><td>Nein</td>
+          <td>Prüft die Kontrollen eines Dienstleisters, der Daten des Kunden <b>verarbeitet</b>. Es gibt keinen Dienst, der etwas verarbeitet: Die Verarbeitung findet auf Ihrem Rechner statt.</td></tr>
+      <tr><td>21 CFR Part 11 (FDA)</td><td>Nein</td>
+          <td>Verlangt ein geschlossenes und validiertes System, einen Prüfpfad und eine elektronische Signatur. Ein Dokumentgenerator im Browser <b>erfüllt das nicht und kann es allein nicht erfüllen</b>. In einer nach Part&nbsp;11 regulierten Umgebung kann {{marca}} das Bild erzeugen, aber der kontrollierte Datensatz muss in Ihrem validierten System liegen.</td></tr>
+      <tr><td>CSV / GAMP 5</td><td>Nein</td>
+          <td>Die Validierung eines computergestützten Systems findet in <b>Ihrer</b> Umgebung statt, bezogen auf Ihre Nutzung. Das ist nichts, was ein Anbieter fertig liefert.</td></tr>
+      <tr><td>SOX / ITGC</td><td>Als Zertifizierung nicht anwendbar</td>
+          <td>{{marca}} ist keine IT-Kontrolle. Es <b>erzeugt den Nachweis</b>, der in Ihre Kontrolle eingeht. Verantwortlich für die Kontrolle bleiben Sie.</td></tr>
+      <tr><td>HIPAA — <i>Business-Associate</i>-Vereinbarung</td><td>Unterzeichnen wir nicht</td>
+          <td>Wir erhalten keine Daten, also besteht die Beziehung nicht, die eine solche Vereinbarung formalisieren würde. Wenn Ihre Richtlinie eine Vereinbarung mit jedem Werkzeug verlangt, das Gesundheitsdaten <b>berührt</b>, auch lokal, sprechen Sie mit Ihrem Compliance-Team — wir werden bei einer Entscheidung, die nicht unsere ist, nicht sagen, dass alles in Ordnung sei.</td></tr>
+      <tr><td>LGPD / DSGVO</td><td>Keine Zertifizierung</td>
+          <td>Ein &bdquo;LGPD-Zertifikat&ldquo; gibt es nicht. Unsere Position, die Rechtsgrundlagen und die Fristen sind in der <a href="{{privacidade}}" style="color:var(--accent)">Datenschutzerklärung</a> beschrieben.</td></tr>
+      <tr><td>Bericht über einen Penetrationstest</td><td>Haben wir nicht</td>
+          <td>Es gibt keine Infrastruktur zu testen außer dem Hosting statischer Dateien. Was es gibt, ist der Code, der auf Ihrem Rechner läuft — und der ist lesbar.</td></tr>
+      <tr><td>Cyber-Haftpflichtversicherung</td><td>Nein</td>
+          <td>Wir sind ein kleines Unternehmen, und es wäre nicht ehrlich, eine Deckung anzudeuten, die es nicht gibt.</td></tr>
+    </table>
+
+    <h3>Was es stattdessen gibt</h3>
+    <ul>
+      <li>Der Code, der in Ihrem Browser läuft, <b>lässt sich lesen</b>: Es ist eine Seite, und <code>Strg+U</code> zeigt alles. Serverseitigen Code gibt es nicht, weil es keinen Server gibt.</li>
+      <li>Die <b>Offline-Version</b> kann von Ihrem Team heruntergeladen, geprüft, versioniert und verteilt werden.</li>
+      <li>Die Überprüfung, dass nichts hinausgeht, dauert dreißig Sekunden und hängt nicht davon ab, dass Sie uns glauben.</li>
+    </ul>
+
+    <h2>Was weiterhin in Ihrer Verantwortung liegt</h2>
+    <ul>
+      <li>Das erzeugte Dokument enthält, was auf Ihrem Bildschirm zu sehen war. Wenn Sie Produktivdaten aufgenommen haben, <b>enthält die entstandene Datei Produktivdaten</b> — und wohin sie danach geht, entscheiden Sie.</li>
+      <li>Die Bildschirmfreigabe erfasst alles, was darauf zu sehen ist, auch das Fenster, das im Hintergrund offen geblieben ist. Geben Sie lieber ein bestimmtes Fenster frei, wenn der Inhalt sensibel ist.</li>
+      <li>Die automatische Transkription lädt beim ersten Mal ein Spracherkennungsmodell von einem öffentlichen CDN herunter. Wenn Ihre Richtlinie ein externes CDN verbietet, nutzen Sie die Offline-Version und schreiben Sie die Notizen von Hand.</li>
+      <li>{{marca}} erzeugt den visuellen Nachweis. Der Freigabepfad bleibt in Ihrem System für Änderungen.</li>
+    </ul>
+
+    <h2>Wer verantwortlich ist</h2>
+    <p>{{marca}} wird angeboten von <b>{{empresa}}</b>, CNPJ <b>{{cnpj}}</b>.</p>
+    <p>Um ein Sicherheitsproblem zu melden, eine Auskunft für eine Lieferantenbewertung zu erbitten oder die
+    Offline-Version anzufordern: <a href="mailto:{{contato}}" style="color:var(--accent)">{{contato}}</a>.
+    Ein Belohnungsprogramm für Schwachstellen gibt es nicht, aber wir antworten.</p>
+    <p class="small muted">Diese Seite beschreibt die Funktionsweise zum oben genannten Datum. Wenn sich etwas
+    so ändert, dass es das hier Geschriebene betrifft, ändert sich diese Seite mit — und das Datum oben ist,
+    woran Sie das überprüfen.</p>
+  </div>
+</section>

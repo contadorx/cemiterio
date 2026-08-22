@@ -1,0 +1,53 @@
+<section style="padding-top:60px">
+  <div class="wrap doc">
+    <p class="eyebrow">Use case</p>
+    <h1 style="font-size:32px">A video the AI can actually read end to end</h1>
+    <p class="updated">A model watching video samples one frame per second, blind. An hour becomes 3,600 images, over a million tokens, and most of them are the same static screen. The document solves that before it ever reaches the model.</p>
+
+    {{figura}}
+
+    <h2>Three things that save you an afternoon</h2>
+    <p><b>A long video becomes several subjects.</b> Mark where each subject starts and walk away with one document per subject — each fits in one conversation, instead of blowing the context window all at once.</p>
+    <p><b>Your domain’s vocabulary, before you send it.</b> System names, acronyms and products the transcript gets wrong are fixed in one go, and the AI reads the right text.</p>
+    <p><b>Redact before pasting.</b> What cannot leave the company is covered in the image, not hidden: the redaction is burned in, and what you send has no data underneath.</p>
+
+    <p class="row" style="gap:10px;margin:0 0 8px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=ia&amp;lang=en">Prepare a video for the AI</a>
+      <span class="small muted">free, and the video does not leave your computer</span>
+    </p>
+
+    <h2>The pain</h2>
+    <p>You have a recording — a demo, a lesson, a support session, an incident — and you want to ask a model things about it. Sending the file hits three walls: the size limit, the cost of processing repeated frames, and the fact that <b>most models simply do not accept video</b>.</p>
+    <p>And even where they do, the model loses what was <i>said</i> alongside what was <i>shown</i>: the speech arrives as a loose block of text, with no idea which screen it belongs to.</p>
+
+    <h2>What comes out</h2>
+    <p>A PDF (or Markdown, HTML, JSON) any model can read, with the information already organised:</p>
+    <ul>
+      <li><b>~60 screens instead of 3,600</b>, because the rest were repetitions of the same image</li>
+      <li><b>Each image paired with the speech of that stretch</b>, not the whole transcript dumped at the end</li>
+      <li><b>The exact timestamp of every frame</b>, so the model can cite "at 04:12" precisely</li>
+      <li><b>It fits any model</b>, including the ones that refuse video — it is a document, not a media file</li>
+      <li><b>A ready-made prompt</b>, written so the model understands what it is reading before it answers</li>
+      <li><b>Structured JSON</b> when the destination is not a chat but your own code or your agent</li>
+    </ul>
+
+    <h2>How to do it</h2>
+    <ol class="passos">
+      <li>Leave the use case on <b>Context for AI</b> — it is the default.</li>
+      <li>Drag in the video, or record the screen on the spot.</li>
+      <li>Let it transcribe and pull the frames. Discard what does not matter in the review: every screen fewer is a token fewer.</li>
+      <li>Produce the PDF, copy the prompt, and take both to the AI you use.</li>
+    </ol>
+
+    <h2>What it does not do — better to know up front</h2>
+    <p><b>It sends nothing to any model.</b> It assembles the material and hands it to you. You choose the model, the account and the usage policy — including a model running inside your own company.</p>
+    <p><b>It does not replace watching the video when movement is the data.</b> If what matters is an animation, a transition or someone’s gesture, scene-change frames lose that. For system screens, which is the common case, they catch everything that matters.</p>
+    <p><b>It does not summarise by itself.</b> The summary is the model’s job; ours is to make the model read the right thing.</p>
+
+    <p class="row" style="gap:10px;margin-top:30px;flex-wrap:wrap">
+      <a class="btn" href="{{site}}/app?modelo=ia&amp;lang=en">Prepare a video for the AI</a>
+      <a class="btn ghost" href="{{precos}}">See the plans</a>
+    </p>
+    <p class="small muted" style="margin-top:16px">It is the most general of the five, and the tool’s default — when you do not know which document you want, this is the one that works.</p>
+  </div>
+</section>

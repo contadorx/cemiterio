@@ -1,0 +1,97 @@
+<section style="padding-top:60px">
+  <div class="wrap doc" style="max-width:860px">
+    <h1 style="font-size:32px">O {{marca}} e as alternativas</h1>
+    <p class="updated">Atualizado em 14 de agosto de 2026.<br>
+    Esta página foi escrita por nós, então leia com essa lente. Para compensar, ela tem duas coisas que
+    comparativo de fornecedor nunca tem: os preços de tabela dos concorrentes e a seção
+    <a href="#perdemos" style="color:var(--accent)">onde cada um ganha da gente</a>.</p>
+
+    <h2>Os cinco grupos</h2>
+    <p>Todas as ferramentas que transformam trabalho na tela em documento caem em um destes grupos:</p>
+    <ul>
+      <li><b>O que vinha com o Windows</b> — o Steps Recorder (<code>psr.exe</code>), descontinuado em 2024.
+      <a href="{{steps}}" style="color:var(--accent)">Há uma página inteira sobre isso</a>.</li>
+      <li><b>Passo a passo na nuvem</b> — Scribe, Tango, Guidde e afins: você clica, eles montam o guia num
+      site deles.</li>
+      <li><b>Instalados no PC</b> — FlowShare, Folge: programas de desktop que capturam localmente.</li>
+      <li><b>Suítes de teste</b> — Tricentis Tosca, Worksoft Certify, qTest: automação de regressão que
+      também documenta o que executa.</li>
+      <li><b>O {{marca}}</b> — gravação e documento no navegador, sem instalação e sem upload.</li>
+    </ul>
+
+    <h2>Lado a lado</h2>
+    <table class="legal">
+      <tr><th></th><th>{{marca}}</th><th>Steps Recorder</th><th>Nuvem<br><span style="font-weight:400">(Scribe, Tango, Guidde)</span></th><th>Instalados<br><span style="font-weight:400">(FlowShare, Folge)</span></th><th>Suítes<br><span style="font-weight:400">(Tosca, Worksoft, qTest)</span></th></tr>
+      <tr><td>Instalação</td>
+          <td class="sim">Nenhuma — é um endereço</td><td>Vinha no Windows</td>
+          <td class="sim">Extensão de navegador</td><td class="nao">Programa no PC, com aprovação de TI</td>
+          <td class="nao">Projeto de implantação</td></tr>
+      <tr><td>Seu conteúdo sai da máquina?</td>
+          <td class="sim">Não — processamento na aba</td><td class="sim">Não</td>
+          <td class="nao">Sim: as telas sobem para o servidor deles</td><td class="sim">Não</td>
+          <td>Depende da instalação</td></tr>
+      <tr><td>Narração falada vira texto</td>
+          <td class="sim">Sim, transcrita e sincronizada</td><td class="nao">Não</td>
+          <td class="nao">Não</td><td class="nao">Não</td><td class="nao">Não</td></tr>
+      <tr><td>Hora de relógio por passo</td>
+          <td class="sim">Sim</td><td>Sim</td><td class="nao">Não</td><td class="nao">Não</td>
+          <td class="sim">Sim</td></tr>
+      <tr><td>Cabeçalho de evidência<br><span style="font-weight:400;font-size:12.5px">caso, sistema, chamado, resultado</span></td>
+          <td class="sim">Sim</td><td class="nao">Não</td><td class="nao">Não</td><td class="nao">Não</td>
+          <td class="sim">Sim, no formato da suíte</td></tr>
+      <tr><td>Impressão digital das imagens (SHA-256)</td>
+          <td class="sim">Opcional</td><td class="nao">Não</td><td class="nao">Não</td><td class="nao">Não</td>
+          <td>Trilha própria</td></tr>
+      <tr><td>Saídas</td>
+          <td class="sim">PDF, Word, ZIP, JSON</td><td class="nao">MHT</td>
+          <td>Link, PDF nos planos pagos</td><td class="sim">PDF, Word, HTML, PPT</td>
+          <td>Relatórios da suíte</td></tr>
+      <tr><td>Funciona offline</td>
+          <td class="sim">Sim — arquivo único</td><td class="sim">Sim</td><td class="nao">Não</td>
+          <td class="sim">Sim</td><td>Depende</td></tr>
+      <tr><td>Preço de tabela</td>
+          <td class="sim">Gratuito</td><td>Acabou</td>
+          <td>US$ 13–38 por usuário/mês</td><td>Folge: €75–130 uma vez<br>FlowShare: €450/usuário/ano</td>
+          <td class="nao">Não público; relatos de €10–20 mil por licença/ano</td></tr>
+      <tr><td>Feito para</td>
+          <td>Evidência de teste e contexto para IA, sem subir nada</td>
+          <td>O que hoje é órfão</td><td>Guias de onboarding e suporte</td>
+          <td>Manuais e treinamento</td><td>Regressão automatizada</td></tr>
+    </table>
+    <p class="small muted">Preços de tabela públicos em agosto de 2026, nos sites dos fornecedores; os das
+    suítes vêm de relatos de clientes (PeerSpot), porque não há tabela pública. Confira antes de decidir —
+    preço muda, e esta página só é atualizada de tempos em tempos.</p>
+
+    <h2 id="perdemos">Onde cada um ganha da gente</h2>
+    <p>A parte que falta nos comparativos dos outros:</p>
+    <ul>
+      <li><b>FlowShare</b> lê os campos do <b>SAP GUI for Windows</b> — sabe qual transação e qual botão você
+      clicou, e escreve isso sozinho. Um navegador não tem esse acesso, e o {{marca}} também não. Se o seu
+      dia é só SAP GUI clássico e a TI aprova instalar, ele é a melhor ferramenta desse trabalho.</li>
+      <li><b>Scribe, Tango e Guidde</b> geram a descrição de cada clique automaticamente, têm edição rica e
+      hospedam o guia num link que se atualiza. Se o objetivo é uma base de guias viva para o time — e as
+      telas não têm dado sensível — eles resolvem um problema que nós não tentamos resolver.</li>
+      <li><b>Tosca, Worksoft e qTest</b> <b>executam</b> o teste de regressão por você, milhares de vezes,
+      e documentam cada execução. O {{marca}} documenta um teste que uma pessoa fez uma vez. São problemas
+      diferentes; se o seu é o primeiro, é lá que ele mora.</li>
+      <li><b>O Steps Recorder</b> vinha instalado em todas as máquinas do mundo corporativo — distribuição
+      que ninguém mais vai ter. Por isso a página dele é a nossa porta de entrada, não um troféu.</li>
+    </ul>
+
+    <h2>Onde o {{marca}} ganha</h2>
+    <ul>
+      <li><b>Atrito.</b> Nenhuma instalação, nenhuma conta, nenhum chamado para a TI. Numa estação travada
+      por política, essa é a diferença entre usar hoje e usar no trimestre que vem.</li>
+      <li><b>Privacidade estrutural.</b> Não é uma promessa de contrato: não existe servidor para onde subir.
+      <a href="{{seguranca}}" style="color:var(--accent)">A página de segurança</a> ensina a conferir isso
+      em trinta segundos.</li>
+      <li><b>A fala.</b> Você narra o teste em voz alta e a narração vira a descrição escrita de cada passo.
+      Nenhuma das alternativas escuta.</li>
+      <li><b>O documento da auditoria.</b> Hora de relógio, cabeçalho de identificação, numeração de passo e
+      hash opcional — no formato que se anexa num chamado, com o nome certo no arquivo.</li>
+      <li><b>Preço.</b> Gratuito, porque o seu computador faz o trabalho.</li>
+    </ul>
+
+    <p style="margin-top:34px"><a class="btn" href="{{app}}">Abrir a ferramenta</a></p>
+  </div>
+</section>
