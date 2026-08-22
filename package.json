@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "checar": "node testes/checar-render.js && node testes/checar-enums.js",
-    "tipos": "tsc --noEmit",
+    "tipos": "tsc --noEmit && tsc --noEmit -p testes/tsconfig.real.json",
+    "contraprova": "tsx --tsconfig testes/tsconfig.real.json testes/contraprova-autorizacao.ts",
     "ci": "npm run checar && npm run tipos && npm run testar && npm run build",
     "auditar": "bash testes/auditar.sh",
     "testar": "tsx --tsconfig testes/tsconfig.json testes/simular.ts"
