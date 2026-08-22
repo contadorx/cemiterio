@@ -164,10 +164,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-41}
 #   0066  +1  sureya_concluir_lavagem
 #   0068  +1  sureya_iniciar_lavagem
 #   0071  +2  sureya_espelha_movimento_na_conta, sureya_espelha_status_movimento
-# Nenhuma das quatro existe em producao ainda. As demais migrations desta
+#   0073  +1  sureya_lancar  (a porta unica do razao da familia)
+# Nenhuma das cinco existe em producao ainda. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-4}
+FUNCOES_DELTA=${FUNCOES_DELTA:-5}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -202,6 +203,77 @@ if [ "$divergiu" = "1" ]; then
   echo "============================================================"
   exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# O ESPELHO ENTRE OS DOIS RAZOES
+#
+# O placar prova que os OBJETOS existem. Nao prova que eles se comportam. O
+# espelho da 0071/0072 e a peca em que um erro nao aparece como falha: aparece
+# como numero errado na ficha da familia — e foi assim que o buraco do delete
+# passou pela revisao. Por isso ele tem prova propria, aqui, em banco limpo.
+# ---------------------------------------------------------------------------
+echo "ESPELHO — movimentos -> conta_corrente"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/espelho.sql 2>&1); then
+  echo "$saida" | grep -E "ESPELHO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "O espelho entre os dois razoes esta mentindo."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# AS ESCRITAS DE DINHEIRO
+#
+# Depois da 0073 nenhuma funcao escreve em `movimentos`. Aqui cada porta de
+# dinheiro e exercitada de verdade e cobrada pelo EFEITO — passar sem erro nao
+# e prova de nada quando o defeito possivel e "lancou no lugar errado".
+# ---------------------------------------------------------------------------
+echo "ESCRITAS — as portas de dinheiro"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/escritas.sql 2>&1); then
+  echo "$saida" | grep -E "ESCRITAS FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Alguma porta de dinheiro nao faz o que promete."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# QUEM AINDA ESCREVE NO RAZAO ANTIGO
+#
+# Depois da 0073 so tres funcoes podem tocar `movimentos`, e as tres de
+# proposito — sao as que precisam manter os dois lados iguais enquanto a tabela
+# nao e congelada. Qualquer nome novo nesta lista significa que alguem escreveu
+# dinheiro no lugar errado, e e melhor descobrir aqui do que no extrato de uma
+# familia.
+#
+# Esta e a condicao do congelamento: quando esta lista couber so nas de espelho,
+# `movimentos` pode virar somente-leitura.
+# ---------------------------------------------------------------------------
+esperadas="sureya_conciliar_comprovante sureya_espelha_movimento_na_conta sureya_espelha_status_movimento sureya_excluir_servico"
+achadas=$(psql -q $ALVO -tAc "
+  select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public'
+     and p.prosrc ~* '(insert into|update|delete from)[[:space:]]+movimentos'
+   order by 1;" | tr '\n' ' ')
+echo "ESCREVEM EM \`movimentos\` (esperado: so as de espelho/limpeza)"
+inesperada=0
+for f in $achadas; do
+  case " $esperadas " in
+    *" $f "*) printf "  ok  %s\n" "$f" ;;
+    *)        printf "  !!  %s  <-- NAO DEVERIA ESCREVER NO RAZAO ANTIGO\n" "$f"; inesperada=1 ;;
+  esac
+done
+if [ "$inesperada" = "1" ]; then
+  echo
+  echo "Funcao escrevendo dinheiro no razao antigo. Ver DECISOES.md D-01."
+  echo "============================================================"
+  exit 1
+fi
+echo
 
 echo "O repositorio reconstroi o banco."
 echo "============================================================"

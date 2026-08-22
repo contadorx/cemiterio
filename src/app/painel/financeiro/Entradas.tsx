@@ -267,7 +267,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
     setDebitos(lista);
     // marca tudo por padrão: o normal é o Pix pagar o que está em aberto
     const m: Record<string, boolean> = {};
-    for (const d of lista) m[d.movimento_id] = true;
+    for (const d of lista) m[d.lancamento_id] = true;
     setEscolhidos(m);
     // sugere o valor total em aberto, se ainda não digitou nada
     if (!f.valor && r?.total) setF((v) => ({ ...v, valor: String(r.total) }));
@@ -277,7 +277,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
     const v = Number(String(f.valor).replace(",", "."));
     if (!v || v <= 0) return alert("Informe o valor que entrou.");
     setSalvando(true);
-    const marcados = debitos.filter((d) => escolhidos[d.movimento_id]).map((d) => d.movimento_id);
+    const marcados = debitos.filter((d) => escolhidos[d.lancamento_id]).map((d) => d.lancamento_id);
     const r = await fetch("/api/financeiro/entradas", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -298,7 +298,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
   }
 
   const totalEscolhido = debitos
-    .filter((d) => escolhidos[d.movimento_id])
+    .filter((d) => escolhidos[d.lancamento_id])
     .reduce((s, d) => s + Number(d.em_aberto), 0);
 
   return (
@@ -372,11 +372,11 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${cor.linha}` }}>
           <label style={painel.rotulo}>Este pagamento é de quais lavagens?</label>
           {debitos.map((d: any) => (
-            <label key={d.movimento_id}
+            <label key={d.lancamento_id}
                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
                             borderTop: `1px solid ${cor.linha}`, cursor: "pointer" }}>
-              <input type="checkbox" checked={!!escolhidos[d.movimento_id]}
-                     onChange={(e) => setEscolhidos({ ...escolhidos, [d.movimento_id]: e.target.checked })}
+              <input type="checkbox" checked={!!escolhidos[d.lancamento_id]}
+                     onChange={(e) => setEscolhidos({ ...escolhidos, [d.lancamento_id]: e.target.checked })}
                      style={{ width: 20, height: 20 }} />
               <div style={{ flex: 1 }}>
                 <span style={{ color: cor.navy }}>

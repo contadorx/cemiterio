@@ -1,7 +1,7 @@
 # Build 4 — verdade financeira
 
-**Estado:** decisão tomada em 22/08/2026, implementada no razão, e as leituras
-migradas (11 arquivos). Faltam as escritas e o congelamento do razão antigo.
+**Estado:** decisão tomada em 22/08/2026, implementada no razão. Leituras (11
+arquivos) e escritas (13 funções + 1 lib) migradas. Falta o congelamento.
 
 > **A decisão, nas palavras da responsável:**
 > *"É a família, mas sempre tem um responsável financeiro."*
@@ -370,7 +370,195 @@ massa.** São duas implementações da mesma regra — uma por pessoa (a ficha),
 em lote (as listas). Se divergirem, a lista mostra um número e a ficha da mesma
 pessoa mostra outro, que é o sintoma exato que este build existiu para acabar.
 
-### 8.7 O que falta, na ordem
+### 8.7 O buraco que a própria 0071 abriu — e como ele foi achado
+
+A 0071 espelhou `movimentos` → `conta_corrente` em dois eventos: `insert` e
+`update of status_conc`. **Faltou o terceiro: apagar.**
+
+Isso só apareceu ao ir migrar as escritas. São **doze funções** que escrevem no
+razão antigo, e três delas apagam:
+
+| Função | O que apaga |
+|---|---|
+| `sureya_excluir_servico` | o débito do serviço excluído |
+| `sureya_desidentificar_entrada` | o crédito de uma entrada bancária desfeita |
+| `sureya_saldo_abertura` | a abertura anterior, antes de inserir a nova |
+
+Como `movimento_id` nasceu com `on delete set null`, apagar o movimento **não
+apagava o espelho** — só desligava o vínculo. A linha ficava em
+`conta_corrente` indistinguível de um lançamento nativo, e continuava pesando
+no saldo da família.
+
+#### Reproduzido em banco limpo, com a trilha inteira aplicada
+
+```
+(1) débito de 100,00, depois apagado
+      depois do insert   movimentos 1   conta_corrente 1   saldo −100,00
+      DEPOIS DO DELETE   movimentos 0   conta_corrente 1   saldo −100,00
+```
+
+Dívida fantasma: o lançamento não existe mais e a família continua devendo.
+
+O segundo é pior, porque é a operação normal de quem se corrige:
+
+```
+(2) a casa digita abertura de 500,00 e corrige para 300,00
+      razão antigo (movimentos)         −300,00   ← certo
+      razão da família (conta_corrente)  −800,00   ← as duas somadas
+```
+
+**Cobrança de 800,00 sobre uma dívida de 300,00.** E como as leituras já
+migraram (8.6), é o 800,00 que aparece na ficha.
+
+#### A correção: `migrations/0072_o_espelho_tambem_desfaz.sql`
+
+`movimento_id` passa a ser `on delete cascade`. Um gatilho `before delete`
+funcionaria igual, mas a chave estrangeira resolve isso de forma declarativa e
+sem depender de ordem de execução — e ordem de gatilho contra ação de chave é
+exatamente o tipo de detalhe que passa despercebido numa revisão. `cascade` diz
+o que é verdade: **linha espelhada não tem vida própria.**
+
+O gatilho de update também deixou de olhar só `status_conc`: passou a
+acompanhar `valor`, `data`, `descricao` e `tipo`. Hoje nenhuma função corrige o
+valor de um movimento — mas o dia em que uma corrigir, o espelho ficaria com o
+valor velho, calado.
+
+A view `sureya_espelhos_orfaos` lista candidatos a espelho abandonado e **não
+apaga nada**: apagar linha de dinheiro por heurística é pior que a doença. Hoje
+volta vazia.
+
+#### Por que isso agora roda no CI
+
+O placar prova que os **objetos** existem. Não prova que eles **se comportam** —
+e o espelho é a peça em que um erro não aparece como falha, e sim como número
+errado na ficha da família. Foi assim que o buraco do delete passou pela revisão.
+
+`testes/espelho.sql` roda dentro do `migrar-limpo`, em banco reconstruído do
+zero, e prova oito coisas a cada commit:
+
+```
+  ok  insert espelha no razao da familia
+  ok  delete leva o espelho junto
+  ok  abertura corrigida nao soma com a anterior
+  ok  correcao de valor chega no espelho
+  ok  comprovante a conferir NAO vira saldo
+  ok  conferido vira saldo
+  ok  lancamento nativo sobrevive
+  ok  um movimento, uma linha espelhada
+```
+
+Não dava para testar isso no `simular.ts`: o fake-supabase não executa gatilho.
+
+Na primeira execução o harness reprovou — e o errado era **ele**, não o produto:
+meu `ci_saldo()` somava tudo sem aplicar a regra de status, enquanto o espelho
+carregava `a_conferir` corretamente. O ajudante passou a usar a mesma regra do
+`calcularSaldo()`, para o SQL e o TypeScript não contarem dinheiro de jeitos
+diferentes.
+
+### 8.8 As escritas — `migrations/0073_uma_porta_so_para_o_dinheiro.sql`
+
+Treze funções escreviam em `movimentos`. Depois da 0073, **nenhuma escreve**
+dinheiro lá.
+
+#### Por que a mudança teve de ser estrutural, e por que agora
+
+Cinco tabelas apontavam para `movimentos` por chave estrangeira —
+`entradas_banco`, `lancamentos`, `pedidos_extras`, `quitacoes` (duas) e o
+auto-vínculo de estorno. Congelar sem repontar quebraria conciliação bancária,
+pedidos extras e quitação. Não era opcional.
+
+O custo foi medido antes: **todas vazias de vínculo.** Zero linhas para migrar.
+Daqui a seis meses cada uma dessas chaves é uma conversa.
+
+#### A porta única
+
+Treze funções montavam o próprio `insert`. Foi assim que
+`sureya_saldo_abertura` acabou gravando uma origem diferente da outra porta que
+faz a mesma coisa — ninguém compara treze inserts. Agora existe
+`sureya_lancar()`: quem lança diz **o que** está lançando, a porta resolve a
+família, valida e grava.
+
+#### Quatro defeitos que só apareceram ao escrever isto
+
+**1. A abertura gravava a origem errada.** `sureya_saldo_abertura` escrevia
+`ajuste`; a outra porta escreve `abertura`. E `ehDoPeriodo()` — a regra de 8.6,
+que impede saldo de abertura de virar "trabalho do mês" — só exclui `abertura`.
+Bastava usar a ficha uma vez para 240,00 de história entrarem no relatório do
+mês como limpeza executada.
+
+**2. A abertura era "por família" só no comentário.** O filtro era
+`cliente_id` — a pessoa. Pai e filha podiam ter cada um o seu saldo de abertura,
+e os dois somavam no razão da família.
+
+**3. Cinco colunas à deriva.** `entradas_banco.documento`, `.banco`,
+`.identificada_por`, `lancamentos.cliente_id`, `.movimento_id` — existem em
+produção e em migration nenhuma. `identificada_por` é a séria:
+`sureya_identificar_entrada` grava nela, então num ambiente reconstruído do
+repositório identificar uma entrada bancária falhava inteira. O placar não
+pegaria: ele conta tabelas, funções, gatilhos e policies, **não colunas**. Só
+apareceram porque as portas passaram a ser chamadas de verdade no CI.
+
+**4. O contrato de nomes, quase quebrado por mim.** Renomeei as colunas de saída
+de `sureya_entrada_identificada` — e a rota lê `r.r_entrada`. Nada teria dado
+erro: os campos chegariam `undefined` e a tela mostraria uma entrada sem id, em
+silêncio. Restaurei os nomes e travei o contrato num teste.
+
+#### E a lavagem: a pergunta de 8.9 já tinha sido respondida por um índice
+
+A 0066 desenhou dois lançamentos por limpeza, de propósito:
+
+```
+movimentos       débito de v_valor   "Limpeza executada"
+conta_corrente   débito de ZERO      "Limpeza realizada"
+```
+
+e escreveu o porquê: *"valor zero, de propósito. Quem gera a dívida é a
+competência. Se a lavagem também lançasse valor, a família seria cobrada duas
+vezes."*
+
+Só que a 0071 pôs um espelho entre as duas, e `uq_conta_corrente_lavagem` só
+admite uma linha `lavagem` por serviço. A ordem dentro da função é débito
+primeiro, extrato depois. Medido em banco limpo, depois de uma limpeza de 55,00:
+
+```
+linhas  valor  descricao            veio_do_espelho
+     1  55.00  Limpeza executada    t
+```
+
+A linha de valor zero **nunca chega**. O que fica é o que o comentário da 0066
+mandava evitar — decidido por um índice único, sem ninguém escolher.
+
+Isso não deu prejuízo porque **as 298 famílias estão em `modo_cobranca =
+consumo`**, e em consumo a limpeza deve mesmo virar dívida: o acidente acertou o
+número pelo motivo errado. No dia em que alguém marcar `competencia`, a limpeza
+lança e o fechamento lança de novo.
+
+Agora o valor depende do modo, que é o que `familias.modo_cobranca` sempre
+significou:
+
+| modo | a limpeza |
+|---|---|
+| `consumo` | lança o valor — comportamento de hoje, agora **dito** |
+| `competencia` | lança zero — a intenção da 0066, agora alcançável |
+
+Nada muda para nenhuma família existente.
+
+#### O CI ganhou 43 provas e um guarda
+
+`testes/escritas.sql` exercita cada porta de dinheiro num banco do zero e cobra
+o **efeito**, não a ausência de erro. E o harness passou a listar quem escreve
+em `movimentos`, falhando se aparecer um nome novo — é a condição do
+congelamento, verificada a cada commit.
+
+#### Por que o congelamento ainda não veio
+
+Duas funções ainda tocam `movimentos`, **de propósito**:
+`sureya_conciliar_comprovante` (mantém os dois lados iguais para as linhas
+antigas) e `sureya_excluir_servico` (limpa os dois). Enquanto as 2 linhas
+legadas existirem, congelar quebraria as duas. O congelamento é o passo
+seguinte, e é pequeno.
+
+### 8.9 O que falta, na ordem
 
 1. ~~**Migrar os arquivos** que ainda leem `movimentos`~~ — **feito (8.6)**. As
    leituras acabaram. Restam as **escritas**: uma em TypeScript
@@ -384,7 +572,7 @@ pessoa mostra outro, que é o sintoma exato que este build existiu para acabar.
    fechado.
 5. **O resto do glossário** (8.2), por escrito.
 
-### 8.8 Uma pergunta que ficou aberta
+### 8.10 Uma pergunta que ficou aberta
 
 `familias.modo_cobranca` separa dois mundos: `consumo` (cada lavagem vira
 dívida) e `competencia` (o mês vira dívida, a lavagem é só registro).

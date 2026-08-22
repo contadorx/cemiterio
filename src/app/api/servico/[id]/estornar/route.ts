@@ -38,6 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({
     ok: true,
     valorEstornado: Number(r.valor_estornado) || 0,
-    movimento: r.movimento_estorno || null,
+    // `lancamento_estorno` desde a 0073: o estorno passou a nascer no razao da
+    // familia. O nome do campo devolvido a tela continua `movimento` para nao
+    // quebrar quem ja consome.
+    movimento: r.lancamento_estorno || null,
   });
 }

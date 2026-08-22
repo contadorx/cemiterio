@@ -55,33 +55,35 @@ export async function registrarComprovante(
 
   const comprovanteId = (comp as any).id as string;
 
-  // POR QUE ESTA ESCRITA CONTINUA EM `movimentos`
+  // A ULTIMA PORTA DE DINHEIRO A SAIR DO RAZAO ANTIGO.
   //
-  // A decisao de 22/08 fez de `conta_corrente` a fonte da verdade, e todas as
-  // LEITURAS ja migraram. As escritas nao migraram ainda — e nao precisam
-  // migrar de uma vez, porque o gatilho `trg_espelha_movimento_na_conta`
-  // (0071) leva cada linha daqui para o razao da familia, com `movimento_id`
-  // preenchido, sem duplicar. O `status_conc: "a_conferir"` viaja junto: o
-  // comprovante NAO vira saldo antes de alguem conferir, nos dois razoes.
+  // Ate a 0073, esta escrita ia para `movimentos` e chegava ao razao da familia
+  // pelo gatilho de espelho. Agora vai direto, pela mesma porta que as treze
+  // funcoes SQL usam (`sureya_lancar`) — e com isso NADA mais escreve em
+  // `movimentos`, que e a condicao para congela-lo.
   //
-  // Migrar a escrita e o passo do congelamento de `movimentos`, e so pode
-  // acontecer depois que nenhuma outra porta escrever la — hoje sao esta e as
-  // funcoes SQL. Enquanto isso, o gatilho e o que mantem os dois iguais.
+  // O `a_conferir` e o ponto inteiro desta funcao: comprovante que a familia
+  // manda no WhatsApp NAO e dinheiro ate alguem bater com o extrato. Ele entra
+  // no razao marcado, aparece como "a conferir" na ficha, e so vira saldo
+  // quando `sureya_conciliar_comprovante` aprovar.
   //
   // Só cria a pendência de crédito se tem valor lido.
   if (dados.valor && dados.valor > 0) {
-    const { error: e2 } = await db.from("movimentos").insert({
-      org_id: org,
-      cliente_id: clienteId,
-      tipo: "credito",
-      valor: dados.valor,
-      origem: "pix_comprovante",
-      comprovante_id: comprovanteId,
-      status_conc: "a_conferir",
-      descricao: "Comprovante de Pix (aguardando conferência)",
-      data: dados.data || diaOperacao(),
+    const { error: e2 } = await db.rpc("sureya_lancar", {
+      p_cliente: clienteId,
+      p_tipo: "credito",
+      p_valor: dados.valor,
+      p_origem: "pagamento",
+      p_descricao: "Comprovante de Pix (aguardando conferência)",
+      p_data: dados.data || diaOperacao(),
+      p_status: "a_conferir",
+      p_comprovante: comprovanteId,
     });
-    if (e2) console.error("[conciliacao] movimento pendente falhou:", e2.message);
+    // NAO derruba o comprovante se o lancamento falhar: a imagem ja esta
+    // guardada e a conferencia manual continua possivel. Mas o erro tem de
+    // aparecer no log — foi um `catch` mudo como este que escondeu, por meses,
+    // o extrato da familia nunca funcionando.
+    if (e2) console.error("[conciliacao] lancamento pendente falhou:", e2.message);
   }
 
   return { comprovanteId };

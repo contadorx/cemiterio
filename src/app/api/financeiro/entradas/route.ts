@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     // entrada do banco identificada = dinheiro recebido: mesma regra da ficha
     const reguaZerada = await zerarReguaSeQuitou(b.clienteId);
     return NextResponse.json({
-      ok: true, id: r.r_entrada, movimento: r.r_movimento,
+      ok: true, id: r.r_entrada, movimento: r.r_lancamento,
       quitados: r.r_quitados || 0, sobrou: Number(r.r_sobrou) || 0, reguaZerada,
     });
   }
