@@ -18,6 +18,12 @@ import { Cartao, Selo, dinheiro } from "./pecas";
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho",
                "julho","agosto","setembro","outubro","novembro","dezembro"];
 
+/** 2026-08-31 -> "31/08/2026". Sem `new Date`, que muda o dia por fuso. */
+function dataCurta(iso: string) {
+  const [a, m, d] = String(iso).slice(0, 10).split("-");
+  return `${d}/${m}/${a}`;
+}
+
 function competenciaAtual() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -60,21 +66,35 @@ export default function Painel() {
       </div>
 
       {/* Três números e nada mais no topo: o que falta fazer, o que falta
-          entrar, e quanto isso soma. */}
+          entrar, e quanto isso soma.
+
+          A LINHA DE BAIXO NÃO É ENFEITE. Os três números falavam de tempos
+          diferentes sem dizer: "falta limpar" era o mês escolhido, "falta pagar"
+          era hoje. A auditoria reprovou (CA-02) pedindo que a interface declare
+          o momento. Agora os três são do mesmo instante, e a tela diz qual. */}
       {r && (
-        <div className="mb-4 grid grid-cols-3 gap-3 rounded-xl2 bg-brand p-4 text-sobre">
-          <div>
-            <p className="text-[26px] font-semibold leading-tight">{r.faltaLimpar}</p>
-            <p className="text-[12px] opacity-75">falta limpar</p>
+        <div className="mb-4 rounded-xl2 bg-brand p-4 text-sobre">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-[26px] font-semibold leading-tight">{r.faltaLimpar}</p>
+              <p className="text-[12px] opacity-75">falta limpar</p>
+            </div>
+            <div>
+              <p className="text-[26px] font-semibold leading-tight">{r.faltaPagar}</p>
+              <p className="text-[12px] opacity-75">falta pagar</p>
+            </div>
+            <Link href="/painel/financeiro" className="block">
+              <p className="text-[26px] font-semibold leading-tight">{dinheiro(r.emAberto)}</p>
+              <p className="text-[12px] opacity-75">em aberto →</p>
+            </Link>
           </div>
-          <div>
-            <p className="text-[26px] font-semibold leading-tight">{r.faltaPagar}</p>
-            <p className="text-[12px] opacity-75">falta pagar</p>
-          </div>
-          <Link href="/painel/financeiro" className="block">
-            <p className="text-[26px] font-semibold leading-tight">{dinheiro(r.emAberto)}</p>
-            <p className="text-[12px] opacity-75">em aberto →</p>
-          </Link>
+          {dados?.saldoEm && (
+            <p className="mt-3 border-t border-white/20 pt-2 text-[11px] opacity-70">
+              {dados.mesFechado
+                ? `Posição de ${dataCurta(dados.saldoEm)} — como a conta fechou em ${mesNome}.`
+                : `Posição de hoje — ${mesNome} ainda está em andamento.`}
+            </p>
+          )}
         </div>
       )}
 

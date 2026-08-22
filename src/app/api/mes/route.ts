@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { calcularSaldosPorFamilia } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 
@@ -31,13 +32,21 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("competencia") ||
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-01`;
 
-  // Limites do mês pedido, para filtrar as limpezas.
+  // Limites do mês pedido. `fim` é o primeiro dia do mês seguinte (as limpezas
+  // usam `< fim`); `ultimoDia` é o último dia DESTE mês, que é onde a foto do
+  // saldo é tirada.
   const inicio = competencia;
   const d = new Date(competencia + "T12:00:00");
   d.setMonth(d.getMonth() + 1);
   const fim = d.toISOString().slice(0, 10);
+  const ultimoDia = new Date(d.getTime() - 86400000).toISOString().slice(0, 10);
 
-  const [famRes, tumRes, servRes, ccRes] = await Promise.all([
+  // A competência é do passado se o mês já acabou. Só então a palavra
+  // "fechamento" quer dizer alguma coisa.
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  const mesFechado = ultimoDia < hojeStr;
+
+  const [famRes, tumRes, servRes] = await Promise.all([
     db.from("familias").select("id,nome,contratado").eq("org_id", org).order("nome"),
     db.from("tumulos").select("id,familia_id,contratado,codigo,ruas(nome),quadras(codigo)").eq("org_id", org),
     db.from("servicos")
@@ -45,22 +54,26 @@ export async function GET(req: NextRequest) {
       .eq("org_id", org)
       .gte("data_executada", inicio)
       .lt("data_executada", fim),
-    db.from("conta_corrente").select("familia_id,tipo,valor,origem").eq("org_id", org),
   ]);
 
   const familias = (famRes.data || []) as any[];
   const tumulos = (tumRes.data || []) as any[];
   const servicos = (servRes.data || []) as any[];
-  const lancamentos = (ccRes.data || []) as any[];
 
-  // Saldo por família. Os registros de LAVAGEM ficam de fora: eles têm valor
-  // zero e existem só para acompanhar o serviço no extrato.
-  const saldo = new Map<string, number>();
-  for (const l of lancamentos) {
-    if (l.origem === "lavagem") continue;
-    const v = Number(l.valor);
-    saldo.set(l.familia_id, (saldo.get(l.familia_id) || 0) + (l.tipo === "debito" ? v : -v));
-  }
+  // O SALDO É O DO FIM DA COMPETÊNCIA ESCOLHIDA — não o de hoje (CA-02).
+  //
+  // Esta rota filtrava as limpezas pelo mês e somava o saldo INTEIRO, sem corte
+  // de data. Abrir julho em setembro mostrava as limpezas de julho ao lado da
+  // dívida de setembro, na mesma linha. A auditoria reprovou com essas palavras:
+  // "misturando tempos na mesma linha".
+  //
+  // E a soma era uma terceira cópia da regra, que já divergia em três pontos —
+  // um deles quebrado pela 0073, quando a lavagem passou a carregar valor no
+  // modo `consumo`. Agora quem soma é `calcularSaldosPorFamilia`, com `ate`.
+  const saldos = await calcularSaldosPorFamilia(
+    familias.map((f: any) => f.id),
+    { ate: ultimoDia },
+  );
 
   // Limpezas do mês por túmulo.
   const limpezasPorTumulo = new Map<string, number>();
@@ -82,7 +95,11 @@ export async function GET(req: NextRequest) {
     const meus = tumulosPorFamilia.get(f.id) || [];
     const contratados = meus.filter((t) => t.contratado);
     const limpos = contratados.filter((t) => (limpezasPorTumulo.get(t.id) || 0) > 0).length;
-    const s = Math.round((saldo.get(f.id) || 0) * 100) / 100;
+    // Sinal canônico do sistema: negativo = em aberto. Esta rota usava o
+    // inverso (débito positivo), que era uma quarta convenção só dela. Aqui
+    // vira `devendo`, positivo, só na hora de exibir.
+    const conta = saldos.get(f.id) || { saldo: 0, aConferir: 0 };
+    const s = Math.round(-conta.saldo * 100) / 100;
 
     return {
       familiaId: f.id,
@@ -96,6 +113,7 @@ export async function GET(req: NextRequest) {
       limpezaOk: contratados.length > 0 && limpos >= contratados.length,
       semPlano: !f.contratado,
       saldo: s,
+      aConferir: conta.aConferir,
       pagamentoOk: s <= 0.005,
       frase: s <= 0.005 ? "Em dia" : `Em aberto · ${dinheiro(s)}`,
       local: meus[0]
@@ -111,6 +129,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     competencia,
+    // A TELA PRECISA PODER DIZER DE QUANDO É O NÚMERO.
+    // Sem isto, "falta pagar" continua ambíguo mesmo com a conta certa — e a
+    // auditoria pede exatamente que a interface declare o momento.
+    saldoEm: ultimoDia,
+    mesFechado,
     linhas,
     resumo: {
       familias: linhas.length,
