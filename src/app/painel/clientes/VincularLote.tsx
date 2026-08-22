@@ -34,7 +34,11 @@ type Orfao = {
   criadoEm: string | null;
 };
 
-type Familia = { id: string; nome: string; telefone: string | null; quadras: string[] };
+type Familia = {
+  id: string; nome: string; telefone: string | null; quadras: string[];
+  /** A família existe e ainda não se sabe com quem falar (0091). */
+  semContato?: boolean;
+};
 
 type Atrib = {
   modo: "existente" | "nova";
@@ -117,10 +121,15 @@ export default function VincularLote({ onMudou }: { onMudou?: () => void }) {
 
   const idsMarcados = Object.keys(marcados).filter((id) => visiveis.some((o) => o.id === id));
 
-  // um item só está pronto quando dá para saber de quem é o jazigo
+  // Um item só está pronto quando dá para saber de QUAL FAMÍLIA é o jazigo.
+  //
+  // O telefone saiu da conta (0091). Era ele a parede: 81 dos 204 jazigos
+  // capturados no campo são de famílias de quem a Sureya ainda não tem número,
+  // e exigir o telefone deixava todos parados esperando algo que talvez nunca
+  // chegue. Nome da família basta; o contato entra quando aparecer.
   function pronto(id: string): boolean {
     const a = pegar(id);
-    if (a.modo === "nova") return !!a.novoNome.trim() && !!a.novoTel.trim();
+    if (a.modo === "nova") return !!a.novoNome.trim();
     return !!a.clienteId;
   }
   const prontos = idsMarcados.filter(pronto);
@@ -135,7 +144,7 @@ export default function VincularLote({ onMudou }: { onMudou?: () => void }) {
       const o = orfaos.find((x) => x.id === id);
       const item: any = { tumuloId: id };
       if (a.modo === "nova") item.novaFamilia = { nome: a.novoNome.trim(), telefone: a.novoTel.trim() };
-      else item.clienteId = a.clienteId;
+      else item.familiaId = a.clienteId;   // `clienteId` no estado é o id da FAMÍLIA desde a 0091
 
       if (a.freq >= 0) {
         const at = ATALHOS_FREQUENCIA[a.freq];
@@ -540,20 +549,33 @@ function Cartao({
             )}
           </>
         ) : (
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
-            <input
-              style={painel.input}
-              placeholder="Nome da família"
-              value={atrib.novoNome}
-              onChange={(e) => onMudar({ novoNome: e.target.value })}
-            />
-            <input
-              style={painel.input}
-              placeholder="WhatsApp com DDD"
-              inputMode="tel"
-              value={atrib.novoTel}
-              onChange={(e) => onMudar({ novoTel: e.target.value })}
-            />
+          <div>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+              <input
+                style={painel.input}
+                placeholder="Nome da família"
+                value={atrib.novoNome}
+                onChange={(e) => onMudar({ novoNome: e.target.value })}
+              />
+              {/* O TELEFONE VIROU OPCIONAL (0091), e o rótulo diz isso.
+                  Um campo que parece obrigatório é obrigatório na prática: quem
+                  não tem o número desiste da linha inteira em vez de cadastrar
+                  a família e voltar depois — que é exatamente o que trancou 81
+                  jazigos. */}
+              <input
+                style={painel.input}
+                placeholder="WhatsApp com DDD (se tiver)"
+                inputMode="tel"
+                value={atrib.novoTel}
+                onChange={(e) => onMudar({ novoTel: e.target.value })}
+              />
+            </div>
+            {!atrib.novoTel.trim() && !!atrib.novoNome.trim() && (
+              <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 2px 0", lineHeight: 1.45 }}>
+                Sem telefone a família é criada assim mesmo, e o jazigo fica ligado a ela.
+                As limpezas <b>viram cobrança normalmente</b> — o contato entra quando aparecer.
+              </p>
+            )}
           </div>
         )}
 

@@ -1289,43 +1289,208 @@ function Identificacao({ c, aoMudar }: { c: any; aoMudar: () => void }) {
 /* ------------------------------------------------------------------ */
 
 /**
- * AS PESSOAS DA FAMÍLIA.
+ * OS CONTATOS DA FAMÍLIA, E QUEM ACERTA A CONTA.
  *
- * Uma família pode ter vários cadastros: o filho que paga, a neta que
- * acompanha. Só aparece quando há mais de uma — com uma só, não ocupa espaço.
+ * O QUE MUDOU E POR QUÊ (migration 0091)
+ * ---------------------------------------------------------------------------
+ * Este cartão se chamava "Pessoas da família" e só LISTAVA — e só aparecia
+ * quando havia mais de uma pessoa. Fazia sentido enquanto a família era o
+ * apelido de um contato: 298 famílias, 298 contatos, um para um.
+ *
+ * Agora a família é a entidade, e duas coisas que ela não fazia viraram o
+ * trabalho do dia:
+ *
+ *   · **acrescentar um contato** a uma família que ainda não tem nenhum — é o
+ *     caminho de volta dos jazigos cadastrados sem telefone;
+ *   · **trocar quem paga**, com o motivo escrito. "Tem família que o contato
+ *     financeiro muda ano após ano", e a troca precisa deixar rastro: a
+ *     pergunta que aparece depois é sobre o passado — "para quem foi a cobrança
+ *     de março?".
+ *
+ * Por isso ele aparece SEMPRE, inclusive com zero contato: é justamente aí que
+ * há trabalho a fazer.
  */
 function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
-  const [lista, setLista] = useState<any[]>([]);
+  const [dados, setDados] = useState<any>(null);
+  const [abrindo, setAbrindo] = useState(false);
+  const [novo, setNovo] = useState({ nome: "", telefone: "" });
+  const [trocando, setTrocando] = useState(false);
+  const [escolha, setEscolha] = useState<string>("");
+  const [motivo, setMotivo] = useState("");
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [verHistorico, setVerHistorico] = useState(false);
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
     if (!familiaId) return;
-    fetch(`/api/clientes?familiaId=${familiaId}`)
+    fetch(`/api/familias/${familiaId}/contatos`)
       .then((x) => x.json())
-      .then((r) => { if (r?.ok) setLista(r.clientes || []); })
+      .then((r) => {
+        if (!r?.ok) return;
+        setDados(r);
+        setEscolha(r.familia?.responsavelId || "");
+      })
       .catch(() => {});
   }, [familiaId]);
 
-  if (!familiaId || lista.length <= 1) return null;
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (!familiaId || !dados) return null;
+
+  const contatos = dados.contatos || [];
+  const historico = dados.historico || [];
+  const semContato = !dados.familia?.responsavelId;
+
+  async function agir(corpo: any) {
+    setOcupado(true); setErro("");
+    try {
+      const r = await fetch(`/api/familias/${familiaId}/contatos`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      }).then((x) => x.json());
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return false; }
+      carregar();
+      return true;
+    } finally { setOcupado(false); }
+  }
 
   return (
-    <Cartao titulo="Pessoas da família">
-      {lista.map((p: any) => (
+    <Cartao
+      titulo="Contatos da família"
+      acao={
+        <Botao onClick={() => setAbrindo((x) => !x)}>
+          <Plus size={16} /> Contato
+        </Botao>
+      }
+    >
+      {/* SEM CONTATO NÃO É ERRO — é uma família cadastrada de quem ainda não se
+          tem telefone, que era o caso de 81 jazigos. Mas precisa aparecer, ou a
+          Sureya descobre pela cobrança que nunca chega. */}
+      {semContato && (
+        <p className="mb-3 rounded-lg border border-aviso/30 bg-aviso/10 p-3 text-[14px] leading-relaxed text-aviso">
+          <b>Esta família ainda não tem com quem falar.</b> As limpezas continuam
+          sendo registradas e cobradas normalmente — mas nada é enviado, porque
+          não há para quem.
+        </p>
+      )}
+
+      {abrindo && (
+        <div className="mb-3 rounded-lg bg-surface p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo rotulo="Nome">
+              <Entrada value={novo.nome} onChange={(e: any) => setNovo({ ...novo, nome: e.target.value })} />
+            </Campo>
+            <Campo rotulo="WhatsApp com DDD">
+              <Entrada inputMode="tel" value={novo.telefone}
+                       onChange={(e: any) => setNovo({ ...novo, telefone: e.target.value })} />
+            </Campo>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Botao tom="principal" disabled={ocupado || !novo.nome.trim() || !novo.telefone.trim()}
+                   onClick={async () => {
+                     if (await agir({ acao: "novo", ...novo })) {
+                       setNovo({ nome: "", telefone: "" }); setAbrindo(false);
+                     }
+                   }}>
+              {ocupado ? "Salvando…" : "Acrescentar"}
+            </Botao>
+            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+          {semContato && (
+            <p className="mt-2 text-[13px] text-ink-soft">
+              Sendo o primeiro, ele já passa a ser quem acerta a conta.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!contatos.length && !abrindo && (
+        <p className="text-[14px] text-ink-soft">Nenhum contato cadastrado.</p>
+      )}
+
+      {contatos.map((p: any) => (
         <div key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0">
           <div className="min-w-0">
             <p className="text-[15px] text-ink">
               {p.nome}
               {p.id === atualId && <span className="text-ink-soft"> · esta ficha</span>}
             </p>
-            <p className="text-[13px] text-ink-soft">
-              {p.telefone}{p.parentesco ? ` · ${p.parentesco}` : ""}
-            </p>
+            <p className="text-[13px] text-ink-soft">{p.telefone}</p>
           </div>
           <div className="flex flex-shrink-0 gap-1.5">
-            {p.responsavel_financeiro && <Selo tom="bom">paga</Selo>}
-            {p.recebe_fotos && <Selo tom="neutro">recebe fotos</Selo>}
+            {p.paga && <Selo tom="bom">acerta a conta</Selo>}
+            {p.recebeFotos && <Selo tom="neutro">recebe fotos</Selo>}
           </div>
         </div>
       ))}
+
+      {/* QUEM ACERTA A CONTA — a troca, com o motivo.
+          O motivo não é burocracia: é o que responde "por que a cobrança
+          mudou de pessoa?" seis meses depois, quando alguém pergunta. */}
+      {!!contatos.length && (
+        <div className="mt-3 border-t border-line pt-3">
+          {!trocando ? (
+            <button className="text-[14px] text-ink-soft underline decoration-dotted hover:text-brand"
+                    onClick={() => setTrocando(true)}>
+              Trocar quem acerta a conta
+            </button>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Campo rotulo="Quem acerta a conta">
+                  <Selecao value={escolha} onChange={(e: any) => setEscolha(e.target.value)}>
+                    {/* "Ninguém por enquanto" é escolha legítima, não um campo
+                        vazio: a família pode ficar sem contato de propósito. */}
+                    <option value="">ninguém por enquanto</option>
+                    {contatos.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.nome}</option>
+                    ))}
+                  </Selecao>
+                </Campo>
+                <Campo rotulo="Por quê" dica="fica no histórico">
+                  <Entrada value={motivo} placeholder="ex.: este ano quem acerta é a filha"
+                           onChange={(e: any) => setMotivo(e.target.value)} />
+                </Campo>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Botao tom="principal" disabled={ocupado}
+                       onClick={async () => {
+                         if (await agir({ acao: "quem_paga", clienteId: escolha || null, motivo })) {
+                           setMotivo(""); setTrocando(false);
+                         }
+                       }}>
+                  {ocupado ? "Salvando…" : "Salvar"}
+                </Botao>
+                <Botao onClick={() => { setTrocando(false); setEscolha(dados.familia?.responsavelId || ""); }}>
+                  Cancelar
+                </Botao>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+
+      {historico.length > 1 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <button className="text-[14px] text-ink-soft underline decoration-dotted hover:text-brand"
+                  onClick={() => setVerHistorico((v) => !v)}>
+            {verHistorico ? "Esconder o histórico" : `Histórico de quem acertou a conta (${historico.length})`}
+          </button>
+          {verHistorico && (
+            <div className="mt-2">
+              {historico.map((h: any) => (
+                <p key={h.id} className="border-t border-line py-2 text-[13px] text-ink-soft first:border-t-0">
+                  <b className="text-ink">{h.quem || "ninguém"}</b>
+                  {" desde "}{String(h.desde).slice(8, 10)}/{String(h.desde).slice(5, 7)}/{String(h.desde).slice(0, 4)}
+                  {h.motivo && <> — {h.motivo}</>}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </Cartao>
   );
 }

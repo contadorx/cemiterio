@@ -269,3 +269,56 @@ povoamento: bloco resolve hoje e quebra na próxima organização. A lista de te
 mora numa função só (`sureya_semear_textos`), que o gatilho e o povoamento das
 antigas chamam — duas cópias da lista neste repositório seria o começo de duas
 listas diferentes.
+<<<<<<< Updated upstream
+=======
+
+---
+
+## D-10 · A família é a entidade; o contato é uma consequência
+
+**O que ele disse, 22/08:** *"Tenho o jazigo e tenho família, e família é um
+contato — o problema é que por vezes eu não tenho o contato. Preciso que a
+família seja o NOME da família e que tenha contatos abaixo dela, que podem ou
+não existir. Nos contatos tenho que ter um contato financeiro, que pode mudar ao
+longo do tempo."*
+
+**O que o banco dizia:** 298 famílias e **298 contatos — um para um, exato**. Não
+era coincidência: `sureya_familia_para_cliente` (0062) criava uma família a cada
+contato que nascia sem uma, batizada com o sobrenome dele. A família não era uma
+entidade — era o apelido de um contato. E como `clientes.telefone` é NOT NULL,
+**não havia caminho para cadastrar a família de quem não se tem telefone**. Daí
+81 dos 204 jazigos capturados no campo, parados.
+
+**A inversão (0091):**
+
+| | antes | agora |
+|---|---|---|
+| quem nasce primeiro | o contato | a **família**, só com o nome |
+| o jazigo aponta para | o contato | a **família** |
+| `tumulos.cliente_id` | o vínculo | campo **derivado** — o contato financeiro atual, mantido pelo banco |
+| quem paga | um booleano no contato | `familias.responsavel_id` + **log com data e motivo** |
+
+`cliente_id` não sumiu de propósito: virar campo derivado é o que faz todo o
+código que já o lê continuar funcionando, sem reescrever o sistema para o
+cadastro destravar hoje.
+
+**O efeito invisível que isto obrigou a consertar.**
+`sureya_concluir_lavagem` decidia lançar o débito com
+`if v_s.cliente_id is not null`. Família sem contato → `cliente_id` nulo → a
+limpeza aconteceria, a foto sairia, e **a cobrança não existiria**, calada.
+Quando o contato aparecesse meses depois, o histórico estaria vazio.
+
+A dívida é da **família** desde a 0071 (D-01), e `conta_corrente.familia_id` já
+era NOT NULL enquanto `cliente_id` era anulável: o teste certo sempre foi a
+família. Corrigido — e é a conferência mais importante de
+`testes/familia_sem_contato.sql`.
+
+**Por substituição, e não recopiando a função.** São 274 linhas; copiá-las para
+a migration cria uma segunda cópia no repositório, e cópia envelhece em
+silêncio — a deriva que este banco já pagou caro três vezes. A migration lê a
+definição viva, troca a condição e falha se não reconhecer o texto original.
+
+**O log existe porque "muda ano após ano" é um fato com data.** Um campo sozinho
+só sabe o presente, e a pergunta que aparece é sempre sobre o passado: *para quem
+foi a cobrança de março?*
+>>>>>>> Stashed changes

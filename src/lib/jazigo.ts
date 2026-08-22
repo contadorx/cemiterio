@@ -371,3 +371,42 @@ export function explicarErroJazigo(erro: string, detalhe?: string): string {
       return erro;
   }
 }
+
+/**
+ * VINCULAR UM JAZIGO A UMA FAMÍLIA — sem passar por contato nenhum.
+ *
+ * `anexarJazigo` acima pede um `clienteId`, porque o sistema nasceu
+ * contato-primeiro: a família era o apelido de uma pessoa. A partir da 0091 a
+ * família é a entidade, e existe sem contato — foi o que travou 81 jazigos
+ * capturados no campo, de quem a Sureya ainda não tem telefone.
+ *
+ * Aqui só se grava `familia_id`. Quem preenche `cliente_id` é o gatilho
+ * `trg_jazigo_herda_familia`, que o deriva do contato financeiro da família —
+ * e o deixa nulo quando ela ainda não tem um. Ou seja: o campo derivado
+ * continua certo sem ninguém ter de lembrar dele.
+ */
+export async function vincularJazigoAFamilia(
+  db: SupabaseClient,
+  org: string,
+  familiaId: string,
+  tumuloId: string,
+): Promise<ResultadoJazigo> {
+  const { data: alvo } = await db
+    .from("tumulos").select("id,familia_id").eq("id", tumuloId).eq("org_id", org).maybeSingle();
+  if (!alvo) return { ok: false, erro: "jazigo_nao_encontrado" };
+
+  const dona = (alvo as any).familia_id as string | null;
+  if (dona && dona !== familiaId) {
+    // NÃO ROUBA. Mesma regra da porta antiga: devolve o nome de quem é, para a
+    // tela poder explicar em vez de só recusar.
+    const { data: outra } = await db
+      .from("familias").select("nome").eq("id", dona).maybeSingle();
+    return { ok: false, erro: "jazigo_de_outra_familia", detalhe: (outra as any)?.nome || undefined };
+  }
+
+  const { error } = await db
+    .from("tumulos").update({ familia_id: familiaId }).eq("id", tumuloId).eq("org_id", org);
+  if (error) return { ok: false, erro: error.message };
+
+  return { ok: true, tumuloId, reaproveitado: dona === familiaId };
+}

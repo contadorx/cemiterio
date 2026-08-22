@@ -163,6 +163,23 @@ preço praticado. Os dois dependem de você, não de código.
 qualquer descuido que ligue `ativo` publica isso. Precisa do nome oficial, do
 bairro e da confirmação da cidade antes de virar página.
 
+<<<<<<< Updated upstream
+=======
+**v) O gatilho que cria família a partir do contato continua ligado.**
+`sureya_familia_para_cliente` (0062) ainda batiza uma família nova a cada contato
+que nasce sem `familia_id` — é o que mantinha o um-para-um. Depois da 0091 ele
+não atrapalha (contato criado dentro de uma família já traz `familia_id`), mas
+uma porta que ainda crie contato solto continua gerando família automática com
+nome deduzido. Vale revisar quando as portas de cadastro estiverem todas
+família-primeiro.
+
+**w) `tumulos.cliente_id` é campo derivado e ninguém sabe disso lendo o código.**
+Desde a 0091 quem manda é `familia_id`, e `cliente_id` é preenchido por gatilho a
+partir do contato financeiro. As leituras existentes continuam certas, mas uma
+escrita direta em `cliente_id` seria sobrescrita na próxima troca de responsável
+sem aviso. Um `comment on column` já ajudaria; o certo é ir tirando as escritas.
+
+>>>>>>> Stashed changes
 **m) A remoção a pedido nunca foi exercitada.** É a etapa 4 do roteiro
 (`BUILD_7.md` §6) e vale fazer com uma família de teste **antes** da primeira
 real pedir.
