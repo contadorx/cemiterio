@@ -1,7 +1,9 @@
 # Build 6 — a fila lembra o que aconteceu
 
 **Estado:** outbox e alertas entregues e provados em banco limpo. `0076` e
-`0077` aplicadas em produção. Falta a tela e os itens de privacidade.
+`0077` aplicadas em produção. Entregas 1, 2, 5 e 6 feitas; a 3 foi encerrada por
+decisão (`DECISOES.md` D-03). Entrega 4 e 7 escritas (`POLITICA_DADOS.md`, `RUNBOOKS.md`); falta ensaiar a
+restauração e decidir os prazos de retenção.
 
 ---
 
@@ -110,14 +112,91 @@ ok  concluir duas vezes nao reabre nada
 
 **Total: 133 testes + 75 provas de comportamento em SQL.**
 
+
 ---
 
-## 5. O que falta do Build 6
+## 6. A tela da fila
 
-- **a tela** mostrar tentativas, último erro e "2 de 3 fotos já foram";
-- fila de liberação com antes/depois, data/hora, destinatário e jazigo (entrega 1);
-- confirmar descarte e oferecer desfazer (entrega 2, metade);
-- **buckets privados com URL assinada** (entrega 3) — hoje as fotos são públicas
-  por URL, e é o item de privacidade mais sério do build;
-- política de retenção/exclusão/consentimento LGPD (entrega 4);
-- runbooks de deploy, rollback, rotação de segredos e restauração (entrega 7).
+### 6.1 O cartão dizia menos do que sabia
+
+| O roadmap pede (entrega 1) | O que a tela fazia |
+|---|---|
+| antes/depois | duas fotos lado a lado, **sem dizer qual é qual** |
+| data/hora | não mostrava |
+| família **e** destinatário | `para \|\| familia` — colapsava os dois num nome só |
+| jazigo | só quadra/rua, não a identificação |
+
+O colapso de família e destinatário é o que mais custa: quando a **neta** recebe
+a foto do jazigo da **avó**, a tela mostrava um nome e não dava para saber qual
+dos dois era.
+
+### 6.2 O rótulo antes/depois não podia ser adivinhado
+
+`fotos` é montada como `[antes, depois]` com os nulos removidos (0066). Com duas
+fotos a ordem resolve. **Com uma só, a posição não diz nada** — pode ser um
+serviço sem foto do antes, ou sem a do depois.
+
+Adivinhar pela posição erraria o rótulo justamente no caso em que ele importa.
+Agora o rótulo vem do serviço, comparando a URL com `foto_antes_url` e
+`foto_depois_url`. Foto que não casa com nenhuma fica **sem rótulo**, em vez de
+receber um chute.
+
+### 6.3 O estado da última tentativa, no cartão
+
+A `0077` já guardava tudo; a tela não mostrava nada. Uma mensagem que falhou seis
+vezes ficava visualmente idêntica a uma que acabou de entrar na fila.
+
+Agora o cartão diz quantas tentativas, o erro, quando foi — e distingue
+**transitório** de **permanente** com cor e texto diferentes, porque a ação é
+diferente: um é "tente de novo", o outro é "alguém tem de mexer no cadastro".
+
+E quando há retomada, o botão muda de `Enviar com 3 fotos` para **`Continuar
+(faltam 1)`**, com a explicação ao lado: *"2 de 3 fotos já foram. Ao tentar de
+novo mando só as que faltam — a família não recebe repetido."*
+
+### 6.4 Descartar deixou de ser irreversível
+
+"Não enviar" ficava ao lado de "Enviar", do mesmo tamanho, e agia na hora. Sem
+confirmação, sem volta: a mensagem sumia da lista e a família nunca recebia,
+sem ninguém perceber.
+
+Agora pergunta antes, e depois oferece **desfazer** numa barra no topo — não
+dentro do cartão que acabou de sumir. A rota ganhou `acao: "restaurar"`, com
+`where status = 'descartado'`, que garante que isso nunca ressuscite algo já
+enviado.
+
+### 6.5 Uma coisa que o `id` quase deixou passar
+
+O bloco de restaurar entrou antes da validação de `id`. Sem mover a checagem
+para cima, um pedido sem `id` viraria `update ... .eq("id", undefined)` — que
+não é rejeitado do jeito que se espera. A validação passou a ser a primeira
+coisa do POST.
+
+---
+
+## 7. Uma observação sobre o portão do CI
+
+**O projeto não tem ESLint configurado** — não há `.eslintrc`, e o `next build`
+não roda lint. Os comentários `eslint-disable-next-line` espalhados pelo código
+são decorativos.
+
+Não é urgente e não foi mexido aqui, mas vale saber: o portão de qualidade hoje
+é tipagem + testes + build, não lint.
+
+---
+
+## 8. O que falta do Build 6
+
+- ~~a tela mostrar tentativas, último erro e "2 de 3 fotos já foram"~~ — **feito (6.3)**;
+- ~~antes/depois, data/hora, destinatário e jazigo (entrega 1)~~ — **feito (6.1, 6.2)**;
+- ~~confirmar descarte e oferecer desfazer (entrega 2)~~ — **feito (6.4)**;
+- ~~buckets privados com URL assinada (entrega 3)~~ — **encerrada por decisão**
+  (`DECISOES.md` D-03): as fotos ficam com link público, porque a família é
+  idosa e qualquer passo a mais desequilibra o acesso. Medido: a listagem do
+  balde já é bloqueada por RLS e os caminhos têm UUID, então o que se aceita é
+  "quem tem o link abre", não "qualquer um descobre";
+- ~~política de retenção/exclusão/consentimento LGPD (entrega 4)~~ — **escrita**
+  em `POLITICA_DADOS.md`, com o D-03 declarado e a lista do que a remoção não
+  alcança hoje. Falta **decidir** os prazos e implementá-los;
+- ~~runbooks (entrega 7)~~ — **escritos** em `RUNBOOKS.md`. Falta **ensaiar**:
+  restauração, rollback de migration e cópia do Storage (que não existe).

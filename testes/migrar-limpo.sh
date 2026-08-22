@@ -167,8 +167,11 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0067  +41  as restritivas que separam campo de administracao
 #   0074  +1   movimentos_congelado (RESTRICTIVE: o razao antigo vira historia)
 #   0075  +2   competencias_org e competencias_so_admin_escreve
+#   0079  +5   as restritivas de DELETE que faltavam (clientes, tumulos,
+#              membros, orgs, movimentos) — a 0067 tinha posto a guarda so no
+#              WITH CHECK, que o DELETE nao consulta
 # Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-44}
+POLICIES_DELTA=${POLICIES_DELTA:-49}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -180,10 +183,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-44}
 #             sureya_fechar_competencia, sureya_reabrir_competencia
 #   0077  +4  sureya_fila_reservar, sureya_fila_soltar, sureya_fila_concluir,
 #             sureya_fila_destravar
-# Saldo: +11. As demais migrations desta
+#   0078  +2  sureya_arquivos_do_cliente, sureya_expurgo_previa
+#   0080  +1  sureya_conferencia_cadastro
+# Saldo: +14. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-11}
+FUNCOES_DELTA=${FUNCOES_DELTA:-14}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

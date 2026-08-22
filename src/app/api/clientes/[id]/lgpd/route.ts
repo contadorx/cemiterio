@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { auditar } from "@/lib/auditoria";
 import { orgAtual } from "@/lib/org";
+import { apagarArquivos } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const acao = body?.acao;
 
   if (acao === "anonimizar") {
+    // O ARQUIVO SAI ANTES DO REGISTRO.
+    //
+    // `storage.objects` é uma tabela, e dá para apagar linha dela — mas isso
+    // remove só o registro. O arquivo continua no balde e continua abrindo pela
+    // URL pública (DECISOES.md D-03). Quem apaga de verdade é a API de Storage,
+    // que mora aqui.
+    //
+    // A ordem é deliberada: se o Storage falhar, a pessoa **não** é marcada
+    // como anonimizada. Devolver "não consegui remover as fotos, tente de novo"
+    // é melhor que registrar uma remoção que não aconteceu inteira — e um
+    // comprovante de remoção sobre arquivo que ficou é pior que não ter
+    // removido.
+    const { data: arquivos, error: eArq } = await db
+      .rpc("sureya_arquivos_do_cliente", { p_cliente: params.id });
+
+    if (eArq) {
+      return NextResponse.json(
+        { ok: false, erro: `nao consegui listar os arquivos: ${eArq.message}` },
+        { status: 500 },
+      );
+    }
+
+    const urls = ((arquivos || []) as any[]).map((a) => a.url).filter(Boolean);
+    const { removidos, falharam } = await apagarArquivos(db, urls);
+
+    if (falharam.length) {
+      return NextResponse.json({
+        ok: false,
+        erro: `Removi ${removidos} de ${urls.length} arquivos. ${falharam.length} não saíram, `
+            + `então NÃO marquei a pessoa como removida — os dados continuam como estavam. `
+            + `Tente de novo; se insistir, é preciso apagar esses arquivos à mão no Storage.`,
+        arquivosRestantes: falharam.slice(0, 20),
+      }, { status: 502 });
+    }
+
     const { error } = await db.rpc("sureya_anonimizar_cliente", { p_cliente: params.id });
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
     const org = await orgAtual(db);

@@ -318,6 +318,34 @@ async function rodar() {
          porFam.get("f-ant")!.aConferir === porPessoa.aConferir,
          `familia ${JSON.stringify(porFam.get("f-ant"))} x ficha ${JSON.stringify(porPessoa)}`);
 
+  // ---- REMOCAO NO STORAGE: a traducao de URL para caminho
+  //
+  // Se `caminhoDaUrl` errar, `apagarArquivos` nao apaga nada e devolve "removi
+  // 0 de 13" — a rota trata como falha, o que e certo. O perigo real e o
+  // contrario: uma traducao que ACERTA por acaso num formato e erra em outro,
+  // deixando arquivo para tras numa remocao que a tela deu como concluida.
+  const st = await import("../src/lib/storage");
+  const base = "https://abc.supabase.co/storage/v1/object/public";
+  checar("URL de servico vira caminho",
+         st.caminhoDaUrl(`${base}/servicos/org1/serv1/depois-123.jpg`, "servicos")
+           === "org1/serv1/depois-123.jpg");
+  checar("URL de comprovante vira caminho",
+         st.caminhoDaUrl(`${base}/comprovantes/org1/cli1/999.pdf`, "comprovantes")
+           === "org1/cli1/999.pdf");
+  checar("balde errado nao casa",
+         st.caminhoDaUrl(`${base}/servicos/org1/x.jpg`, "comprovantes") === null);
+  checar("query string e descartada",
+         st.caminhoDaUrl(`${base}/servicos/org1/x.jpg?t=1`, "servicos") === "org1/x.jpg");
+  checar("acento no caminho volta decodificado",
+         st.caminhoDaUrl(`${base}/servicos/org1/sess%C3%A3o.jpg`, "servicos") === "org1/sessão.jpg");
+  checar("URL de fora nao vira caminho — e o que impede apagar o que nao e nosso",
+         st.caminhoDaUrl("https://exemplo.com/foto.jpg", "servicos") === null);
+  checar("vazio nao vira caminho", st.caminhoDaUrl("", "servicos") === null);
+  checar("o balde e descoberto pela URL",
+         st.baldeDaUrl(`${base}/comprovantes/o/c/1.pdf`) === "comprovantes" &&
+         st.baldeDaUrl(`${base}/servicos/o/s/1.jpg`) === "servicos" &&
+         st.baldeDaUrl("https://exemplo.com/x.jpg") === null);
+
   console.log("\n=== 2. CAPACIDADE ===");
   const cap = await import("../src/lib/capacidade");
   const c = await cap.calcularCapacidade();

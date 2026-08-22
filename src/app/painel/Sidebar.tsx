@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays, Home, Inbox, MapPin, Receipt, Settings,
-  Sparkles, Users, MessageCircle, LogOut, Landmark,
+  Sparkles, Users, MessageCircle, LogOut, Landmark, ClipboardCheck,
 } from "lucide-react";
 
 /**
@@ -32,6 +32,10 @@ const CARTEIRA = [
   // que é o caso de tudo que a Nina cadastra no campo.
   { href: "/painel/jazigos", label: "Jazigos", icon: Landmark },
   { href: "/painel/financeiro", label: "Financeiro", icon: Receipt },
+  // A dupla conferência do cadastro (Build 7, etapa 1). Fica na carteira e não
+  // no dia a dia de propósito: é trabalho de preparação, feito uma vez por
+  // família, não algo que se abre todo dia.
+  { href: "/painel/conferencia", label: "Conferência", icon: ClipboardCheck },
 ];
 
 const AJUSTES = [

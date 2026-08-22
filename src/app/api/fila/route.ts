@@ -34,9 +34,11 @@ export async function GET() {
   const { data, error } = await db
     .from("fila_liberacao")
     .select(
-      "id,tipo,status,texto,fotos,criado_em," +
+      "id,tipo,status,texto,fotos,criado_em,servico_id," +
         "tentativas,ultimo_erro,ultimo_erro_em,erro_tipo,fotos_enviadas," +
-        "familias(nome),clientes(nome,telefone),tumulos(codigo,ruas(nome),quadras(codigo))"
+        "familias(nome),clientes(nome,telefone)," +
+        "tumulos(codigo,identificacao,ruas(nome),quadras(codigo))," +
+        "servicos(foto_antes_url,foto_depois_url,data_executada)"
     )
     .eq("org_id", org)
     .eq("status", "aguardando")
@@ -45,14 +47,39 @@ export async function GET() {
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  const itens = (data || []).map((f: any) => ({
+  const itens = (data || []).map((f: any) => {
+    // QUAL É O ANTES E QUAL É O DEPOIS.
+    //
+    // `fotos` é montada como `[antes, depois]` com os nulos removidos (0066).
+    // Com duas fotos a ordem resolve; com UMA, a posição não diz nada — pode
+    // ser um serviço sem foto do antes, ou sem a do depois. Adivinhar pela
+    // posição erra o rótulo justamente no caso em que ele importa.
+    //
+    // Por isso o rótulo vem do serviço, comparando a URL. Foto que não casa com
+    // nenhuma das duas fica sem rótulo, em vez de receber um chute.
+    const antes  = f.servicos?.foto_antes_url  || null;
+    const depois = f.servicos?.foto_depois_url || null;
+    const fotos = (Array.isArray(f.fotos) ? f.fotos : []).map((url: string) => ({
+      url,
+      etapa: url === antes ? "antes" : url === depois ? "depois" : null,
+    }));
+
+    return {
     id: f.id,
     tipo: f.tipo,
     texto: f.texto,
-    fotos: Array.isArray(f.fotos) ? f.fotos : [],
+    fotos,
     criadoEm: f.criado_em,
+    // QUANDO A LIMPEZA FOI FEITA — não quando a mensagem entrou na fila. É o
+    // que a família vai perguntar, e é o que o roadmap pede ("data/hora").
+    executadoEm: f.servicos?.data_executada ?? null,
     familia: f.familias?.nome ?? null,
+    // Família e destinatário são coisas diferentes: a mensagem é sobre o jazigo
+    // da família, e vai para UMA pessoa dela. A tela mostrava `para || familia`,
+    // que some com a distinção justamente quando o destinatário é a neta e não
+    // quem contratou.
     para: f.clientes?.nome ?? null,
+    jazigo: f.tumulos?.identificacao || f.tumulos?.codigo || null,
     telefone: f.clientes?.telefone ?? null,
     local: f.tumulos
       ? [f.tumulos.quadras?.codigo, f.tumulos.ruas?.nome].filter(Boolean).join(" · ")
@@ -65,7 +92,8 @@ export async function GET() {
     ultimoErroEm: f.ultimo_erro_em || null,
     erroTipo: f.erro_tipo || null,
     fotosEnviadas: Number(f.fotos_enviadas) || 0,
-  }));
+    };
+  });
 
   // O ESTADO DO WHATSAPP vai junto com a lista.
   // Sem isto, a Sureya só descobriria que a instância caiu ao tocar em
@@ -86,8 +114,35 @@ export async function POST(req: NextRequest) {
   const org = env.orgId();
   const { id, acao, texto } = await req.json();
 
-  if (!id || !["enviar", "descartar"].includes(acao)) {
+  // O `id` e conferido ANTES de qualquer acao. Sem isto, `restaurar` sem id
+  // viraria um update com `.eq("id", undefined)` — que o PostgREST nao rejeita
+  // do jeito que se espera, e o resultado seria uma consulta sem filtro de id.
+  if (!id || !["enviar", "descartar", "restaurar"].includes(acao)) {
     return NextResponse.json({ ok: false, erro: "Ação inválida." }, { status: 400 });
+  }
+
+  // DESFAZER O DESCARTE.
+  //
+  // "Não enviar" era irreversível: a mensagem saía da lista e não havia como
+  // trazê-la de volta pela tela. Descartar por engano a foto da limpeza do
+  // túmulo do pai de alguém não deveria custar um chamado técnico.
+  //
+  // Só volta o que foi descartado — `where status = 'descartado'` garante que
+  // isto nunca ressuscita algo já enviado.
+  if (acao === "restaurar") {
+    const { data: d, error: eR } = await db
+      .from("fila_liberacao")
+      .update({ status: "aguardando", decidido_em: null, decidido_por: null })
+      .eq("id", id).eq("org_id", org).eq("status", "descartado")
+      .select("id").maybeSingle();
+    if (eR) return NextResponse.json({ ok: false, erro: eR.message }, { status: 500 });
+    if (!d) {
+      return NextResponse.json(
+        { ok: false, erro: "Esta mensagem não está descartada." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, restaurada: true });
   }
 
   // Reserva o item ANTES de enviar: muda para 'enviando' e só o primeiro
