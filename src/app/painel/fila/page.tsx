@@ -17,7 +17,7 @@ import { Cartao, Botao, Selo } from "../pecas";
  */
 
 interface Item {
-  id: string; tipo: string; texto: string; fotos: string[];
+  id: string; tipo: string; texto: string; fotos: string[] | null;
   familia: string | null; para: string | null; telefone: string | null; local: string | null;
 }
 
@@ -107,9 +107,9 @@ export default function Fila() {
             {item.local && <span className="text-[13px] text-ink-soft">{item.local}</span>}
           </div>
 
-          {!!item.fotos.length && (
+          {!!item.fotos?.length && (
             <div className="mb-3 flex gap-2 overflow-x-auto">
-              {item.fotos.map((f, i) => (
+              {(item.fotos || []).map((f, i) => (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img key={i} src={f} alt="" className="h-28 w-40 flex-shrink-0 rounded-lg object-cover" />
               ))}
@@ -130,7 +130,7 @@ export default function Fila() {
               <Send size={16} />
               {ocupado === item.id
                 ? "Enviando…"
-                : `Enviar${item.fotos.length ? ` com ${item.fotos.length} foto${item.fotos.length > 1 ? "s" : ""}` : ""}`}
+                : `Enviar${item.fotos?.length ? ` com ${item.fotos.length} foto${item.fotos.length > 1 ? "s" : ""}` : ""}`}
             </Botao>
             <Botao tom="perigo" disabled={ocupado === item.id}
                    onClick={() => decidir(item, "descartar")}>
