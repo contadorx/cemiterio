@@ -1,6 +1,7 @@
 # Build 2 — lavagem confiável ponta a ponta
 
-**Estado:** núcleo entregue e testado. Falta a conferência no ambiente real.
+**Estado:** núcleo e lote 2 entregues e testados em banco limpo. Falta a
+conferência no ambiente real.
 
 ---
 
@@ -154,9 +155,8 @@ literal*. Sete concatenações ganharam `::text`.
 
 ## 5. Explicitamente fora do escopo
 
-- `concluir-admin` (a porta do painel) ainda é a antiga; deve passar a chamar a
-  mesma função, para as duas portas se comportarem igual;
-- `iniciar` ainda não valida atribuição no banco — mesma correção, outro verbo;
+- ~~`concluir-admin` chamando a mesma função~~ — **feito no lote 2 (seção 8)**;
+- ~~`iniciar` validando atribuição no banco~~ — **feito no lote 2**, migration 0068;
 - outbox de WhatsApp com retry e estado legível é Build 6;
 - classificar falha transitória × permanente e o painel de pendências é Build 6.
 
@@ -168,6 +168,7 @@ literal*. Sete concatenações ganharam `::text`.
 |---|---|
 | `0065` | Nenhum. Não se remove valor de enum no PostgreSQL — e não se deve: o código depende dele. |
 | `0066` | `drop function sureya_concluir_lavagem(...)`, `drop view sureya_lavagens_incompletas`, e reverter a rota para o commit anterior. Os três índices únicos podem ficar: eles só impedem duplicata. |
+| `0068` | `drop function sureya_iniciar_lavagem(uuid, text)` e reverter `campo/iniciar/route.ts`. Nenhum dado é alterado pela migration em si. |
 
 `conta_corrente.servico_id` também pode ficar — é aditiva e nulável.
 
@@ -186,10 +187,94 @@ literal*. Sete concatenações ganharam `::text`.
 | Reconciliação diária | ✅ view criada |
 | Upload fora da transação | ✅ |
 | Rodar tudo no ambiente real | ❌ **falta** |
-| `concluir-admin` usando a mesma função | ❌ falta |
-| `iniciar` validando atribuição | ❌ falta |
+| `concluir-admin` usando a mesma função | ✅ lote 2 |
+| `iniciar` validando atribuição | ✅ `0068`, testado |
 | Correlação por `servico_id` e etapa | ❌ Build 6 |
 
 **Parecer: núcleo do Build 2 pronto e provado em banco limpo.** O que falta é
 ambiente: rodar as migrations no Supabase, repetir os sete testes lá, e igualar
 as duas portas de conclusão.
+
+---
+
+## 8. Lote 2 — as duas portas que faltavam
+
+### 8.1 O `iniciar` escapava de tudo
+
+`campo/iniciar/route.ts` usava `supabaseAdmin()` — service role, que **ignora
+RLS por completo**. Nenhuma policy da 0067 alcançava aquela rota. E o que ela
+fazia era:
+
+```ts
+const patch = { executora_id: auth.userId };
+await adm.from("servicos").update(patch).eq("id", b.servicoId)
+```
+
+Sem comparar `executora_id` com quem chamava — apenas sobrescrevendo. Era a
+metade do P0 nº 3 que continuava aberta **depois** da 0066 e da 0067: bastava
+chamar `/api/campo/iniciar` com o UUID de outra pessoa para tomar o serviço
+dela, junto com a foto do antes, o cronômetro e a remuneração da conclusão.
+
+`migrations/0068_iniciar_lavagem_transacional.sql` cria
+`sureya_iniciar_lavagem`, com a mesma regra do concluir, e a rota passou a
+chamá-la **com a sessão da pessoa** em vez da chave mestra.
+
+Testado num banco reconstruído do zero:
+
+| Teste | Resultado |
+|---|---|
+| Ana começa o serviço da Nina | `ERROR: servico_de_outra_executora` |
+| Nina começa o próprio | ok, foto do antes gravada |
+| Nina toca de novo | `ja_iniciado`, **mesma hora** — o cronômetro não reinicia |
+| Ana pega serviço sem dono | `reservado`, passa a ser dela, `pendente` → `agendado` |
+| Nina tenta pegar o que virou da Ana | `ERROR: servico_de_outra_executora` |
+| Admin começa qualquer um | permitido, e **não rouba** a executora |
+
+### 8.2 As duas portas de conclusão se comportavam diferente
+
+`concluir-admin` tinha a própria cópia dos oito passos. A cópia divergia em
+coisas que ninguém notava:
+
+- **não criava o rascunho da mensagem.** Lavagem concluída pelo painel nunca
+  aparecia na fila de liberação — a família simplesmente não recebia a foto.
+  Pela porta do campo, aparecia.
+- não registrava a lavagem no extrato da família;
+- débito, remuneração e consumo eram outra implementação da mesma regra, com as
+  mesmas falhas silenciosas em `try/catch`.
+
+Agora as duas chamam `sureya_concluir_lavagem`. Divergir de novo exigiria mudar
+a função — que é onde a regra deve morar.
+
+### 8.3 O que o painel informa, e por que é gravado ANTES
+
+Duração digitada à mão (`duracao_ajustada` + `motivo_ajuste`) e quem executou
+(`executoraId` — quem estava na escala, não quem clicou). Os dois são gravados
+antes da chamada, **não como parâmetro novo da função**.
+
+Isso é deliberado. Acrescentar parâmetro com `DEFAULT` criaria uma segunda
+assinatura de `sureya_concluir_lavagem`, e uma chamada com os 6 argumentos
+antigos passaria a casar com as duas — `function is not unique`. Foi exatamente
+o que aconteceu com `sureya_fechar_dia`, que existia em duas versões e obrigou a
+rota do campo a carregar um fallback que nunca pôde funcionar.
+
+Gravar antes é seguro: são fatos sobre um serviço que ainda não foi concluído.
+Se a transação falhar, nada foi concluído e os dois campos ficam inertes.
+
+### 8.4 Um bug meu, pego pelo teste
+
+`returns table(iniciado_em ...)` declara uma **variável PL/pgSQL** com o nome da
+coluna. Dentro do `update`, o Postgres recusou:
+
+```
+column reference "iniciado_em" is ambiguous
+It could refer to either a PL/pgSQL variable or a table column.
+```
+
+Eu tinha até escrito um comentário avisando dessa colisão — e mesmo assim caí
+nela. As colunas passaram a ser qualificadas (`servicos.iniciado_em`).
+
+### 8.5 O que ainda falta do Build 2
+
+- correlação por `servico_id` e etapa nos logs (Build 6);
+- classificar falha transitória × permanente e o painel de pendências (Build 6);
+- rodar os testes acima no ambiente real.

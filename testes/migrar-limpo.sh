@@ -154,7 +154,7 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 # Ajuste no mesmo commit em que criar ou remover policy.
 POLICIES_DELTA=${POLICIES_DELTA:-41}
 
-FUNCOES_DELTA=${FUNCOES_DELTA:-1}
+FUNCOES_DELTA=${FUNCOES_DELTA:-2}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

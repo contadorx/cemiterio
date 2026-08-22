@@ -1,140 +1,169 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import { env } from "@/lib/env";
 import { subirFotoServico, notificarFamilia } from "@/lib/servico";
-import { consumirMaterial } from "@/lib/consumo";
-import { carimbarRemuneracao, ehAvulso } from "@/lib/remuneracao";
-import { diaOperacao } from "@/lib/vencimento";
+import { registrarErro } from "@/lib/monitor";
+import { rascunhoDaLavagem } from "@/lib/mensagens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /**
- * Conclusão pelo ADMIN — para quando a Nina mandou a foto por WhatsApp, ou
- * quando o próprio dono foi ao cemitério, ou quando o registro falhou no campo.
+ * Conclusão pelo PAINEL — para quando a Nina mandou a foto por WhatsApp, ou
+ * quando a própria dona foi ao cemitério, ou quando o registro falhou no campo.
  *
- * Aceita a duração informada à mão (não há cronômetro aqui) e respeita o
- * momento de cobrança do plano: no "contra_foto", é a entrega que libera o débito.
+ * Build 2, lote 2: passa a usar a MESMA transação do campo
+ * (`sureya_concluir_lavagem`, migration 0066).
+ *
+ * A auditoria pede que as duas portas se comportem igual, e elas não se
+ * comportavam. Esta rota tinha a própria cópia dos oito passos — e a cópia
+ * divergia em coisas que ninguém notava:
+ *
+ *   · **não criava o rascunho da mensagem**. Lavagem concluída pelo painel
+ *     nunca aparecia na fila de liberação: a família simplesmente não recebia
+ *     a foto. Pela porta do campo, aparecia.
+ *   · não registrava a lavagem no extrato da família;
+ *   · débito, remuneração e consumo eram outra implementação da mesma regra,
+ *     com as mesmas falhas silenciosas em `try/catch`.
+ *
+ * Agora as duas portas chamam a mesma função, então divergir de novo exigiria
+ * mudar a função — que é onde a regra deve morar.
+ *
+ * O QUE O PAINEL INFORMA E O CAMPO NÃO
+ * ---------------------------------------------------------------------------
+ * Duração digitada à mão e quem executou. Os dois são gravados ANTES da
+ * chamada, e não como parâmetro novo da função.
+ *
+ * Isso é deliberado: acrescentar parâmetro com DEFAULT criaria uma segunda
+ * assinatura de `sureya_concluir_lavagem`, e uma chamada com os 6 argumentos
+ * antigos passaria a casar com as duas — `function is not unique`. Foi
+ * exatamente o que aconteceu com `sureya_fechar_dia`, que existia em duas
+ * versões e obrigou a rota do campo a ter um fallback que nunca funcionou.
+ *
+ * Gravar antes é seguro: são fatos sobre um serviço que ainda NÃO foi
+ * concluído. Se a transação falhar, nada foi concluído e os dois campos ficam
+ * inertes.
  */
+
+// POST { servicoId, fotoDepoisBase64, fotoAntesBase64?, mimetype?,
+//        duracaoMinutos?, motivoAjuste?, executoraId?, notificar? }
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
+  const db = auth.db;
 
   const b = await req.json().catch(() => ({}));
   const servicoId = String(b?.servicoId || "");
-  if (!servicoId) return NextResponse.json({ ok: false, erro: "servico_obrigatorio" }, { status: 400 });
+  if (!servicoId) {
+    return NextResponse.json({ ok: false, erro: "servico_obrigatorio" }, { status: 400 });
+  }
   if (!b?.fotoDepoisBase64) {
     return NextResponse.json({ ok: false, erro: "foto_obrigatoria" }, { status: 400 });
   }
 
-  const db = supabaseAdmin();
-  const org = env.orgId();
-
-  const { data: serv } = await db
-    .from("servicos")
-    .select("id,status,cliente_id,tumulo_id,valor,plano_id,executora_id,planos(momento_cobranca,cadencia)")
-    .eq("org_id", org).eq("id", servicoId).maybeSingle();
-  if (!serv) return NextResponse.json({ ok: false, erro: "servico_nao_encontrado" }, { status: 404 });
-  if ((serv as any).status === "executado") {
-    return NextResponse.json({ ok: false, erro: "ja_concluido" }, { status: 400 });
-  }
-
-  // fotos
+  // ---------------------------------------------------------------- upload
   const urlDepois = await subirFotoServico(servicoId, b.fotoDepoisBase64, b.mimetype || "image/jpeg", "depois");
-  if (!urlDepois) return NextResponse.json({ ok: false, erro: "falha_ao_subir_foto" }, { status: 500 });
-  let urlAntes: string | null = null;
-  if (b?.fotoAntesBase64) {
-    urlAntes = await subirFotoServico(servicoId, b.fotoAntesBase64, b.mimetype || "image/jpeg", "antes");
+  if (!urlDepois) {
+    return NextResponse.json({ ok: false, erro: "falha_ao_subir_foto" }, { status: 500 });
+  }
+  const urlAntes = b?.fotoAntesBase64
+    ? await subirFotoServico(servicoId, b.fotoAntesBase64, b.mimetype || "image/jpeg", "antes")
+    : null;
+
+  // -------------------------------------------- o que só o painel informa
+  const patch: Record<string, unknown> = {};
+  const duracao = b?.duracaoMinutos ? Math.max(1, Number(b.duracaoMinutos)) : null;
+  if (duracao) {
+    patch.duracao_ajustada = duracao;
+    patch.motivo_ajuste = b?.motivoAjuste || "informado pelo painel";
+  }
+  // Quem executou é quem estava na escala — não quem clicou no painel. Sem
+  // isto, a transação carimbaria a remuneração no nome de quem administra.
+  if (b?.executoraId) patch.executora_id = b.executoraId;
+
+  if (Object.keys(patch).length) {
+    const { error: ePatch } = await db
+      .from("servicos").update(patch).eq("id", servicoId).neq("status", "executado");
+    if (ePatch) {
+      return NextResponse.json({ ok: false, erro: ePatch.message }, { status: 500 });
+    }
   }
 
-  const duracao = b?.duracaoMinutos ? Math.max(1, Number(b.duracaoMinutos)) : null;
-  const momento = (serv as any).planos?.momento_cobranca || "depois";
-  const agora = new Date().toISOString();
-
-  const { error } = await db.from("servicos").update({
-    status: "executado",
-    data_executada: agora,
-    foto_depois_url: urlDepois,
-    ...(urlAntes ? { foto_antes_url: urlAntes } : {}),
-    ...(duracao ? { duracao_ajustada: duracao, motivo_ajuste: b?.motivoAjuste || "informado pelo painel" } : {}),
-    // no "contra_foto", a entrega é o que libera a cobrança
-    ...(momento === "contra_foto" ? { cobranca_liberada_em: agora } : {}),
-    // MESMA TRAVA DO CAMPO: só transiciona quem ainda não está executado.
-    // Sem isto, a rota lia o status numa consulta e atualizava noutra — duas
-    // submissões simultâneas (duplo clique, aba repetida) passavam as duas e
-    // a família levava dois débitos pela mesma limpeza.
-  }).eq("id", servicoId).eq("org_id", org).neq("status", "executado");
-  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-
-  // débito (idempotente): quem paga antes já pagou, não debita de novo
-  //
-  // O valor vinha cru de servicos.valor. Um AVULSO pode nascer sem valor (a
-  // ficha deixa em branco de propósito, quando você ainda não decidiu quanto
-  // cobrar) — e aí o débito entrava vazio: limpeza feita, nada a receber, e
-  // ninguém avisado. Agora cai na mesma cascata que o app de campo já usava:
-  // valor do serviço → valor do plano → valor de referência da casa.
-  let debitou = false;
-  let valorDebitado: number | null = null;
-  if (momento !== "antes") {
-    let valor = Number((serv as any).valor) || 0;
-    if (!valor && (serv as any).plano_id) {
-      const { data: plano } = await db
-        .from("planos").select("valor_vigente").eq("id", (serv as any).plano_id).maybeSingle();
-      valor = Number((plano as any)?.valor_vigente) || 0;
-    }
-    if (!valor) {
-      const { data: o } = await db
-        .from("orgs").select("valor_referencia_limpeza").eq("id", org).maybeSingle();
-      valor = Number((o as any)?.valor_referencia_limpeza) || 40;
-    }
-
-    const { data: jaTem } = await db
-      .from("movimentos").select("id").eq("servico_id", servicoId).eq("tipo", "debito").maybeSingle();
-    if (!jaTem) {
-      await db.from("movimentos").insert({
-        org_id: org, cliente_id: (serv as any).cliente_id, tipo: "debito",
-        valor, origem: "servico", servico_id: servicoId,
-        status_conc: "confirmado", descricao: "Limpeza executada",
-        // dia de Sao Paulo, igual ao campo (com UTC, conclusao depois das
-        // 21h caia no dia — e no mes — seguinte)
-        data: diaOperacao(),
-      });
-      debitou = true;
-      valorDebitado = valor;
-      // congela no serviço o que foi cobrado, para a ficha e o relatório
-      if (!Number((serv as any).valor)) {
-        await db.from("servicos").update({ valor }).eq("id", servicoId).eq("org_id", org);
+  // ------------------------------------------------------- texto da mensagem
+  // Mesma composição da porta do campo, para as duas gerarem o mesmo rascunho.
+  let texto: string | null = null;
+  let destinatario: string | null = null;
+  try {
+    const { data: s } = await db
+      .from("servicos").select("tumulo_id").eq("id", servicoId).maybeSingle();
+    const tumuloId = (s as any)?.tumulo_id as string | null;
+    if (tumuloId) {
+      const { data: tum } = await db
+        .from("tumulos").select("familia_id,foto_antes_url").eq("id", tumuloId).maybeSingle();
+      const familiaId = (tum as any)?.familia_id as string | null;
+      if (familiaId) {
+        const { data: pessoas } = await db
+          .from("clientes")
+          .select("id,nome,recebe_fotos,responsavel_financeiro")
+          .eq("familia_id", familiaId);
+        const lista = (pessoas || []) as any[];
+        const destino =
+          lista.find((p) => p.recebe_fotos) ||
+          lista.find((p) => p.responsavel_financeiro) ||
+          lista[0];
+        if (destino) {
+          destinatario = destino.id;
+          texto = rascunhoDaLavagem({
+            familiaId,
+            clienteId: destino.id,
+            tumuloId,
+            servicoId,
+            nome: destino.nome || "",
+            fotoAntes: (tum as any)?.foto_antes_url || urlAntes || null,
+            fotoDepois: urlDepois,
+          }).texto;
+        }
       }
     }
+  } catch {
+    // Sem texto, a transação usa a frase padrão. Nada sai sem aprovação.
   }
 
-  // remuneracao da executora deste servico (0031). Concluido pelo painel, a
-  // executora e quem estava na escala — nao quem clicou. Se ninguem estiver
-  // marcado, o painel pode informar b.executoraId.
-  const quem = b?.executoraId || (serv as any).executora_id || null;
-  if (quem) {
-    if (!(serv as any).executora_id) {
-      await db.from("servicos").update({ executora_id: quem }).eq("id", servicoId);
+  // ------------------------------------------------------------- a transação
+  const { data, error } = await db.rpc("sureya_concluir_lavagem", {
+    p_servico: servicoId,
+    p_foto_depois: urlDepois,
+    p_foto_antes: urlAntes,
+    p_duracao_min: null,          // no painel a duração é a ajustada, gravada acima
+    p_texto_mensagem: texto,
+    p_destinatario: destinatario,
+  });
+
+  if (error) {
+    const negado = error.code === "42501" || /sem_permissao|sem_org/.test(error.message || "");
+    if (!negado) {
+      await registrarErro("servico/concluir-admin: transação recusada", error.message, { servicoId });
     }
-    // receita = o valor REALMENTE cobrado (cascata resolvida), nao o que
-    // estava gravado antes — que e nulo justamente nos avulsos. Com regra por
-    // percentual, o carimbo saia R$ 0,00 sem erro nenhum.
-    await carimbarRemuneracao(db, {
-      servicoId, orgId: org, executoraId: quem,
-      receita: valorDebitado ?? (Number((serv as any).valor) || 0),
-      avulso: ehAvulso(serv as any),
-    });
+    return NextResponse.json({ ok: false, erro: error.message }, { status: negado ? 403 : 500 });
   }
 
-  const material = await consumirMaterial(servicoId).catch(() => ({ total: 0, itens: [] }));
+  const r = (Array.isArray(data) ? data[0] : data) as any;
+
   const aviso = b?.notificar === false
     ? { enviado: false, motivo: "desmarcado" as const }
     : await notificarFamilia(servicoId, urlDepois);
-  const notificado = aviso.enviado;
 
   return NextResponse.json({
-    ok: true, urlDepois, duracao, debitou, valorDebitado, momento, notificado, material, motivoEnvio: aviso.motivo,
+    ok: true,
+    urlDepois,
+    duracao,
+    jaExecutado: !!r?.ja_estava_executado,
+    debitou: !!r?.debito_criado,
+    valorDebitado: Number(r?.valor) || null,
+    remuneracao: r?.remuneracao ?? null,
+    material: { total: Number(r?.custo_material) || 0, itens: [] },
+    notificado: aviso.enviado,
+    motivoEnvio: aviso.motivo,
+    reparos: (r?.reparos as string[]) || [],
   });
 }
