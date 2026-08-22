@@ -126,33 +126,34 @@ ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
-# LACUNA DECLARADA
+# AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
 #
-# Producao tem 7 policies a mais que o repositorio. Elas foram criadas a mao e
-# nao estao em migration nenhuma; a CONSULTA A do _diagnostico/0054 devolve
-# todas com `using` e `with check`, e e ela que fecha este numero.
+# A extracao (CONSULTA A) resolveu o misterio: NAO sao regras novas. Sao a
+# MESMA regra criada duas vezes, por migrations diferentes, com nomes
+# diferentes, em 7 tabelas:
 #
-# Enquanto isso, a lacuna fica DECLARADA em vez de derrubar o CI. A diferenca
-# importa: uma divergencia declarada aparece em toda execucao e tem dono; um
-# CI vermelho permanente vira ruido e para de ser lido.
+#   assinaturas_push        assinaturas_push_org + push_org
+#   categorias_financeiras  cat_fin_org          + categorias_financeiras_org
+#   entradas_banco          entradas_banco_org   + entradas_org
+#   historico_cliente       hist_cliente_org     + historico_cliente_org
+#   lancamentos             lanc_org             + lancamentos_org
+#   servicos_extras         extras_org           + servicos_extras_org
+#   telefones_ignorados     tel_ign_org          + telefones_ignorados_org
 #
-# Quando as 7 policies entrarem numa migration, ZERE esta variavel. Se ela
-# ficar aqui depois disso, o teste passa a esconder divergencia de verdade.
-POLICIES_PENDENTES=${POLICIES_PENDENTES:-7}
+# Duplicata permissiva nao muda o acesso (elas se somam com OU), mas e uma
+# armadilha de manutencao: apagar uma deixa a outra valendo, e o commit parece
+# ter apertado. Por isso a 0067 usa policy RESTRICTIVE, que entra com E.
+#
+# O repositorio cria so a versao unica de cada. Somamos as 7 aqui para o placar
+# fechar, em vez de reproduzir a duplicacao no repositorio.
+POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 
-# DELTA DELIBERADO DE FUNCOES
-#
-# O placar de producao e um retrato de 21/08/2026, ANTES das migrations 0057+.
-# Estas mudam o numero de proposito, e o esperado tem de andar junto:
-#
-#   0057  -1  remove o `sureya_fechar_dia` de 4 argumentos (duplicado: com o
-#             5o parametro tendo DEFAULT, chamada de 4 args era ambigua)
-#   0058  +1  sureya_espelha_plano_no_jazigo
-#   0066  +1  sureya_concluir_lavagem
-#
-# Some um item aqui no mesmo commit em que criar ou remover uma funcao. Se
-# ficar desatualizado, o placar acusa divergencia que nao existe — e um alarme
-# que dispara sem motivo e pior que nao ter alarme.
+# DELTA DELIBERADO DE POLICIES
+#   0059  +1   quitacoes_org (a tabela e nova no repositorio)
+#   0067  +41  as restritivas que separam campo de administracao
+# Ajuste no mesmo commit em que criar ou remover policy.
+POLICIES_DELTA=${POLICIES_DELTA:-41}
+
 FUNCOES_DELTA=${FUNCOES_DELTA:-1}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
@@ -173,12 +174,11 @@ echo "PLACAR — repositorio reconstruido x producao (21/08/2026)"
 linha "tabelas"  "$tb" "$ESPERADO_TABELAS"
 linha "funcoes"  "$fn" "$((ESPERADO_FUNCOES + FUNCOES_DELTA))"
 linha "gatilhos" "$tg" "$ESPERADO_GATILHOS"
-linha "policies" "$((po + POLICIES_PENDENTES))" "$ESPERADO_POLICIES"
-if [ "$POLICIES_PENDENTES" -gt 0 ]; then
+linha "policies" "$((po + POLICIES_DUPLICADAS))" "$((ESPERADO_POLICIES + POLICIES_DELTA))"
+if [ "$POLICIES_DUPLICADAS" -gt 0 ]; then
   echo
-  echo "  ATENCAO: $POLICIES_PENDENTES policies ainda nao estao em migration."
-  echo "  O repositorio cria $po; producao tem $ESPERADO_POLICIES."
-  echo "  Falta a CONSULTA A do _diagnostico/0054 para recupera-las."
+  echo "  nota: $POLICIES_DUPLICADAS policies duplicadas em producao nao sao"
+  echo "        reproduzidas aqui de proposito (mesma regra, dois nomes)."
 fi
 echo
 

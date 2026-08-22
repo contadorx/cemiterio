@@ -1,8 +1,0 @@
-balde  2  69516a3aa94a6276b4e6db942da59840
-coluna  164  93aa4fa782bf214841dc35cdb38fe749
-funcao  89  96c84b0989bbc85b83d6a887cff569a2
-indice  41  4cb78b88b702773e06e2d4993f9ebb91
-permissao  267  04a4f17fc89779affeb0b598fbde3d60
-restricao  55  41eeecf42d30db974bc66d80c942f7da
-rls  19  4d90245b36e42a06cbb5ccdfc839e9af
-sequencia  16  9dac0ec4e6b5a3b90545e5386c0ef0df

@@ -1,0 +1,230 @@
+"use client";
+
+import Link from "next/link";
+import { MARCA } from "@/lib/marca";
+import { useState, useEffect } from "react";
+import EstiloMobile from "./EstiloMobile";
+
+/**
+ * As cores agora vêm dos TOKENS (app/tema.css), e não de hex cravado.
+ *
+ * Por que reapontar em vez de reescrever as telas: cinco telas ainda usam
+ * estes objetos de estilo — Famílias, Agenda, Avulsos, Financeiro e Config,
+ * mais de 2.300 linhas somadas. Reescrever tudo à mão arriscaria perder
+ * função. Trocando a origem da cor aqui, todas passam a falar a mesma língua
+ * visual do resto do sistema, e o tema escuro alcança elas de graça.
+ *
+ * Conforme cada tela for reescrita com `pecas.tsx`, some daqui.
+ */
+export const cor = {
+  navy: "rgb(var(--zm-brand))",
+  teal: "rgb(var(--zm-positivo))",
+  bg: "rgb(var(--zm-fundo))",
+  card: "rgb(var(--zm-card))",
+  linha: "rgb(var(--zm-linha))",
+  cinza: "rgb(var(--zm-ink-muted))",
+  ouro: "rgb(var(--zm-ouro))",
+  aviso: "rgb(var(--zm-aviso))",
+  perigo: "rgb(var(--zm-perigo))",
+  sobre: "rgb(var(--zm-sobre))",
+};
+
+/**
+ * O MENU ENXUTO.
+ *
+ * O painel tinha 12 itens porque o sistema tentava ser um mini-ERP: CRM de
+ * leads, agente de IA no WhatsApp, plaquetas QR, mapa. Para uma operação de
+ * duas pessoas — a Sureya e a Nina — isso é tela demais para achar o que
+ * importa.
+ *
+ * Ficaram só os itens que servem ao ciclo real do mês: quem foi limpo e quem
+ * pagou.
+ *
+ * O QUE SAIU DAQUI (e por quê):
+ *   Atendimento e WhatsApp  · o agente de IA foi desligado; a Sureya atende
+ *                             pelo WhatsApp Business, com tom humano e custo
+ *                             zero. No lugar entrou a Liberação.
+ *   Plaquetas               · a plaquinha redonda de 4 cm aprovada não tem QR,
+ *                             por legibilidade. A tela perdeu a função.
+ *   Jazigos                 · não sumiu: virou um bloco dentro da ficha da
+ *                             família, junto do plano e do valor.
+ *
+ * NADA FOI APAGADO. As telas continuam no repositório e os dados no banco —
+ * só saíram do menu e as rotas devolvem 404 (ver src/middleware.ts). Religar
+ * é devolver a linha a esta lista.
+ */
+const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
+  {
+    titulo: "Dia a dia",
+    itens: [
+      { href: "/painel", label: "Início" },
+      { href: "/painel/agenda", label: "Agenda" },
+      // A fila de rascunhos que esperam a aprovação da Sureya. Nada é enviado
+      // sem ela olhar e decidir, uma mensagem por vez.
+      { href: "/painel/fila", label: "Liberação" },
+      { href: "/painel/avulsos", label: "Avulsos" },
+      { href: "/campo", label: "📍 Campo" },
+    ],
+  },
+  {
+    titulo: "Carteira",
+    itens: [
+      { href: "/painel/clientes", label: "Famílias" },
+      // DINHEIRO TEM UMA PORTA SÓ.
+      // "Fechamento" era um item separado, e o Financeiro tinha uma aba "O
+      // mês": duas entradas para a mesma coisa, e ninguém sabia qual abrir.
+      // Agora fechar o mês é a primeira aba daqui.
+      { href: "/painel/financeiro", label: "Financeiro" },
+    ],
+  },
+  {
+    titulo: "Ajustes",
+    itens: [
+      // Onde se reconecta o WhatsApp. Voltou ao menu porque a entrega das
+      // fotos aprovadas na fila depende da instância estar de pé — sem esta
+      // tela, um WhatsApp caído não tem como ser religado.
+      { href: "/painel/whatsapp", label: "WhatsApp" },
+      { href: "/painel/config", label: "Config" },
+    ],
+  },
+];
+
+const ITENS = GRUPOS.flatMap((g) => g.itens);
+
+// Faixa de aviso que aparece em TODAS as telas do painel enquanto os disparos
+// automáticos estiverem desligados — para não esquecer que a IA não responde
+// sozinha durante a migração/captura das quadras.
+function AvisoDisparos() {
+  const [ligado, setLigado] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/config/disparos")
+      .then((r) => r.json())
+      .then((j) => { if (vivo) setLigado(!!j?.ativo); })
+      .catch(() => { if (vivo) setLigado(null); });
+    return () => { vivo = false; };
+  }, []);
+
+  if (ligado !== false) return null; // só aparece quando está DESLIGADO
+
+  return (
+    <div style={{
+      background: "rgb(var(--zm-perigo))", color: "#fff", padding: "10px 16px",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      gap: 12, flexWrap: "wrap", fontSize: 14, textAlign: "center",
+    }}>
+      <span>⏸ <strong>Disparos automáticos desligados</strong> — a IA não responde sozinha e os avisos automáticos não saem.</span>
+      <Link href="/painel/config" style={{
+        color: "rgb(var(--zm-perigo))", background: "#fff", fontWeight: 700, textDecoration: "none",
+        padding: "5px 12px", borderRadius: 8, fontSize: 13, whiteSpace: "nowrap",
+      }}>Ligar na Config</Link>
+    </div>
+  );
+}
+
+/**
+ * A NAVEGAÇÃO ANTIGA — agora vazia, de propósito.
+ *
+ * O menu passou para a coluna do `AppShell` (painel/layout.tsx), que envolve
+ * todas as telas. As páginas continuam chamando `<PainelNav />` e isto não faz
+ * nada: assim a troca aconteceu sem editar quinze arquivos de uma vez, e sem
+ * risco de deixar uma tela sem menu no caminho.
+ *
+ * Conforme cada tela for reescrita no visual novo, a chamada sai junto.
+ */
+export function PainelNav(_: { atual?: string }) {
+  return null;
+}
+
+const botaoBase: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  boxSizing: "border-box",
+  lineHeight: 1.1,
+  textDecoration: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: 600,
+};
+
+export const painel: Record<string, React.CSSProperties> = {
+  // O shell (painel/layout.tsx) já dá fundo, largura máxima e espaçamento.
+  // Estes dois viraram neutros para as telas antigas não desenharem uma
+  // segunda moldura por dentro da primeira.
+  wrap: {},
+  conteudo: {},
+  h1: { fontSize: 22, fontWeight: 600, color: "rgb(var(--zm-ink))", margin: "0 0 16px" },
+  card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: 14, padding: 16, marginBottom: 12, color: "rgb(var(--zm-ink))" },
+
+  // ── Botões tamanho padrão (altura de toque confortável no celular, >= 48px) ──
+  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 48 },
+  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 48 },
+  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 48 },
+
+  // ── Botões compactos (linhas densas de ação: uma medida única, sem improviso) ──
+  // Antes cada tela inventava um padding ("4px 10px", "6px 12px", "8px 14px"…);
+  // agora é um só tamanho para todos os botões pequenos.
+  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 40 },
+  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 40 },
+  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 40 },
+
+  // fontSize 16 evita o zoom automático do iOS ao focar o campo
+  input: { width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 8, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", boxSizing: "border-box" },
+  rotulo: { fontSize: 13, fontWeight: 500, color: cor.cinza, marginBottom: 4, display: "block" },
+};
+
+/**
+ * DINHEIRO DIGITADO NO PADRAO BRASILEIRO.
+ *
+ * O <input type="number"> nao serve: no teclado do celular em pt-BR o usuario
+ * digita "40,50" e o campo devolve string vazia — o valor sumia sem aviso e a
+ * tela salvava 0. Os campos de dinheiro sao type="text" inputMode="decimal" e
+ * passam por aqui.
+ *
+ * Devolve NaN (nunca 0) quando o texto e ambiguo ou invalido, para a tela
+ * RECUSAR o salvamento em vez de gravar um numero inventado:
+ *   "40,50" -> 40.5      "1.234,56" -> 1234.56     "40.5" -> 40.5
+ *   "" -> NaN            "abc" -> NaN              "1,2,3" -> NaN
+ *   "," -> NaN        (virgula solta nao e zero: era um campo apagado)
+ *   "40.5,00" -> NaN  (nem 40,50 nem 405: "40.5" nao e milhar valido)
+ *   "1.500" -> NaN    (1500 para quem escreve em pt-BR, 1,5 para quem escreve
+ *                      em ingles — e o campo aceita os dois formatos. Um erro
+ *                      de 1000x no honorario nao pode sair de um palpite:
+ *                      devolve NaN e a tela pede "1500" ou "1.500,00".)
+ */
+export function numeroBR(v: any): number {
+  const t = String(v ?? "").trim();
+  if (!t || !/^[\d.,]+$/.test(t)) return NaN;
+  if (!/\d/.test(t)) return NaN;
+  if (/^\d{1,3}\.\d{3}$/.test(t)) return NaN;
+  const virgulas = (t.match(/,/g) || []).length;
+  const pontos = (t.match(/\./g) || []).length;
+  if (virgulas > 1) return NaN;
+  let limpo = t;
+  if (virgulas === 1) {
+    const i = t.indexOf(",");
+    const inteiro = t.slice(0, i), dec = t.slice(i + 1);
+    if (pontos && !/^\d{1,3}(\.\d{3})+$/.test(inteiro)) return NaN;
+    limpo = inteiro.replace(/\./g, "") + (dec ? "." + dec : "");
+  } else if (pontos > 1) {
+    if (!/^\d{1,3}(\.\d{3})+$/.test(t)) return NaN;
+    limpo = t.replace(/\./g, "");
+  }
+  const n = Number(limpo);
+  return isFinite(n) ? n : NaN;
+}
+
+/**
+ * Numero -> texto pt-BR com 2 casas ("40,50"), para preencher campo de dinheiro.
+ * null/undefined/"" devolvem "" (campo vazio), nunca "0,00": preco inventado num
+ * campo de dinheiro e pior que campo em branco.
+ */
+export function dinheiroBR(v: any): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  if (!isFinite(n)) return "";
+  return (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
+}
