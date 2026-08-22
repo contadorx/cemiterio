@@ -43,52 +43,71 @@ function montarBanco(): Tabelas {
       { id: "q2", org_id: ORG, cemiterio_id: "cem-1", codigo: "Q-02", ordem: 2 },
       { id: "q3", org_id: ORG, cemiterio_id: "cem-1", codigo: "Q-03", ordem: 3 },
     ],
+    familias: [
+      { id: "f-cec", org_id: ORG, nome: "Família Ramos" },
+      { id: "f-ant", org_id: ORG, nome: "Família Prado" },
+      { id: "f-mar", org_id: ORG, nome: "Família Souza" },
+      { id: "f-neu", org_id: ORG, nome: "Família Ferreira" },
+      { id: "f-avu", org_id: ORG, nome: "Família Hikehara" },
+      { id: "f-sua", org_id: ORG, nome: "Família Stella" },
+      { id: "f-lin", org_id: ORG, nome: "Família LINEU" },
+      { id: "f-anon", org_id: ORG, nome: "Família Removida" },
+    ],
     clientes: [
       // adiantado (crédito sobra)
-      { id: "c-cec", org_id: ORG, nome: "Cecília Ramos", telefone: "5511900001", ativo_ia: true,
+      { id: "c-cec", org_id: ORG, familia_id: "f-cec", responsavel_financeiro: true, nome: "Cecília Ramos", telefone: "5511900001", ativo_ia: true,
         modo: "automatico", score: 95, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
         envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
       // devendo (dispara cobrança)
-      { id: "c-ant", org_id: ORG, nome: "Antônio Prado", telefone: "5511900002", ativo_ia: true,
+      { id: "c-ant", org_id: ORG, familia_id: "f-ant", responsavel_financeiro: true, nome: "Antônio Prado", telefone: "5511900002", ativo_ia: true,
         modo: "copiloto", score: 40, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
         envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
       // zerado com plano (dispara aviso de saldo)
-      { id: "c-mar", org_id: ORG, nome: "Marcos Souza", telefone: "5511900003", ativo_ia: true,
+      { id: "c-mar", org_id: ORG, familia_id: "f-mar", responsavel_financeiro: true, nome: "Marcos Souza", telefone: "5511900003", ativo_ia: true,
         modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
         envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
       // já em cobrança nível 2 (testa a régua)
-      { id: "c-neu", org_id: ORG, nome: "Neusa Ferreira", telefone: "5511900004", ativo_ia: true,
+      { id: "c-neu", org_id: ORG, familia_id: "f-neu", responsavel_financeiro: true, nome: "Neusa Ferreira", telefone: "5511900004", ativo_ia: true,
         modo: "copiloto", score: 60, cobranca_nivel: 2, aviso_saldo_em: null,
         cobranca_em: new Date(Date.now() - 10 * 86400000).toISOString(),
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
         envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
       // régua 'nao_cobrar': a IA NUNCA cobra (avulso/esporádico)
-      { id: "c-avu", org_id: ORG, nome: "Eliana Hikehara", telefone: "5511900005", ativo_ia: true,
+      { id: "c-avu", org_id: ORG, familia_id: "f-avu", responsavel_financeiro: true, nome: "Eliana Hikehara", telefone: "5511900005", ativo_ia: true,
         modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "nao_cobrar", envio_automatico: true, ativacao_ativa: true, ativacao_meses: 6,
         ultima_ativacao_em: null, dias_entre_cobrancas: 7, max_lembretes: 3 },
       // régua 'suave': um único lembrete
-      { id: "c-sua", org_id: ORG, nome: "Julieta Stella", telefone: "5511900006", ativo_ia: true,
+      { id: "c-sua", org_id: ORG, familia_id: "f-sua", responsavel_financeiro: true, nome: "Julieta Stella", telefone: "5511900006", ativo_ia: true,
         modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "a senhora", regua_cobranca: "suave", envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6,
         dias_entre_cobrancas: 7, max_lembretes: 3 },
       // família com DOIS jazigos (caso real: LINEU e Dra. YONE)
-      { id: "c-lin", org_id: ORG, nome: "LINEU", telefone: "5511900007", ativo_ia: true,
+      { id: "c-lin", org_id: ORG, familia_id: "f-lin", responsavel_financeiro: true, nome: "LINEU", telefone: "5511900007", ativo_ia: true,
         modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
         tratamento: "o senhor", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
         envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
       // anonimizado (LGPD): NÃO pode entrar em campanha nem cobrança
-      { id: "c-anon", org_id: ORG, nome: "Cliente removido", telefone: "anon:xyz", ativo_ia: false,
+      // A FILHA DO LINEU. Mesma familia, NAO e a responsavel financeira.
+      // Existe para o invariante da decisao de 22/08 virar teste: a divida e da
+      // familia, entao as duas pessoas tem de devolver o MESMO saldo.
+      { id: "c-lin2", org_id: ORG, familia_id: "f-lin", responsavel_financeiro: false,
+        nome: "Marta (filha do LINEU)", telefone: "5511900008", ativo_ia: true,
+        modo: "copiloto", score: 50, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
+        anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
+        tratamento: "voce", regua_cobranca: "padrao", dias_entre_cobrancas: 7, max_lembretes: 3,
+        envio_automatico: true, ativacao_ativa: false, ativacao_meses: 6 },
+      { id: "c-anon", org_id: ORG, familia_id: "f-anon", responsavel_financeiro: true, nome: "Cliente removido", telefone: "anon:xyz", ativo_ia: false,
         modo: "copiloto", score: 0, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
         anonimizado_em: new Date().toISOString(), perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0 },
     ],
@@ -140,6 +159,33 @@ function montarBanco(): Tabelas {
       { id: "s3", org_id: ORG, tumulo_id: "t4", plano_id: "p4", cliente_id: "c-neu",
         data_prevista: null, status: "pendente", valor: 55, prioridade: 30, adiado_vezes: 3,
         executora_id: null, ordem_dia: null, foto_depois_url: null },
+    ],
+    // O RAZAO DA FAMILIA — decisao de 22/08: "e a familia, mas sempre tem um
+    // responsavel financeiro". `calcularSaldo()` le daqui desde entao.
+    //
+    // O fake-supabase nao executa gatilho, entao o espelho da migration 0071
+    // (`movimentos` -> `conta_corrente`) nao roda nos testes. Esta massa
+    // representa o estado DEPOIS do espelho: cada movimento tem o seu par
+    // aqui, com `movimento_id` preenchido — exatamente como o banco fica.
+    //
+    // Se algum dia os dois lados divergirem, e sinal de que o espelho mudou e
+    // esta massa nao acompanhou.
+    conta_corrente: [
+      // Cecília: débito 40, crédito 200 => +160
+      { id: "l1", org_id: ORG, familia_id: "f-cec", movimento_id: "m1", tipo: "debito",  origem: "lavagem",   valor: 40,  status_conc: "confirmado", data: diasAtras(30), servico_id: "s1" },
+      { id: "l2", org_id: ORG, familia_id: "f-cec", movimento_id: "m2", tipo: "credito", origem: "pagamento", valor: 200, status_conc: "confirmado", data: diasAtras(31) },
+      // Antônio: débito 45, nenhum crédito confirmado => -45
+      { id: "l3", org_id: ORG, familia_id: "f-ant", movimento_id: "m3", tipo: "debito",  origem: "lavagem",   valor: 45,  status_conc: "confirmado", data: diasAtras(30), servico_id: "s2" },
+      // crédito informado e ainda não batido com o extrato: NAO e saldo
+      { id: "l4", org_id: ORG, familia_id: "f-ant", movimento_id: "m4", tipo: "credito", origem: "pagamento", valor: 45,  status_conc: "a_conferir", data: diasAtras(1) },
+      // rejeitado: ignorado dos dois lados
+      { id: "l5", org_id: ORG, familia_id: "f-ant", movimento_id: "m5", tipo: "credito", origem: "pagamento", valor: 999, status_conc: "rejeitado",  data: diasAtras(1) },
+      { id: "l6", org_id: ORG, familia_id: "f-neu", movimento_id: "m6", tipo: "debito",  origem: "avulso",    valor: 55,  status_conc: "confirmado", data: diasAtras(40) },
+      { id: "l7", org_id: ORG, familia_id: "f-avu", movimento_id: "m7", tipo: "debito",  origem: "avulso",    valor: 50,  status_conc: "confirmado", data: diasAtras(40) },
+      { id: "l8", org_id: ORG, familia_id: "f-sua", movimento_id: "m8", tipo: "debito",  origem: "avulso",    valor: 80,  status_conc: "confirmado", data: diasAtras(40) },
+      // LINEU tem DOIS jazigos: a divida e uma so, da familia
+      { id: "l9", org_id: ORG, familia_id: "f-lin", movimento_id: "m9",  tipo: "debito", origem: "avulso",    valor: 360, status_conc: "confirmado", data: diasAtras(40) },
+      { id: "l10",org_id: ORG, familia_id: "f-lin", movimento_id: "m10", tipo: "debito", origem: "avulso",    valor: 360, status_conc: "confirmado", data: diasAtras(40) },
     ],
     movimentos: [
       // Cecília: 1 débito 40, crédito 200 => +160
@@ -314,6 +360,17 @@ async function rodar() {
   const cobLin = banco.interacoes_ia.filter((i) => i.cliente_id === "c-lin" && i.assunto === "cobranca");
   checar("cobrança avisa que o valor é do conjunto",
          cobLin.some((r) => r.rascunho.includes("2 jazigos")), cobLin[0]?.rascunho?.slice(0, 140) || "sem cobrança");
+  // A DECISAO DE 22/08, COMO TESTE.
+  //
+  // "E a familia, mas sempre tem um responsavel financeiro." Se o saldo fosse
+  // por pessoa, a Marta apareceria em dia enquanto o pai deve 720 — e a regua
+  // de cobranca trataria os dois como contas diferentes. Foi exatamente esse
+  // desencontro que deixou a Familia Anninha devendo 240 sem ninguem ver.
+  const sPai   = await fin.calcularSaldo("c-lin");
+  const sFilha = await fin.calcularSaldo("c-lin2");
+  checar("a divida e da FAMILIA: pai e filha veem o mesmo saldo",
+         sPai.saldo === sFilha.saldo && sPai.saldo === -720,
+         `pai ${sPai.saldo}, filha ${sFilha.saldo}`);
   checar("saldo soma os dois jazigos numa conta só",
          (await fin.calcularSaldo("c-lin")).saldo === -720, String((await fin.calcularSaldo("c-lin")).saldo));
 

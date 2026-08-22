@@ -30,8 +30,21 @@ async function selecionarClientes(publico: Publico): Promise<{ id: string; nome:
   }
 
   if (publico === "em_aberto") {
+    // O SALDO E DA FAMILIA, ENTAO A LISTA E DE RESPONSAVEIS.
+    //
+    // `calcularSaldo` devolve o saldo da familia desde 22/08. Sem filtrar,
+    // uma familia com tres pessoas entraria tres vezes na campanha — tres
+    // mensagens sobre a mesma divida, para a mesma casa.
+    const { data: responsaveis } = await db
+      .from("clientes")
+      .select("id")
+      .eq("org_id", org)
+      .eq("responsavel_financeiro", true);
+    const respondem = new Set((responsaveis || []).map((r: any) => r.id));
+
     const out: { id: string; nome: string }[] = [];
     for (const c of base) {
+      if (!respondem.has(c.id)) continue;
       const s = await calcularSaldo(c.id);
       if (s.saldo < -0.005) out.push(c);
     }

@@ -1,0 +1,41 @@
+-- =====================================================================
+-- SUREYA — 0069 · 'abertura' COMO ORIGEM DE LANÇAMENTO
+--
+-- ESTE ARQUIVO RODA SOZINHO. Não junte com outro.
+-- (`alter type ... add value` não roda dentro de bloco de transação, e o
+--  editor SQL do Supabase envolve o que você cola em uma. Mesma razão da
+--  0047b e da 0065.)
+--
+-- O QUE FOI ENCONTRADO
+-- ---------------------------------------------------------------------
+-- Comparando o enum do repositório com o de produção:
+--
+--   repositório (0049 + 0065)   competencia | avulso | pagamento | ajuste | lavagem
+--   produção                    competencia | avulso | pagamento | ajuste | abertura | lavagem
+--
+-- `abertura` está em produção e em migration nenhuma. Pela ordem em que
+-- aparece — antes de `lavagem`, que a 0065 acrescentou — ela foi criada à
+-- mão no SQL Editor antes deste trabalho começar.
+--
+-- E está EM USO: há uma linha em `conta_corrente` com
+-- `origem = 'abertura'`, valor 240,00, descrição "Situação inicial · em
+-- aberto". Quem escreve é `src/app/api/conta-corrente/route.ts` (ação
+-- `abertura`).
+--
+-- Sem esta migration, um ambiente reconstruído do repositório recusa essa
+-- rota com `invalid input value for enum`. É o mesmo modo de falha que a
+-- 0065 corrigiu para `lavagem` — e que fazia a linha "Limpeza realizada"
+-- nunca aparecer no extrato.
+-- =====================================================================
+
+alter type sureya_origem_lancamento add value if not exists 'abertura';
+
+-- Conferência:
+-- select enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid
+--  where t.typname = 'sureya_origem_lancamento' order by e.enumsortorder;
+-- → competencia | avulso | pagamento | ajuste | lavagem | abertura
+--
+-- A ORDEM pode diferir de produção (lá `abertura` vem antes de `lavagem`).
+-- Isso é inofensivo: `sureya_origem_lancamento` é usada para rotular, nunca
+-- para ordenar. Se algum dia for usada em `order by`, a ordem do enum
+-- precisa ser igualada — e aí o caminho é recriar o tipo, não acrescentar.

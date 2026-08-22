@@ -109,6 +109,16 @@ export async function cobrancaGentil(): Promise<number> {
     .select("id,nome,tratamento,cobranca_em,cobranca_nivel,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,anonimizado_em")
     .eq("org_id", org)
     .eq("envio_automatico", true)                    // familia em revisao fica de fora
+    // UMA COBRANCA POR FAMILIA, PARA QUEM RESPONDE POR ELA.
+    //
+    // Desde 22/08 o saldo e da FAMILIA ("e a familia, mas sempre tem um
+    // responsavel financeiro"). Sem este filtro, `calcularSaldo` devolve o
+    // mesmo valor negativo para TODAS as pessoas da casa, e a familia recebe
+    // uma cobranca por pessoa pela mesma divida — o pai, a filha, o neto.
+    //
+    // Foi um teste que pegou isto: ao acrescentar uma segunda pessoa na
+    // familia do LINEU, o publico "em aberto" passou a devolver as duas.
+    .eq("responsavel_financeiro", true)
     .is("anonimizado_em", null);
 
   let n = 0;

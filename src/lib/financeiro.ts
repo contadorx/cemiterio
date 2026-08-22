@@ -4,17 +4,67 @@ import { diaOperacao, proximaData } from "./vencimento";
 import { auditar } from "./auditoria";
 
 export interface Saldo {
-  saldo: number;      // só confirmados: créditos − débitos
-  aConferir: number;  // créditos pendentes de conferência
+  saldo: number;      // só confirmados: créditos − débitos, no razão da FAMÍLIA
+  aConferir: number;  // créditos informados, ainda não batidos com o extrato
+  /** true = a pessoa não tem família; o saldo devolvido é zero por ausência de
+   *  dado, não por estar em dia. Hoje não ocorre em nenhum dos 298 cadastros. */
+  semFamilia?: boolean;
 }
 
+/**
+ * O SALDO E DA FAMILIA — decisao de 22/08/2026.
+ *
+ * A pergunta que o Build 4 precisava responder era "a divida e da pessoa ou da
+ * familia?". A resposta foi: **da familia, e sempre tem um responsavel
+ * financeiro** — que nao e quem deve, e quem responde.
+ *
+ * Ate aqui esta funcao somava `movimentos`, que e por PESSOA. E os lancamentos
+ * novos vinham entrando em `conta_corrente`, que e por FAMILIA. As duas
+ * metades se desencontraram, e a medicao mostrou o estrago:
+ *
+ *     Familia Anninha    movimentos: 0 linhas, saldo 0,00
+ *                        conta_corrente: 1 linha, saldo -240,00
+ *
+ * Ela devia 240,00 e a regua de cobranca — que chama esta funcao — nao a
+ * enxergava. Nao era caso raro: era a primeira linha da lista.
+ *
+ * Continua recebendo `clienteId` porque e assim que as cinco chamadas fazem, e
+ * porque a pessoa e o que a tela tem na mao. A funcao resolve a familia dela e
+ * soma o razao da familia. Duas pessoas da mesma familia passam a devolver o
+ * MESMO saldo — que e o ponto da decisao.
+ */
 export async function calcularSaldo(clienteId: string): Promise<Saldo> {
   const db = supabaseAdmin();
-  const { data } = await db
-    .from("movimentos")
+
+  const { data: cli } = await db
+    .from("clientes")
+    .select("familia_id")
+    .eq("org_id", env.orgId())
+    .eq("id", clienteId)
+    .maybeSingle();
+
+  const familiaId = (cli as any)?.familia_id as string | null;
+
+  // Pessoa sem familia nao deveria existir (o gatilho
+  // `sureya_familia_para_cliente` cria uma no cadastro, e hoje sao zero casos).
+  // Se aparecer, e cadastro incompleto: devolver zero seria dizer "esta em dia"
+  // sobre alguem de quem nao se sabe nada. Zero e o unico numero honesto aqui,
+  // mas quem chama precisa poder distinguir — dai `semFamilia`.
+  if (!familiaId) return { saldo: 0, aConferir: 0, semFamilia: true };
+
+  const { data, error } = await db
+    .from("conta_corrente")
     .select("tipo,valor,status_conc")
     .eq("org_id", env.orgId())
-    .eq("cliente_id", clienteId);
+    .eq("familia_id", familiaId);
+
+  // ERRO AQUI NAO PODE VIRAR SALDO ZERO.
+  //
+  // Saldo zero significa "em dia" para a regua de cobranca e para o aviso de
+  // saldo baixo. Uma falha de leitura que devolvesse zero calaria a cobranca de
+  // uma familia inadimplente — o mesmo modo de falha que deixou a agenda
+  // parada por meses.
+  if (error) throw new Error(`saldo_indisponivel: ${error.message}`);
 
   let saldo = 0;
   let aConferir = 0;
@@ -23,6 +73,8 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
     const v = Number((m as any).valor) || 0;
     if (st === "rejeitado") continue;
     if (st === "a_conferir") {
+      // Comprovante informado e ainda nao batido com o extrato NAO e saldo.
+      // E o que a conferencia existe para impedir.
       if ((m as any).tipo === "credito") aConferir += v;
       continue;
     }

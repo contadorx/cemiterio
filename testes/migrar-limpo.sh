@@ -124,6 +124,12 @@ fi
 ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
+
+# DELTA DELIBERADO DE GATILHOS
+#   0058  +1  trg_espelha_plano_no_jazigo   (ja aplicado em producao)
+#   0071  +2  trg_espelha_movimento_na_conta, trg_espelha_status_movimento
+# O da 0058 ja esta contado no 14 de producao; os dois da 0071 ainda nao.
+GATILHOS_DELTA=${GATILHOS_DELTA:-2}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -154,7 +160,14 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 # Ajuste no mesmo commit em que criar ou remover policy.
 POLICIES_DELTA=${POLICIES_DELTA:-41}
 
-FUNCOES_DELTA=${FUNCOES_DELTA:-2}
+# DELTA DELIBERADO DE FUNCOES
+#   0066  +1  sureya_concluir_lavagem
+#   0068  +1  sureya_iniciar_lavagem
+#   0071  +2  sureya_espelha_movimento_na_conta, sureya_espelha_status_movimento
+# Nenhuma das quatro existe em producao ainda. As demais migrations desta
+# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
+# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
+FUNCOES_DELTA=${FUNCOES_DELTA:-4}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -173,7 +186,7 @@ linha() {
 echo "PLACAR — repositorio reconstruido x producao (21/08/2026)"
 linha "tabelas"  "$tb" "$ESPERADO_TABELAS"
 linha "funcoes"  "$fn" "$((ESPERADO_FUNCOES + FUNCOES_DELTA))"
-linha "gatilhos" "$tg" "$ESPERADO_GATILHOS"
+linha "gatilhos" "$tg" "$((ESPERADO_GATILHOS + GATILHOS_DELTA))"
 linha "policies" "$((po + POLICIES_DUPLICADAS))" "$((ESPERADO_POLICIES + POLICIES_DELTA))"
 if [ "$POLICIES_DUPLICADAS" -gt 0 ]; then
   echo
