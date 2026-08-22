@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ehDoPeriodo } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 import { env } from "@/lib/env";
 import { mesOperacao } from "@/lib/vencimento";
@@ -21,10 +22,10 @@ export async function GET(req: NextRequest) {
   const fimDate = new Date(new Date(ini + "T00:00:00").getFullYear(), new Date(ini + "T00:00:00").getMonth() + 1, 0);
   const fim = fimDate.toISOString().slice(0, 10);
 
-  // movimentos do mês
+  // LANCAMENTOS DO MES, NO RAZAO DA FAMILIA (DECISOES.md D-01).
   const { data: movs } = await db
-    .from("movimentos")
-    .select("tipo,valor,status_conc,data,cliente_id")
+    .from("conta_corrente")
+    .select("tipo,valor,status_conc,data,familia_id,origem")
     .gte("data", ini)
     .lte("data", fim);
 
@@ -32,6 +33,8 @@ export async function GET(req: NextRequest) {
   let executado = 0;
   let aConferir = 0;
   for (const m of movs || []) {
+    // Saldo de abertura tem data mas nao e movimento do mes. Ver `ehDoPeriodo`.
+    if (!ehDoPeriodo((m as any).origem)) continue;
     const v = Number((m as any).valor) || 0;
     const st = (m as any).status_conc;
     if ((m as any).tipo === "credito" && st === "confirmado") recebido += v;
@@ -39,18 +42,32 @@ export async function GET(req: NextRequest) {
     else if ((m as any).tipo === "debito") executado += v;
   }
 
-  // saldo atual por cliente (todos os movimentos, não só do mês)
+  // SALDO ATUAL POR FAMILIA (tudo, nao so o mes). Aqui a abertura CONTA: ela e
+  // divida de verdade — so nao e movimento do mes.
+  //
+  // O relatorio passa a listar FAMILIA, nao pessoa. Com o saldo no grao da
+  // familia, listar pessoas repetiria a mesma divida uma vez por membro e o
+  // "total a receber" sairia multiplicado. O nome exibido e o do RESPONSAVEL
+  // FINANCEIRO, que e para quem a cobranca se dirige; se faltar, cai no nome da
+  // familia.
   const { data: todos } = await db
-    .from("movimentos")
-    .select("cliente_id,tipo,valor,status_conc");
-  const { data: clientes } = await db.from("clientes").select("id,nome");
-  const nomeDe = new Map((clientes || []).map((c: any) => [c.id, c.nome]));
+    .from("conta_corrente")
+    .select("familia_id,tipo,valor,status_conc");
+  const [{ data: responsaveis }, { data: familias }] = await Promise.all([
+    db.from("clientes").select("nome,familia_id").eq("responsavel_financeiro", true),
+    db.from("familias").select("id,nome"),
+  ]);
+  const nomeDe = new Map<string, string>((familias || []).map((f: any) => [f.id, f.nome]));
+  for (const r of (responsaveis || []) as any[]) {
+    if (r.familia_id) nomeDe.set(r.familia_id, r.nome);
+  }
 
   const saldoPorCli = new Map<string, number>();
   for (const m of todos || []) {
     const st = (m as any).status_conc;
     if (st === "rejeitado" || st === "a_conferir") continue;
-    const cid = (m as any).cliente_id;
+    const cid = (m as any).familia_id;
+    if (!cid) continue;
     const v = Number((m as any).valor) || 0;
     saldoPorCli.set(cid, (saldoPorCli.get(cid) || 0) + ((m as any).tipo === "credito" ? v : -v));
   }

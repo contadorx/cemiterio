@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { calcularSaldosEmLote } from "./financeiro";
 import { diaOperacao } from "./vencimento";
 
 export interface Candidato {
@@ -40,18 +41,20 @@ export async function calcularTemperatura(db: SupabaseClient): Promise<Candidato
 
   const { data: planos } = await db
     .from("planos")
-    .select("id,cliente_id,cadencia,valor_vigente,data_valor_vigente,ativo,clientes(nome,telefone)")
+    .select("id,cliente_id,cadencia,valor_vigente,data_valor_vigente,ativo,clientes(nome,telefone,familia_id)")
     .eq("ativo", true);
 
-  // saúde de pagamento por cliente (saldo confirmado >= 0 => bom pagador)
-  const { data: mov } = await db.from("movimentos").select("cliente_id,tipo,valor,status_conc");
-  const saldo = new Map<string, number>();
-  for (const m of mov || []) {
-    if ((m as any).status_conc !== "confirmado") continue;
-    const cur = saldo.get((m as any).cliente_id) || 0;
-    const v = Number((m as any).valor) || 0;
-    saldo.set((m as any).cliente_id, cur + ((m as any).tipo === "credito" ? v : -v));
-  }
+  // SAUDE DE PAGAMENTO — saldo confirmado >= 0 significa bom pagador.
+  //
+  // Le o razao da FAMILIA (DECISOES.md D-01). Isto muda quem entra na lista de
+  // reajuste: uma pessoa em dia cuja FAMILIA esta devendo deixa de ser
+  // candidata. E o comportamento certo — reajustar quem deve e pedir briga.
+  const saldos = await calcularSaldosEmLote(
+    (planos || []).map((p: any) => ({
+      id: p.cliente_id,
+      familia_id: p.clientes?.familia_id ?? null,
+    })),
+  );
 
   const lista: Candidato[] = [];
 
@@ -69,7 +72,7 @@ export async function calcularTemperatura(db: SupabaseClient): Promise<Candidato
     const gap = valorAtual > 0 ? (sugerido - valorAtual) / valorAtual : 0;
     if (gap <= 0.02) continue;
 
-    const bomPagador = (saldo.get((p as any).cliente_id) || 0) >= -0.005;
+    const bomPagador = (saldos.get((p as any).cliente_id)?.saldo ?? 0) >= -0.005;
 
     // temperatura: tempo + defasagem + segurança do pagador
     let t = Math.min(55, meses * 3.5); // ~16 meses -> 55

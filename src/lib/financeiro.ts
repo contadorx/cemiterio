@@ -3,6 +3,34 @@ import { env } from "./env";
 import { diaOperacao, proximaData } from "./vencimento";
 import { auditar } from "./auditoria";
 
+/**
+ * O QUE CONTA COMO MOVIMENTO **DO PERIODO**, E O QUE E SO HISTORIA
+ * ---------------------------------------------------------------------------
+ * `conta_corrente` guarda duas coisas com a mesma cara de lancamento:
+ *
+ *   · o que ACONTECEU — uma limpeza, um pagamento, uma competencia fechada;
+ *   · o que a familia JA DEVIA quando entrou no sistema (`origem = 'abertura'`).
+ *
+ * A segunda tem data, e a data e o dia em que alguem digitou. Em producao ha
+ * uma linha assim: debito de R$ 240,00 carimbado 17/08/2026, que e divida
+ * anterior ao sistema inteiro.
+ *
+ * Para o SALDO, ela conta — a familia deve mesmo.
+ * Para qualquer relatorio POR PERIODO, ela nao pode contar: somaria R$ 240,00
+ * de "limpeza executada em agosto" que ninguem executou, e o mes fecharia com
+ * um numero que nao corresponde a trabalho nenhum.
+ *
+ * E a mesma confusao que a auditoria descreve na home (CA-02): misturar o que
+ * aconteceu no mes com o que a familia devia desde sempre.
+ *
+ * Esta funcao existe para a regra morar num lugar so. Se aparecer outra origem
+ * de historia migrada, e aqui que ela entra — e todos os relatorios acertam
+ * juntos.
+ */
+export function ehDoPeriodo(origem: string | null | undefined): boolean {
+  return origem !== "abertura";
+}
+
 export interface Saldo {
   saldo: number;      // só confirmados: créditos − débitos, no razão da FAMÍLIA
   aConferir: number;  // créditos informados, ainda não batidos com o extrato
@@ -81,6 +109,81 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
     saldo += (m as any).tipo === "credito" ? v : -v;
   }
   return { saldo: Math.round(saldo * 100) / 100, aConferir: Math.round(aConferir * 100) / 100 };
+}
+
+/**
+ * O MESMO SALDO, PARA UMA LISTA INTEIRA, EM DUAS CONSULTAS.
+ *
+ * POR QUE ESTA FUNCAO EXISTE
+ * ---------------------------------------------------------------------------
+ * `calcularSaldo()` faz duas consultas por pessoa. Nas telas de lista — a de
+ * clientes (400 linhas), indicadores, reajuste, relatorio — isso seria 800
+ * consultas para desenhar uma tela. As rotas que fazem isso hoje ja resolveram
+ * o problema do jeito certo: baixam TODOS os lancamentos de uma vez e agrupam
+ * em memoria. So que baixavam de `movimentos`, que e o razao errado.
+ *
+ * Esta funcao preserva o formato (uma consulta so, agrupada em memoria) e troca
+ * o razao. A regra de soma e IDENTICA a de `calcularSaldo()` — e tem de
+ * continuar sendo. Se as duas divergirem, a lista de clientes vai mostrar um
+ * numero e a ficha da mesma pessoa vai mostrar outro, que e exatamente o
+ * sintoma que o Build 4 existiu para acabar.
+ *
+ * PESSOAS DA MESMA FAMILIA DEVOLVEM O MESMO SALDO
+ * ---------------------------------------------------------------------------
+ * Isso e a decisao, nao um efeito colateral. Numa lista de PESSOAS, a divida da
+ * familia aparece em cada membro dela. Quem precisar contar familias — e nao
+ * pessoas — filtra por `responsavel_financeiro`, que e exatamente para isso que
+ * ele serve.
+ *
+ * @param clientes pares { id, familia_id } que quem chama JA TEM em maos. Pedir
+ *                 assim evita uma terceira consulta so para redescobrir a
+ *                 familia de gente que a rota acabou de carregar.
+ */
+export async function calcularSaldosEmLote(
+  clientes: { id: string; familia_id: string | null }[],
+): Promise<Map<string, Saldo>> {
+  const fora = new Map<string, Saldo>();
+  for (const c of clientes) fora.set(c.id, { saldo: 0, aConferir: 0, semFamilia: !c.familia_id });
+
+  const familiaIds = [...new Set(clientes.map((c) => c.familia_id).filter(Boolean))] as string[];
+  if (!familiaIds.length) return fora;
+
+  const db = supabaseAdmin();
+  const { data, error } = await db
+    .from("conta_corrente")
+    .select("familia_id,tipo,valor,status_conc")
+    .eq("org_id", env.orgId())
+    .in("familia_id", familiaIds);
+
+  // MESMA REGRA DA `calcularSaldo()`: erro de leitura nao vira saldo zero.
+  // Numa lista, zero em massa e pior ainda — a tela de "atrasados" voltaria
+  // vazia e a operacao leria isso como "ninguem devendo".
+  if (error) throw new Error(`saldo_indisponivel: ${error.message}`);
+
+  const porFamilia = new Map<string, Saldo>();
+  for (const m of data || []) {
+    const fid = (m as any).familia_id as string;
+    const st = (m as any).status_conc;
+    const v = Number((m as any).valor) || 0;
+    const acc = porFamilia.get(fid) || { saldo: 0, aConferir: 0 };
+    if (st === "rejeitado") { porFamilia.set(fid, acc); continue; }
+    if (st === "a_conferir") {
+      if ((m as any).tipo === "credito") acc.aConferir += v;
+    } else {
+      acc.saldo += (m as any).tipo === "credito" ? v : -v;
+    }
+    porFamilia.set(fid, acc);
+  }
+
+  for (const c of clientes) {
+    if (!c.familia_id) continue;
+    const acc = porFamilia.get(c.familia_id) || { saldo: 0, aConferir: 0 };
+    fora.set(c.id, {
+      saldo: Math.round(acc.saldo * 100) / 100,
+      aConferir: Math.round(acc.aConferir * 100) / 100,
+    });
+  }
+  return fora;
 }
 
 /**

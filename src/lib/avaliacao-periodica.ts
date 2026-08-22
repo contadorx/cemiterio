@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase-admin";
+import { calcularSaldo } from "./financeiro";
 import { env } from "./env";
 import { redigir } from "./redator";
 
@@ -55,13 +56,13 @@ export async function pedidosDeAvaliacao(opcoes?: {
       .gte("created_at", corte).limit(1).maybeSingle();
     if (recente) continue;
 
-    // a família está devendo? não é hora de pedir avaliação
-    const { data: movs } = await db
-      .from("movimentos").select("tipo,valor,status_conc").eq("cliente_id", s.cliente_id);
-    const saldo = (movs || []).reduce((acc: number, m: any) => {
-      if (m.status_conc !== "confirmado") return acc;
-      return acc + (m.tipo === "credito" ? Number(m.valor) : -Number(m.valor));
-    }, 0);
+    // A FAMILIA esta devendo? Nao e hora de pedir avaliacao.
+    //
+    // Antes isto somava `movimentos` por PESSOA, com a regra reescrita a mao.
+    // Agora chama a funcao canonica: a decisao de 22/08 diz que quem deve e a
+    // familia (DECISOES.md D-01), e uma segunda copia da regra de soma so
+    // serviria para divergir da primeira com o tempo.
+    const { saldo } = await calcularSaldo(s.cliente_id);
     if (saldo < -0.005) continue;
 
     // emite o token e monta o link

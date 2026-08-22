@@ -186,6 +186,11 @@ function montarBanco(): Tabelas {
       // LINEU tem DOIS jazigos: a divida e uma so, da familia
       { id: "l9", org_id: ORG, familia_id: "f-lin", movimento_id: "m9",  tipo: "debito", origem: "avulso",    valor: 360, status_conc: "confirmado", data: diasAtras(40) },
       { id: "l10",org_id: ORG, familia_id: "f-lin", movimento_id: "m10", tipo: "debito", origem: "avulso",    valor: 360, status_conc: "confirmado", data: diasAtras(40) },
+      // ABERTURA: divida anterior ao sistema. Tem data (o dia em que alguem
+      // digitou) mas nao e movimento daquele dia. Conta no SALDO e nunca em
+      // relatorio por periodo. Nao tem par em `movimentos` — e justamente o
+      // caso da familia Anninha em producao, que a cobranca nao enxergava.
+      { id: "l11",org_id: ORG, familia_id: "f-avu", movimento_id: null,  tipo: "debito", origem: "abertura",  valor: 240, status_conc: "confirmado", data: diasAtras(5) },
     ],
     movimentos: [
       // Cecília: 1 débito 40, crédito 200 => +160
@@ -247,6 +252,35 @@ async function rodar() {
   checar("crédito rejeitado é ignorado", sAnt.saldo === -45, `999 rejeitado não pode entrar`);
   checar("texto de saldo adiantado", fin.saldoTexto(sCec).includes("adiantado"), fin.saldoTexto(sCec));
   checar("texto de saldo em aberto", fin.saldoTexto(sAnt).includes("em aberto"), fin.saldoTexto(sAnt));
+
+  // ---- a abertura conta no saldo, mas nunca num relatorio por periodo
+  const sAvu = await fin.calcularSaldo("c-avu");
+  checar("saldo de abertura CONTA no saldo da familia", sAvu.saldo === -290,
+         `veio ${sAvu.saldo} (esperado -290 = -50 avulso -240 abertura)`);
+  checar("abertura fica FORA de relatorio por periodo",
+         fin.ehDoPeriodo("abertura") === false && fin.ehDoPeriodo("pagamento") === true);
+
+  // ---- O LOTE TEM DE DAR O MESMO NUMERO QUE A FUNCAO DE UMA PESSOA SO.
+  //
+  // Sao duas implementacoes da mesma regra: `calcularSaldo` faz uma consulta
+  // por pessoa (usada na ficha), `calcularSaldosEmLote` faz uma para a lista
+  // inteira (usada em clientes, reajuste, relatorio). Se divergirem, a lista
+  // mostra um numero e a ficha da mesma pessoa mostra outro — que e o sintoma
+  // exato que o Build 4 existiu para acabar. Este teste e a trava disso.
+  const todos = banco.clientes.map((c: any) => ({ id: c.id, familia_id: c.familia_id }));
+  const emLote = await fin.calcularSaldosEmLote(todos);
+  let divergiu: string | null = null;
+  for (const c of todos) {
+    const um = await fin.calcularSaldo(c.id);
+    const lote = emLote.get(c.id)!;
+    if (um.saldo !== lote.saldo || um.aConferir !== lote.aConferir) {
+      divergiu = `${c.id}: uma ${um.saldo}/${um.aConferir} x lote ${lote.saldo}/${lote.aConferir}`;
+      break;
+    }
+  }
+  checar("lote e ficha dao o MESMO saldo para todo mundo", divergiu === null, divergiu || "");
+  checar("lote cobre todos os clientes", emLote.size === todos.length,
+         `${emLote.size} de ${todos.length}`);
 
   console.log("\n=== 2. CAPACIDADE ===");
   const cap = await import("../src/lib/capacidade");

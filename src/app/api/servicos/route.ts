@@ -103,8 +103,12 @@ export async function GET(req: NextRequest) {
   }
 
   if (ids.length) {
+    // "Cobrado" = existe debito para este servico, no razao da familia
+    // (DECISOES.md D-01). O gatilho da 0071 espelha os debitos do razao antigo
+    // para ca, entao ler so este alcança os dois — e alcança tambem os debitos
+    // de origem `lavagem`, que nunca existiram em `movimentos`.
     const { data: movs } = await db
-      .from("movimentos")
+      .from("conta_corrente")
       .select("servico_id,valor")
       .eq("org_id", org)
       .eq("tipo", "debito")

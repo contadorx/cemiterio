@@ -17,9 +17,15 @@ export async function GET(req: NextRequest) {
     .toISOString()
     .slice(0, 10);
 
+  // CSV PARA A CONTABILIDADE — razao da familia (DECISOES.md D-01).
+  //
+  // Aqui NAO se filtra saldo de abertura: quem recebe este arquivo quer o
+  // extrato inteiro do periodo, com a origem na coluna ao lado para decidir o
+  // que fazer com cada linha. Filtrar em silencio seria esconder lancamento de
+  // quem esta conferindo.
   const { data: movs } = await db
-    .from("movimentos")
-    .select("data,tipo,valor,status_conc,descricao,origem,clientes(nome)")
+    .from("conta_corrente")
+    .select("data,tipo,valor,status_conc,descricao,origem,familia_id,familias(nome)")
     .gte("data", ini)
     .lte("data", fim)
     .order("data", { ascending: true });
@@ -29,12 +35,12 @@ export async function GET(req: NextRequest) {
     return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
-  const linhas = ["data;cliente;tipo;valor;status;origem;descricao"];
+  const linhas = ["data;familia;tipo;valor;status;origem;descricao"];
   for (const m of movs || []) {
     linhas.push(
       [
         (m as any).data,
-        esc((m as any).clientes?.nome || ""),
+        esc((m as any).familias?.nome || ""),
         (m as any).tipo,
         Number((m as any).valor).toFixed(2),
         (m as any).status_conc,

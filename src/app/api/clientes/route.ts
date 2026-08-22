@@ -5,6 +5,7 @@ import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 import { anexarJazigo, criarPlanoSeFaltar, explicarErroJazigo } from "@/lib/jazigo";
 import { valorMensalDoPlano, valorMensalEfetivo, diaOperacao } from "@/lib/vencimento";
+import { calcularSaldosEmLote } from "@/lib/financeiro";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,15 +65,19 @@ export async function GET(req: NextRequest) {
     servicosPorCliente.set(sv.cliente_id, (servicosPorCliente.get(sv.cliente_id) || 0) + 1);
   }
 
-  const [{ data: tums }, { data: plans }, { data: movs }] = await Promise.all([
+  // O SALDO VEM DO RAZAO DA FAMILIA (decisao de 22/08/2026, DECISOES.md D-01).
+  // Duas pessoas da mesma familia mostram o MESMO numero nesta lista — e a
+  // decisao, nao duplicidade. Para contar FAMILIAS atrasadas em vez de pessoas,
+  // filtre por `responsavel_financeiro`, que ja vem em cada linha.
+  const [{ data: tums }, { data: plans }, saldos] = await Promise.all([
     db.from("tumulos").select("cliente_id,identificacao,rua,quadra_id,quadras(codigo)").in("cliente_id", ids.length ? ids : ["-"]),
     db.from("planos").select("cliente_id,cadencia,lavagens_por_ciclo,valor_mensal,valor_vigente,ativo,proximo_servico,proxima_cobranca,pago_ate,migrado_em").in("cliente_id", ids.length ? ids : ["-"]),
-    db.from("movimentos").select("cliente_id,tipo,valor,status_conc").in("cliente_id", ids.length ? ids : ["-"]),
+    calcularSaldosEmLote((clientes || []) as any[]),
   ]);
 
   const porCliente = new Map<string, any>();
   for (const c of (clientes || []) as any[]) {
-    porCliente.set(c.id, { ...c, jazigos: [], cadencias: [], saldo: 0, mensal: 0,
+    porCliente.set(c.id, { ...c, jazigos: [], cadencias: [], saldo: 0, aConferir: 0, mensal: 0,
                            proximaLavagem: null, proximaCobranca: null,
                            temPlanoAtivo: false, conferido: true });
   }
@@ -97,10 +102,10 @@ export async function GET(req: NextRequest) {
       if (!p.migrado_em) x.conferido = false;
     }
   }
-  for (const m of (movs || []) as any[]) {
-    const x = porCliente.get(m.cliente_id); if (!x) continue;
-    if (m.status_conc !== "confirmado") continue;
-    x.saldo += m.tipo === "credito" ? Number(m.valor) : -Number(m.valor);
+  for (const [clienteId, s] of saldos) {
+    const x = porCliente.get(clienteId); if (!x) continue;
+    x.saldo = s.saldo;
+    x.aConferir = s.aConferir;
   }
 
   let lista = [...porCliente.values()].map((c) => ({

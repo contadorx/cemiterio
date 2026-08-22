@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ehDoPeriodo } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { diaOperacao, mesOperacao } from "@/lib/vencimento";
@@ -47,12 +48,17 @@ export async function GET(req: NextRequest) {
   const medido = custoMedido > 0;
   const custoIa = Math.round((medido ? custoMedido : chamadas * custoUnit) * 100) / 100;
 
-  // recebido das famílias no mês (entra como entrada operacional, mesmo sem lançamento manual)
+  // Recebido das familias no mes (entra como entrada operacional, mesmo sem
+  // lancamento manual). Razao da familia — DECISOES.md D-01.
+  //
+  // Isto alimenta `naoLancado`, que e o alarme de "entrou dinheiro e ninguem
+  // lancou no caixa". Lendo o razao antigo, pagamento que so existia no novo
+  // ficava fora da conta e o alarme dizia que estava tudo lancado.
   const { data: movs } = await db
-    .from("movimentos").select("tipo,valor,status_conc,data")
+    .from("conta_corrente").select("tipo,valor,status_conc,data,origem")
     .gte("data", ini).lte("data", fim).eq("status_conc", "confirmado");
   const recebidoFamilias = (movs || [])
-    .filter((m: any) => m.tipo === "credito")
+    .filter((m: any) => m.tipo === "credito" && ehDoPeriodo(m.origem))
     .reduce((s: number, m: any) => s + Number(m.valor), 0);
 
   let entradas = 0, saidas = 0;

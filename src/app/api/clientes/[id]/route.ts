@@ -18,10 +18,21 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .maybeSingle();
   if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
 
+  // O EXTRATO E DA FAMILIA (DECISOES.md D-01).
+  //
+  // Antes esta ficha listava `movimentos` da PESSOA. O resultado pratico: a
+  // ficha da Anninha mostrava extrato vazio e saldo zero enquanto a familia
+  // dela devia R$ 240,00 — o lancamento estava no razao novo, que a ficha nao
+  // lia. Agora as duas pessoas da mesma familia veem o MESMO extrato, que e o
+  // que a operacao ja dizia em voz alta ("a familia esta devendo").
+  const familiaId = (cliente as any).familia_id as string | null;
+
   const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
     db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,ruas(nome),quadras(codigo)").eq("cliente_id", id),
     db.from("planos").select("id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate,proxima_cobranca,proximo_servico,migrado_em,momento_cobranca").eq("cliente_id", id),
-    db.from("movimentos").select("id,tipo,valor,status_conc,data,descricao").eq("cliente_id", id).order("data", { ascending: false }),
+    db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem")
+      .eq("familia_id", familiaId || "00000000-0000-0000-0000-000000000000")
+      .order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
   ]);
 
@@ -42,8 +53,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     cliente,
     tumulos: tumulos || [],
     planos: planos || [],
-    saldo,
-    aConferir,
+    saldo: Math.round(saldo * 100) / 100,
+    aConferir: Math.round(aConferir * 100) / 100,
+    extrato: mov || [],
+    // Pessoa sem familia: extrato vazio por AUSENCIA DE DADO, nao por estar em
+    // dia. Quem desenha a tela precisa poder dizer isso em vez de mostrar
+    // "R$ 0,00 · em dia" sobre alguem de quem nao se sabe nada.
+    semFamilia: !familiaId,
     pagamentos,
     mensagens: (msgs || []).reverse(),
   });
@@ -102,9 +118,24 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (auth.erro) return auth.erro;
   const db = auth.db;
 
-  const { count } = await db
-    .from("movimentos").select("id", { count: "exact", head: true }).eq("cliente_id", params.id);
-  if ((count || 0) > 0) {
+  // A TRAVA TEM DE OLHAR OS DOIS RAZOES.
+  //
+  // Ela contava so `movimentos`. Depois da decisao de 22/08, uma familia pode
+  // ter a divida inteira em `conta_corrente` e nenhuma linha em `movimentos` —
+  // e foi o caso da Anninha, com R$ 240,00. Essa familia passava pela trava e
+  // era excluida, levando o historico junto. Enquanto os dois razoes existirem,
+  // qualquer linha em qualquer um deles impede a exclusao.
+  const { data: cli } = await db
+    .from("clientes").select("familia_id").eq("id", params.id).maybeSingle();
+  const fid = (cli as any)?.familia_id as string | null;
+
+  const [{ count }, { count: countCc }] = await Promise.all([
+    db.from("movimentos").select("id", { count: "exact", head: true }).eq("cliente_id", params.id),
+    fid
+      ? db.from("conta_corrente").select("id", { count: "exact", head: true }).eq("familia_id", fid)
+      : Promise.resolve({ count: 0 } as any),
+  ]);
+  if ((count || 0) + (countCc || 0) > 0) {
     return NextResponse.json(
       { ok: false, erro: "tem_movimento_financeiro",
         mensagem: "Esta família já tem lançamentos no financeiro. Excluir apagaria o histórico. Use 'Remover dados' (LGPD), que preserva a contabilidade." },

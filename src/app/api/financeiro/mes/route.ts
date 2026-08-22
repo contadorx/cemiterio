@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ehDoPeriodo } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 import { calcularTemperatura } from "@/lib/reajuste";
 import { diaOperacao, mesOperacao } from "@/lib/vencimento";
@@ -68,12 +69,12 @@ export async function GET(req: NextRequest) {
     { data: servMes },
     { data: comprovantes },
   ] = await Promise.all([
-    db.from("movimentos")
-      .select("cliente_id,tipo,valor,status_conc,data,origem,servico_id,descricao")
+    db.from("conta_corrente")
+      .select("familia_id,tipo,valor,status_conc,data,origem,servico_id,descricao")
       .lte("data", fim)
       .order("data"),
     db.from("clientes")
-      .select("id,nome,telefone,cobranca_nivel,max_lembretes,envio_automatico,regua_cobranca,anonimizado_em"),
+      .select("id,nome,telefone,familia_id,responsavel_financeiro,cobranca_nivel,max_lembretes,envio_automatico,regua_cobranca,anonimizado_em"),
     db.from("servicos")
       .select("id,status,valor,data_executada,cliente_id,plano_id,foto_depois_url,planos(cadencia)")
       .gte("data_executada", ini)
@@ -93,12 +94,25 @@ export async function GET(req: NextRequest) {
     .is("identificada_em", null).lte("data", fim)
     .then((r) => (r.error ? null : r.data), () => null);
 
+  // DOIS INDICES, PORQUE HA DOIS GRAOS NESTA TELA.
+  //
+  // O dinheiro e da FAMILIA (DECISOES.md D-01); o serviço continua tendo dono
+  // pessoa. `porFamilia` aponta para o RESPONSAVEL FINANCEIRO: e o nome que a
+  // cobranca usa, e sao os campos de regua dele que valem para a familia.
   const nomeDe = new Map((clientes || []).map((c: any) => [c.id, c]));
+  const porFamilia = new Map<string, any>();
+  for (const c of (clientes || []) as any[]) {
+    if (c.familia_id && c.responsavel_financeiro) porFamilia.set(c.familia_id, c);
+  }
 
   // =====================================================================
   // 1. O DINHEIRO DO MÊS
   // =====================================================================
-  const doMes = (movsAte || []).filter((m: any) => m.data >= ini);
+  // Saldo de abertura entra no SALDO (a familia deve mesmo) mas nunca no
+  // dinheiro DO MES: ele tem data de digitacao, nao de acontecimento. Ver
+  // `ehDoPeriodo` em lib/financeiro. Era exatamente a mistura que a auditoria
+  // aponta na home (CA-02).
+  const doMes = (movsAte || []).filter((m: any) => m.data >= ini && ehDoPeriodo(m.origem));
   let entrou = 0, aConferir = 0, faturado = 0;
   for (const m of doMes as any[]) {
     const v = Number(m.valor) || 0;
@@ -131,20 +145,24 @@ export async function GET(req: NextRequest) {
   for (const m of (movsAte || []) as any[]) {
     if (m.status_conc === "rejeitado" || m.status_conc === "a_conferir") continue;
     const v = Number(m.valor) || 0;
-    saldoAte.set(m.cliente_id, (saldoAte.get(m.cliente_id) || 0) + (m.tipo === "credito" ? v : -v));
-    if (m.tipo === "credito") ultimoCredito.set(m.cliente_id, m.data);
-    else ultimoDebito.set(m.cliente_id, m.data);
+    if (!m.familia_id) continue;
+    saldoAte.set(m.familia_id, (saldoAte.get(m.familia_id) || 0) + (m.tipo === "credito" ? v : -v));
+    if (m.tipo === "credito") ultimoCredito.set(m.familia_id, m.data);
+    else ultimoDebito.set(m.familia_id, m.data);
   }
 
   const devendo: any[] = [];
   const adiantados: any[] = [];
-  for (const [cid, saldo] of saldoAte) {
-    const c: any = nomeDe.get(cid);
+  for (const [fid, saldo] of saldoAte) {
+    // O titular e o responsavel financeiro da familia. `clienteId` continua
+    // sendo id de PESSOA porque e o que o painel usa para abrir a ficha.
+    const c: any = porFamilia.get(fid);
     if (!c || c.anonimizado_em) continue;
     if (saldo < -0.005) {
-      const desde = ultimoCredito.get(cid) || null;
+      const desde = ultimoCredito.get(fid) || null;
       devendo.push({
-        clienteId: cid,
+        clienteId: c.id,
+        familiaId: fid,
         nome: c.nome,
         telefone: c.telefone,
         valor: r2(Math.abs(saldo)),
@@ -161,7 +179,7 @@ export async function GET(req: NextRequest) {
         naoCobrar: c.regua_cobranca === "nao_cobrar",
       });
     } else if (saldo > 0.005) {
-      adiantados.push({ clienteId: cid, nome: c.nome, valor: r2(saldo) });
+      adiantados.push({ clienteId: c.id, familiaId: fid, nome: c.nome, valor: r2(saldo) });
     }
   }
   devendo.sort((a, b) => b.valor - a.valor);
@@ -171,10 +189,16 @@ export async function GET(req: NextRequest) {
   const pagouNoMes = new Map<string, number>();
   for (const m of doMes as any[]) {
     if (m.tipo !== "credito" || m.status_conc !== "confirmado") continue;
-    pagouNoMes.set(m.cliente_id, (pagouNoMes.get(m.cliente_id) || 0) + (Number(m.valor) || 0));
+    if (!m.familia_id) continue;
+    pagouNoMes.set(m.familia_id, (pagouNoMes.get(m.familia_id) || 0) + (Number(m.valor) || 0));
   }
   const pagaram = [...pagouNoMes.entries()]
-    .map(([cid, v]) => ({ clienteId: cid, nome: (nomeDe.get(cid) as any)?.nome || "—", valor: r2(v) }))
+    .map(([fid, v]) => ({
+      clienteId: (porFamilia.get(fid) as any)?.id || null,
+      familiaId: fid,
+      nome: (porFamilia.get(fid) as any)?.nome || "—",
+      valor: r2(v),
+    }))
     .sort((a, b) => b.valor - a.valor);
 
   // =====================================================================

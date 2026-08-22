@@ -55,6 +55,19 @@ export async function registrarComprovante(
 
   const comprovanteId = (comp as any).id as string;
 
+  // POR QUE ESTA ESCRITA CONTINUA EM `movimentos`
+  //
+  // A decisao de 22/08 fez de `conta_corrente` a fonte da verdade, e todas as
+  // LEITURAS ja migraram. As escritas nao migraram ainda — e nao precisam
+  // migrar de uma vez, porque o gatilho `trg_espelha_movimento_na_conta`
+  // (0071) leva cada linha daqui para o razao da familia, com `movimento_id`
+  // preenchido, sem duplicar. O `status_conc: "a_conferir"` viaja junto: o
+  // comprovante NAO vira saldo antes de alguem conferir, nos dois razoes.
+  //
+  // Migrar a escrita e o passo do congelamento de `movimentos`, e so pode
+  // acontecer depois que nenhuma outra porta escrever la — hoje sao esta e as
+  // funcoes SQL. Enquanto isso, o gatilho e o que mantem os dois iguais.
+  //
   // Só cria a pendência de crédito se tem valor lido.
   if (dados.valor && dados.valor > 0) {
     const { error: e2 } = await db.from("movimentos").insert({

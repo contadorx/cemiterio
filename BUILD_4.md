@@ -1,7 +1,7 @@
 # Build 4 — verdade financeira
 
-**Estado:** decisão tomada em 22/08/2026 e implementada no razão. Falta migrar
-os 14 arquivos que ainda leem o razão antigo.
+**Estado:** decisão tomada em 22/08/2026, implementada no razão, e as leituras
+migradas (11 arquivos). Faltam as escritas e o congelamento do razão antigo.
 
 > **A decisão, nas palavras da responsável:**
 > *"É a família, mas sempre tem um responsável financeiro."*
@@ -300,19 +300,91 @@ que ele deixar de valer.
 | Pai e filha na mesma família | **mesmo saldo** (−720,00) — o invariante da decisão |
 | Família com dois membros, cobrança automática | **uma** mensagem, para o responsável |
 
-### 8.6 O que falta, na ordem
+### 8.6 As 11 leituras migradas, e o que cada número virou
 
-1. **Migrar os 14 arquivos** que ainda leem `movimentos` para o razão da
-   família. `calcularSaldo()` era o mais importante e já foi.
-2. **Congelar `movimentos`** — só depois que ninguém mais escrever nele.
-   Congelar por policy é melhor que apagar: o histórico fica legível.
+Com o razão trocado, os quatro números que a operação olha mudam assim — medido
+em produção em 22/08:
+
+| Número | Lia `movimentos` | Lê `conta_corrente` | O que faltava |
+|---|---|---|---|
+| Recebido no mês | 60,00 | **160,00** | o pagamento de 100,00 de 08/08 |
+| Executado no mês | 40,00 | **90,00** | as duas lavagens de 25,00 |
+| A receber | 40,00 | **280,00** | os 240,00 da Anninha |
+| Famílias em aberto | por pessoa | por família | uma dívida, uma linha |
+
+**Arquivos migrados (11):** `clientes` (lista e ficha), `indicadores`,
+`financeiro/mes`, `financeiro/relatorio`, `financeiro/gestao`,
+`financeiro/export`, `financeiro/recibo`, `hoje`, `servicos`, `clientes/lgpd`,
+e as libs `reajuste` e `avaliacao-periodica`.
+
+#### A armadilha que a migração destapou: `origem = 'abertura'`
+
+Em produção há um débito de **R$ 240,00 carimbado 17/08/2026** que é dívida
+anterior ao sistema inteiro — a data é a do dia em que alguém digitou.
+
+Para o **saldo**, ela conta: a família deve mesmo.
+Para qualquer relatório **por período**, ela não pode contar. Medindo:
+
+```
+executado em agosto, com o filtro:   R$  90,00   ← trabalho de verdade
+executado em agosto, sem o filtro:   R$ 330,00   ← e 240 disso é história
+```
+
+Trocar o razão sem essa regra teria feito agosto fechar com **mais que o triplo**
+do trabalho que existiu. É a mesma confusão que a auditoria descreve na home
+(CA-02): misturar o que aconteceu no mês com o que a família devia desde sempre.
+
+A regra mora em `ehDoPeriodo()` (`src/lib/financeiro.ts`), num lugar só. Se
+aparecer outra origem de história migrada, é lá que ela entra — e todos os
+relatórios acertam juntos.
+
+#### Três buracos que só apareceram ao migrar
+
+1. **A trava de exclusão olhava um razão só.** `DELETE /api/clientes/[id]`
+   recusava excluir quem tem lançamento — contando `movimentos`. A Anninha, com
+   a dívida inteira no razão novo, **passava pela trava** e seria excluída com o
+   histórico junto. Agora conta os dois.
+2. **Pagamento sem recibo possível.** `/api/financeiro/recibo` só procurava em
+   `movimentos`. O pagamento de 100,00, que existe só no razão novo, devolvia
+   `nao_e_pagamento`: a família pagava e não tinha como receber comprovante.
+   Agora procura nos dois, e o titular é o responsável financeiro. De quebra,
+   comprovante `a_conferir` deixou de virar recibo — recibo é a casa dizendo
+   "recebi", e dizer isso antes de bater o extrato é o que a conferência existe
+   para impedir.
+3. **A exportação LGPD vinha incompleta.** Exportava `movimentos` da pessoa. Para
+   quem tem a vida financeira no razão novo, o campo financeiro do arquivo vinha
+   vazio — o direito de acesso falhando exatamente onde mais importa. Agora leva
+   os dois, e o razão da família vai identificado como tal, porque é um extrato
+   **compartilhado**, não um registro individual.
+
+#### O que a cobertura de teste alcança — e o que não alcança
+
+O `simular.ts` exercita `src/lib/*`, **não as rotas**. Das 11 migrações, só
+`reajuste` e `financeiro` são alcançadas por ele: as outras nove passaram por
+tipagem e leitura, não por teste. Isso está dito aqui porque "128 passaram" não
+significa que as rotas foram provadas.
+
+O que ganhou teste foi o invariante que sustenta as nove: **`calcularSaldo()` e
+`calcularSaldosEmLote()` têm de devolver o mesmo número para toda pessoa da
+massa.** São duas implementações da mesma regra — uma por pessoa (a ficha), uma
+em lote (as listas). Se divergirem, a lista mostra um número e a ficha da mesma
+pessoa mostra outro, que é o sintoma exato que este build existiu para acabar.
+
+### 8.7 O que falta, na ordem
+
+1. ~~**Migrar os arquivos** que ainda leem `movimentos`~~ — **feito (8.6)**. As
+   leituras acabaram. Restam as **escritas**: uma em TypeScript
+   (`src/lib/conciliacao.ts`) e as funções SQL. Todas continuam válidas porque o
+   gatilho da 0071 espelha cada linha para o razão da família.
+2. **Congelar `movimentos`** — só depois de migrar essas escritas. Congelar por
+   policy é melhor que apagar: o histórico fica legível.
 3. **Corrigir a home (CA-02)** — hoje mistura lavagens de uma competência com
    saldo de outro momento. Só dá para corrigir agora que existe um saldo só.
 4. **Funil** — a identificar → a conciliar → em aberto → pronto para fechar →
    fechado.
 5. **O resto do glossário** (8.2), por escrito.
 
-### 8.7 Uma pergunta que ficou aberta
+### 8.8 Uma pergunta que ficou aberta
 
 `familias.modo_cobranca` separa dois mundos: `consumo` (cada lavagem vira
 dívida) e `competencia` (o mês vira dívida, a lavagem é só registro).

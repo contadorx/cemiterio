@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ehDoPeriodo } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -19,8 +20,11 @@ export async function GET() {
     // limpezas a fazer: previstas para hoje OU atrasadas (data no passado) que
     // ainda não saíram (pendente/agendado). Atrasada não some do radar.
     db.from("servicos").select("id,status,data_prevista").lte("data_prevista", hoje),
-    // dinheiro que entrou hoje: crédito já confirmado, com data de hoje
-    db.from("movimentos").select("valor").eq("tipo", "credito").eq("status_conc", "confirmado").eq("data", hoje),
+    // Dinheiro que entrou hoje: credito ja confirmado, com data de hoje.
+    // Le o razao da familia (DECISOES.md D-01) — no razao antigo, pagamento
+    // lancado pela ficha da familia nao aparecia aqui. `origem` vem junto para
+    // descartar saldo de abertura, que tem data mas nao e dinheiro que entrou.
+    db.from("conta_corrente").select("valor,origem").eq("tipo", "credito").eq("status_conc", "confirmado").eq("data", hoje),
     // conversas abertas em que a família falou por último — esperam resposta nossa
     db.from("conversas").select("ultimo_autor").eq("aberta", true),
     // quem chegou pelo site/WhatsApp e ainda não foi atendido. Sem isto, o lead
@@ -35,7 +39,10 @@ export async function GET() {
   const atrasadas = pendentes.filter((s: any) => (s.data_prevista as string) < hoje).length;
 
   let entrouHoje = 0;
-  for (const m of credHoje || []) entrouHoje += Number((m as any).valor) || 0;
+  for (const m of credHoje || []) {
+    if (!ehDoPeriodo((m as any).origem)) continue;   // abertura nao e caixa do dia
+    entrouHoje += Number((m as any).valor) || 0;
+  }
 
   const aguardando = (conversas || []).filter((c: any) => c.ultimo_autor === "cliente").length;
 
