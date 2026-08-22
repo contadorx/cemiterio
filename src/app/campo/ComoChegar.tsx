@@ -19,6 +19,35 @@
  * isso — seta sem bússola apontando como se fosse "para frente" manda a pessoa
  * para o lado errado com cara de certeza.
  *
+ * O QUE VOLTOU DO CAMPO EM 22/08, E O QUE FOI FEITO
+ * ---------------------------------------------------------------------------
+ * "A navegação no campo foi bem ruim, as setas ficam malucas […] a diferença em
+ * metros foi significativa e somente quando cheguei ele ajustou."
+ *
+ * Eram três defeitos, e nenhum deles era "o GPS é ruim":
+ *
+ *   1. A SETA GIRAVA PELO CAMINHO LONGO. O ângulo ia de 0 a 360 e a seta tem
+ *      `transition: transform`. Ao cruzar o norte, 359° -> 1° é interpretado
+ *      pelo navegador como girar 358° para trás. Uma tremida de dois graus
+ *      virava uma volta quase inteira na tela. Defeito de CSS, não de sinal.
+ *      Conserto: `desenrolarAngulo` mantém o ângulo contínuo.
+ *
+ *   2. A POSIÇÃO PODIA VIR VELHA. `maximumAge: 2000` autoriza o navegador a
+ *      devolver uma leitura guardada, e no Android a primeira que chega é a de
+ *      rede, dezenas de metros fora. Daí o número travado até a chegada.
+ *      Conserto: `maximumAge: 0` e uma média das leituras recentes ponderada
+ *      pela precisão de cada uma, descartando as muito piores que a melhor.
+ *
+ *   3. A SETA APONTAVA O RUÍDO QUANDO ELA ESTAVA PARADA. Sem bússola, a
+ *      direção vinha do rumo do GPS; parada, esse rumo é a direção do erro.
+ *      Conserto: com deslocamento abaixo do ruído a seta CONGELA e a tela diz
+ *      por quê, em vez de girar com cara de quem sabe.
+ *
+ * E entrou o MAPA (`MapaAteOJazigo`), que foi o pedido dela. O mapa não depende
+ * de bússola nenhuma: norte para cima, imagem aérea atrás, os dois pontos e a
+ * distância. É a saída para o caso em que a seta, mesmo consertada, não tem
+ * como saber para onde o aparelho aponta.
+ *
  * HONESTIDADE DE DISTÂNCIA
  * ---------------------------------------------------------------------------
  * "12 m" é mentira quando a leitura tem ±15 m. A margem aparece junto e a
@@ -27,7 +56,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { distanciaMetros, rumoGraus, anguloDaSeta, relogio, cardeal, distanciaBr, incerteza } from "@/lib/geo";
+import {
+  distanciaMetros, rumoGraus, anguloDaSeta, relogio, cardeal, distanciaBr, incerteza,
+  desenrolarAngulo, leiturasValidas, mediaPonderada, deslocamentoNaJanela, type Leitura,
+} from "@/lib/geo";
+import MapaAteOJazigo from "./MapaAteOJazigo";
 
 type Alvo = {
   tumulo: string;
@@ -51,7 +84,16 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
   const [erro, setErro] = useState("");
   const [bussola, setBussola] = useState<number | null>(null);
   const [pedindoBussola, setPedindoBussola] = useState(false);
+  const [mapa, setMapa] = useState(false);
+  /** Quanto ela andou na janela recente — é o que diz se o rumo vale. */
+  const [andou, setAndou] = useState(0);
   const watch = useRef<number | null>(null);
+  /** As leituras cruas dos últimos segundos. Ref, não estado: elas chegam
+      várias por segundo e não é cada uma que precisa repintar a tela. */
+  const hist = useRef<Leitura[]>([]);
+  /** O ângulo CONTÍNUO que vai para o CSS — pode passar de 360 ou ficar
+      negativo, e é justamente isso que faz a animação pegar o lado curto. */
+  const anguloRef = useRef<number>(NaN);
 
   const temAlvo = alvo.lat != null && alvo.lng != null && isFinite(Number(alvo.lat)) && isFinite(Number(alvo.lng));
 
@@ -65,10 +107,29 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
     watch.current = navigator.geolocation.watchPosition(
       (p) => {
         setErro("");
+        const agora = Date.now();
+        hist.current = [
+          ...hist.current,
+          {
+            lat: p.coords.latitude,
+            lng: p.coords.longitude,
+            prec: Number(p.coords.accuracy) || 30,
+            em: agora,
+          },
+        ].slice(-24);
+
+        // A POSIÇÃO QUE VAI PARA A TELA é a média das leituras que ainda valem,
+        // ponderada pela precisão de cada uma. Sem isto, cada leitura crua
+        // repintava a seta — e a 43 m com ±9 m de erro o rumo balança uns 12°
+        // de graça, a cada segundo.
+        const boas = leiturasValidas(hist.current, agora);
+        const m = mediaPonderada(boas);
+        if (!m) return;
+        setAndou(deslocamentoNaJanela(boas));
         setPos({
-          lat: p.coords.latitude,
-          lng: p.coords.longitude,
-          prec: Number(p.coords.accuracy) || 30,
+          lat: m.lat,
+          lng: m.lng,
+          prec: m.prec,
           // heading do GPS só existe ANDANDO; parada, vem null ou NaN
           heading: p.coords.heading != null && isFinite(p.coords.heading) && (p.coords.speed || 0) > 0.5
             ? p.coords.heading : null,
@@ -81,10 +142,14 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
             : "Não consegui pegar o sinal do GPS. Saia de perto de paredes e de dentro do carro.",
         );
       },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
+      // maximumAge 0: leitura guardada não serve. Era ela que fazia o número
+      // ficar parado em "43 m" enquanto a pessoa andava, e só destravar na
+      // chegada, quando o GNSS finalmente entregava uma posição própria.
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
     );
     return () => {
       if (watch.current != null) navigator.geolocation.clearWatch(watch.current);
+      hist.current = [];
     };
   }, [temAlvo]);
 
@@ -105,6 +170,16 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
       window.removeEventListener("deviceorientation", ao as any, true);
     };
   }
+
+  // Abre o mapa sozinho na primeira leitura que mostre distância de caminhada.
+  // Uma vez aberto ou fechado pela pessoa, a escolha dela manda — por isso o
+  // efeito só age enquanto ninguém tocou (`decidiu`).
+  const decidiu = useRef(false);
+  useEffect(() => {
+    if (decidiu.current || !pos || !temAlvo) return;
+    const dd = distanciaMetros(pos.lat, pos.lng, Number(alvo.lat), Number(alvo.lng));
+    if (dd > 25) { setMapa(true); decidiu.current = true; }
+  }, [pos, temAlvo, alvo.lat, alvo.lng]);
 
   useEffect(() => {
     const D: any = typeof window !== "undefined" ? (window as any).DeviceOrientationEvent : null;
@@ -133,6 +208,24 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
     margem = incerteza(pos.prec, alvo.gpsPrecisao);
     angulo = anguloDaSeta(rumo, norte);
   }
+
+  // A SETA CONGELA QUANDO NÃO HÁ O QUE APONTAR.
+  //
+  // Sem bússola, a direção sai do rumo do GPS — e parada, esse rumo é a direção
+  // do próprio erro. O corte é o deslocamento da janela contra a precisão da
+  // leitura: andar menos que a margem de erro não é andar, é tremer. Congelada,
+  // a seta guarda a última direção boa e a tela diz que está congelada; girar
+  // com cara de certeza é o que mandava a pessoa para o lado errado.
+  const semReferencia = bussola == null;
+  const parada = semReferencia && andou < Math.max(4, pos ? pos.prec * 0.8 : 8);
+  const congelada = parada && isFinite(anguloRef.current);
+
+  if (temAlvo && pos && !congelada) {
+    // O ângulo que vai para o CSS é CONTÍNUO: 359° -> 1° vira 359° -> 361°, e a
+    // animação percorre 2° em vez de 358° para trás. Este era o "seta maluca".
+    anguloRef.current = desenrolarAngulo(anguloRef.current, angulo);
+  }
+  const anguloTela = isFinite(anguloRef.current) ? anguloRef.current : angulo;
 
   // chegou = a margem já cobre a distância. Com ±18 m, "estou a 15 m" e "estou
   // em cima" são a mesma informação — e continuar mandando andar faria a pessoa
@@ -174,7 +267,7 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
         {temAlvo && pos && (
           <>
             <div style={e.bussolaCaixa}>
-              <div style={{ ...e.seta, transform: `rotate(${angulo}deg)` }}>
+              <div style={{ ...e.seta, transform: `rotate(${anguloTela}deg)`, opacity: congelada ? 0.5 : 1 }}>
                 <svg viewBox="0 0 100 100" width="130" height="130" aria-hidden>
                   <circle cx="50" cy="50" r="47" fill="#f7f3e9" stroke="#e7e0cf" strokeWidth="3" />
                   <path d="M50 12 L74 82 L50 66 L26 82 Z" fill={chegou ? "#166534" : "#0f766e"} />
@@ -184,12 +277,32 @@ export default function ComoChegar({ alvo, onFechar, onComecar }: {
                 <div style={e.distancia}>{chegou ? "chegou" : distanciaBr(d)}</div>
                 <div style={e.margem}>margem de ±{Math.round(margem)} m</div>
                 <div style={e.direcao}>
-                  {norte != null
-                    ? relogio(angulo)
-                    : `para ${cardeal(rumo)} — a seta aponta pelo NORTE, não pela sua frente`}
+                  {congelada
+                    ? "seta parada — comece a andar para ela se orientar"
+                    : norte != null
+                      ? relogio(angulo)
+                      : `para ${cardeal(rumo)} — a seta aponta pelo NORTE, não pela sua frente`}
                 </div>
               </div>
             </div>
+
+            {/* O MAPA — o pedido dela, e a saída para quando a seta não tem
+                referência. Fica aberto por padrão a partir de 25 m: é a
+                distância em que "para que lado eu ando?" ainda é a pergunta.
+                Chegando perto, a foto da lápide vale mais que qualquer mapa. */}
+            <button style={e.botaoSec} onClick={() => { decidiu.current = true; setMapa((x) => !x); }}>
+              {mapa ? "▾ Esconder o mapa" : "🗺️ Ver no mapa"}
+            </button>
+
+            {mapa && (
+              <div style={{ marginTop: 10 }}>
+                <MapaAteOJazigo
+                  alvo={{ lat: Number(alvo.lat), lng: Number(alvo.lng) }}
+                  eu={{ lat: pos.lat, lng: pos.lng }}
+                  margem={margem}
+                />
+              </div>
+            )}
 
             <div style={{ ...e.instrucao, ...(chegou ? e.instrucaoChegou : {}) }}>
               {chegou

@@ -12,6 +12,7 @@ import { prepararFoto, motivoFalha } from "@/lib/foto";
 function explicarEnvio(motivo?: string): string {
   switch (motivo) {
     case "desmarcado": return "você desmarcou o envio";
+    case "fotos_desligadas": return "o envio de fotos está desligado para esta família (ou na chave geral, em Config)";
     case "familia_desligada": return "o envio automático está DESLIGADO nesta família (ligue na ficha dela)";
     case "disparos_desligados": return "a chave mestra de disparos está desligada (Config)";
     case "sem_telefone": return "esta família não tem telefone cadastrado";

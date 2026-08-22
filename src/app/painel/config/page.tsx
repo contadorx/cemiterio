@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -17,6 +17,7 @@ export default function Config() {
             ["equipe", "Equipe"],
             ["cemiterios", "Cemitérios"],
             ["campo", "Campo"],
+            ["mensagens", "Mensagens"],
             ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
@@ -35,7 +36,8 @@ export default function Config() {
         {aba === "equipe" && <Equipe />}
         {aba === "cemiterios" && <Cemiterios />}
         {aba === "campanhas" && <Campanhas />}
-        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && <Agregados aba={aba} />}
+        {aba === "mensagens" && <Mensagens />}
+        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && aba !== "mensagens" && <Agregados aba={aba} />}
       </div>
     </div>
   );
@@ -1153,5 +1155,244 @@ function CompraMaterial({ m, onFechar, onConfirmar }:
         para sugerir o gasto real por limpeza.
       </p>
     </div>
+  );
+}
+
+/**
+ * MENSAGENS — a chave de envio de fotos e os textos da casa.
+ *
+ * Nasceu de duas coisas que a Sureya viu na primeira limpeza de verdade, em
+ * 22/08: a mensagem que chegou na fila era um bilhete de sistema ("A limpeza
+ * foi feita. Segue a foto."), e não havia como dizer "esta família não recebe
+ * foto" sem desligar o envio de todo mundo.
+ *
+ * A CHAVE tem dois níveis de propósito: a geral aqui, e uma por família na
+ * ficha dela, que SOBREPÕE esta. Desligar aqui não apaga a exceção de quem
+ * pediu para receber — por isso a contagem de exceções aparece junto.
+ */
+function Mensagens() {
+  const [ativo, setAtivo] = useState<boolean | null>(null);
+  const [excecoes, setExcecoes] = useState<{ desligadas: number; ligadas: number }>({ desligadas: 0, ligadas: 0 });
+  const [dias, setDias] = useState("");
+  const [diasSalvo, setDiasSalvo] = useState("");
+  const [modelos, setModelos] = useState<any[]>([]);
+  const [tipo, setTipo] = useState<"foto" | "cobranca" | "lembrete" | "agradecimento">("foto");
+  const [rascunho, setRascunho] = useState("");
+  const [edicao, setEdicao] = useState<Record<string, string>>({});
+  const [ocupado, setOcupado] = useState(false);
+
+  async function carregarChave() {
+    const r = await fetch("/api/config/fotos").then((x) => x.json()).catch(() => null);
+    if (r?.ok) {
+      setAtivo(!!r.ativo);
+      setExcecoes(r.excecoes || { desligadas: 0, ligadas: 0 });
+      const d = String(r.diasEntreFotos ?? 30);
+      setDias(d); setDiasSalvo(d);
+    } else setAtivo(null);
+  }
+  async function carregarTextos(t = tipo) {
+    const r = await fetch(`/api/config/textos?tipo=${t}`).then((x) => x.json()).catch(() => null);
+    setModelos(r?.ok ? r.modelos : []);
+    setEdicao({});
+  }
+
+  useEffect(() => { carregarChave(); }, []);
+  useEffect(() => { carregarTextos(tipo); }, [tipo]);
+
+  async function alternarChave() {
+    if (ativo === null) return;
+    const novo = !ativo;
+    if (!novo && !confirm(
+      "Desligar o envio de fotos para as famílias?\n\n" +
+      "As limpezas continuam sendo registradas e você continua vendo as fotos no painel. " +
+      "O que para é a mensagem para a família.")) return;
+    setOcupado(true);
+    const r = await fetch("/api/config/fotos", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ativo: novo }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) carregarChave();
+    else alert("Não consegui salvar: " + (r?.erro || "erro"));
+  }
+
+  async function salvarDias() {
+    setOcupado(true);
+    const r = await fetch("/api/config/fotos", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ diasEntreFotos: dias }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (r?.ok) carregarChave();
+    else alert(r?.erro === "dias_invalidos"
+      ? "Escreva um número de dias entre 0 e 3650. Zero desliga o aviso."
+      : "Não consegui salvar: " + (r?.erro || "erro"));
+  }
+
+  async function acao(metodo: string, corpo: any, url = "/api/config/textos") {
+    setOcupado(true);
+    const r = await fetch(url, {
+      method: metodo,
+      headers: { "Content-Type": "application/json" },
+      body: metodo === "DELETE" ? undefined : JSON.stringify(corpo),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (!r?.ok) {
+      alert(r?.erro === "ultimo_ativo"
+        ? "Este é o único texto ligado deste tipo. Sem nenhum, o sistema volta a mandar a frase curta de reserva — cadastre outro antes de desligar este."
+        : r?.erro === "texto_vazio" ? "O texto não pode ficar vazio."
+        : "Não consegui salvar: " + (r?.erro || "erro"));
+      return false;
+    }
+    await carregarTextos();
+    return true;
+  }
+
+  const ligado = ativo === true;
+  const rotuloTipo: Record<string, string> = {
+    foto: "Foto do serviço", cobranca: "Cobrança",
+    lembrete: "Lembrete", agradecimento: "Agradecimento",
+  };
+
+  return (
+    <>
+      {/* ------------------------------------------------------ a chave */}
+      <div style={{ ...painel.card,
+                    background: ativo === null ? "#f1f5f9" : ligado ? "#f0fdf4" : "rgb(var(--zm-perigo) / 0.08)",
+                    borderLeft: `5px solid ${ativo === null ? cor.linha : ligado ? "rgb(var(--zm-positivo))" : "rgb(var(--zm-perigo))"}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 220, flex: 1 }}>
+            <strong style={{ color: cor.navy, fontSize: 17 }}>
+              Enviar fotos para as famílias: {ativo === null ? "…" : ligado ? "LIGADO" : "DESLIGADO"}
+            </strong>
+            <p style={{ color: cor.cinza, fontSize: 14, margin: "8px 0 0", lineHeight: 1.5 }}>
+              {ligado
+                ? "Ao concluir uma limpeza, a foto vira uma mensagem na fila de liberação para você aprovar."
+                : "Nenhuma mensagem de foto é montada. As limpezas continuam sendo registradas e as fotos continuam no painel — você confere o trabalho de campo do mesmo jeito, a família é que não recebe."}
+            </p>
+            {(excecoes.desligadas > 0 || excecoes.ligadas > 0) && (
+              <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0" }}>
+                Exceções na ficha das famílias:{" "}
+                {excecoes.desligadas > 0 && <b>{excecoes.desligadas} não recebe{excecoes.desligadas > 1 ? "m" : ""}</b>}
+                {excecoes.desligadas > 0 && excecoes.ligadas > 0 && " · "}
+                {excecoes.ligadas > 0 && <b>{excecoes.ligadas} recebe{excecoes.ligadas > 1 ? "m" : ""} sempre</b>}
+                . A chave da família vale mais que esta.
+              </p>
+            )}
+          </div>
+          <button onClick={alternarChave} disabled={ativo === null || ocupado}
+                  style={ligado ? painel.botaoPerigo : painel.botao}>
+            {ligado ? "Desligar envio de fotos" : "Ligar envio de fotos"}
+          </button>
+        </div>
+
+        {/* O AVISO DE FOTO RECENTE.
+            Pedido dela: "preciso da indicação da última data de foto enviada
+            para decidir ou não enviar — não quero manter a frequência toda
+            data". A fila SEMPRE mostra a data; este número é só o ponto a
+            partir do qual ela é pintada de atenção, para achar de relance,
+            numa fila de vinte, as que provavelmente vão ser descartadas.
+            Não bloqueia envio nenhum. */}
+        <div style={{ borderTop: `1px solid ${cor.linha}`, marginTop: 14, paddingTop: 14 }}>
+          <label style={painel.rotulo}>Avisar quando a família já recebeu foto há menos de</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input inputMode="numeric" value={dias} onChange={(e) => setDias(e.target.value)}
+                   style={{ ...painel.input, width: 110 }} />
+            <span style={{ fontSize: 15, color: cor.cinza }}>dias</span>
+            {dias !== diasSalvo && (
+              <button style={painel.botaoMini} disabled={ocupado} onClick={salvarDias}>Salvar</button>
+            )}
+          </div>
+          <p style={{ color: cor.cinza, fontSize: 13, margin: "8px 0 0", lineHeight: 1.5 }}>
+            A data da última foto aparece em toda mensagem da fila, com aviso ou sem.
+            Este número só decide quando a linha fica amarela. <b>Zero desliga o aviso</b>,
+            e nada aqui impede você de enviar.
+          </p>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------ os textos */}
+      <div style={painel.card}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "rgb(var(--zm-ink))", margin: "0 0 8px" }}>Textos das mensagens</h2>
+        <p style={{ color: cor.cinza, fontSize: 14, lineHeight: 1.5, marginTop: 0 }}>
+          O sistema escolhe um destes a cada mensagem, para a mesma família não
+          ler o mesmo parágrafo doze vezes por ano. Você sempre pode editar antes
+          de enviar, e trocar por outro na tela de liberação.
+          {" "}<b>{"{nome}"}</b> vira o primeiro nome de quem recebe, com o tratamento
+          (“Sr. André”). <b>{"{jazigo}"}</b> vira o código do jazigo.
+        </p>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}>
+          {(["foto", "cobranca", "lembrete", "agradecimento"] as const).map((t) => (
+            <button key={t} onClick={() => setTipo(t)}
+                    style={tipo === t ? painel.botao : painel.botaoSec}>
+              {rotuloTipo[t]}
+            </button>
+          ))}
+        </div>
+
+        {modelos.length === 0 && (
+          <p style={{ color: cor.cinza, fontSize: 14 }}>
+            Nenhum texto cadastrado para <b>{rotuloTipo[tipo]}</b>. Sem nenhum, sai a frase
+            curta de reserva — cadastre pelo menos um.
+          </p>
+        )}
+
+        {modelos.map((m: any, i: number) => (
+          <div key={m.id} style={{ border: `1px solid ${cor.linha}`, borderRadius: 12, padding: 12, marginBottom: 10,
+                                   opacity: m.ativo ? 1 : 0.55 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: cor.cinza }}>
+                Texto {i + 1}{m.ativo ? "" : " · desligado"}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button style={painel.botaoSec} disabled={ocupado}
+                        onClick={() => acao("PUT", { id: m.id, ativo: !m.ativo })}>
+                  {m.ativo ? "Desligar" : "Ligar"}
+                </button>
+                <button style={painel.botaoSec} disabled={ocupado}
+                        onClick={() => {
+                          if (!confirm("Apagar este texto de vez?")) return;
+                          acao("DELETE", null, `/api/config/textos?id=${m.id}`);
+                        }}>
+                  Apagar
+                </button>
+              </div>
+            </div>
+            <textarea
+              rows={4}
+              value={edicao[m.id] ?? m.texto}
+              onChange={(e) => setEdicao((x) => ({ ...x, [m.id]: e.target.value }))}
+              style={{ width: "100%", borderRadius: 10, border: `1px solid ${cor.linha}`,
+                       padding: 10, fontSize: 15, lineHeight: 1.5, fontFamily: "inherit" }}
+            />
+            {edicao[m.id] !== undefined && edicao[m.id] !== m.texto && (
+              <button style={{ ...painel.botao, marginTop: 8 }} disabled={ocupado}
+                      onClick={() => acao("PUT", { id: m.id, texto: edicao[m.id] })}>
+                Salvar este texto
+              </button>
+            )}
+          </div>
+        ))}
+
+        <div style={{ marginTop: 14 }}>
+          <textarea
+            rows={3}
+            placeholder={`Escrever mais um texto de ${rotuloTipo[tipo].toLowerCase()}…`}
+            value={rascunho}
+            onChange={(e) => setRascunho(e.target.value)}
+            style={{ width: "100%", borderRadius: 10, border: `1px solid ${cor.linha}`,
+                     padding: 10, fontSize: 15, lineHeight: 1.5, fontFamily: "inherit" }}
+          />
+          <button style={{ ...painel.botao, marginTop: 8 }}
+                  disabled={ocupado || !rascunho.trim()}
+                  onClick={async () => {
+                    if (await acao("POST", { tipo, texto: rascunho })) setRascunho("");
+                  }}>
+            Acrescentar texto
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

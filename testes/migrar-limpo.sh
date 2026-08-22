@@ -125,7 +125,9 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 # DELTA DELIBERADO DE TABELAS
 #   0075  +1  competencias — um mes fechado passa a ser um FATO, com data e
 #             autor. Antes, "fechado" era so a lembranca de quem apertou o botao.
-TABELAS_DELTA=${TABELAS_DELTA:-1}
+#   0085  +1  modelos_mensagem — os textos da casa viram um CONJUNTO. A frase
+#             de reserva escrita dentro da funcao chegou na tela em producao.
+TABELAS_DELTA=${TABELAS_DELTA:-2}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -137,7 +139,11 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             esquema depois.
 # Soma zero. Enquanto a 0074 nao subir, producao tera 2 gatilhos a MAIS que o
 # repositorio — e este numero volta a fechar quando ela subir.
+<<<<<<< Updated upstream
 GATILHOS_DELTA=${GATILHOS_DELTA:-0}
+=======
+GATILHOS_DELTA=${GATILHOS_DELTA:-3}
+>>>>>>> Stashed changes
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -166,12 +172,17 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0059  +1   quitacoes_org (a tabela e nova no repositorio)
 #   0067  +41  as restritivas que separam campo de administracao
 #   0074  +1   movimentos_congelado (RESTRICTIVE: o razao antigo vira historia)
+#   0085  +1   trg_fila_politica_de_foto — a chave de envio e o texto de
+#              reserva aplicados na PORTA da fila, valendo para todo caminho
+#   0089  +1   trg_textos_iniciais — organizacao nova nascia sem texto nenhum
 #   0075  +2   competencias_org e competencias_so_admin_escreve
 #   0079  +5   as restritivas de DELETE que faltavam (clientes, tumulos,
 #              membros, orgs, movimentos) — a 0067 tinha posto a guarda so no
 #              WITH CHECK, que o DELETE nao consulta
+#   0085  +4   modelos_mensagem: a de org mais uma restritiva POR COMANDO
+#              (insert, update, delete) — de novo a licao da 0079
 # Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-49}
+POLICIES_DELTA=${POLICIES_DELTA:-53}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -185,10 +196,24 @@ POLICIES_DELTA=${POLICIES_DELTA:-49}
 #             sureya_fila_destravar
 #   0078  +2  sureya_arquivos_do_cliente, sureya_expurgo_previa
 #   0080  +1  sureya_conferencia_cadastro
+<<<<<<< Updated upstream
 # Saldo: +14. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
 FUNCOES_DELTA=${FUNCOES_DELTA:-14}
+=======
+#   0081  +1  sureya_jazigo_herda_familia
+#   0082  +2  sureya_reordenar_dia, sureya_priorizar_servico
+#   0085  +4  sureya_texto_modelo, sureya_envia_fotos, sureya_primeiro_nome,
+#             sureya_fila_politica_de_foto (o gatilho da porta da fila)
+#   0086  +1  sureya_textos_do_tipo — a lista que a tela oferece
+#   0088  +1  sureya_datar_lavagem — a limpeza anotada depois cai no mes certo
+#   0089  +2  sureya_semear_textos e a casca sureya_textos_iniciais
+# Saldo: +25. As demais migrations desta
+# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
+# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
+FUNCOES_DELTA=${FUNCOES_DELTA:-25}
+>>>>>>> Stashed changes
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -292,6 +317,76 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/outbox.sql 2>&1); then
   echo "$saida" | grep -E "OUTBOX FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "A fila pode estar reenviando foto que ja saiu."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O CONTATO DO SITE TEM PARA ONDE IR
+#
+# O formulario publico prometia "respondemos no mesmo dia" e avisava apontando
+# para uma rota que o middleware devolve 404. O teste cobra a fila que faltava.
+# ---------------------------------------------------------------------------
+echo "CONTATOS — a fila de quem escreveu pelo site"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/contatos.sql 2>&1); then
+  echo "$saida" | grep -E "CONTATOS FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Um contato do site pode ficar sem atendimento e ninguem descobre."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# A LIMPEZA REGISTRADA DEPOIS, PELO PAINEL
+#
+# Ate a 0088 este caminho tinha implementacao propria da regra de dinheiro. O
+# teste cobra que agora ele passa pela MESMA transacao do campo, e que a data
+# retroativa sobrevive a ela.
+# ---------------------------------------------------------------------------
+echo "REGISTRO PELO PAINEL — limpeza feita antes, anotada depois"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/registro_painel.sql 2>&1); then
+  echo "$saida" | grep -E "REGISTRO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Limpeza anotada pelo painel pode nao virar dinheiro, nem foto, nem cair no mes certo."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# OS TEXTOS DA CASA E A CHAVE DE ENVIO
+#
+# O que a Sureya viu na tela em 22/08 foi a frase de reserva escrita dentro da
+# funcao, nao o texto da casa. Aqui esse caminho e percorrido de proposito.
+# ---------------------------------------------------------------------------
+echo "MENSAGENS — o conjunto de textos e a chave de envio de fotos"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/mensagens.sql 2>&1); then
+  echo "$saida" | grep -E "MENSAGENS FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "A familia pode receber um bilhete de sistema, ou receber foto que pediu para nao receber."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# AS RUAS COSTURADAS
+#
+# A 0084 e migration de DADOS: em banco vazio ela nao faz nada, entao aplicar
+# sem erro nao prova coisa alguma. Este teste monta a planta das 4 quadras,
+# reaplica o arquivo e cobra o efeito — inclusive rodando duas vezes.
+# ---------------------------------------------------------------------------
+echo "ROTEIRO — a Principal em todas as quadras, as ruas partidas costuradas"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/roteiro.sql 2>&1); then
+  echo "$saida" | grep -E "ROTEIRO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "A Nina pode estar andando a mesma rua duas vezes no mesmo dia."
   echo "============================================================"
   exit 1
 fi

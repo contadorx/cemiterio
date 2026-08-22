@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarDays, Home, Inbox, MapPin, Receipt, Settings,
-  Sparkles, Users, MessageCircle, LogOut, Landmark, ClipboardCheck,
-} from "lucide-react";
+import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, Mail, MapPin, MessageCircle, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -22,6 +19,9 @@ const DIA_A_DIA = [
   { href: "/painel", label: "O mês", icon: Home },
   { href: "/painel/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/painel/fila", label: "Liberação", icon: Inbox },
+  // Quem escreveu pelo site. Ficava sem tela nenhuma: os avisos apontavam
+  // para o CRM desligado, que devolve 404.
+  { href: "/painel/contatos", label: "Contatos", icon: Mail },
   { href: "/painel/avulsos", label: "Avulsos", icon: Sparkles },
   { href: "/campo", label: "Campo", icon: MapPin },
 ];

@@ -57,8 +57,17 @@ export const SITE = {
       `Limpeza e conservação de jazigos em ${MARCA.regiao}. ` +
       "Terminado o serviço, chega no seu WhatsApp a foto do jazigo limpo. " +
       "Sem precisar acreditar: dá para ver.",
-    cta: "Falar no WhatsApp",
-    cta2: "Pedir um orçamento",
+    // AS DUAS CTAs DIZIAM A MESMA COISA de jeitos diferentes: "Falar no
+    // WhatsApp" e "Pedir um orçamento" são o mesmo pedido, e a pessoa tinha de
+    // adivinhar que uma abre o WhatsApp e a outra rola até um formulário.
+    //
+    // Agora cada uma diz O QUE ACONTECE DEPOIS DO CLIQUE — e elas deixam de
+    // competir: uma é para quem quer resolver agora, a outra para quem não
+    // quer (ou não pode) conversar por escrito. Num público idoso, "prefiro
+    // receber uma ligação" não é a opção secundária: para muita gente é a
+    // única.
+    cta: "Quero saber o valor no WhatsApp",
+    cta2: "Prefiro receber uma ligação",
   },
 
   // -------------------------------------------------------------------------
@@ -178,6 +187,63 @@ export const SITE = {
     fotos: [
       { antes: "/site/antes-1.jpg", depois: "/site/depois-1.jpg", legenda: "Quadra e número, jazigo sem visita há oito meses" },
     ],
+  },
+
+  // -------------------------------------------------------------------------
+  // JÁ SOMOS DE CASA — a seção que faltava para quem JÁ é cliente.
+  //
+  // A página inteira falava com desconhecido. Mas uma família atual entra no
+  // site para: recuperar o link, ver as fotos, avisar uma data, mudar a
+  // frequência, falar de pagamento ou trocar o responsável. Todas essas
+  // pessoas caíam no mesmo botão de WhatsApp genérico e tinham de explicar de
+  // novo quem eram.
+  //
+  // "Ver as fotos" leva a /familia — a página que reenvia o link privado pelo
+  // telefone. As outras abrem WhatsApp COM O ASSUNTO JÁ ESCRITO: menos
+  // digitação para um público idoso, e a conversa já começa no lugar certo.
+  //
+  // O TOKEN NUNCA APARECE AQUI. Ele é o que dá acesso ao histórico da família,
+  // e uma home é pública: o caminho é sempre "diga seu telefone, eu mando no
+  // seu WhatsApp".
+  // -------------------------------------------------------------------------
+  cliente: {
+    titulo: "Já cuidamos do jazigo da sua família?",
+    texto:
+      "Então esta parte é para você. Não precisa explicar tudo de novo — " +
+      "escolha o assunto e a conversa já começa no ponto certo.",
+    acoes: [
+      {
+        rotulo: "Ver as fotos das visitas",
+        detalhe: "a sua página com o histórico — eu reenvio o link no seu WhatsApp",
+        href: "/familia",
+        externo: false,
+      },
+      {
+        rotulo: "Avisar uma data",
+        detalhe: "aniversário, missa, visita da família",
+        texto:
+          "Ola! Sou cliente e queria avisar uma data importante para a proxima visita ao jazigo da minha familia.",
+      },
+      {
+        rotulo: "Mudar a frequência",
+        detalhe: "mais vezes, menos vezes, ou só nas datas",
+        texto:
+          "Ola! Sou cliente e queria conversar sobre a frequencia das visitas ao jazigo da minha familia.",
+      },
+      {
+        rotulo: "Falar sobre pagamento",
+        detalhe: "valor, Pix, comprovante",
+        texto: "Ola! Sou cliente e queria falar sobre o pagamento da manutencao.",
+      },
+      {
+        rotulo: "Trocar quem recebe as mensagens",
+        detalhe: "outro telefone, outra pessoa da família",
+        texto:
+          "Ola! Sou cliente e queria trocar o telefone/a pessoa que recebe as mensagens sobre o jazigo.",
+      },
+    ] as {
+      rotulo: string; detalhe: string; href?: string; externo?: boolean; texto?: string;
+    }[],
   },
 
   // -------------------------------------------------------------------------

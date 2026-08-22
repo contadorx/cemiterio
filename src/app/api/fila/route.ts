@@ -34,7 +34,7 @@ export async function GET() {
   const { data, error } = await db
     .from("fila_liberacao")
     .select(
-      "id,tipo,status,texto,fotos,criado_em,servico_id," +
+      "id,tipo,status,texto,fotos,criado_em,servico_id,familia_id,tumulo_id," +
         "tentativas,ultimo_erro,ultimo_erro_em,erro_tipo,fotos_enviadas," +
         "familias(nome),clientes(nome,telefone)," +
         "tumulos(codigo,identificacao,ruas(nome),quadras(codigo))," +
@@ -46,6 +46,42 @@ export async function GET() {
     .limit(100);
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  // ------------------------------------------------------------------------
+  // QUANDO ESTA FAMÍLIA RECEBEU FOTO PELA ÚLTIMA VEZ (migration 0087)
+  //
+  // Pedido dela: "preciso da indicação da última data de foto enviada para
+  // decidir ou não enviar — não quero manter a frequência toda data". A foto é
+  // um gesto; mandar em toda limpeza transforma carinho em rotina, e a família
+  // de plano semanal receberia cinquenta por ano.
+  //
+  // Duas consultas em lote, não uma por item: com vinte mensagens na fila, uma
+  // por item seriam quarenta idas ao banco para desenhar uma linha de texto.
+  //
+  // A view junta os DOIS caminhos de envio — a fila e o envio automático da
+  // conclusão. Olhar só a fila diria "nunca recebeu" para quem recebeu pela
+  // conclusão, e a Sureya mandaria de novo achando que era a primeira vez.
+  // ------------------------------------------------------------------------
+  const familiaIds = [...new Set((data || []).map((f: any) => f.familia_id).filter(Boolean))];
+  const tumuloIds  = [...new Set((data || []).map((f: any) => f.tumulo_id).filter(Boolean))];
+
+  const [{ data: ultFam }, { data: ultJaz }, { data: cfg }] = await Promise.all([
+    familiaIds.length
+      ? db.from("sureya_ultima_foto_familia").select("familia_id,ultima_em,total")
+          .eq("org_id", org).in("familia_id", familiaIds)
+      : Promise.resolve({ data: [] } as any),
+    tumuloIds.length
+      ? db.from("sureya_ultima_foto_jazigo").select("tumulo_id,ultima_em,total")
+          .eq("org_id", org).in("tumulo_id", tumuloIds)
+      : Promise.resolve({ data: [] } as any),
+    db.from("orgs").select("dias_entre_fotos").eq("id", org).maybeSingle(),
+  ]);
+
+  const porFamilia = new Map<string, any>(((ultFam || []) as any[]).map((r) => [r.familia_id, r]));
+  const porJazigo  = new Map<string, any>(((ultJaz || []) as any[]).map((r) => [r.tumulo_id, r]));
+
+  // Zero desliga o aviso. `?? 30` cobre o banco antigo, antes da coluna existir.
+  const diasEntreFotos = Number((cfg as any)?.dias_entre_fotos ?? 30) || 0;
 
   const itens = (data || []).map((f: any) => {
     // QUAL É O ANTES E QUAL É O DEPOIS.
@@ -92,6 +128,17 @@ export async function GET() {
     ultimoErroEm: f.ultimo_erro_em || null,
     erroTipo: f.erro_tipo || null,
     fotosEnviadas: Number(f.fotos_enviadas) || 0,
+
+    // A ÚLTIMA FOTO QUE ESTA FAMÍLIA RECEBEU.
+    //
+    // `null` aqui significa NUNCA recebeu — que é diferente de "recebeu hoje" e
+    // é justamente o caso em que ela manda sem pensar. A tela precisa dizer as
+    // duas coisas com palavras diferentes.
+    ultimaFotoFamiliaEm: porFamilia.get(f.familia_id)?.ultima_em ?? null,
+    ultimaFotoFamiliaTotal: Number(porFamilia.get(f.familia_id)?.total) || 0,
+    // O grão do jazigo responde a segunda pergunta, que só existe para família
+    // com mais de uma pedra: "recebeu foto há 8 dias" pode ter sido da OUTRA.
+    ultimaFotoJazigoEm: porJazigo.get(f.tumulo_id)?.ultima_em ?? null,
     };
   });
 
@@ -106,7 +153,7 @@ export async function GET() {
     whatsapp = "erro";
   }
 
-  return NextResponse.json({ ok: true, itens, whatsapp });
+  return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos });
 }
 
 export async function POST(req: NextRequest) {

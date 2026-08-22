@@ -99,3 +99,173 @@ disser, fica público como o resto.
 A política de retenção e consentimento (Build 6, entrega 4) precisa **dizer isso
 por escrito**: as fotos ficam acessíveis por link permanente a quem o tiver.
 Sem esse parágrafo, a política afirma uma proteção que o sistema não faz.
+
+---
+
+## D-04 · A chave de envio de fotos é da FAMÍLIA, e a geral é só o padrão
+
+**Pedido, 22/08:** *"queria uma chave para ligar e desligar o envio de fotos do
+início e do fim, uma chave geral e uma por família que sobrepõe — claro, eu
+quero ver para confirmar a atividade de campo."*
+
+**O que foi construído (0085):**
+
+| | |
+|---|---|
+| `orgs.enviar_fotos_familia` | a chave geral, ligada de fábrica |
+| `familias.enviar_fotos` | por família — `null` = segue a geral, e **sobrepõe** nos dois sentidos |
+| Onde a regra age | `sureya_envia_fotos()`, consultada pelo gatilho da fila **e** pelo envio automático |
+
+**Três estados, não dois.** `null` não é "desligado": é "segue a casa". Guardar
+`false` no lugar de nulo faria toda família cadastrada antes desta migration
+parar de receber foto no dia em que alguém religasse a geral.
+
+**O que a chave NÃO desliga.** A limpeza acontece inteira: débito, extrato,
+remuneração, material, e as duas fotos gravadas no serviço e visíveis no painel.
+É exatamente o que ela pediu — conferir o trabalho de campo sem a família
+receber. O que para é a mensagem nascer.
+
+**Por que não reusei `disparos_ativos`.** Aquela é chave de emergência: corta
+todo envio automático de todo mundo, e é por cliente (`envio_automatico`), não
+por família. Esta é de política, tem o grão da carteira, e vale também para a
+fila de liberação — que é manual e não passa por aqueles freios.
+
+---
+
+## D-05 · A seta continua, e o mapa entra ao lado dela
+
+**Do campo, 22/08:** *"a navegação foi bem ruim, as setas ficam malucas, talvez
+um mapa de ponto a ponto seja melhor."*
+
+Antes de trocar a seta pelo mapa, fui ver por que ela estava maluca. **Não era o
+GPS.** O ângulo ia de 0 a 360 e a seta tem `transition: transform`: ao cruzar o
+norte, 359° → 1° é animado pelo navegador como 358° para trás. Uma tremida de
+dois graus virava quase uma volta na tela. Isso está consertado
+(`desenrolarAngulo`), junto com a leitura velha (`maximumAge: 0` e média
+ponderada pela precisão) e com a seta que apontava o ruído quando ela estava
+parada (agora congela e diz que congelou).
+
+**Mesmo consertada, a seta tem um limite que não se conserta:** ela precisa
+saber para onde o APARELHO aponta. Sem bússola calibrada, e parada, essa
+informação não existe — e boa parte dos Android não entrega orientação absoluta.
+
+Por isso o mapa entrou **ao lado**, não no lugar: norte para cima, imagem aérea
+atrás, os dois pontos e a linha entre eles. Não depende de bússola nenhuma. Abre
+sozinho acima de 25 m, que é a distância em que "para que lado eu ando?" ainda é
+a pergunta; perto, quem manda é a foto da lápide.
+
+**A linha é reta, e é dita como reta na tela.** Não conheço os muros nem onde há
+passagem entre quadras. Uma curva inventada mandaria contornar por onde não se
+passa — pior que a reta honesta.
+
+---
+
+## D-06 · A foto é um gesto, não um relatório mensal
+
+**Pedido, 22/08:** *"preciso que tenha a indicação da última data de foto
+enviada para decidir ou não enviar — não quero manter a frequência toda data."*
+
+**O que NÃO foi construído:** nenhuma regra automática. Não há bloqueio, não há
+"a cada N dias o sistema segura a mensagem". A decisão continua sendo dela, uma
+mensagem por vez — o que faltava era o número em cima do qual decidir.
+
+**O que foi construído (0087):** toda mensagem de foto na fila mostra, acima das
+fotos, quando aquela **família** recebeu foto pela última vez, há quantos dias, e
+quantas já recebeu. Para família com mais de uma pedra (são cinco hoje), mostra
+também a data **deste jazigo** quando ela difere — "recebeu há 8 dias" pode ter
+sido da outra pedra, e aí a resposta muda.
+
+**Nunca recebeu é outra coisa que recebeu há muito tempo.** A view devolve
+ausência de linha, não zero, e a tela diz "Primeira foto desta família" em verde.
+Tratar as duas como a mesma coisa faria a tela afirmar que a família recebeu foto
+hoje quando ela nunca recebeu nenhuma.
+
+**Dois caminhos, não um.** A foto chega à família pela fila de liberação
+(`decidido_em`, que só sobrevive em quem saiu mesmo) **ou** pelo envio automático
+da conclusão (`servicos.notificado_cliente`, carimbado por `data_executada`).
+Olhar só a fila diria "nunca recebeu" para quem recebeu pelo outro caminho — data
+errada com cara de certa, que é pior que data nenhuma.
+
+**O aviso amarelo tem um número que a casa escolhe** (Config › Mensagens, padrão
+30 dias, zero desliga). Ele só pinta a linha, para achar de relance numa fila de
+vinte as que provavelmente vão ser descartadas. A data aparece com aviso ou sem.
+
+---
+
+## D-07 · A limpeza anotada pelo painel passa pela mesma porta do campo
+
+**Pedido, 22/08:** *"queria ter como cadastrar um serviço realizado pelo painel,
+com data e foto, para ir para fila e registrar lavagem."*
+
+Ao ir construir, achei que já existia — e existia pela metade. `POST /api/servico`
+com `dataExecutada` criava o serviço `executado` e **inseria em `conta_corrente`
+com um insert próprio**. Ou seja: uma segunda implementação da regra de dinheiro,
+exatamente o que a 0073 veio acabar ao criar a porta única `sureya_lancar`. Além
+disso não aceitava foto (logo, a família nunca recebia), não calculava
+remuneração da executora e não baixava material.
+
+**Uma limpeza registrada pelo painel valia menos que a mesma limpeza registrada
+pelo campo, e a diferença não aparecia em tela nenhuma.**
+
+A porta nova (`/api/servico/registrar-feito`) cria o serviço **já `executado`,
+com a data informada**, e chama `sureya_concluir_lavagem` — a mesma transação do
+campo. Criar já executado não é atalho: a função é convergente e, vendo o serviço
+executado, ela **não reescreve o status** — e é dentro desse `update` que mora
+`data_executada = now()`. Criar pendente apagaria a data retroativa. É o único
+jeito de a data sobreviver sem acrescentar parâmetro à função, que é o que criaria
+a ambiguidade de sobrecarga que já custou caro aqui.
+
+**A foto é opcional.** Sem ela a limpeza é registrada inteira — cobrança,
+extrato, remuneração, material, histórico, urgência do jazigo — e só não há
+mensagem para aprovar. A tela diz isso antes e depois de salvar.
+
+**Nada é enviado.** `notificarFamilia` não é chamada: registro retroativo entra
+na fila e espera aprovação. Uma limpeza de três semanas atrás não deve disparar
+mensagem sozinha.
+
+**`sureya_datar_lavagem` (0088)** fecha o buraco que sobrou: a transação carimba
+`current_date` nos lançamentos. Numa limpeza do mês corrente não muda nada; numa
+de agosto anotada em setembro, muda a **competência** — e competência errada é
+cobrança no mês errado.
+
+---
+
+## D-08 · O lote da fila é sequencial, e dá para parar no meio
+
+**Pedido:** *"na fila cria um marcar e enviar tudo."*
+
+Caixa de seleção em cada cartão, "marcar todas", e — nascido do pedido anterior —
+**"marcar só as N sem aviso"**, que exclui de uma vez as famílias que receberam
+foto há menos dias que o limiar da casa. Sem esse atalho, marcar todas e
+desmarcar as amarelas uma a uma é justamente o trabalho que o lote deveria estar
+tirando.
+
+**Sequencial, não em paralelo.** Cada envio sobe as fotos pela Evolution — são
+megabytes por mensagem, na mesma linha de WhatsApp dela. Vinte de uma vez
+derrubaria a instância, e a fila voltaria com vinte erros de rede que não são
+erros de verdade.
+
+**Dá para parar no meio**, e o que já saiu não volta — não há como desfazer um
+WhatsApp. O resumo do fim nomeia **quem** falhou, não só quantas: "18 de 20"
+sem dizer quais duas obriga a conferir as vinte na mão.
+
+---
+
+## D-09 · Organização nova nascia sem os textos da casa
+
+Não foi pedido: apareceu escrevendo o teste da D-07, num banco limpo. O
+povoamento da 0085 é um laço sobre as organizações que **existiam** no instante
+em que ela rodou. Uma organização criada depois nasce sem modelo nenhum, e
+`sureya_texto_modelo` cai na frase antiga — o mesmo bilhete de sistema que a
+0085 inteira existiu para tirar do caminho.
+
+Em produção há uma organização só, então nunca ia morder aqui. Ia morder na
+primeira restauração de backup em ambiente novo, na homologação, e no dia em que
+existir uma segunda operação — **em silêncio**, porque ninguém abre o cadastro de
+textos para conferir se está vazio.
+
+Fechado com gatilho (`trg_textos_iniciais`), e não com mais um bloco de
+povoamento: bloco resolve hoje e quebra na próxima organização. A lista de textos
+mora numa função só (`sureya_semear_textos`), que o gatilho e o povoamento das
+antigas chamam — duas cópias da lista neste repositório seria o começo de duas
+listas diferentes.

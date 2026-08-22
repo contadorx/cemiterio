@@ -24,7 +24,7 @@ export async function GET(
 
   const { data, error } = await auth.db
     .from("familias")
-    .select("id,nome,observacoes,valor_mensal,valor_base,freq_pagamento,inicio_cobranca,contratado,modo_cobranca")
+    .select("id,nome,observacoes,valor_mensal,valor_base,freq_pagamento,inicio_cobranca,contratado,modo_cobranca,enviar_fotos")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -54,6 +54,19 @@ export async function PATCH(
   if (b.nome !== undefined) patch.nome = String(b.nome || "").trim() || null;
   if (b.observacoes !== undefined) patch.observacoes = String(b.observacoes || "").trim() || null;
   if (b.contratado !== undefined) patch.contratado = !!b.contratado;
+
+  // A CHAVE DE ENVIO DE FOTOS DESTA FAMÍLIA — três estados, não dois.
+  //
+  // `null` não é "desligado": é "segue a chave geral da casa". Tratar nulo
+  // como falso faria toda família cadastrada antes da 0085 parar de receber
+  // foto no dia em que alguém desligasse e religasse a geral. Por isso o
+  // `!!b.enviar_fotos` que serviria para `contratado` NÃO serve aqui.
+  if (b.enviar_fotos !== undefined) {
+    patch.enviar_fotos =
+      b.enviar_fotos === null || b.enviar_fotos === "" || b.enviar_fotos === "geral"
+        ? null
+        : b.enviar_fotos === true || b.enviar_fotos === "sim";
+  }
 
   if (b.valor_mensal !== undefined) {
     const v = Number(String(b.valor_mensal).replace(",", "."));

@@ -110,9 +110,14 @@ export default function Home() {
             <span>{MARCA.nome}</span>
           </Link>
           <nav style={s.menu}>
-            <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={s.topoLink}>
-              Já sou cliente
-            </a>
+            {/* LEVA PARA /familia, e não para o WhatsApp.
+                Quem clica aqui já é cliente e quer a PRÓPRIA página — a do
+                histórico de visitas. Mandar para um WhatsApp em branco obriga
+                a pessoa a explicar quem é para receber de volta um link que o
+                sistema sabe entregar sozinho. */}
+            <Link href="/familia" style={s.topoLink}>
+              Acompanhar minha família
+            </Link>
             <a href={linkWhats()} style={s.topoWhats} target="_blank" rel="noopener">
               WhatsApp
             </a>
@@ -134,6 +139,52 @@ export default function Home() {
           <p style={s.assinatura}>{MARCA.assinatura}</p>
         </div>
       </header>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* ONDE A GENTE ATENDE                                                 */}
+      {/*                                                                     */}
+      {/* SUBIU PARA CÁ, logo abaixo do hero. Estava perto do fim, depois de  */}
+      {/* toda a explicação — e é a PRIMEIRA pergunta de quem chega por       */}
+      {/* indicação: 'vocês atendem onde está a minha família?'. Quem lê      */}
+      {/* quatro seções para descobrir que a resposta é não, não volta.       */}
+      {/*                                                                     */}
+      {/* Cada cemitério tem página própria: é lá que mora o SEO local.       */}
+      {/* ------------------------------------------------------------------ */}
+      <section style={{ ...s.secao, background: c.cream }} id="onde">
+        <h2 style={s.h2}>{SITE.onde.titulo}</h2>
+        <p style={{ ...s.p, textAlign: "center", maxWidth: 640, margin: "0 auto 24px" }}>
+          {SITE.onde.texto}
+        </p>
+        <div style={s.tres}>
+          {CEMITERIOS.map((cem) => {
+            const chegando = cem.status === "chegando";
+            return (
+              <Link key={cem.slug} href={`/cemiterio/${cem.slug}`}
+                    style={chegando ? { ...s.cartaoLink, ...s.cartaoNovo } : s.cartaoLink}>
+                {chegando && <span style={s.selo}>Chegando agora</span>}
+                <h3 style={s.h3}>{cem.nome}</h3>
+                <p style={{ ...s.p, fontSize: 16 }}>
+                  {cem.bairro}, {cem.cidade} — {cem.uf}
+                </p>
+                {/* a oferta aparece já na home: é o motivo de clicar */}
+                {chegando && cem.primeiraGratis && (
+                  <p style={s.ofertaCartao}>A primeira limpeza é por nossa conta</p>
+                )}
+                <span style={s.saibaMais}>
+                  {chegando ? "Ver como funciona aqui →" : "Ver como funciona aqui →"}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+        <p style={{ ...s.p, textAlign: "center", fontSize: 16, marginTop: 20 }}>
+          {SITE.onde.rodape}{" "}
+          <a href={linkWhats("Ola! O jazigo da minha familia fica em outro cemiterio. Voces atendem?")}
+             style={{ color: c.navy, fontWeight: 700 }} target="_blank" rel="noopener">
+            Perguntar no WhatsApp
+          </a>
+        </p>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* A SITUAÇÃO                                                          */}
@@ -189,9 +240,9 @@ export default function Home() {
             <p style={{ ...s.p, color: "rgba(255,255,255,0.8)", fontSize: 17 }}>
               Se preferir ver tudo junto, cada família tem uma página só dela com o
               histórico de todas as visitas.{" "}
-              <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={{ color: c.gold, fontWeight: 700 }}>
-                Já é cliente? Pegue o seu link
-              </a>
+              <Link href="/familia" style={{ color: c.gold, fontWeight: 700 }}>
+                Já é cliente? Receba o seu link de novo
+              </Link>
               .
             </p>
           </div>
@@ -309,47 +360,36 @@ export default function Home() {
         ) : null}
       </section>
 
+
       {/* ------------------------------------------------------------------ */}
-      {/* ONDE A GENTE ATENDE                                                 */}
+      {/* QUEM JÁ É CLIENTE                                                   */}
       {/*                                                                     */}
-      {/* Última pergunta prática antes de chamar no WhatsApp — e a que o FAQ */}
-      {/* respondia praticamente com "provavelmente não". Cada cemitério tem  */}
-      {/* página própria: é lá que mora o SEO local.                          */}
+      {/* Vem antes do FAQ porque a família atual não vai ler perguntas de     */}
+      {/* quem está decidindo: ela quer resolver uma coisa e sair. Cada botão  */}
+      {/* abre a conversa COM O ASSUNTO ESCRITO — menos digitação para um      */}
+      {/* público idoso, e a equipe recebe o contexto pronto.                  */}
       {/* ------------------------------------------------------------------ */}
-      <section style={{ ...s.secao, background: c.cream }} id="onde">
-        <h2 style={s.h2}>{SITE.onde.titulo}</h2>
+      <section style={s.secao} id="ja-sou-cliente">
+        <h2 style={s.h2}>{SITE.cliente.titulo}</h2>
         <p style={{ ...s.p, textAlign: "center", maxWidth: 640, margin: "0 auto 24px" }}>
-          {SITE.onde.texto}
+          {SITE.cliente.texto}
         </p>
-        <div style={s.tres}>
-          {CEMITERIOS.map((cem) => {
-            const chegando = cem.status === "chegando";
-            return (
-              <Link key={cem.slug} href={`/cemiterio/${cem.slug}`}
-                    style={chegando ? { ...s.cartaoLink, ...s.cartaoNovo } : s.cartaoLink}>
-                {chegando && <span style={s.selo}>Chegando agora</span>}
-                <h3 style={s.h3}>{cem.nome}</h3>
-                <p style={{ ...s.p, fontSize: 16 }}>
-                  {cem.bairro}, {cem.cidade} — {cem.uf}
-                </p>
-                {/* a oferta aparece já na home: é o motivo de clicar */}
-                {chegando && cem.primeiraGratis && (
-                  <p style={s.ofertaCartao}>A primeira limpeza é por nossa conta</p>
-                )}
-                <span style={s.saibaMais}>
-                  {chegando ? "Ver como funciona aqui →" : "Ver como funciona aqui →"}
-                </span>
+        <div style={s.clienteGrade}>
+          {SITE.cliente.acoes.map((a) =>
+            a.href ? (
+              <Link key={a.rotulo} href={a.href} style={s.clienteCartao}>
+                <span style={s.clienteRotulo}>{a.rotulo}</span>
+                <span style={s.clienteDetalhe}>{a.detalhe}</span>
               </Link>
-            );
-          })}
+            ) : (
+              <a key={a.rotulo} href={linkWhats(a.texto)} target="_blank" rel="noopener"
+                 style={s.clienteCartao}>
+                <span style={s.clienteRotulo}>{a.rotulo}</span>
+                <span style={s.clienteDetalhe}>{a.detalhe}</span>
+              </a>
+            ),
+          )}
         </div>
-        <p style={{ ...s.p, textAlign: "center", fontSize: 16, marginTop: 20 }}>
-          {SITE.onde.rodape}{" "}
-          <a href={linkWhats("Ola! O jazigo da minha familia fica em outro cemiterio. Voces atendem?")}
-             style={{ color: c.navy, fontWeight: 700 }} target="_blank" rel="noopener">
-            Perguntar no WhatsApp
-          </a>
-        </p>
       </section>
 
       {/* ------------------------------------------------------------------ */}
@@ -415,9 +455,9 @@ export default function Home() {
             <a href="#contato" style={s.rodapeLink}>
               Pedir um orçamento
             </a>
-            <a href={`https://wa.me/${MARCA.whatsapp}`} target="_blank" rel="noreferrer" style={s.rodapeLink}>
-              Já sou cliente — ver o acompanhamento
-            </a>
+            <Link href="/familia" style={s.rodapeLink}>
+              Receber de novo o meu link
+            </Link>
           </div>
         </div>
 
@@ -532,6 +572,19 @@ function Lapide({ estado }: { estado: "antes" | "depois" }) {
 }
 
 const s: Record<string, React.CSSProperties> = {
+  // A grade de quem já é cliente: cartões grandes, porque o dedo que toca aqui
+  // costuma ter setenta anos. `minmax(240px, 1fr)` empilha sozinho no celular.
+  clienteGrade: {
+    display: "grid", gap: 12, maxWidth: 860, margin: "0 auto",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  },
+  clienteCartao: {
+    display: "block", padding: "18px 20px", minHeight: 88,
+    background: "#fff", border: `1px solid ${MARCA.cores.linha}`, borderRadius: 14,
+    textDecoration: "none", color: MARCA.cores.navy,
+  },
+  clienteRotulo: { display: "block", fontSize: 17, fontWeight: 700, marginBottom: 4 },
+  clienteDetalhe: { display: "block", fontSize: 14, color: MARCA.cores.suave, lineHeight: 1.45 },
   pagina: {
     fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
     color: c.navy,

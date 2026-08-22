@@ -346,6 +346,111 @@ async function rodar() {
          st.baldeDaUrl(`${base}/servicos/o/s/1.jpg`) === "servicos" &&
          st.baldeDaUrl("https://exemplo.com/x.jpg") === null);
 
+<<<<<<< Updated upstream
+=======
+  // ---- O DINHEIRO DA PLANILHA
+  //
+  // Este parser vira COBRANCA REAL. O codigo antigo fazia `Number(col) || 40`:
+  // celula vazia, "R$ 60" e "60,00" viravam todos R$ 40 no banco, calados. Com
+  // 250 jazigos vindo do cemiterio numa planilha, um erro aqui e 250 valores
+  // errados que so aparecem na primeira cobranca.
+  const imp = await import("../src/lib/planilha");
+  const n = imp.numeroPlanilha;
+  checar("60 vira 60", n("60") === 60);
+  checar("60,00 vira 60 (pt-BR)", n("60,00") === 60);
+  checar("60.00 vira 60 (export em ingles)", n("60.00") === 60);
+  checar("R$ 60,00 vira 60", n("R$ 60,00") === 60);
+  checar("1.500,00 e mil e quinhentos", n("1.500,00") === 1500);
+  checar("1,500.00 tambem e mil e quinhentos", n("1,500.00") === 1500);
+  checar("espaco em volta nao atrapalha", n("  75,50 ") === 75.5);
+  // O QUE ELE TEM DE RECUSAR — e recusar e devolver NaN, nunca um valor de
+  // conveniencia. Valor nao entendido deixa o plano sem criar e a linha e dita;
+  // um numero chutado vira dinheiro cobrado de uma familia.
+  checar("celula vazia e recusada", Number.isNaN(n("")));
+  checar("texto e recusado", Number.isNaN(n("combinar")));
+  checar("1.500 (ambiguo) e recusado", Number.isNaN(n("1.500")));
+  checar("nada vira 40 por conveniencia", !([n(""), n("combinar"), n("1.500")].includes(40)));
+
+  // ---- A SETA QUE GIRAVA SOZINHA
+  //
+  // Do campo, 22/08: "as setas ficam malucas". Nao era ruido de GPS — era o
+  // angulo indo de 0 a 360 e o CSS animando 359 -> 1 pelo caminho de tras,
+  // quase uma volta inteira por uma tremida de dois graus.
+  const geo = await import("../src/lib/geo");
+  const { desenrolarAngulo: des, leiturasValidas: lv, mediaPonderada: mp,
+          deslocamentoNaJanela: dj } = geo;
+
+  checar("cruzar o norte gira 2 graus, nao 358", des(359, 1) === 361);
+  checar("e no sentido contrario tambem", des(1, 359) === -1);
+  checar("sem angulo anterior, adota o alvo", des(NaN, 137) === 137);
+  checar("giro grande de verdade continua grande", Math.abs(des(0, 170) - 170) < 1e-9);
+  checar("meia volta nao inverte de lado", Math.abs(des(0, 180) - 180) < 1e-9);
+  // O acumulado nunca pode "desandar": tres passos de 10 graus atravessando o
+  // zero tem de somar 30 na tela, e nao voltar para perto de zero.
+  let acc = 350;
+  for (const alvo of [0, 10, 20]) acc = des(acc, alvo);
+  checar("passos seguidos atravessando o zero acumulam", Math.abs(acc - 380) < 1e-9, String(acc));
+
+  // ---- A POSICAO QUE VINHA VELHA
+  const t0 = 1_000_000;
+  const perto = { lat: -23.65, lng: -46.46 };
+  const hist = [
+    { ...perto, prec: 80, em: t0 },                          // leitura de rede, ruim
+    { lat: -23.650009, lng: -46.46, prec: 6, em: t0 + 3000 },  // GNSS, boa
+    { lat: -23.650011, lng: -46.46, prec: 7, em: t0 + 6000 },
+  ];
+  const boas = lv(hist, t0 + 7000);
+  checar("a leitura de rede ruim e descartada quando ha GNSS", boas.length === 2,
+         `sobraram ${boas.length}`);
+  checar("leitura velha sai da janela", lv(hist, t0 + 60000).length === 0);
+  // Sem nenhuma boa, nao pode sobrar nada: posicao ruim e melhor que nenhuma.
+  checar("so leituras ruins? usa as ruins mesmo",
+         lv([{ ...perto, prec: 90, em: t0 }, { ...perto, prec: 95, em: t0 + 1000 }], t0 + 2000).length === 2);
+
+  const media = mp(boas)!;
+  checar("a media fica entre as leituras boas",
+         media.lat <= -23.650009 && media.lat >= -23.650011, String(media.lat));
+  // A MARGEM NAO ENCOLHE POR TER MAIS LEITURAS. Erro de GPS e correlacionado —
+  // mesmo satelite, mesma parede. Anunciar +-3 m porque foram seis leituras e
+  // prometer o que nao se tem, e e assim que alguem desconfia da lapide certa.
+  checar("a margem e a da melhor leitura, nao a da media", media.prec === 6, String(media.prec));
+  checar("sem leitura nenhuma nao inventa posicao", mp([]) === null);
+
+  // ---- ELA ESTA ANDANDO?
+  checar("parada: deslocamento perto de zero", dj([{ ...perto, prec: 6, em: t0 }]) === 0);
+  checar("andando: o deslocamento aparece em metros",
+         dj([{ lat: -23.65, lng: -46.46, prec: 6, em: t0 },
+             { lat: -23.6503, lng: -46.46, prec: 6, em: t0 + 8000 }]) > 30);
+
+  // ---- A DATA DA ULTIMA FOTO, EM DIA CHEIO
+  //
+  // Pedido dela: "preciso da indicacao da ultima data de foto enviada para
+  // decidir ou nao enviar". O caso que quebra a conta ingenua e o mais comum:
+  // foto enviada ONTEM as 23h, olhada hoje as 8h. Sao nove horas, e
+  // floor(9h/24h) e ZERO — a tela diria "ha 0 dias" para o que ela sabe que foi
+  // ontem, e uma tela que discorda da memoria da pessoa para de ser consultada.
+  const dt = await import("../src/lib/datas");
+  const agora = new Date("2026-08-22T08:00:00");
+  const iso = (s: string) => new Date(s).toISOString();
+
+  checar("ontem as 23h e ONTEM, nao 'ha 0 dias'",
+         dt.diasDesde(iso("2026-08-21T23:00:00"), agora) === 1,
+         String(dt.diasDesde(iso("2026-08-21T23:00:00"), agora)));
+  checar("hoje de manha e hoje", dt.diasDesde(iso("2026-08-22T06:00:00"), agora) === 0);
+  checar("oito dias sao oito dias",
+         dt.diasDesde(iso("2026-08-14T15:00:00"), agora) === 8,
+         String(dt.diasDesde(iso("2026-08-14T15:00:00"), agora)));
+  // NUNCA e diferente de HOJE. Devolver 0 para "sem data" faria a tela dizer
+  // que a familia recebeu foto hoje quando ela nunca recebeu nenhuma.
+  checar("sem data devolve nulo, nao zero", dt.diasDesde(null, agora) === null);
+  checar("data invalida devolve nulo", dt.diasDesde("nao e data", agora) === null);
+  checar("data no futuro nao vira negativo",
+         dt.diasDesde(iso("2026-08-30T10:00:00"), agora) === 0);
+
+  checar("fala 'hoje', 'ontem', e nunca 'ha 1 dias'",
+         dt.faz(0) === "hoje" && dt.faz(1) === "ontem" && dt.faz(8) === "há 8 dias");
+
+>>>>>>> Stashed changes
   console.log("\n=== 2. CAPACIDADE ===");
   const cap = await import("../src/lib/capacidade");
   const c = await cap.calcularCapacidade();

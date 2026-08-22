@@ -34,6 +34,17 @@ export default function Painel() {
   const [dados, setDados] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<"todas" | "pendentes">("pendentes");
+  /** Quem escreveu pelo site e ainda espera — ver o comentário do bloco abaixo. */
+  const [contatos, setContatos] = useState<{ total: number; atrasados: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/contatos")
+      .then((r) => r.json())
+      .then((r) => { if (r?.ok) setContatos({ total: r.resumo.total, atrasados: r.resumo.atrasados }); })
+      // Silencioso de propósito: esta tela é sobre o mês. Se a fila de contatos
+      // não responder, o mês continua aparecendo — só o aviso não sai.
+      .catch(() => {});
+  }, []);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -64,6 +75,34 @@ export default function Painel() {
           className="rounded-lg border border-line bg-card px-3 py-2 text-[15px] text-ink focus:border-brand focus:outline-none"
         />
       </div>
+
+      {/* PRECISA DE VOCÊ — quem escreveu pelo site e ainda espera.
+          Fica ACIMA dos números do mês porque é a única coisa desta tela com
+          relógio correndo: o site promete "respondemos no mesmo dia".
+
+          Existia um card assim e ele saiu quando esta tela virou "O mês" — sem
+          que os avisos do formulário soubessem: eles continuaram apontando
+          para /painel/leads, que o middleware devolve como 404. Um contato do
+          site podia ficar no banco sem tela nenhuma em que aparecesse. */}
+      {contatos && contatos.total > 0 && (
+        <Link
+          href="/painel/contatos"
+          className={`mb-4 block rounded-xl2 border p-4 ${
+            contatos.atrasados > 0
+              ? "border-aviso/40 bg-aviso/10"
+              : "border-line bg-card hover:bg-surface"}`}
+        >
+          <p className={`text-[16px] font-semibold ${contatos.atrasados > 0 ? "text-aviso" : "text-ink"}`}>
+            {contatos.total} {contatos.total === 1 ? "pessoa escreveu" : "pessoas escreveram"} pelo site
+            {contatos.atrasados > 0 && (
+              <> — {contatos.atrasados} sem ninguém ter tentado falar</>
+            )}
+          </p>
+          <p className="mt-0.5 text-[13px] text-ink-soft">
+            Abrir a fila de contatos →
+          </p>
+        </Link>
+      )}
 
       {/* Três números e nada mais no topo: o que falta fazer, o que falta
           entrar, e quanto isso soma.

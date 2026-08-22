@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { MessageCircle, Plus, ChevronDown, Pencil, Link2, Trash2, Camera } from "lucide-react";
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
+import { prepararFoto, motivoFalha } from "@/lib/foto";
 
 /**
  * A FICHA DA FAMÍLIA.
@@ -393,6 +394,11 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
           freq_pagamento: r.familia.freq_pagamento ?? "",
           inicio_cobranca: (r.familia.inicio_cobranca ?? "").slice(0, 7),
           contratado: !!r.familia.contratado,
+          // TRÊS estados, não dois: "" = segue a chave geral da casa.
+          // Guardar `false` no lugar de nulo faria a família parar de receber
+          // foto no dia em que alguém religasse a geral.
+          enviar_fotos: r.familia.enviar_fotos === null || r.familia.enviar_fotos === undefined
+            ? "geral" : (r.familia.enviar_fotos ? "sim" : "nao"),
         });
       }).catch(() => {});
   }, [familiaId]);
@@ -435,7 +441,18 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
       }
     >
       {!abrindo ? (
-        !d?.contratado ? (
+        <>
+        {/* A EXCEÇÃO DE FOTO APARECE SEMPRE, com ou sem plano.
+            Uma família marcada como "nunca enviar" e que não mostra nada aqui é
+            uma armadilha: a Sureya conclui a limpeza, nenhuma mensagem aparece
+            na fila, e não há tela em que se descubra por quê. */}
+        {d?.enviar_fotos === false && (
+          <p className="mb-2"><Selo tom="atencao">esta família NÃO recebe fotos</Selo></p>
+        )}
+        {d?.enviar_fotos === true && (
+          <p className="mb-2"><Selo tom="neutro">recebe fotos mesmo com a chave geral desligada</Selo></p>
+        )}
+        {!d?.contratado ? (
           <p className="text-[14px] text-ink-soft">
             Sem plano — as limpezas entram como avulso na conta corrente.
           </p>
@@ -461,7 +478,8 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
                   : <Selo tom="atencao">falta dizer o ritmo da limpeza no túmulo</Selo>)
               : <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
           </div>
-        )
+        )}
+        </>
       ) : (
         <>
           <label className="mb-3 flex items-center gap-2 text-[14px] text-ink">
@@ -469,6 +487,21 @@ function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: (
                    onChange={(e) => setF({ ...f, contratado: e.target.checked })} />
             Esta família tem plano
           </label>
+
+          {/* A CHAVE DE ENVIO DE FOTOS DESTA FAMÍLIA (migration 0085).
+              Fica fora do bloco do plano de propósito: família sem plano também
+              recebe limpeza avulsa, e também pode não querer receber foto.
+              O terceiro estado ("segue a casa") é o padrão e não é o mesmo que
+              "não" — ele acompanha a chave geral em Config › Mensagens. */}
+          <Campo rotulo="Fotos do serviço para esta família"
+                 dica="a escolha aqui vale mais que a chave geral em Config">
+            <Selecao value={f.enviar_fotos}
+                     onChange={(e: any) => setF({ ...f, enviar_fotos: e.target.value })}>
+              <option value="geral">segue a chave geral da casa</option>
+              <option value="sim">sempre enviar</option>
+              <option value="nao">nunca enviar</option>
+            </Selecao>
+          </Campo>
 
           {f.contratado && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -951,6 +984,25 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
+  const [depois, setDepois] = useState<{ b64: string; mt: string; previa: string } | null>(null);
+  const [antes, setAntes] = useState<{ b64: string; mt: string; previa: string } | null>(null);
+  const [fotoErro, setFotoErro] = useState("");
+  const [feito, setFeito] = useState<any>(null);
+  // Câmera e galeria são inputs SEPARADOS: sem o atributo `capture` o celular
+  // só abre a galeria, e o painel não conseguiria tirar a foto na hora.
+  const refDep = useRef<HTMLInputElement>(null);
+  const refDepCam = useRef<HTMLInputElement>(null);
+  const refAnt = useRef<HTMLInputElement>(null);
+  const refAntCam = useRef<HTMLInputElement>(null);
+
+  async function lerFoto(arq: File, set: (v: any) => void) {
+    setFotoErro("");
+    try {
+      // Reduz no navegador: foto de celular em tamanho cheio não cabe no envio.
+      const f = await prepararFoto(arq);
+      set({ b64: f.b64, mt: f.mt, previa: f.previa });
+    } catch (e) { setFotoErro(motivoFalha(e)); }
+  }
 
   // LIMPEZA AVULSA — a que a Sureya registra à mão.
   // Existe porque nem toda limpeza passa pelo app da Nina: a própria Sureya
@@ -965,18 +1017,31 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
       // Isto era um `await fetch(...)` solto: se a gravação falhasse, a tela
       // fechava o formulário e não dizia nada. A Sureya registrou quatro
       // limpezas, três falharam e ela só descobriu olhando a lista vazia.
-      const r = await fetch("/api/servico", {
+      // A PORTA NOVA (0088). A antiga (`POST /api/servico` com `dataExecutada`)
+      // criava o serviço executado e inseria em `conta_corrente` por conta
+      // própria — sem foto, sem fila, sem remuneração e sem material. Uma
+      // limpeza registrada aqui valia menos que a mesma registrada pelo campo.
+      // Esta passa pela MESMA transação, e aceita a foto.
+      const r = await fetch("/api/servico/registrar-feito", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tumuloId, dataExecutada: data }),
+        body: JSON.stringify({
+          tumuloId,
+          data,
+          fotoDepoisBase64: depois?.b64,
+          fotoAntesBase64: antes?.b64,
+          mimetype: depois?.mt || antes?.mt,
+        }),
       }).then((x) => x.json()).catch(() => null);
 
       if (!r?.ok) {
         setErro(r?.mensagem || r?.erro || "Não consegui registrar a limpeza.");
         return;
       }
+      setFeito(r);
       setLancando(false);
       setTumuloId("");
+      setDepois(null); setAntes(null); setFotoErro("");
       aoMudar();
       recarregar();
     } finally { setOcupado(false); }
@@ -1023,10 +1088,62 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
                 ))}
               </Selecao>
             </Campo>
-            <Campo rotulo="Quando foi feita">
-              <Entrada type="date" value={data} onChange={(e: any) => setData(e.target.value)} />
+            <Campo rotulo="Quando foi feita" dica="pode ser uma data passada">
+              <Entrada type="date" value={data} max={new Date().toISOString().slice(0, 10)}
+                       onChange={(e: any) => setData(e.target.value)} />
             </Campo>
           </div>
+
+          {/* AS FOTOS.
+              Opcionais: sem elas a limpeza é registrada inteira — cobrança,
+              extrato, histórico, urgência do jazigo — e só não há mensagem
+              para aprovar, porque não há o que mandar. Com a do depois, a
+              mensagem cai na fila de liberação e espera você. */}
+          <input ref={refDep} type="file" accept="image/*" hidden
+                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) lerFoto(f, setDepois); }} />
+          <input ref={refDepCam} type="file" accept="image/*" capture="environment" hidden
+                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) lerFoto(f, setDepois); }} />
+          <input ref={refAnt} type="file" accept="image/*" hidden
+                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) lerFoto(f, setAntes); }} />
+          <input ref={refAntCam} type="file" accept="image/*" capture="environment" hidden
+                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) lerFoto(f, setAntes); }} />
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[13px] font-medium text-ink-soft">
+                Foto do depois <span className="font-normal">— é a que a família recebe</span>
+              </label>
+              <div className="flex gap-2">
+                <Botao onClick={() => refDepCam.current?.click()}>
+                  <Camera size={16} /> {depois ? "Trocar" : "Tirar"}
+                </Botao>
+                <Botao onClick={() => refDep.current?.click()}>Da galeria</Botao>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {depois && <img src={depois.previa} alt="depois" className="mt-2 h-28 w-full rounded-lg object-cover" />}
+            </div>
+            <div>
+              <label className="mb-1 block text-[13px] font-medium text-ink-soft">
+                Foto do antes <span className="font-normal">— opcional</span>
+              </label>
+              <div className="flex gap-2">
+                <Botao onClick={() => refAntCam.current?.click()}>
+                  <Camera size={16} /> {antes ? "Trocar" : "Tirar"}
+                </Botao>
+                <Botao onClick={() => refAnt.current?.click()}>Da galeria</Botao>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {antes && <img src={antes.previa} alt="antes" className="mt-2 h-28 w-full rounded-lg object-cover" />}
+            </div>
+          </div>
+          {fotoErro && <p className="mt-2 text-[13px] text-perigo">{fotoErro}</p>}
+
+          <p className="mt-3 text-[13px] text-ink-soft">
+            {depois
+              ? "Com a foto, a mensagem entra na fila de liberação e espera você aprovar. Nada sai sozinho."
+              : "Sem foto, a limpeza é registrada normalmente (cobrança, histórico e urgência do jazigo) — só não há mensagem para aprovar."}
+          </p>
+
           <div className="mt-3 flex gap-2">
             <Botao tom="principal" onClick={registrar} disabled={ocupado || !tumuloId}>
               {ocupado ? "Registrando…" : "Registrar limpeza"}
@@ -1037,6 +1154,31 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
       )}
 
       {erro && <p className="mb-2 text-[13px] text-perigo">{erro}</p>}
+
+      {/* O QUE ACONTECEU, escrito.
+          Registrar limpeza dispara cinco efeitos invisíveis — cobrança,
+          extrato, remuneração, material e a mensagem na fila. Sem esta lista a
+          Sureya não tem como saber se a foto virou mensagem ou se a chave de
+          envio daquela família estava desligada, e descobriria pela ausência. */}
+      {feito && (
+        <div className="mb-3 rounded-lg border border-positivo/30 bg-positivo/10 p-3 text-[13px] leading-relaxed text-positivo">
+          <b>Limpeza registrada em {feito.data.slice(8, 10)}/{feito.data.slice(5, 7)}.</b>
+          <ul className="mt-1 list-disc pl-4">
+            {feito.reaproveitado && <li>Aproveitou a limpeza que já estava marcada nesse dia.</li>}
+            <li>{feito.debitou
+                  ? `Cobrança lançada: ${dinheiro(Number(feito.valor) || 0)}`
+                  : "Sem cobrança nova (já paga, já lançada, ou plano por competência)"}</li>
+            {feito.lancamentosDatados > 0 && <li>Lançamento movido para o mês da limpeza.</li>}
+            {feito.material > 0 && <li>Material descontado: {dinheiro(Number(feito.material))}</li>}
+            <li>{feito.naFila
+                  ? "A mensagem está na fila de liberação, esperando você aprovar."
+                  : feito.comFoto
+                    ? "A mensagem NÃO entrou na fila — o envio de fotos está desligado para esta família (ou na chave geral)."
+                    : "Sem foto, então não há mensagem para enviar."}</li>
+          </ul>
+          <button className="mt-2 underline" onClick={() => setFeito(null)}>ok</button>
+        </div>
+      )}
 
       {!lista.length && !erro && (
         <p className="text-[14px] text-ink-soft">Nenhuma limpeza registrada ainda.</p>

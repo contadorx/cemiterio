@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { MARCA } from "@/lib/marca";
+import { useEffect, useRef, useState } from "react";
+import { MARCA, CEMITERIOS } from "@/lib/marca";
 import { SITE } from "@/lib/site";
 
 /**
@@ -19,7 +19,38 @@ export default function FormularioContato() {
   const [telefone, setTelefone] = useState("");
   const [jazigo, setJazigo] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [cemiterio, setCemiterio] = useState("");
   const [empresa, setEmpresa] = useState(""); // armadilha de robô
+
+  /**
+   * DE ONDE ELA VEIO — sem pedir nada a ela.
+   *
+   * Página, CTA e utm_* saem da URL e do referrer, e vão junto no envio. É
+   * como a casa descobre ONDE há demanda (qual cemitério, qual campanha) sem
+   * acrescentar um campo sequer ao formulário — que é curto de propósito, e é
+   * o motivo de ele ser respondido.
+   *
+   * Nada aqui identifica a pessoa: é a origem do clique, não quem clicou.
+   */
+  const origem = useRef<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const dados: Record<string, string> = { pagina: window.location.pathname };
+      for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "cta"]) {
+        const v = p.get(k);
+        if (v) dados[k] = v;
+      }
+      // Só o domínio de quem indicou, nunca a URL inteira: a página de origem
+      // pode carregar busca, e busca é dado de outra pessoa.
+      if (document.referrer) {
+        try { dados.veio_de = new URL(document.referrer).hostname; } catch {}
+      }
+      origem.current = dados;
+    } catch {
+      // Navegador antigo ou bloqueio: o formulário funciona sem isto.
+    }
+  }, []);
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState(false);
   const [erro, setErro] = useState("");
@@ -32,7 +63,8 @@ export default function FormularioContato() {
       const r = await fetch("/api/contato", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nome, telefone, jazigo, mensagem, empresa }),
+        body: JSON.stringify({ nome, telefone, jazigo, mensagem, empresa,
+                               cemiterio, utm: origem.current }),
       }).then((x) => x.json());
       if (r?.ok) setPronto(true);
       else setErro(r?.mensagem || "Não consegui enviar. Tente pelo WhatsApp.");
@@ -76,6 +108,29 @@ export default function FormularioContato() {
           autoComplete="tel"
           placeholder="(11) 90000-0000"
         />
+      </label>
+
+      {/* O CEMITÉRIO — a primeira pergunta de toda conversa, respondida antes
+          de ela começar. É um <select>, e não um campo de texto: escolher não
+          é digitar, e o formulário continua do mesmo tamanho.
+
+          "Não sei dizer" está na lista de propósito. Sem essa opção, quem não
+          sabe ou abandona o formulário ou chuta — e um chute é pior que um
+          "não sei", porque a equipe liga preparada para o lugar errado. */}
+      <label style={s.rot}>
+        Em qual cemitério
+        <select
+          style={s.input}
+          value={cemiterio}
+          onChange={(e) => setCemiterio(e.target.value)}
+        >
+          <option value="">escolha</option>
+          {CEMITERIOS.map((cm) => (
+            <option key={cm.slug} value={cm.slug}>{cm.nome}</option>
+          ))}
+          <option value="outro">Outro cemitério</option>
+          <option value="nao-sei">Não sei dizer</option>
+        </select>
       </label>
 
       <label style={s.rot}>

@@ -31,6 +31,10 @@ type Corpo = {
   telefone?: string;
   mensagem?: string;
   jazigo?: string;
+  /** De qual cemitério a pessoa está falando — a primeira pergunta da conversa. */
+  cemiterio?: string;
+  /** Página, CTA e utm_*: campos invisíveis, custo zero para quem preenche. */
+  utm?: Record<string, string>;
   empresa?: string; // armadilha
 };
 
@@ -46,6 +50,20 @@ export async function POST(req: NextRequest) {
   const digitos = so(b.telefone).replace(/\D/g, "");
   const mensagem = so(b.mensagem).slice(0, 1000);
   const jazigo = so(b.jazigo).slice(0, 200);
+  const cemiterio = so(b.cemiterio).slice(0, 80);
+
+  // A ORIGEM ANÔNIMA, e só ela. Nada aqui identifica a pessoa: é de onde o
+  // clique veio, para a casa saber onde há demanda sem aumentar o formulário.
+  // Limitado a 12 chaves e 200 caracteres cada — o campo é público, e um POST
+  // caprichoso não pode encher a tabela com um JSON de megabyte.
+  const utm: Record<string, string> = {};
+  if (b.utm && typeof b.utm === "object" && !Array.isArray(b.utm)) {
+    for (const [k, v] of Object.entries(b.utm).slice(0, 12)) {
+      const chave = so(k).slice(0, 40);
+      const valor = so(v).slice(0, 200);
+      if (chave && valor) utm[chave] = valor;
+    }
+  }
 
   if (!nome) {
     return NextResponse.json(
@@ -99,6 +117,9 @@ export async function POST(req: NextRequest) {
       .update({
         mensagens: [...antigas, nova].slice(-20),
         status: (ja as any).status === "descartado" ? "novo" : (ja as any).status,
+        // Quem escreve de novo pode ter dito de qual cemitério só na segunda
+        // vez. Não apaga o que já havia: só preenche quando veio.
+        ...(cemiterio ? { cemiterio_interesse: cemiterio } : {}),
       })
       .eq("id", (ja as any).id);
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
@@ -111,15 +132,26 @@ export async function POST(req: NextRequest) {
     nome_wa: nome,
     mensagens: [nova],
     status: "novo",
+    // SEM ISTO, todo contato do site ficava indistinguível dos 104 que vieram
+    // do agente de IA — que gravam `origem = 'whatsapp'`. A fila não teria como
+    // dizer o que veio do site.
+    origem: "site",
   };
 
   const { data: criado, error } = await db.from("leads").insert(linha).select("id").single();
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  // colunas que podem não existir neste banco (nome, contexto): tenta e ignora
+  // Colunas da 0061 e da 0090. O update vai separado do insert de propósito: se
+  // um destes campos não existir no banco, o contato JÁ está gravado — o pior
+  // caso é perder o cemitério, nunca a pessoa.
   await db
     .from("leads")
-    .update({ nome, contexto: jazigo || null })
+    .update({
+      nome,
+      contexto: jazigo || null,
+      cemiterio_interesse: cemiterio || null,
+      utm: Object.keys(utm).length ? utm : null,
+    })
     .eq("id", (criado as any).id);
 
   // AVISA NA HORA (o buraco que fazia o funil inteiro não valer nada).
@@ -129,7 +161,16 @@ export async function POST(req: NextRequest) {
   // acaso. Três avisos, do mais barato ao mais garantido:
   //   1. push no navegador de quem está no painel (se as chaves VAPID existirem);
   //   2. WhatsApp no seu celular, se SUREYA_AVISO_WHATSAPP estiver preenchida;
-  //   3. o card "leads do site" no Início, que não depende de configuração.
+  //   3. a fila em /painel/contatos e o aviso no Início, que não dependem de
+  //      configuração nenhuma.
+  //
+  // ⚠ O QUE ESTAVA ERRADO AQUI
+  // Os dois primeiros avisos mandavam para a rota do CRM antigo, que o
+  // middleware devolve como 404 desde que ele foi desligado — o aviso chegava
+  // e o link não abria. E o item 3 falava de um card que saiu quando a tela
+  // inicial virou "O mês". Os três caminhos estavam quebrados ao mesmo tempo,
+  // e o texto aqui dizia que estavam de pé.
+  //
   // Nada aqui pode derrubar a resposta ao visitante: tudo em try/catch.
   await avisarLeadNovo(nome, telefone, jazigo, mensagem, (criado as any).id);
 
@@ -149,7 +190,7 @@ async function avisarLeadNovo(
     await avisar({
       titulo: `Lead novo do site: ${nome}`,
       corpo: resumo || telefone,
-      url: `/painel/leads/${leadId}`,
+      url: `/painel/contatos`,
       tag: `lead-${leadId}`,
     });
   } catch (e) {
@@ -165,7 +206,7 @@ async function avisarLeadNovo(
         `*${nome}*\nWhatsApp: ${telefone}\n` +
         (jazigo ? `Jazigo: ${jazigo}\n` : "") +
         (mensagem ? `\n"${mensagem}"\n` : "") +
-        `\nAbrir: https://${(process.env.NEXT_PUBLIC_SITE_URL || "zeloememoria.com.br").replace(/^https?:\/\//, "")}/painel/leads/${leadId}`,
+        `\nAbrir: https://${(process.env.NEXT_PUBLIC_SITE_URL || "zeloememoria.com.br").replace(/^https?:\/\//, "")}/painel/contatos`,
     );
   } catch (e) {
     console.error("[contato] aviso por WhatsApp falhou:", (e as any)?.message || e);

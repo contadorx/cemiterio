@@ -32,8 +32,13 @@ export async function subirFotoServico(
 /**
  * Manda a foto do jazigo limpo pra família. É o entregável que prova o serviço.
  *
- * TRES freios, nesta ordem:
- *  1. `clientes.envio_automatico` — o interruptor por familia (revisao do cadastro);
+ * QUATRO freios, nesta ordem:
+ *  0. a CHAVE DE ENVIO DE FOTOS (0085) — `familias.enviar_fotos` sobrepondo
+ *     `orgs.enviar_fotos_familia`. É freio de POLÍTICA, não de emergência:
+ *     "esta família não quer receber foto". Vem primeiro porque é o único que
+ *     tem o grão certo — família, não cliente — e porque vale também para a
+ *     fila de liberação, onde o gatilho da porta aplica a mesma regra;
+ *  1. `clientes.envio_automatico` — o interruptor por cadastro em revisao;
  *  2. `orgs.disparos_ativos` — a chave mestra da casa;
  *  3. a fila de reenvio — se o WhatsApp falhar, a foto nao se perde.
  *
@@ -41,7 +46,15 @@ export async function subirFotoServico(
  */
 export type ResultadoNotificacao = {
   enviado: boolean;
-  motivo: "enviado" | "familia_desligada" | "disparos_desligados" | "sem_cliente" | "sem_telefone" | "falhou";
+  motivo:
+    | "enviado"
+    /** A chave de envio de fotos está desligada para esta família (ou para a casa). */
+    | "fotos_desligadas"
+    | "familia_desligada"
+    | "disparos_desligados"
+    | "sem_cliente"
+    | "sem_telefone"
+    | "falhou";
 };
 
 export async function notificarFamilia(
@@ -61,6 +74,27 @@ export async function notificarFamilia(
 
   const clienteId = (serv as any).cliente_id;
   if (!clienteId) return { enviado: false, motivo: "sem_cliente" };
+
+  // FREIO 0 — a chave de envio de fotos, no grão da FAMÍLIA.
+  //
+  // A pergunta é respondida pelo banco (`sureya_envia_fotos`) e não aqui, de
+  // propósito: é a mesma função que o gatilho da fila consulta. Duas cópias da
+  // regra dariam o caso em que a mensagem não entra na fila mas o envio
+  // automático sai assim mesmo — que é o pior dos dois mundos.
+  const tumuloId = (serv as any).tumulo_id;
+  if (tumuloId) {
+    const { data: tum } = await db
+      .from("tumulos").select("familia_id").eq("id", tumuloId).maybeSingle();
+    const familiaId = (tum as any)?.familia_id as string | null;
+    if (familiaId) {
+      const { data: liberado, error: erroChave } =
+        await db.rpc("sureya_envia_fotos", { p_familia: familiaId });
+      // Erro de leitura não pode virar "pode enviar": na dúvida, não sai foto
+      // de família que talvez tenha pedido para não receber.
+      if (erroChave) return { enviado: false, motivo: "fotos_desligadas" };
+      if (liberado === false) return { enviado: false, motivo: "fotos_desligadas" };
+    }
+  }
 
   const { data: cli } = await db
     .from("clientes")
