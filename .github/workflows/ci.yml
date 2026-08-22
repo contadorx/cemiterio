@@ -32,6 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `migrar-limpo` sobe um cluster temporário; o runner do Ubuntu já traz
+      # os binários, mas não o servidor.
+      - name: PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql postgresql-client
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -56,6 +63,17 @@ jobs:
       # banco em memória. Sem credencial, sem rede.
       - name: Simulador de operações
         run: npm run testar
+
+      # O REPOSITÓRIO RECONSTRÓI O BANCO?
+      #
+      # Aplica migrations/ a um PostgreSQL vazio. Este passo já teria pegado,
+      # sozinho: a 0051 estourando `ruas.org_id not null` em banco limpo, a
+      # tabela `quitacoes` sem `create table`, 32 colunas e 15 funções que só
+      # existiam dentro do banco de produção.
+      #
+      # Nenhum deles aparece em revisão de código. Todos aparecem aqui.
+      - name: Migrations em banco limpo
+        run: npm run migrar-limpo
 
       # Build de produção por último: é o passo mais caro.
       - name: Build de produção

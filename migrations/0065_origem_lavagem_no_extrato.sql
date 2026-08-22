@@ -1,0 +1,50 @@
+-- =====================================================================
+-- SUREYA — 0065 · 'lavagem' COMO ORIGEM DE LANÇAMENTO
+--
+-- ESTE ARQUIVO RODA SOZINHO. Não junte com outro.
+--
+-- POR QUÊ (mesma razão da 0047b)
+-- `alter type ... add value` não aceita rodar dentro de bloco de transação, e
+-- o editor SQL do Supabase envolve o que você cola em uma. Dentro de outra
+-- migration, estas linhas derrubariam o arquivo inteiro com um erro que não
+-- explica nada.
+--
+-- O QUE ESTAVA QUEBRADO
+-- ---------------------------------------------------------------------
+-- A migration 0049 criou o enum com quatro valores:
+--     ('competencia', 'avulso', 'pagamento', 'ajuste')
+--
+-- E o código insere um QUINTO em `conta_corrente.origem`, em dois lugares:
+--     src/app/api/servico/concluir/route.ts:128   origem: "lavagem"
+--     src/app/api/servico/route.ts:161            origem: "lavagem"
+--
+-- Os dois inserts estão dentro de `try/catch` mudo. O comentário do código
+-- atribui a falha ao índice único:
+--
+--     "Índice único barrou (reprocessamento) ou algo falhou: é só o registro
+--      visual do extrato."
+--
+-- Não é o índice. É o enum recusando um valor que não existe:
+--
+--     ERROR: invalid input value for enum sureya_origem_lancamento: "lavagem"
+--
+-- Ou seja: a linha "Limpeza realizada" **nunca apareceu no extrato de família
+-- nenhuma**, desde que o recurso foi escrito. A família vê a cobrança do mês e
+-- não vê as limpezas que a geraram.
+--
+-- Encontrado aplicando a trilha a um PostgreSQL vazio — nunca em produção,
+-- porque o catch engolia.
+--
+-- COMO RODAR
+--   1. Cole SÓ este arquivo no editor e execute.
+--   2. Depois rode a 0066.
+--
+-- Rodar duas vezes é inofensivo: o `if not exists` protege.
+-- =====================================================================
+
+alter type sureya_origem_lancamento add value if not exists 'lavagem';
+
+-- Conferência:
+-- select enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid
+--  where t.typname = 'sureya_origem_lancamento' order by e.enumsortorder;
+-- → competencia | avulso | pagamento | ajuste | lavagem

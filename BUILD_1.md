@@ -1,7 +1,8 @@
 # Build 1 — acesso e proteção de dados
 
-**Estado:** parte **1a entregue**; parte **1b bloqueada** aguardando o dump das
-policies reais.
+**Estado:** **1a entregue**. **1b parcialmente entregue** — o acesso anônimo às
+funções está fechado (0057) e o contrato voltou a chegar no jazigo (0058). As
+*policies* por papel seguem bloqueadas aguardando a **Consulta A**.
 
 ---
 
@@ -36,8 +37,9 @@ policy` no escuro derruba a operação: se a policy real tiver outro nome, outra
 condição, ou se alguma tabela tiver ganhado policy depois da 0001, o `drop`
 erra o alvo e o `create` deixa a tabela mais aberta do que estava.
 
-O dump ainda não chegou — do `0053` voltou só a seção 16 (volume por tabela).
-Então **1a entrega o que é certo sem o dump**, e **1b espera**.
+Voltaram a seção 16 (volume por tabela) e a **Consulta C** (o código das ~50
+funções). A Consulta C destravou a metade do 1b que vive nas funções — ver a
+seção 9. Falta a **Consulta A**, que é a das *policies*.
 
 Não é atraso: 1a resolve sozinha uma falha de acesso que estava aberta.
 
@@ -154,6 +156,8 @@ Com ela em mãos, o 1b entrega:
 |---|---|---|
 | `0055` | `create or replace` de 4 funções + grants + índice | Recriar `current_org_id()` sem `and ativo` (o corpo original está na 0001, linha 47). As outras três podem ser removidas com `drop function`: nenhuma policy as usa ainda. |
 | `0056` | Nenhum enquanto as PARTES 2 e 3 estiverem comentadas | `update tumulos set proximo_servico = null where contratado;` e recomeçar |
+| `0057` | Revoga/concede EXECUTE; remove o `sureya_fechar_dia` de 4 args; corrige 2 funções | `grant execute on all functions in schema public to authenticated;` devolve o estado anterior (amplo demais — é rollback de emergência, não destino) |
+| `0058` | Cria gatilho em `planos` + uma passada de espelho | `drop trigger trg_espelha_plano_no_jazigo on planos;` — o espelho já aplicado permanece, e é o estado correto |
 
 `0056` é a companheira operacional da `0052`: como `planos` tem 1 linha, quase
 todo jazigo contratado ficaria com `proximo_servico` nulo — e o gerador trata
@@ -172,11 +176,17 @@ escrevem estão comentadas de propósito.
 4. conferir membros:  select user_id, nome, papel, ativo from membros;
 5. 0055                     → papéis no banco + desligamento que desliga
 6. npm run contraprova      → a linha de base: o que ainda está aberto
-7. 0052                     → a coluna que falta (P0 da agenda)
-8. 0056 PARTE 1             → quantos ficariam "devidos hoje"
-9. 0056 PARTE 2 e/ou 3      → o ponteiro por decisão
-10. /api/agenda/gerar com horizonte 1  → ensaio curto antes do mês inteiro
+7. 0057                     → fecha as funções para anônimo (P0)
+8. npm run contraprova      → os itens de ANÔNIMO devem virar PASSA
+9. 0052                     → a coluna que falta (P0 da agenda)
+10. 0058                    → o plano volta a chegar no jazigo (P0)
+11. 0056 PARTE 1            → quantos ficariam "devidos hoje"
+12. 0056 PARTE 2 e/ou 3     → o ponteiro por decisão
+13. /api/agenda/gerar com horizonte 1  → ensaio curto antes do mês inteiro
 ```
+
+A 0057 vem antes da 0052 de propósito: fechar porta aberta para a internet tem
+precedência sobre religar a agenda.
 
 O passo 6 é o que transforma "acho que está aberto" em uma lista de portas com
 nome.
@@ -190,7 +200,10 @@ nome.
 | Helpers de papel no banco, com validação de membro ativo | ✅ `0055` |
 | Desligar revoga acesso a dados imediatamente | ✅ banco + API |
 | Contraprova executável, independente da interface | ✅ `npm run contraprova` |
-| Policies por operação | ❌ **1b — depende da Consulta A** |
+| Funções fechadas para anônimo/`PUBLIC` | ✅ `0057` |
+| Contrato escrito em `planos` chega em `tumulos` | ✅ `0058` |
+| Policies por operação | ❌ **depende da Consulta A** |
+| Guarda `is_admin()` dentro das ~35 funções administrativas | ❌ próximo lote |
 | Campo escreve só no serviço atribuído a ele | ❌ 1b |
 | Grants e RPCs `security definer` revisados | ❌ 1b — depende da Consulta A |
 | Revogação de sessão no Auth ao desligar | ❌ 1b |
@@ -247,3 +260,143 @@ Somando: **`quitacoes` (tabela) + as seis colunas de contrato de `familias` +
 `tumulos.proximo_servico` + as 24 funções `sureya_*` da migration 0046.**
 Restaurar um backup a partir do repositório não reconstrói este sistema. É o
 P0 nº 4 da auditoria, agora com nome e sobrenome.
+
+---
+
+## 9. O que a Consulta C revelou (dump das funções)
+
+Voltaram ~50 funções `sureya_*`. Quase todas `SECURITY DEFINER` — rodam com os
+privilégios do dono e **ignoram RLS**. Nelas, RLS não protege nada: o que
+protege é o `GRANT EXECUTE`.
+
+### 9.1 P0 — as funções de dinheiro estão abertas para `PUBLIC`
+
+No PostgreSQL, função nova nasce com `GRANT EXECUTE TO PUBLIC`. A migration
+0016 sabia disso e escreveu:
+
+> "As funções das migrations 0001–0006 nasceram sem revoke from public, então
+> PUBLIC mantinha EXECUTE e o anon herdava."
+
+Ela revogou **cinco**. Depois vieram as migrations 0017–0051 com dezenas de
+funções novas — incluindo todas as de dinheiro. Só a 0014 e a 0038 voltaram a
+revogar algo.
+
+Ficaram executáveis por `PUBLIC` (logo, por `anon` — a chave que está no
+navegador de qualquer visitante): `sureya_pagamento_avulso`,
+`sureya_entrada_identificada`, `sureya_registrar_entrada_banco`,
+`sureya_pagar_equipe`, `sureya_estornar_servico`, `sureya_excluir_servico`,
+`sureya_anonimizar_cliente`, `sureya_saldo_abertura`, `sureya_aplicar_reajuste`.
+
+O que segura a maioria hoje é `current_org_id()` devolver `NULL` sem sessão.
+Mas `sureya_registrar_indicacao` e as `sureya_portal_*` **não dependem de
+sessão** — acham a org pelo token ou pelo código. Depender de um efeito
+colateral como fronteira de segurança não é fronteira.
+
+**`migrations/0057_fecha_a_porta_das_funcoes.sql`** inverte o padrão: revoga de
+`public`, `anon` e `authenticated` em toda função `sureya_*` que exista no
+banco (inclusive as que nunca estiveram no repositório — escrever a lista à mão
+deixaria de fora justamente a esquecida), e libera nominalmente.
+
+O mapa de quem precisa do quê saiu do código, rota por rota:
+
+| Quem chama | Funções | Fonte |
+|---|---|---|
+| `anon` (chave pública) | `sureya_portal_cabecalho`, `_historico`, `_irmaos`, `sureya_responder_avaliacao`, `sureya_registrar_indicacao` | `api/{portal,avaliar,indicar}/route.ts` criam o cliente com `SUPABASE_ANON_KEY` |
+| `campo` (`exigirLogado`) | `sureya_puxar_servicos`, `sureya_conversa_equipe`, `sureya_fechar_dia`, `sureya_registrar_gps` | 4 rotas |
+| `admin` (`exigirAdmin`) | as outras ~35 | 27 rotas |
+
+Não há `.rpc(` em nenhum `.tsx`: nenhuma função é chamada do navegador.
+
+### 9.2 O que a 0057 ainda NÃO fecha
+
+`authenticated` inclui campo **e** admin, e nenhuma dessas funções olha
+`papel`. Depois da 0057, uma conta de campo ainda chama
+`sureya_pagamento_avulso` direto pelo PostgREST.
+
+A correção é `if not is_admin() then raise exception 'somente_admin'; end if;`
+dentro de cada função administrativa — as funções vieram na 0055. Isso exige
+reemitir cada uma com o corpo inteiro, em lotes, começando pelas de dinheiro.
+
+**Não farei isso por regex sobre `pg_get_functiondef()`.** Reescrever 50 funções
+de segurança com expressão regular em produção troca um risco conhecido por um
+pior.
+
+### 9.3 P0 — o contrato é escrito em `planos` e lido em `tumulos`
+
+A 0049 mudou a **leitura** do contrato para `tumulos`. A **escrita** ficou em
+`planos`, em seis funções e duas rotas:
+
+```
+sureya_lead_vira_cliente        insert into planos
+sureya_reagenda_apos_execucao   update planos set proximo_servico   (gatilho)
+sureya_remarcar_servico         update planos set proximo_servico
+sureya_pular_servico            update planos set proximo_servico
+sureya_aplicar_reajuste         update planos set valor_vigente
+sureya_adiar_reajuste           update planos set reajuste_adiado_ate
+POST /api/planos                insert into planos
+/api/tumulos/importar           insert into planos
+```
+
+É o mesmo bug que o comentário do `agenda.ts` diz ter resolvido — voltando pela
+outra porta. Consequências: **lead convertido nunca entra na agenda** (104 leads
+no banco), concluir não avança o ponteiro que a agenda lê, remarcar e pular não
+replanejam nada, e o reajuste muda um valor que não é o cobrado.
+
+**`migrations/0058_espelha_plano_no_jazigo.sql`** põe um gatilho em `planos` que
+espelha o contrato para `tumulos`. Fecha a classe inteira em vez de remendar
+seis funções e deixar a sétima quebrada. Direção única (`planos` → `tumulos`),
+porque o caminho contrário já existe em `agenda.ts:296` e espelhar nos dois
+sentidos criaria laço.
+
+Isto **não** decide qual tabela é a fonte da verdade — essa é a decisão do
+Build 4, a mesma que a auditoria pede para `movimentos` × `conta_corrente`. O
+espelho só impede que a divergência continue produzindo agenda vazia.
+
+### 9.4 `sureya_fechar_dia` existe duas vezes
+
+```
+(uuid, date, text, text)                        ← antiga
+(uuid, date, text, text, boolean default false) ← atual
+```
+
+Com o quinto argumento tendo `DEFAULT`, uma chamada de quatro argumentos casa
+com as duas e o PostgreSQL recusa: *function is not unique*.
+
+O código já convive com isso: `api/campo/fechar-dia/route.ts` chama com cinco
+argumentos e, **se der erro, tenta de novo com quatro** (linha 52). Esse
+segundo caminho não pode funcionar — é a cicatriz de alguém ter batido nisso e
+contornado por fora. A versão antiga também ignora `motivo_nao_feito`, então o
+"Começou a chover" que a pessoa digitou some do adiamento.
+
+A 0057 remove a antiga. Depois disso o fallback vira código morto.
+
+### 9.5 Semanal e quinzenal não existem para o replanejamento
+
+A 0047b acrescentou `semanal` e `quinzenal` ao enum `sureya_cadencia`.
+`sureya_intervalo_dias` nunca soube: para essas duas cai no `else 0`. E quem
+chama trata zero como "não faço nada":
+
+```
+sureya_pular_servico           if v_intervalo <= 0 then return null
+sureya_remarcar_servico        if v_intervalo <= 0 then ... 0 seguintes
+sureya_reagenda_apos_execucao  if v_intervalo <= 0 then return new
+```
+
+Em contrato semanal ou quinzenal: remarcar não replaneja, pular não avança,
+concluir não agenda a próxima. Sem erro. Corrigido na 0057, junto com
+`sureya_descreve_frequencia`, que também não tinha as duas cadências.
+
+### 9.6 Mais coisas que só existem no banco
+
+- **`unaccent_simples()`** — usada por `sureya_palpites_entrada`, não aparece
+  em migration nenhuma e não tem prefixo `sureya_`, então nem saiu na Consulta C.
+- **`sureya_saldo_abertura`** usa `sureya_tipo_movimento`,
+  `sureya_origem_movimento` e `sureya_status_conc`, enquanto `conta_corrente`
+  usa `sureya_tipo_lancamento` e `sureya_origem_lancamento`. São **dois modelos
+  financeiros paralelos** vivos ao mesmo tempo — o `movimentos` × `conta_corrente`
+  da auditoria, agora com os enums à vista.
+
+A lista de coisas que existem só no banco chega a: **`quitacoes` (tabela), as 6
+colunas de contrato de `familias`, `unaccent_simples()`, e ~50 funções
+`sureya_*`.** A Consulta C é o texto que precisa virar migration versionada —
+guarde o resultado dela, é o insumo do arquivo que fecha o Build 0.

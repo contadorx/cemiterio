@@ -17,7 +17,9 @@ policy de RLS escrita contra um schema que não é o real não protege nada; uma
 RPC transacional escrita contra colunas que não existem falha em produção; e um
 backup restaurado a partir das migrations não reconstrói o sistema.
 
-A execução deste build mostrou que a resposta hoje é **não** — e não por pouco.
+A execução deste build mostrou que a resposta era **não** — e não por pouco.
+Agora é **sim**, e verificável a cada commit: `npm run migrar-limpo` aplica a
+trilha inteira a um PostgreSQL vazio e falha se qualquer arquivo não aplicar.
 
 ---
 
@@ -154,8 +156,11 @@ sistema.
 
 ## 3. Explicitamente fora do escopo
 
-- Escrever a migration das seis colunas de `familias` — depende da extração.
-- Versionar as 24 funções `sureya_*` — depende da seção 9 da `0053`.
+- ~~Escrever a migration das colunas de `familias`~~ — **feito na 0061**, junto
+  com outras 26 colunas que o teste em banco limpo revelou. Os tipos são
+  reconstruídos do uso; o `_diagnostico/0063` faz o banco gerar os verdadeiros.
+- ~~Versionar as funções `sureya_*`~~ — **feito na 0062** (15 funções). Faltam os
+  `create trigger` e `unaccent_simples()`, ambos no `0063`.
 - Qualquer mudança de RLS, policy ou grant — é o Build 1.
 - Tornar a conclusão da lavagem transacional — é o Build 2.
 - Redesenhar tela, ligar disparo, migrar carteira, alterar saldo real.
@@ -198,12 +203,16 @@ O que ainda falta (entra no Build 6, mas o insumo nasce aqui):
 ## 6. Testes automatizados
 
 ```
-npm ci        → instalação limpa a partir do package-lock
-npm run checar → 0 acessos desprotegidos a .map/.join em dado de fetch
-npm run tipos  → tsc --noEmit limpo
-npm run testar → 123 passaram, 0 falharam   (antes: 110 passaram, 13 falharam)
-npm run build  → build de produção fecha
+npm ci             → instalação limpa a partir do package-lock
+npm run checar     → 0 acessos desprotegidos a .map/.join em dado de fetch
+npm run tipos      → tsc --noEmit limpo (código + contraprova)
+npm run testar     → 123 passaram, 0 falharam   (antes: 110 passaram, 13 falharam)
+npm run migrar-limpo → 52 migrations num Postgres vazio, 0 falhas
+npm run build      → build de produção fecha
 ```
+
+`migrar-limpo` entrou no CI. Ele é o passo que, sozinho, teria pego os três
+problemas da seção 8 — nenhum deles aparece em revisão de código.
 
 **Ressalva honesta e importante:** a massa de teste agora inclui
 `tumulos.proximo_servico`, ou seja, representa o schema **depois** da migration
@@ -239,14 +248,58 @@ provar que a restauração devolve o mesmo schema.
 | Suíte corrigida e executável | ✅ 123/123 |
 | Diagnóstico fora da trilha automática | ✅ `migrations/_diagnostico/` |
 | Ambientes separados documentados | ✅ `.env.example` |
-| Schema real comparado à baseline, sem diferença desconhecida | ❌ **depende de rodar a `0053` no Supabase** |
+| **O repositório reconstrói o banco** | ✅ **`npm run migrar-limpo` — 53 migrations, 0 falhas** |
+| Placar contra produção | ✅ tabelas 55=55, funções 56=56, gatilhos 14=14 · ⚠️ policies 55 de 62 (lacuna declarada) |
+| Schema real comparado à baseline, sem diferença desconhecida | ⚠️ **quase** — 32 colunas e 1 tabela foram reconstruídas por inferência de tipo; o `_diagnostico/0063` faz o banco gerar o DDL verdadeiro |
 | Backup restaurado e consultável | ❌ não executado — sem acesso ao ambiente |
 | Nenhuma chave de produção no ambiente de ensaio | ❌ a conferir no ambiente |
 | Dados de teste cobrindo os fluxos críticos | ❌ **bloqueado**: o seed atual (`SEED_dados_teste.sql`) escreve em `planos` e é anterior à 0049; refazê-lo exige antes saber o schema real de `familias` |
 
-**Parecer: Build 0 NÃO fechado.** A metade que depende do repositório está
-pronta e provada. A metade que depende do ambiente não pode ser feita a partir
-do código — e é justamente ela que este build existe para forçar.
+**Parecer: Build 0 quase fechado.** A pergunta central — *o repositório
+descreve o sistema que está no ar?* — passou de "não sei" para "sim, e é
+verificável a cada commit".
+
+A resposta foi **não** três vezes, e cada vez por um motivo diferente. Todos
+foram encontrados rodando a trilha num PostgreSQL 16 vazio, não lendo código:
+
+1. `0051` fazia `select id into v_org from orgs limit 1` e inseria dados de uma
+   operação específica. Em banco vazio, `v_org` nulo estourava o `not null` de
+   `ruas.org_id` — **não era possível montar um ambiente de homologação a
+   partir do repositório.**
+2. `quitacoes` e cinco colunas de `movimentos` (`conferido_em`,
+   `conferido_por`, `nota_conferencia`, `sem_comprovante`, `estorna_movimento`)
+   não existiam em migration alguma.
+3. **32 colunas e 15 funções `sureya_*`** só existiam dentro do banco de
+   produção — entre elas `sureya_proximo_dia_util`, `sureya_reagenda_apos_execucao`
+   e as seis colunas de contrato de `familias`.
+
+4. Faltavam ainda **4 gatilhos**. O placar de produção (consulta 5 do
+   `_diagnostico/0063`) devolveu `gatilhos: 14`; o repositório reconstruído
+   tinha 10. Os quatro que faltavam eram exatamente os das funções recuperadas
+   na 0062 — a extração devolve funções, e gatilho é outro objeto. Deduzidos
+   dos corpos (quem atribui a `new.` é BEFORE; quem faz `update` em outra
+   tabela é AFTER; quem lê `old.` é UPDATE) e recriados na 0064.
+
+**O placar hoje:** tabelas 55=55, funções 56=56, gatilhos 14=14. Falta só
+**policies: 55 de 62** — sete criadas à mão que a Consulta A recupera. Essa
+lacuna está *declarada* em `migrar-limpo.sh`, não escondida: aparece em toda
+execução, com dono e caminho, em vez de deixar o CI vermelho permanente (que
+vira ruído e para de ser lido).
+
+Falta também substituir os tipos inferidos pelos verdadeiros
+(`_diagnostico/0063`) e `unaccent_simples()`.
+
+### O ciclo da agenda, provado ponta a ponta
+
+Com 0052 + 0058 + 0064 juntas, num banco reconstruído do zero:
+
+```
+concluir servico  →  planos.proximo_servico   25/08 → 31/08   (gatilho 0064)
+                  →  tumulos.proximo_servico  25/08 → 31/08   (espelho 0058)
+                                                ↑ é daqui que a agenda lê
+```
+
+Era esse o laço que estava partido em três lugares ao mesmo tempo.
 
 **O Build 1 não deve começar antes da seção 7.** Escrever policy de RLS sem
 saber quais colunas e funções existem de verdade é repetir, na camada de

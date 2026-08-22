@@ -40,6 +40,24 @@ begin
   select id into v_org from orgs limit 1;
   select id into v_cem from cemiterios where org_id = v_org limit 1;
 
+  -- BANCO VAZIO NAO E ERRO.
+  --
+  -- Este bloco insere DADOS de uma operacao especifica (a Rua 7, as Quadras 3
+  -- e 4) dentro da trilha de schema. Em producao ele funciona porque `orgs` ja
+  -- tem linha. Num banco limpo — homologacao, restauracao de backup, CI —
+  -- `v_org` volta nulo e o insert estoura em `org_id not null`, derrubando a
+  -- migration inteira.
+  --
+  -- Ou seja: ate esta correcao, a trilha do repositorio NAO reconstruia o
+  -- sistema do zero. Comprovado rodando as 46 migrations num Postgres limpo.
+  --
+  -- A guarda torna o bloco inofensivo onde nao ha o que povoar, sem mudar nada
+  -- onde ja rodou. O lugar certo destes dados e um seed, nao uma migration.
+  if v_org is null or v_cem is null then
+    raise notice '0051: sem org/cemiterio cadastrado — nada a povoar (banco limpo). Schema aplicado normalmente.';
+    return;
+  end if;
+
   -- A Rua 7 faltava nas quadras de cima. Ordem 0: subindo o cemitério, ela é
   -- a primeira rua que se encontra nas quadras 3 e 4.
   select id into v_q from quadras where cemiterio_id=v_cem and codigo='Quadra 3';
