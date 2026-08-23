@@ -44,14 +44,17 @@ function montarBanco(): Tabelas {
       { id: "q3", org_id: ORG, cemiterio_id: "cem-1", codigo: "Q-03", ordem: 3 },
     ],
     familias: [
-      { id: "f-cec", org_id: ORG, nome: "Família Ramos" },
-      { id: "f-ant", org_id: ORG, nome: "Família Prado" },
-      { id: "f-mar", org_id: ORG, nome: "Família Souza" },
-      { id: "f-neu", org_id: ORG, nome: "Família Ferreira" },
-      { id: "f-avu", org_id: ORG, nome: "Família Hikehara" },
-      { id: "f-sua", org_id: ORG, nome: "Família Stella" },
-      { id: "f-lin", org_id: ORG, nome: "Família LINEU" },
-      { id: "f-anon", org_id: ORG, nome: "Família Removida" },
+      // `responsavel_id` e o que liga o contato a familia: a fila de liberacao
+      // decide POR FAMILIA (silencio por tipo, ultima acao), e sem ele nenhuma
+      // dessas protecoes alcancaria a mensagem.
+      { id: "f-cec", org_id: ORG, nome: "Família Ramos", responsavel_id: "c-cec", silenciar: [] },
+      { id: "f-ant", org_id: ORG, nome: "Família Prado", responsavel_id: "c-ant", silenciar: [] },
+      { id: "f-mar", org_id: ORG, nome: "Família Souza", responsavel_id: "c-mar", silenciar: [] },
+      { id: "f-neu", org_id: ORG, nome: "Família Ferreira", responsavel_id: "c-neu", silenciar: [] },
+      { id: "f-avu", org_id: ORG, nome: "Família Hikehara", responsavel_id: "c-avu", silenciar: [] },
+      { id: "f-sua", org_id: ORG, nome: "Família Stella", responsavel_id: "c-sua", silenciar: [] },
+      { id: "f-lin", org_id: ORG, nome: "Família LINEU", responsavel_id: "c-lin", silenciar: [] },
+      { id: "f-anon", org_id: ORG, nome: "Família Removida", responsavel_id: "c-anon", silenciar: [] },
     ],
     clientes: [
       // adiantado (crédito sobra)
@@ -214,6 +217,9 @@ function montarBanco(): Tabelas {
       { id: "mat2", org_id: ORG, nome: "balde", unidade: "un", estoque: 5, alerta_minimo: 2 },
     ],
     conversas: [], mensagens: [], interacoes_ia: [], campanhas: [],
+    // A FILA DE LIBERACAO e agora a porta unica (0094): cobranca, aviso,
+    // comemorativa e convite de servico entram todos por aqui.
+    fila_liberacao: [],
     dias_sem_campo: [],
     datas_comemorativas: [
       { id: "d1", org_id: ORG, nome: "Finados", regra: "fixa", mes: new Date().getUTCMonth()+1,
@@ -624,7 +630,7 @@ async function rodar() {
   console.log("\n=== 4. PROATIVOS (cobrança / aviso de saldo / gatilhos) ===");
   const pro = await import("../src/lib/proativo");
   const nCob = await pro.cobrancaGentil();
-  const rascunhosCob = banco.interacoes_ia.filter((i) => i.assunto === "cobranca");
+  const rascunhosCob = banco.fila_liberacao.filter((i: any) => i.tipo === "cobranca");
   checar("gerou cobrança para quem deve", nCob >= 1, `gerou ${nCob}`);
   checar("NÃO cobrou o cliente anonimizado (LGPD)",
          !rascunhosCob.some((r) => r.cliente_id === "c-anon"), "anonimizado não pode ser cobrado");
@@ -646,7 +652,7 @@ async function rodar() {
   checar("gatilho não repete no mesmo ano", nGat2 === 0, `segunda passada gerou ${nGat2}`);
 
   console.log("\n=== 4b. RÉGUA DE COBRANÇA POR FAMÍLIA ===");
-  const todosCob = banco.interacoes_ia.filter((i) => i.assunto === "cobranca");
+  const todosCob = banco.fila_liberacao.filter((i: any) => i.tipo === "cobranca");
   checar("régua 'nao_cobrar' NUNCA é cobrada",
          !todosCob.some((r) => r.cliente_id === "c-avu"), "Eliana é avulsa: só convite, nunca cobrança");
   const cobSuave = todosCob.filter((r) => r.cliente_id === "c-sua");
@@ -654,7 +660,7 @@ async function rodar() {
   const nivelSuave = banco.clientes.find((c) => c.id === "c-sua")!.cobranca_nivel;
   checar("régua 'suave' para no primeiro lembrete", nivelSuave === 1, `nível ${nivelSuave}`);
   checar("texto usa o tratamento da família",
-         cobSuave.some((r) => r.rascunho.includes("Julieta")), cobSuave[0]?.rascunho?.slice(0, 80) || "");
+         cobSuave.some((r: any) => r.texto.includes("Julieta")), cobSuave[0]?.texto?.slice(0, 80) || "");
 
   console.log("\n=== 4c. RÉGUA DE ATIVAÇÃO (avulsos e datas) ===");
   const ativ = await import("../src/lib/ativacao");
@@ -669,22 +675,22 @@ async function rodar() {
   banco.clientes.find((c) => c.id === "c-avu")!.ultima_ativacao_em = null;
   const nPer2 = await ativ.convitesPeriodicos();
   checar("convite periódico dispara para quem tem ativação ligada", nPer2 >= 1, `gerou ${nPer2}`);
-  const textosPeriodicos = banco.interacoes_ia.filter((i) => i.rascunho?.includes("gostaria que a gente desse uma cuidada"));
+  const textosPeriodicos = banco.fila_liberacao.filter((i: any) => i.texto?.includes("gostaria que a gente desse uma cuidada"));
   checar("convite PERIÓDICO só vai para quem tem ativação ligada",
          textosPeriodicos.every((c) => c.cliente_id === "c-avu"),
          `foi para: ${[...new Set(textosPeriodicos.map((c) => c.cliente_id))].join(",")}`);
-  const convData = banco.interacoes_ia.filter((i) => i.rascunho?.includes("Finados chegando no jazigo"));
+  const convData = banco.fila_liberacao.filter((i: any) => i.texto?.includes("Finados chegando no jazigo"));
   checar("convite de DATA vai para todas as famílias", convData.length >= 4, `foi para ${convData.length}`);
-  const convites = banco.interacoes_ia.filter((i) => i.rascunho?.includes("gostaria que a gente desse uma cuidada"));
+  const convites = banco.fila_liberacao.filter((i: any) => i.texto?.includes("gostaria que a gente desse uma cuidada"));
   checar("convite periódico foi só para a avulsa",
          convites.every((c) => c.cliente_id === "c-avu"), `foram ${convites.length}`);
   checar("convite não é cobrança (não cita valor em aberto)",
-         convites.every((c) => !c.rascunho.includes("em aberto")), "");
+         convites.every((c: any) => !c.texto.includes("em aberto")), "");
 
   console.log("\n=== 4d. FAMÍLIA COM MAIS DE UM JAZIGO ===");
-  const cobLin = banco.interacoes_ia.filter((i) => i.cliente_id === "c-lin" && i.assunto === "cobranca");
+  const cobLin = banco.fila_liberacao.filter((i: any) => i.cliente_id === "c-lin" && i.tipo === "cobranca");
   checar("cobrança avisa que o valor é do conjunto",
-         cobLin.some((r) => r.rascunho.includes("2 jazigos")), cobLin[0]?.rascunho?.slice(0, 140) || "sem cobrança");
+         cobLin.some((r: any) => r.texto.includes("2 jazigos")), cobLin[0]?.texto?.slice(0, 140) || "sem cobrança");
   // A DECISAO DE 22/08, COMO TESTE.
   //
   // "E a familia, mas sempre tem um responsavel financeiro." Se o saldo fosse

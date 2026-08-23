@@ -13,9 +13,21 @@ import { statusConexao } from "@/lib/evolution-admin";
  * exatamente o que faz o cliente ficar.
  */
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const db = supabaseAdmin();
   const org = env.orgId();
+
+  // FILTRO POR TIPO.
+  //
+  // Desde a 0094 a fila recebe TUDO: foto da lavagem, cobrança, lembrete,
+  // agradecimento, comemorativa e convite de serviço. Numa lista única, decidir
+  // sobre trinta fotos e duas cobranças no mesmo scroll é como as cobranças
+  // passam batido — são decisões de natureza diferente, tomadas em momentos
+  // diferentes.
+  //
+  // O filtro é aplicado no BANCO e não na tela: o limite de 100 itens é do
+  // banco, e filtrar depois traria as 100 fotos e mostraria zero cobranças.
+  const tipoFiltro = (req.nextUrl.searchParams.get("tipo") || "").trim();
 
   // O QUE MORREU NO MEIO DO CAMINHO VOLTA PARA A FILA.
   //
@@ -31,21 +43,34 @@ export async function GET() {
     () => {}, (e: any) => console.error("[fila] destravar falhou:", e?.message),
   );
 
-  const { data, error } = await db
+  let consulta = db
     .from("fila_liberacao")
     .select(
       "id,tipo,status,texto,fotos,criado_em,servico_id,familia_id,tumulo_id," +
         "tentativas,ultimo_erro,ultimo_erro_em,erro_tipo,fotos_enviadas," +
-        "familias(nome),clientes(nome,telefone)," +
+        "familias(nome,silenciar),clientes(nome,telefone)," +
         "tumulos(codigo,identificacao,ruas(nome),quadras(codigo))," +
         "servicos(foto_antes_url,foto_depois_url,data_executada)"
     )
     .eq("org_id", org)
-    .eq("status", "aguardando")
+    .eq("status", "aguardando");
+  if (tipoFiltro) consulta = consulta.eq("tipo", tipoFiltro);
+
+  const { data, error } = await consulta
     .order("criado_em", { ascending: true })
     .limit(100);
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  // QUANTAS DE CADA TIPO ESTÃO ESPERANDO — contadas SEM o filtro, senão os
+  // números das abas sumiriam assim que uma aba fosse escolhida.
+  const { data: todosTipos } = await db
+    .from("fila_liberacao").select("tipo")
+    .eq("org_id", org).eq("status", "aguardando").limit(2000);
+  const porTipo: Record<string, number> = {};
+  for (const r of ((todosTipos as any[]) || [])) {
+    porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1;
+  }
 
   // ------------------------------------------------------------------------
   // QUANDO ESTA FAMÍLIA RECEBEU FOTO PELA ÚLTIMA VEZ (migration 0087)
@@ -65,7 +90,7 @@ export async function GET() {
   const familiaIds = [...new Set((data || []).map((f: any) => f.familia_id).filter(Boolean))];
   const tumuloIds  = [...new Set((data || []).map((f: any) => f.tumulo_id).filter(Boolean))];
 
-  const [{ data: ultFam }, { data: ultJaz }, { data: cfg }] = await Promise.all([
+  const [{ data: ultFam }, { data: ultJaz }, { data: cfg }, { data: ultAcao }] = await Promise.all([
     familiaIds.length
       ? db.from("sureya_ultima_foto_familia").select("familia_id,ultima_em,total")
           .eq("org_id", org).in("familia_id", familiaIds)
@@ -75,10 +100,30 @@ export async function GET() {
           .eq("org_id", org).in("tumulo_id", tumuloIds)
       : Promise.resolve({ data: [] } as any),
     db.from("orgs").select("dias_entre_fotos").eq("id", org).maybeSingle(),
+    // A ÚLTIMA AÇÃO — de qualquer tipo, não só foto (0094).
+    //
+    // A pergunta que ela faz antes de liberar não é só "já mandei foto?": é
+    // "eu já não falei com essa gente esta semana?". Três mensagens no mesmo
+    // dia, cada uma de um tipo, cada uma liberada sozinha sem que nada na tela
+    // dissesse que as outras duas existiam — é assim que se cansa uma família.
+    familiaIds.length
+      ? db.from("sureya_ultima_acao_familia").select("familia_id,tipo,dia")
+          .eq("org_id", org).in("familia_id", familiaIds)
+      : Promise.resolve({ data: [] } as any),
   ]);
 
   const porFamilia = new Map<string, any>(((ultFam || []) as any[]).map((r) => [r.familia_id, r]));
   const porJazigo  = new Map<string, any>(((ultJaz || []) as any[]).map((r) => [r.tumulo_id, r]));
+
+  // Duas leituras da mesma lista, porque são duas perguntas: a última do MESMO
+  // tipo ("já mandei cobrança para essa família?") e a última de QUALQUER tipo
+  // ("já falei com essa gente?").
+  const acoesDaFamilia = new Map<string, any[]>();
+  for (const a of ((ultAcao as any[]) || [])) {
+    const arr = acoesDaFamilia.get(a.familia_id) || [];
+    arr.push(a);
+    acoesDaFamilia.set(a.familia_id, arr);
+  }
 
   // Zero desliga o aviso. `?? 30` cobre o banco antigo, antes da coluna existir.
   const diasEntreFotos = Number((cfg as any)?.dias_entre_fotos ?? 30) || 0;
@@ -139,6 +184,25 @@ export async function GET() {
     // O grão do jazigo responde a segunda pergunta, que só existe para família
     // com mais de uma pedra: "recebeu foto há 8 dias" pode ter sido da OUTRA.
     ultimaFotoJazigoEm: porJazigo.get(f.tumulo_id)?.ultima_em ?? null,
+
+    // A ÚLTIMA AÇÃO DESTA FAMÍLIA (0094), nas duas leituras.
+    ultimaAcao: (() => {
+      const arr = acoesDaFamilia.get(f.familia_id) || [];
+      if (!arr.length) return null;
+      const maisRecente = arr.reduce((a, b) => (a.dia >= b.dia ? a : b));
+      const mesmoTipo = arr.find((a) => a.tipo === f.tipo) || null;
+      return {
+        tipo: maisRecente.tipo,
+        dia: maisRecente.dia,
+        mesmoTipoDia: mesmoTipo?.dia ?? null,
+      };
+    })(),
+
+    // O QUE ESTA FAMÍLIA PEDIU PARA NÃO RECEBER. Vai junto para a tela poder
+    // oferecer "não enviar mais deste tipo" já sabendo o estado atual — e para
+    // não oferecer silenciar o que já está silenciado.
+    silenciados: Array.isArray(f.familias?.silenciar) ? f.familias.silenciar : [],
+    familiaId: f.familia_id ?? null,
     };
   });
 
@@ -153,7 +217,7 @@ export async function GET() {
     whatsapp = "erro";
   }
 
-  return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos });
+  return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos, porTipo, tipo: tipoFiltro || null });
 }
 
 export async function POST(req: NextRequest) {

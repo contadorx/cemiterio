@@ -2,45 +2,78 @@ import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { calcularSaldo } from "./financeiro";
 
-// Tudo aqui gera RASCUNHO (copiloto): mensagens proativas nunca saem sozinhas.
+// Tudo aqui gera mensagem PREPARADA (copiloto): nada sai sozinho. Quem manda é
+// a Sureya, tocando em "enviar" na tela de liberação.
 
-async function conversaDe(clienteId: string): Promise<{ id: string } | null> {
+/**
+ * A FAMÍLIA DE UM CONTATO.
+ *
+ * Precisa estar aqui porque a fila decide por família: é a família que silencia
+ * um tipo de mensagem (0094) e é por família que se conta a última ação. Sem
+ * ela, uma família que pediu para não receber cobrança receberia assim mesmo.
+ *
+ * `limit(1)` e não `maybeSingle()`: nada impede duas famílias com o mesmo
+ * responsável, e `maybeSingle()` devolve ERRO com duas linhas — que este código
+ * leria como "não tem família" e seguiria enfileirando sem a proteção.
+ */
+async function familiaDe(clienteId: string): Promise<string | null> {
   const db = supabaseAdmin();
-  const org = env.orgId();
-  const { data: aberta } = await db
-    .from("conversas")
+  const { data } = await db
+    .from("familias")
     .select("id")
-    .eq("org_id", org)
-    .eq("cliente_id", clienteId)
-    .eq("aberta", true)
-    .maybeSingle();
-  if (aberta) return { id: (aberta as any).id };
-  const { data: nova, error } = await db
-    .from("conversas")
-    .insert({ org_id: org, cliente_id: clienteId, aberta: true })
-    .select("id")
-    .single();
-  if (error) return null;
-  return { id: (nova as any).id };
+    .eq("org_id", env.orgId())
+    .eq("responsavel_id", clienteId)
+    .limit(1);
+  return ((data as any[]) || [])[0]?.id ?? null;
 }
 
-async function criarRascunho(
+/**
+ * ENFILEIRAR — a porta única (0094).
+ *
+ * ⚠ O QUE MUDOU, e por quê
+ *
+ * Isto escrevia em `interacoes_ia`, que era uma SEGUNDA fila, com uma segunda
+ * tela: a aba "Rascunhos da IA", dentro de outro endereço. Duas filas para o
+ * mesmo ato — decidir se uma mensagem sai — davam duas telas para olhar todo
+ * dia, e a segunda ninguém olhava.
+ *
+ * Pior que o esquecimento: as proteções da `fila_liberacao` não valiam ali. A
+ * chave de "não enviar para esta família" (0085), a contagem de tentativas e o
+ * destravamento do que morreu no meio do envio (0077) existiam numa fila e não
+ * na outra. Uma mensagem comemorativa podia sair para uma família em luto sem
+ * passar por nenhuma das duas.
+ *
+ * Agora tudo entra pela mesma porta e pelo mesmo gatilho.
+ *
+ * DEVOLVE FALSO QUANDO A PORTA BARRA. O gatilho `BEFORE INSERT` devolve NULL
+ * para o que a família silenciou: o insert termina sem erro e sem linha. Ler só
+ * `error` diria que enfileirou, e o contador da rotina anunciaria mensagens que
+ * não existem.
+ *
+ * NÃO CRIA MAIS CONVERSA. A versão antiga abria uma `conversa` só para pendurar
+ * o rascunho — foi assim que nasceram as 162 conversas das quais 15 têm
+ * mensagem (D-12). Mensagem preparada não é conversa; conversa começa quando
+ * alguém fala.
+ */
+async function enfileirar(
   clienteId: string,
-  assunto: "cobranca" | "outro",
+  tipo: "cobranca" | "lembrete" | "comemorativa" | "servico",
   texto: string
 ): Promise<boolean> {
-  const conv = await conversaDe(clienteId);
-  if (!conv) return false;
   const db = supabaseAdmin();
-  const { error } = await db.from("interacoes_ia").insert({
-    org_id: env.orgId(),
-    cliente_id: clienteId,
-    conversa_id: conv.id,
-    assunto,
-    rascunho: texto,
-    acao_humana: null,
-  });
-  return !error;
+  const { data, error } = await db
+    .from("fila_liberacao")
+    .insert({
+      org_id: env.orgId(),
+      cliente_id: clienteId,
+      familia_id: await familiaDe(clienteId),
+      tipo,
+      texto,
+      status: "aguardando",
+    })
+    .select("id");
+  if (error) return false;
+  return (((data as any[]) || []).length) > 0;
 }
 
 function diasAtras(iso: string | null, dias: number): boolean {
@@ -89,7 +122,7 @@ export async function avisosSaldoBaixo(): Promise<number> {
         2
       )}. Quando quiser, pode garantir pelo Pix de sempre que a gente já deixa tudo certinho por aqui. Qualquer coisa, estou à disposição.`;
 
-    if (await criarRascunho(clienteId, "cobranca", texto)) {
+    if (await enfileirar(clienteId, "lembrete", texto)) {
       await db.from("clientes").update({ aviso_saldo_em: new Date().toISOString() }).eq("id", clienteId);
       n++;
     }
@@ -181,7 +214,7 @@ export async function cobrancaGentil(): Promise<number> {
     const textos = regua === "suave" ? suaves : regua === "firme" ? firmes : padrao;
     const texto = textos[Math.min(nivel, textos.length - 1)];
 
-    if (await criarRascunho((c as any).id, "cobranca", texto)) {
+    if (await enfileirar((c as any).id, "cobranca", texto)) {
       await db
         .from("clientes")
         .update({ cobranca_nivel: nivel + 1, cobranca_em: new Date().toISOString() })
@@ -239,7 +272,7 @@ export async function gatilhosDeData(): Promise<number> {
           ? `Olá, ${nome}. Na próxima semana é o aniversário${quem} — uma data de memória e carinho. Se quiser, podemos fazer uma limpeza especial e deixar flores no túmulo para o dia. Me avisa que eu organizo tudo. 🌷`
           : `Olá, ${nome}. Sei que a próxima semana traz uma data delicada${quem ? `, a memória${quem}` : ""}. Se desejar, preparo uma limpeza especial para que o túmulo esteja bem cuidado no dia. Estou à disposição, com carinho. 🌿`;
 
-      if (await criarRascunho((t as any).cliente_id, "outro", texto)) n++;
+      if (await enfileirar((t as any).cliente_id, "comemorativa", texto)) n++;
     }
   }
 
@@ -255,7 +288,7 @@ export async function gatilhosDeData(): Promise<number> {
     for (const [clienteId, info] of porCliente) {
       if (await jaDisparado(info.tumuloId, "finados")) continue;
       const texto = `Olá, ${info.nome}. O Dia de Finados está chegando, e sabemos o quanto essa data é importante. Se quiser, garantimos uma limpeza caprichada antes do dia 2, para que esteja tudo bem cuidado na sua visita. É só me avisar. 🌿`;
-      if (await criarRascunho(clienteId, "outro", texto)) n++;
+      if (await enfileirar(clienteId, "comemorativa", texto)) n++;
     }
   }
 

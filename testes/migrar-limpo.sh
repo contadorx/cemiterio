@@ -209,10 +209,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-57}
 #   0092  +1  sureya_agenda_fora_do_lugar — a UNICA definicao de "fora do
 #             lugar". sureya_reorganizar_agenda nao entra na conta: ela cai e
 #             nasce de novo (o retorno ganhou colunas), mas ja existia.
-# Saldo: +29. As demais migrations desta
+#   0094  +1  sureya_familia_silencia — o que esta familia nao recebe. A 0093
+#             nao entra: view nao e funcao, e este contador so conta pg_proc.
+# Saldo: +30. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-29}
+FUNCOES_DELTA=${FUNCOES_DELTA:-30}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

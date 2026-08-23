@@ -14,6 +14,39 @@ export default function Thread() {
   const [ocupado, setOcupado] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const [versaoPedidos, setVersaoPedidos] = useState(0);
+  /** A sugestão da IA, e o que ela leu para escrever. */
+  const [sugerindo, setSugerindo] = useState(false);
+  const [leu, setLeu] = useState<number | null>(null);
+
+  /**
+   * SUGERIR RESPOSTA — a IA lê tudo e escreve uma proposta no campo.
+   *
+   * Não é o robô de volta. O robô respondia sozinho e foi desligado por um bom
+   * motivo (D-12). Aqui a IA escreve NO CAMPO DE TEXTO e para por aí: quem lê,
+   * corrige, apaga e envia é a pessoa.
+   *
+   * O que ela ganha com isso não é digitação, é MEMÓRIA: para responder bem é
+   * preciso saber que esta família tem dois jazigos, que a última limpeza foi
+   * há seis dias, que está R$ 80 adiantada e que a régua dela é "suave" — cinco
+   * telas. A proposta chega com isso considerado.
+   *
+   * Substituir o que já está escrito exige confirmação: a frase que ela digitou
+   * é dela, e uma sugestão que apaga o trabalho de alguém não é ajuda.
+   */
+  async function sugerir() {
+    if (texto.trim() && !confirm("Substituir o que você já escreveu pela sugestão da IA?")) return;
+    setSugerindo(true);
+    setLeu(null);
+    try {
+      const r = await fetch(`/api/conversas/${id}/sugerir`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || "Não consegui sugerir agora. Escreva à mão."); return; }
+      setTexto(r.texto);
+      setLeu(Number(r.mensagensLidas) || 0);
+    } finally { setSugerindo(false); }
+  }
 
   async function carregar() {
     const r = await fetch(`/api/conversas/${id}`).then((x) => x.json());
@@ -150,10 +183,30 @@ export default function Thread() {
             <button style={painel.botao} onClick={enviar} disabled={ocupado || !texto.trim()}>
               Enviar
             </button>
+            {/* A IA ESCREVE, VOCÊ MANDA.
+                Fica ao lado de Enviar e não dentro de um painel que precisa ser
+                aberto: é para o caso comum — responder o que a família acabou
+                de perguntar —, e um caso comum atrás de dois cliques não é
+                usado. O "Me ajuda a escrever", logo abaixo, é para quando ela
+                já sabe o que quer dizer e quer três jeitos de dizer. */}
+            <button style={painel.botaoSec} onClick={sugerir} disabled={sugerindo || ocupado}>
+              {sugerindo ? "A IA está lendo a conversa…" : "🤖 Sugerir resposta"}
+            </button>
             <span style={{ fontSize: 14, color: cor.cinza }}>
               Enter quebra linha · Ctrl+Enter envia
             </span>
           </div>
+          {/* Dizer QUANTO ela leu, em vez de pedir fé. Uma sugestão que ignorou
+              o combinado de três semanas atrás é pior que sugestão nenhuma, e
+              quem revisa precisa saber com o que está lidando. */}
+          {leu !== null && (
+            <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0" }}>
+              A IA leu {leu === 0 ? "o cadastro da família (a conversa ainda não tem mensagens)"
+                                  : `as ${leu} últimas mensagens desta conversa`}, os jazigos, o
+              saldo e a régua de cobrança. <b>Revise antes de enviar</b> — o que estiver entre
+              colchetes é coisa que ela não sabia.
+            </p>
+          )}
         </div>
         <div style={{ marginTop: 12 }}>
           <AnotarPedido

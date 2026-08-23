@@ -595,3 +595,119 @@ do aplicativo de campo.
 Na agenda, a linha se acende quando a última lavagem está a **7 dias ou menos**
 da que está marcada. Não é erro — pode ser um pedido da família —, é a pergunta
 que alguém precisa fazer antes de a equipe andar até lá.
+
+---
+
+## D-16 · Uma fila só, e a liberação primeiro
+
+**O que se mediu**, em produção, em 23/08/2026:
+
+> **164 mensagens paradas**, esperando decisão, numa fila que nenhuma tela do
+> menu mostrava. **157 eram cobranças**, geradas dia após dia entre 04 e 22 de
+> agosto.
+
+Não é que alguém decidiu não enviá-las. **Ninguém viu.**
+
+### Por que existiam duas filas
+
+Mensagem para família saía por dois caminhos, cada um com sua tela:
+
+| | onde | quem olhava |
+|---|---|---|
+| `fila_liberacao` | `/painel/fila` | todo dia |
+| `interacoes_ia` | aba "Rascunhos da IA", dentro de `/painel/conversas` | ninguém |
+
+A segunda nasceu quando a IA respondia sozinha e precisava de aval. O robô foi
+desligado (D-12); a fila ficou, e `proativo.ts` e `ativacao.ts` continuaram
+escrevendo nela — aniversário, Finados, aviso de saldo, cobrança gentil.
+
+Pior que o esquecimento: **as proteções não valiam ali**. A chave de "não enviar
+para esta família" (0085), a contagem de tentativas e o destravamento do que
+morre no meio do envio (0077) existiam numa fila e não na outra. Uma mensagem
+comemorativa podia sair para uma família em luto sem passar por nenhuma das
+duas.
+
+### A decisão
+
+`fila_liberacao` passa a ser a **porta única** (0094). Dois tipos novos —
+`comemorativa` e `servico` — e `proativo.ts`/`ativacao.ts` enfileiram por ela.
+Tudo passa pelo mesmo gatilho.
+
+**As 164 não foram migradas automaticamente.** São 157 cobranças de até 19 dias
+atrás, muitas do mesmo cliente em dias seguidos: despejá-las numa fila de envio
+seria preparar cobranças repetidas para a mesma família. Elas aparecem numa aba
+**"Fila antiga"**, com o número anunciado na primeira aba, e **somem quando a
+lista zerar** — a aba existe para o passivo ser pago, não para virar mais um
+lugar permanente de olhar.
+
+### "Não enviar mais disso"
+
+Descartar resolve a mensagem de hoje; não resolve a decisão. Há família que não
+quer cobrança por WhatsApp, e família em luto para quem uma mensagem
+comemorativa é uma ofensa — e nesses casos descartar item a item é lembrar
+disso todo mês. Basta esquecer uma vez.
+
+`familias.silenciar` é um **array de tipos**, e não uma coluna booleana por
+tipo: tipo novo não deve pedir migration nova. E vale **na porta** — o gatilho
+devolve NULL no insert, e a mensagem não chega a existir. Não é filtro de tela.
+
+**A foto não entrou nesse array.** A chave dela (0085) é de **três** estados —
+ligada, desligada e "segue a casa", que é o padrão de quase todas as famílias —
+e o array é de dois. Absorver uma na outra perderia o estado do meio.
+
+### A última ação
+
+A pergunta antes de liberar não é só "já mandei foto?": é **"eu já não falei com
+essa gente esta semana?"**. Três mensagens no mesmo dia, cada uma de um tipo,
+cada uma liberada sozinha sem que nada na tela dissesse que as outras duas
+existiam — é assim que se cansa uma família.
+
+`sureya_ultima_acao_familia` responde as duas: a última de qualquer tipo e a
+última **do mesmo tipo**. Só conta o que foi **enviado**: descartada não chegou
+em ninguém, e contá-la faria a tela dizer que a família recebeu o que a Sureya
+decidiu não mandar.
+
+### A ordem das abas é a ordem do dia
+
+1. **Liberação** — o que está pronto e depende de um toque. Vem primeiro porque
+   é o que tem prazo: do outro lado há gente esperando resposta já escrita.
+2. **Conversas** — quem falou com a gente. Resolver, arquivar, fixar, ação em
+   massa: tudo isso já existia no módulo antigo e foi religado, não reescrito.
+3. **Contatos do site** — quem chegou agora e ainda não é ninguém aqui.
+4. **Fila antiga** — o passivo, que some quando zerar.
+
+`/painel/fila` e `/painel/contatos` continuam de pé, redirecionando. Uma tela que
+some vira 404 justamente para quem já sabia usá-la.
+
+---
+
+## D-17 · A IA como assistente — ela escreve, quem manda é a pessoa
+
+**Não é o robô de volta.** O robô antigo respondia sozinho e foi desligado por
+um bom motivo (D-12): conversa automática com família idosa e enlutada quebra
+exatamente o que faz o cliente ficar.
+
+O botão **Sugerir resposta** escreve **no campo de texto** e para por aí. Quem
+lê, corrige, apaga e envia é a pessoa. Nada nessa rota grava mensagem, nada
+chama o WhatsApp — ela devolve texto. A diferença é de desenho, não de
+configuração.
+
+**O que a IA lê:** as últimas 60 mensagens da conversa (eram 16 no "Me ajuda a
+escrever" — a pergunta de hoje quase sempre continua uma combinação de semanas
+atrás), os jazigos, o saldo, a régua de cobrança, o tratamento da família e o
+conhecimento da casa.
+
+**Por que vale a pena.** O trabalho não é escrever: é lembrar. Para responder
+bem é preciso saber que esta família tem dois jazigos, que a última limpeza foi
+há seis dias, que ela está R$ 80 adiantada e que a régua dela é "suave" — isso
+está em cinco telas. A proposta chega com tudo considerado, e o minuto é gasto
+corrigindo o tom em vez de abrindo abas.
+
+**Ela diz o que não sabe.** Quando falta um valor, uma data ou uma decisão que é
+da casa, a instrução é não inventar: escrever até onde dá e deixar
+`[confirmar a data com a Sureya]` entre colchetes. E a tela diz quantas
+mensagens foram lidas, em vez de pedir fé.
+
+**Dois botões, dois usos.** *Sugerir resposta* é um clique, para o caso comum —
+responder o que a família acabou de perguntar. *Me ajuda a escrever* continua
+para quando ela já sabe o que quer dizer e quer três jeitos de dizer.

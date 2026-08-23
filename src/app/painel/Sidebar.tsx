@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, Mail, MapPin, MessageCircle, Receipt, Settings, Sparkles, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, MapPin, MessageCircle, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -18,10 +18,12 @@ import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, Mail, MapP
 const DIA_A_DIA = [
   { href: "/painel", label: "O mês", icon: Home },
   { href: "/painel/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/painel/fila", label: "Liberação", icon: Inbox },
-  // Quem escreveu pelo site. Ficava sem tela nenhuma: os avisos apontavam
-  // para o CRM desligado, que devolve 404.
-  { href: "/painel/contatos", label: "Contatos", icon: Mail },
+  // CONVERSAS é uma entrada só para tudo que é falar com a família: a
+  // liberação das mensagens preparadas, as conversas de WhatsApp e quem
+  // escreveu pelo site. Eram três endereços — e, embaixo deles, duas filas
+  // de mensagem esperando decisão, das quais só uma tinha tela que alguém
+  // abria. Ver 0094 e D-16.
+  { href: "/painel/conversas", label: "Conversas", icon: Inbox },
   { href: "/painel/avulsos", label: "Avulsos", icon: Sparkles },
   { href: "/campo", label: "Campo", icon: MapPin },
 ];

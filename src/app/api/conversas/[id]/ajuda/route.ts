@@ -42,7 +42,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const ctx = await montarContexto(cliente as any);
   const cfg = await carregarConfigIa();
-  const historico = await historicoConversa(params.id, 16);
+  // Todo o histórico que couber, e não as 16 últimas: a pergunta de hoje
+  // quase sempre continua uma combinação de semanas atrás, e uma resposta que
+  // ignora isso obriga a família a se repetir.
+  const historico = await historicoConversa(params.id, 60);
 
   const conversa = historico
     .map((m: any) => (m.role === "user" ? "Família: " : "Eu: ") + m.content)

@@ -304,3 +304,94 @@ select ci5b('a Pedra B guarda a dela',
   'a Pedra B nao registrou o envio automatico');
 
 do $$ begin raise notice 'ULTIMA FOTO: todas as conferencias passaram'; end $$;
+
+-- ============================================================================
+-- A PORTA UNICA DA LIBERACAO (0094)
+--
+-- Havia DUAS filas de mensagem esperando decisao: `fila_liberacao` (foto,
+-- cobranca) e `interacoes_ia` (aniversario, Finados, aviso de saldo). A segunda
+-- tinha tela propria, num endereco que ninguem abria — e em 23/08/2026 havia
+-- 164 mensagens paradas nela, 157 delas cobrancas geradas dia apos dia entre 04
+-- e 22 de agosto. Nao e que alguem decidiu nao enviar: ninguem viu.
+--
+-- O que se cobra aqui: os tipos novos entram, o silencio da familia barra na
+-- PORTA (e nao na tela), e a foto continua com a chave propria dela.
+-- ============================================================================
+insert into familias (id, org_id, nome, modo_cobranca)
+  values ('bbbbbbbb-0000-0000-0000-000000000094','aaaaaaaa-0000-0000-0000-000000000005',
+          'Familia Silenciosa','consumo') on conflict (id) do nothing;
+
+-- 1 · OS TIPOS NOVOS EXISTEM E ENTRAM
+insert into fila_liberacao (id, org_id, familia_id, tipo, texto, status)
+values ('cccccccc-0000-0000-0000-000000000941','aaaaaaaa-0000-0000-0000-000000000005',
+        'bbbbbbbb-0000-0000-0000-000000000094','comemorativa','Feliz Dia das Maes','aguardando'),
+       ('cccccccc-0000-0000-0000-000000000942','aaaaaaaa-0000-0000-0000-000000000005',
+        'bbbbbbbb-0000-0000-0000-000000000094','servico','Que tal uma cuidada extra?','aguardando');
+
+select ci5('comemorativa e servico entram na fila',
+  (select count(*)::text from fila_liberacao
+    where familia_id = 'bbbbbbbb-0000-0000-0000-000000000094'
+      and tipo in ('comemorativa','servico')), '2');
+
+-- 2 · O SILENCIO BARRA NA PORTA
+--
+-- A mensagem nao entra e e descartada depois: ela NAO EXISTE. A diferenca
+-- importa porque uma mensagem que entra e alguem tem de decidir sobre ela, e
+-- essa decisao ja foi tomada quando a familia pediu para nao receber.
+update familias set silenciar = array['comemorativa']
+ where id = 'bbbbbbbb-0000-0000-0000-000000000094';
+
+insert into fila_liberacao (id, org_id, familia_id, tipo, texto, status)
+values ('cccccccc-0000-0000-0000-000000000943','aaaaaaaa-0000-0000-0000-000000000005',
+        'bbbbbbbb-0000-0000-0000-000000000094','comemorativa','Finados chegando','aguardando');
+
+select ci5('familia que silenciou o tipo NAO recebe a mensagem na fila',
+  (select count(*)::text from fila_liberacao
+    where id = 'cccccccc-0000-0000-0000-000000000943'), '0');
+
+-- 3 · O SILENCIO E POR TIPO, e nao um mudo geral
+insert into fila_liberacao (id, org_id, familia_id, tipo, texto, status)
+values ('cccccccc-0000-0000-0000-000000000944','aaaaaaaa-0000-0000-0000-000000000005',
+        'bbbbbbbb-0000-0000-0000-000000000094','cobranca','Consta em aberto','aguardando');
+
+select ci5('e os outros tipos continuam passando',
+  (select count(*)::text from fila_liberacao
+    where id = 'cccccccc-0000-0000-0000-000000000944'), '1');
+
+-- 4 · O QUE JA ESTAVA NA FILA NAO SOME
+--
+-- Silenciar vale da proxima em diante. Sumir com o que alguem ja esta olhando
+-- na tela seria decidir por quem esta olhando.
+select ci5('o que ja estava na fila continua la',
+  (select count(*)::text from fila_liberacao
+    where id = 'cccccccc-0000-0000-0000-000000000941'), '1');
+
+-- 5 · A ULTIMA ACAO SO CONTA O QUE FOI ENVIADO
+update fila_liberacao set status = 'enviado', decidido_em = now() - interval '3 days'
+ where id = 'cccccccc-0000-0000-0000-000000000941';
+update fila_liberacao set status = 'descartado', decidido_em = now()
+ where id = 'cccccccc-0000-0000-0000-000000000944';
+
+select ci5('a ultima acao ve a enviada',
+  (select tipo from sureya_ultima_acao_familia
+    where familia_id = 'bbbbbbbb-0000-0000-0000-000000000094'), 'comemorativa');
+
+select ci5('e NAO conta a descartada — ela nao chegou em ninguem',
+  (select count(*)::text from sureya_ultima_acao_familia
+    where familia_id = 'bbbbbbbb-0000-0000-0000-000000000094' and tipo = 'cobranca'), '0');
+
+-- 6 · A FOTO CONTINUA COM A CHAVE DELA
+--
+-- `silenciar` e de dois estados; a chave da foto (0085) e de TRES — ligada,
+-- desligada e "segue a casa", que e o padrao de quase todas as familias.
+-- Absorver uma na outra perderia o estado do meio.
+update familias set silenciar = array['comemorativa','cobranca'], enviar_fotos = true
+ where id = 'bbbbbbbb-0000-0000-0000-000000000094';
+
+insert into fila_liberacao (id, org_id, familia_id, tipo, texto, status)
+values ('cccccccc-0000-0000-0000-000000000945','aaaaaaaa-0000-0000-0000-000000000005',
+        'bbbbbbbb-0000-0000-0000-000000000094','foto','Segue a foto','aguardando');
+
+select ci5('foto com a chave ligada passa, mesmo com outros tipos silenciados',
+  (select count(*)::text from fila_liberacao
+    where id = 'cccccccc-0000-0000-0000-000000000945'), '1');

@@ -34,20 +34,37 @@ function dataDoAno(regra: string, mes: number, dia: number | null, ordinal: numb
   return null;
 }
 
-async function conversaDe(clienteId: string): Promise<string | null> {
+/** A família deste contato — é por família que a fila decide (0094). */
+async function familiaDe(clienteId: string): Promise<string | null> {
   const db = supabaseAdmin();
-  const org = env.orgId();
-  const { data: aberta } = await db
-    .from("conversas").select("id")
-    .eq("org_id", org).eq("cliente_id", clienteId).eq("aberta", true).maybeSingle();
-  if (aberta) return (aberta as any).id;
-  const { data: nova } = await db
-    .from("conversas").insert({ org_id: org, cliente_id: clienteId, aberta: true })
-    .select("id").single();
-  return (nova as any)?.id || null;
+  const { data } = await db
+    .from("familias").select("id")
+    .eq("org_id", env.orgId()).eq("responsavel_id", clienteId).limit(1);
+  return ((data as any[]) || [])[0]?.id ?? null;
 }
 
-async function criarConvite(clienteId: string, texto: string, motivo: string): Promise<boolean> {
+/**
+ * O CONVITE ENTRA NA FILA DE LIBERAÇÃO, e não numa segunda fila (0094).
+ *
+ * Escrevia em `interacoes_ia`, que tinha tela própria — a aba "Rascunhos da
+ * IA", em outro endereço, que ninguém abria. Convite comemorativo preparado e
+ * nunca olhado é a mesma coisa que convite não feito, com o agravante de
+ * parecer trabalho pronto.
+ *
+ * `tipo` separa as duas coisas que esta função produz, porque quem libera
+ * decide diferente sobre cada uma:
+ *   · `comemorativa` — Finados, Dia das Mães: a data é de todo mundo;
+ *   · `servico`      — o convite periódico, que é oferta de trabalho novo.
+ *
+ * NÃO CRIA MAIS CONVERSA para pendurar o convite: foi assim que nasceram as
+ * 162 conversas das quais 15 têm mensagem (D-12).
+ */
+async function criarConvite(
+  clienteId: string,
+  texto: string,
+  motivo: string,
+  tipo: "comemorativa" | "servico",
+): Promise<boolean> {
   const db = supabaseAdmin();
   const org = env.orgId();
   const ano = new Date().getFullYear();
@@ -60,14 +77,25 @@ async function criarConvite(clienteId: string, texto: string, motivo: string): P
     .select("id");
   if (!marcado || marcado.length === 0) return false;   // já convidado neste ano
 
-  const conversaId = await conversaDe(clienteId);
-  if (!conversaId) return false;
+  const { data: criado, error } = await db
+    .from("fila_liberacao")
+    .insert({
+      org_id: org, cliente_id: clienteId, familia_id: await familiaDe(clienteId),
+      tipo, texto, status: "aguardando",
+    })
+    .select("id");
 
-  const { error } = await db.from("interacoes_ia").insert({
-    org_id: org, cliente_id: clienteId, conversa_id: conversaId,
-    assunto: "outro", rascunho: texto, acao_humana: null,
-  });
-  if (error) return false;
+  // A PORTA PODE BARRAR — família que silenciou este tipo (0094). O insert
+  // termina sem erro e SEM LINHA, então checar só `error` diria que enfileirou.
+  //
+  // E a trava do ano tem de ser desfeita: ela foi gravada antes, e deixá-la de
+  // pé marcaria a família como já convidada por uma mensagem que nunca existiu
+  // — se o silêncio for tirado amanhã, o convite deste ano nunca mais sairia.
+  if (error || !((criado as any[]) || []).length) {
+    await db.from("ativacoes_disparadas").delete()
+      .eq("org_id", org).eq("cliente_id", clienteId).eq("motivo", motivo).eq("ano", ano);
+    return false;
+  }
 
   await db.from("clientes").update({ ultima_ativacao_em: new Date().toISOString() }).eq("id", clienteId);
   return true;
@@ -108,7 +136,7 @@ export async function convitesDeData(): Promise<number> {
         .replace(/\{tratamento_nome\}/g, saudacaoNome(c.nome))
         .replace(/\{nome\}/g, saudacaoNome(c.nome))
         .replace(/\{familia\}/g, familia.replace(/^Família\s+/i, ""));
-      if (await criarConvite(c.id, texto, d.nome)) n++;
+      if (await criarConvite(c.id, texto, d.nome, "comemorativa")) n++;
     }
   }
   return n;
@@ -153,7 +181,7 @@ export async function convitesPeriodicos(): Promise<number> {
 
     // motivo com o ciclo, para permitir mais de um convite por ano quando a cadência é curta
     const ciclo = Math.floor(new Date().getUTCMonth() / Math.max(1, meses));
-    if (await criarConvite(c.id, texto, `periodica-${ciclo}`)) n++;
+    if (await criarConvite(c.id, texto, `periodica-${ciclo}`, "servico")) n++;
   }
   return n;
 }
