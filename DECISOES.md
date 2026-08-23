@@ -1680,3 +1680,57 @@ Restam **1 mídia pendente** em `fila_envios` (de 22/08) e **1 foto descartada**
 em `fila_liberacao`. A mídia fica onde está enquanto a chave estiver desligada;
 ela sai sozinha no dia em que a casa religar, e é o comportamento esperado —
 está anotado aqui para que não vire surpresa.
+
+---
+
+## D-35 · Descartar não descartava
+
+**O caso:** *"tinha uma foto eu descartei, então deveria ser descartada também
+né"*. Estava certo. Medido em 23/08:
+
+```
+fila_liberacao   1 foto DESCARTADA    servico 1b54c69d…
+fila_envios      1 midia PENDENTE     .../1b54c69d…/depois-….jpg
+```
+
+A mesma foto, em duas filas, com **decisões opostas**.
+
+As duas não são redundantes, e por isso a confusão é fácil: `fila_liberacao`
+espera uma **pessoa aprovar**; `fila_envios` é de coisa **já aprovada cuja
+entrega falhou** e está tentando de novo — esta tinha duas tentativas. Quando a
+mensagem volta para a tela e é descartada, o descarte apagava só a intenção. A
+tentativa seguia viva do outro lado e **sairia sozinha no dia em que a entrega
+voltasse a funcionar**.
+
+Faltava o vínculo: `fila_envios` guardava telefone e payload, e para saber de
+que serviço era a mídia só olhando o caminho do arquivo. Agora tem
+`servico_id`, e o descarte alcança as duas filas.
+
+O backfill usa exatamente a amarração frágil que a coluna vem substituir — mas
+para o que **já** estava na fila não há outra fonte, e deixar a linha de hoje
+sem vínculo manteria o defeito vivo justamente no caso que o revelou.
+
+`proximo_retry` é NOT NULL e fica onde está: quem drena filtra por
+`status = 'pendente'`, então mudar o status já para a tentativa. Zerar a data
+exigiria afrouxar a coluna sem ganho nenhum.
+
+### Como registrar quem pagou o ano inteiro adiantado
+
+O caso Virgínia — pagou em janeiro/2026 por jan–dez, R$ 40/mês. Medido: no
+banco ela **não tem contrato nenhum salvo** (`contratado = false`, valor e
+ritmo nulos); os números na tela eram placeholders. A conferência já acusava.
+
+O caminho é registrar **a verdade inteira**, não só o estado final:
+
+1. ritmo da limpeza, valor mensal **R$ 40**, marcar *entra na rota*
+2. **cobrar a cada 12 meses**, pagamento **no início do período** (adiantado)
+3. próxima cobrança em **janeiro/2026** — e não em 2027
+4. *Lançar as cobranças vencidas* → nascem **12 competências de R$ 40**
+5. registrar o **pagamento de R$ 480 com data de janeiro/2026**
+
+Ensaiado em produção e desfeito: 12 competências jan–dez/26, saldo final
+**R$ 0,00**, e a próxima cobrança vira **01/01/2027 sozinha**.
+
+Pôr direto "próxima cobrança em 2027" também deixaria ela em dia — e apagaria
+2026 inteiro: nem a receita dos doze meses no painel, nem o registro de que ela
+pagou. O saldo ficaria certo pelo motivo errado.

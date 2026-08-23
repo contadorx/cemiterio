@@ -265,8 +265,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-67}
 #             do periodo, e pre/pos-pago), sem funcao nova.
 #   0111  +1  sureya_regua_do_dia — a regua ENFILEIRA, nunca envia. Nao ha
 #             caminho daqui para o WhatsApp, e e de proposito.
-# Saldo: +51.
-FUNCOES_DELTA=${FUNCOES_DELTA:-51}
+#   0113  +1  sureya_cancelar_reenvio_do_servico — descartar na fila de
+#             liberacao nao alcancava a tentativa de reenvio: a foto descartada
+#             sairia sozinha no dia em que a entrega voltasse.
+# Saldo: +52.
+FUNCOES_DELTA=${FUNCOES_DELTA:-52}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

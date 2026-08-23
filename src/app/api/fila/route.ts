@@ -264,6 +264,30 @@ export async function POST(req: NextRequest) {
   //
   // Só volta o que foi descartado — `where status = 'descartado'` garante que
   // isto nunca ressuscita algo já enviado.
+  // DESCARTAR ALCANÇA A FILA DE REENVIO (0113).
+  //
+  // Eram duas filas com decisões opostas sobre a mesma foto: `fila_liberacao`
+  // descartada, e `fila_envios` ainda tentando entregar. A segunda só existe
+  // quando o envio JÁ falhou — então a mensagem tinha saído, voltado, e o
+  // descarte na tela não a alcançava. Ela sairia sozinha no dia em que a
+  // entrega voltasse a funcionar.
+  if (acao === "descartar") {
+    const { data: item } = await db
+      .from("fila_liberacao").select("servico_id")
+      .eq("id", id).eq("org_id", org).maybeSingle();
+    const servicoId = (item as any)?.servico_id;
+    if (servicoId) {
+      await db.from("fila_envios")
+        // `proximo_retry` e NOT NULL e fica como esta: quem drena filtra por
+        // `status = 'pendente'`, entao o status ja para a tentativa.
+        .update({
+          status: "falhou",
+          ultimo_erro: "cancelado junto com o descarte na fila de liberacao",
+        })
+        .eq("org_id", org).eq("servico_id", servicoId).eq("status", "pendente");
+    }
+  }
+
   if (acao === "restaurar") {
     const { data: d, error: eR } = await db
       .from("fila_liberacao")
