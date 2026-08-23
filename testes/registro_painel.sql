@@ -250,7 +250,54 @@ select ci6('avulso nao precisa de plano',
 
 select ci6('mas avulso SEM VALOR e pendencia',
   (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
-    where item = 'valor da limpeza'), 'pendente');
+    where item = 'valor combinado'), 'pendente');
+
+-- ---------------------------------------------------------------------------
+-- O RATEIO (0100): o combinado e MENSAL e cada lavagem desconta a fracao.
+--
+-- Medido na ALCANTARA em 23/08: combinado de R$ 25/mes, lavagem semanal, e a
+-- limpeza debitou R$ 40 — que nao veio de lugar nenhum do contrato. E havia um
+-- erro pior a espera: a cascata pegava `plano.valor_mensal` e cobrava INTEIRO
+-- por lavagem, o que num contrato semanal e QUATRO VEZES o combinado.
+-- ---------------------------------------------------------------------------
+select ci6('quatro semanas no mes, e nao 4,28',
+  sureya_lavagens_no_mes('semanal')::text, '4');
+select ci6('e um bimestre vale meio mes de contrato por lavagem',
+  sureya_lavagens_no_mes('bimestral')::text, '0.5');
+select ci6('periodicidade desconhecida nao inventa divisor',
+  coalesce(sureya_lavagens_no_mes('todo dia')::text, 'nulo'), 'nulo');
+
+update familias set regime = 'contrato' where id = 'bbbbbbbb-0000-0000-0000-000000000097';
+update tumulos set valor_mensal = 25, periodicidade = 'semanal'
+ where id = 'ffffffff-0000-0000-0000-000000000097';
+
+select ci6('R$ 25/mes com lavagem semanal da R$ 6,25 por lavagem',
+  sureya_valor_da_lavagem('ffffffff-0000-0000-0000-000000000097')::text, '6.25');
+
+select ci6b('e a conferencia mostra a conta por extenso',
+  (select detalhe like '%25.00/mes = R$ 6.25 por lavagem%'
+     from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'valor combinado'),
+  'a conferencia nao explica de onde saiu o valor da lavagem');
+
+-- AVULSO NAO DIVIDE: nao ha mes para ratear, e o preco e o da ida.
+--
+-- Os dois valores convivem no mesmo tumulo de proposito: sao dois negocios
+-- diferentes, e o que decide qual vale e o REGIME da familia. Sem isso, mudar
+-- de contrato para avulso exigiria reescrever o cadastro.
+update tumulos set valor_lavagem = 40 where id = 'ffffffff-0000-0000-0000-000000000097';
+update familias set regime = 'avulso' where id = 'bbbbbbbb-0000-0000-0000-000000000097';
+select ci6('avulso cobra o preco da ida, sem dividir',
+  sureya_valor_da_lavagem('ffffffff-0000-0000-0000-000000000097')::text, '40.00');
+
+-- SEM RITMO NAO HA COMO DIVIDIR, e a conferencia cobra isso.
+update familias set regime = 'contrato' where id = 'bbbbbbbb-0000-0000-0000-000000000097';
+update tumulos set periodicidade = null where id = 'ffffffff-0000-0000-0000-000000000097';
+select ci6('sem ritmo, a conferencia acusa',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'ritmo da limpeza'), 'pendente');
+update tumulos set periodicidade = 'semanal' where id = 'ffffffff-0000-0000-0000-000000000097';
+update familias set regime = 'avulso' where id = 'bbbbbbbb-0000-0000-0000-000000000097';
 
 -- 6 · COM TUDO RESOLVIDO, O OK PASSA
 update tumulos set valor_lavagem = 40 where id = 'ffffffff-0000-0000-0000-000000000097';

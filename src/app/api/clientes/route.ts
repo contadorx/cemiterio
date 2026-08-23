@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const [{ data: tumsFam }, { data: famsInfo }, { data: servs }] = await Promise.all([
     db.from("tumulos").select("familia_id,periodicidade,contratado")
       .in("familia_id", familiaIds.length ? familiaIds : ["-"]),
-    db.from("familias").select("id,contratado,valor_mensal,freq_pagamento,inicio_cobranca")
+    db.from("familias").select("id,nome,responsavel_id,contratado,valor_mensal,freq_pagamento,inicio_cobranca")
       .in("id", familiaIds.length ? familiaIds : ["-"]),
     db.from("servicos").select("cliente_id").not("data_executada", "is", null)
       .in("cliente_id", ids.length ? ids : ["-"]),
@@ -191,7 +191,17 @@ export async function GET(req: NextRequest) {
       : servicos > 0 ? "operacional"
       : "pronta";
 
-    return { ...c, etapa, qtdTumulos: meus.length, qtdServicos: servicos };
+    return {
+      ...c, etapa, qtdTumulos: meus.length, qtdServicos: servicos,
+      // O NOME DA FAMÍLIA vai na linha. A lista se chama "Famílias" e mostrava
+      // o nome da PESSOA — e como a família costuma se chamar de um jeito e o
+      // contato de outro (a Família Andre tem uma pessoa chamada "Nagae"), não
+      // dava para achar a família pelo nome dela sem abrir ficha por ficha.
+      familia: fam?.nome || null,
+      // Quem responde pelo dinheiro. `responsavel_financeiro` no cliente é o
+      // espelho antigo; quem manda é o ponteiro da família (0091).
+      ehResponsavel: !!fam?.responsavel_id && fam.responsavel_id === c.id,
+    };
   });
 
   const filtroEtapa = q.get("etapa");

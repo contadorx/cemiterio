@@ -84,23 +84,54 @@ export default function Ficha() {
   if (erro) return <p className="text-[15px] text-perigo">{erro}</p>;
   if (!d) return <p className="text-[15px] text-ink-soft">Carregando…</p>;
 
-  const c = d.cliente;
+  // ==========================================================================
+  // A FICHA É DA FAMÍLIA. A pessoa é uma parte dela.
+  //
+  // `c` pode ser NULO: família sem contato é estado legítimo desde a 0091, e
+  // eram 24 famílias assim em 23/08. A tela quebrava na primeira linha, lendo
+  // `c.telefone` — por isso essas famílias não tinham ficha nenhuma.
+  //
+  // `clienteId` é o id DA PESSOA, e não o da URL: o endereço agora pode ser o
+  // da família, e passar o id da família para um componente que espera pessoa
+  // faria buscas silenciosamente vazias.
+  // ==========================================================================
+  const c = d.cliente || null;
+  const fam = d.familia || null;
+  const familiaId: string | null = fam?.id || c?.familia_id || null;
+  const clienteId: string | null = c?.id || null;
+
   // A API de cliente devolve crédito como positivo — o oposto da conta
   // corrente. Invertemos aqui para que "em aberto" signifique a mesma coisa
   // nas duas telas do sistema.
   const devendo = -d.saldo;
   const emDia = Math.abs(devendo) < 0.005;
-  const fone = String(c.telefone || "").replace(/\D/g, "");
+  const fone = String(c?.telefone || "").replace(/\D/g, "");
+
+  const pendentes = (d.conferencia || []).filter(
+    (i: any) => i.situacao === "pendente" && i.obrigatorio);
 
   return (
     <>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href="/painel/clientes" className="text-[13px] text-ink-soft hover:text-ink">
-            ← Famílias
+          {/* DE ONDE SE VEIO. Quem chegou pela conferência volta para lá; quem
+              veio da lista volta para a lista. Um único "← Famílias" mandava
+              quem estava conferindo procurar a conferência de novo. */}
+          <Link href={veioDaConferencia ? "/painel/conferencia" : "/painel/clientes"}
+                className="text-[13px] text-ink-soft hover:text-ink">
+            ← {veioDaConferencia ? "Conferência" : "Famílias"}
           </Link>
-          <h1 className="mt-1 text-[22px] font-semibold text-ink">{c.nome}</h1>
-          <p className="text-[13px] text-ink-soft">{c.telefone}</p>
+          {/* O TÍTULO DIZ O QUE CADA NOME É. "ALCANTARA — CLECIA" economiza
+              duas palavras e custa a certeza: quem lê rápido não sabe se o
+              segundo nome é o responsável, o falecido ou outra família. */}
+          <h1 className="mt-1 text-[22px] font-semibold text-ink">
+            (Família - {fam?.nome || c?.nome || "sem nome"})
+          </h1>
+          <p className="text-[15px] text-ink">
+            {c
+              ? <>(Responsável - {c.nome}){c.telefone ? <span className="text-ink-soft"> · {c.telefone}</span> : null}</>
+              : <span className="text-aviso">(Responsável - não definido)</span>}
+          </p>
         </div>
         {fone && (
           <a
@@ -133,13 +164,20 @@ export default function Ficha() {
         )}
       </div>
 
-      <Identificacao c={c} aoMudar={carregar} />
-      <Contrato familiaId={c.familia_id} aoMudar={carregar} />
-      <Pessoas familiaId={c.familia_id} atualId={id} />
-      <Tumulos tumulos={d.tumulos || []} clienteId={id} aoMudar={carregar} />
-      <ContaCorrente familiaId={c.familia_id} clienteId={id} aoMudar={carregar} />
-      <Limpezas clienteId={id} tumulos={d.tumulos || []} aoMudar={carregar} />
-      <Ajustes clienteId={id} nome={c.nome} />
+      {/* A CONFERÊNCIA MORA AQUI, e não numa tela à parte. Corrigir e dar o
+          ok são o mesmo minuto de trabalho — ir até a conferência para
+          carimbar o que se acabou de arrumar é uma viagem que ninguém faz. */}
+      {familiaId && <BarraConferencia familiaId={familiaId} fam={fam}
+                                      pendentes={pendentes} aoMudar={carregar} />}
+
+      {familiaId && <DadosDaFamilia fam={fam} familiaId={familiaId} aoMudar={carregar} />}
+      {c && <Identificacao c={c} aoMudar={carregar} />}
+      <Contrato familiaId={familiaId} aoMudar={carregar} />
+      <Pessoas familiaId={familiaId} atualId={clienteId || ""} />
+      <Tumulos tumulos={d.tumulos || []} clienteId={clienteId} aoMudar={carregar} />
+      {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar} />}
+      <Limpezas clienteId={clienteId} tumulos={d.tumulos || []} aoMudar={carregar} />
+      {c && <Ajustes clienteId={c.id} nome={c.nome} />}
     </>
   );
 }
@@ -159,6 +197,67 @@ export default function Ficha() {
  * (`sureya_conferir_familia`), não da tela, porque ok em cadastro incompleto é
  * pior que nenhum ok: fica registrado que foi conferido.
  */
+/**
+ * O NOME DA FAMÍLIA — que não era editável em lugar nenhum.
+ *
+ * O cartão logo abaixo diz "Dados do contato" e edita `clientes`. Ele dizia
+ * "Dados da família", e era a confusão inteira num rótulo só: quem abria para
+ * corrigir "Família Andre" acabava renomeando a PESSOA.
+ *
+ * Medido em 23/08: a Família Andre tem uma pessoa chamada "Nagae" e um jazigo
+ * chamado "Nagae". O sobrenome está na pessoa e o primeiro nome está na
+ * família — trocados. Sem este cartão não havia como desfazer isso pela tela;
+ * a rota da família nem aceitava `nome`.
+ */
+function DadosDaFamilia({ fam, familiaId, aoMudar }: {
+  fam: any; familiaId: string; aoMudar: () => void;
+}) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [nome, setNome] = useState(fam?.nome || "");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    if (!nome.trim()) { alert("A família precisa de um nome."); return; }
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/familias/${familiaId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      setAbrindo(false);
+      aoMudar();
+    } finally { setSalvando(false); }
+  }
+
+  return (
+    <Cartao
+      titulo="Dados da família"
+      acao={
+        <Botao onClick={() => { setNome(fam?.nome || ""); setAbrindo((x) => !x); }}>
+          <Pencil size={16} /> Editar
+        </Botao>
+      }
+    >
+      {!abrindo ? (
+        <p className="text-[15px] text-ink">{fam?.nome || "sem nome"}</p>
+      ) : (
+        <>
+          <Campo rotulo="Nome da família" dica="é por ele que ela aparece nas listas">
+            <Entrada value={nome} onChange={(e: any) => setNome(e.target.value)} />
+          </Campo>
+          <div className="mt-3 flex gap-2">
+            <Botao tom="principal" onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Botao>
+            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+        </>
+      )}
+    </Cartao>
+  );
+}
+
 function BarraConferencia({ familiaId, fam, pendentes, aoMudar }: {
   familiaId: string; fam: any; pendentes: any[]; aoMudar: () => void;
 }) {
@@ -311,6 +410,12 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
   const [f, setF] = useState({
     periodicidade: t.periodicidade ?? "",
     contratado: !!t.contratado,
+    // O COMBINADO É MENSAL E É DESTE TÚMULO (0100). Uma família pode ter três
+    // jazigos com ritmos e preços diferentes — guardar o valor na família
+    // obriga a inventar um rateio na hora de cobrar.
+    valor_mensal: t.valor_mensal ?? "",
+    // O preço de uma ida, para quem é avulso: aí não há mês para dividir.
+    valor_lavagem: t.valor_lavagem ?? "",
   });
   const [salvando, setSalvando] = useState(false);
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
@@ -322,17 +427,28 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
     // túmulo que não aparece em lugar nenhum. Melhor barrar aqui que deixar
     // a Sureya descobrir semanas depois.
     if (f.contratado && !f.periodicidade) {
-      setAviso("Diga de quanto em quanto tempo a Nina limpa este túmulo.");
+      // O ritmo é o DIVISOR do rateio: sem ele não dá para saber quanto vale
+      // uma lavagem de um combinado mensal.
+      setAviso("Diga de quanto em quanto tempo este túmulo é lavado — é o que divide o valor mensal.");
       return;
     }
     setAviso("");
     setSalvando(true);
     try {
-      await fetch(`/api/tumulos/${t.id}`, {
+      const r = await fetch(`/api/tumulos/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
-      });
+        body: JSON.stringify({
+          ...f,
+          // Vazio é NULO, e não zero: "não combinei ainda" e "combinei zero"
+          // são coisas diferentes, e a conferência cobra a primeira.
+          valor_mensal: String(f.valor_mensal).trim() === ""
+            ? null : Number(String(f.valor_mensal).replace(",", ".")),
+          valor_lavagem: String(f.valor_lavagem).trim() === ""
+            ? null : Number(String(f.valor_lavagem).replace(",", ".")),
+        }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setAviso(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
       setAbrindo(false);
       aoMudar();
     } finally {
@@ -406,7 +522,14 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               tela que alcança pedra ainda sem família e permite trabalhar por
               rua, em lote. Aqui fica só o que é do contrato: o ritmo. */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Campo rotulo="A Nina limpa" dica="de quanto em quanto tempo">
+            {/* QUEM LAVA NÃO SE DECIDE AQUI.
+                O rótulo dizia "A Nina limpa", e isso é duas coisas erradas numa
+                frase: prende o cadastro a UMA pessoa (a equipe não é fixa —
+                D-11, "limpeza é limpeza") e mistura o CONTRATO com a ESCALA.
+                O que está sendo cadastrado é o ritmo combinado com a família;
+                quem vai lavar em cada data é decidido na agenda, e pode ser
+                ninguém até alguém começar. */}
+            <Campo rotulo="Este túmulo é lavado" dica="de quanto em quanto tempo">
               <Selecao
                 value={f.periodicidade}
                 onChange={(e: any) => setF({ ...f, periodicidade: e.target.value })}
@@ -414,6 +537,20 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 <option value="">escolha</option>
                 {PERIODICIDADES.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
               </Selecao>
+            </Campo>
+            {/* O COMBINADO MENSAL, deste túmulo.
+                Cada lavagem desconta a fração: R$ 25/mês com lavagem semanal
+                dá R$ 6,25 por ida. Antes o valor mensal era cobrado INTEIRO a
+                cada lavagem — quatro vezes o combinado num contrato semanal. */}
+            <Campo rotulo="Valor mensal deste túmulo"
+                   dica="cada lavagem desconta a fração do mês">
+              <Entrada value={f.valor_mensal} inputMode="decimal" placeholder="25,00"
+                       onChange={(e: any) => setF({ ...f, valor_mensal: e.target.value })} />
+            </Campo>
+            <Campo rotulo="Valor de uma lavagem avulsa"
+                   dica="para quem não tem contrato — aqui não há mês para dividir">
+              <Entrada value={f.valor_lavagem} inputMode="decimal" placeholder="40,00"
+                       onChange={(e: any) => setF({ ...f, valor_lavagem: e.target.value })} />
             </Campo>
             <Campo rotulo="Endereço, foto e falecido">
               <a
@@ -1364,19 +1501,33 @@ function Identificacao({ c, aoMudar }: { c: any; aoMudar: () => void }) {
   async function salvar() {
     setSalvando(true);
     try {
-      await fetch(`/api/clientes/${c.id}`, {
+      // A RESPOSTA É LIDA. Antes o `await fetch` ia sozinho: dando erro, a tela
+      // fechava o editor, recarregava e mostrava o valor ANTIGO — a pessoa via
+      // "não aconteceu nada" e não tinha como saber por quê. Falha muda numa
+      // tela de edição é o mesmo que a edição não existir.
+      const r = await fetch(`/api/clientes/${c.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(f),
-      });
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) {
+        alert(r?.mensagem || r?.erro || "Não consegui salvar. Tente de novo.");
+        return;
+      }
       setAbrindo(false);
       aoMudar();
     } finally { setSalvando(false); }
   }
 
   return (
+    // ⚠ ESTE CARTÃO EDITA A PESSOA, e dizia "Dados da família".
+    //
+    // O nome, o WhatsApp e as observações que ele mostra são de `clientes` —
+    // do CONTATO. Quem abria "Dados da família" para corrigir "Família Andre"
+    // acabava renomeando a pessoa, que é a confusão de sempre com outro rótulo.
+    // O nome da família tem cartão próprio, logo acima.
     <Cartao
-      titulo="Dados da família"
+      titulo="Dados do contato"
       acao={
         <Botao onClick={() => setAbrindo((x) => !x)}>
           <Pencil size={16} /> Editar
@@ -1446,6 +1597,12 @@ function Identificacao({ c, aoMudar }: { c: any; aoMudar: () => void }) {
  */
 function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
   const [dados, setDados] = useState<any>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [ed, setEd] = useState<any>({});
+  // `mexendo` e nao `ocupado`: ja existe um `ocupado` booleano neste
+  // componente, para o POST. Dois estados com o mesmo nome viram um bug que
+  // so aparece quando as duas acoes acontecem juntas.
+  const [mexendo, setMexendo] = useState<string | null>(null);
   const [abrindo, setAbrindo] = useState(false);
   const [novo, setNovo] = useState({ nome: "", telefone: "" });
   const [trocando, setTrocando] = useState(false);
@@ -1486,6 +1643,42 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
       carregar();
       return true;
     } finally { setOcupado(false); }
+  }
+
+  /** Corrige os dados de uma pessoa da família. */
+  async function salvarPessoa(id: string) {
+    setMexendo(id); setErro("");
+    try {
+      const r = await fetch(`/api/familias/${familiaId}/contatos`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contatoId: id, ...ed }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      setEditando(null); setEd({});
+      carregar();
+    } finally { setMexendo(null); }
+  }
+
+  /**
+   * Tira a pessoa da família.
+   *
+   * Quem responde pelo dinheiro NÃO sai por aqui — o servidor recusa, e com
+   * razão: deixar a família sem quem responde tem de ser uma escolha ("trocar
+   * quem acerta a conta"), e não o efeito colateral de remover um contato.
+   */
+  async function removerPessoa(p: any) {
+    if (!confirm(
+      `Remover ${p.nome} desta família?\n\n` +
+      `Os jazigos e o histórico ficam onde estão — sai só a pessoa.`)) return;
+    setMexendo(p.id); setErro("");
+    try {
+      const r = await fetch(`/api/familias/${familiaId}/contatos?contatoId=${p.id}`, {
+        method: "DELETE",
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui remover."); return; }
+      if (r.mensagem) alert(r.mensagem);
+      carregar();
+    } finally { setMexendo(null); }
   }
 
   return (
@@ -1542,19 +1735,63 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
         <p className="text-[14px] text-ink-soft">Nenhum contato cadastrado.</p>
       )}
 
+      {/* EDITAR E REMOVER A PESSOA.
+          A lista era só de leitura: dava para ADICIONAR contato e TROCAR quem
+          acerta a conta, e não dava para corrigir o nome de quem já estava lá
+          nem tirar alguém. As rotas existiam (PATCH e DELETE em
+          /api/familias/[id]/contatos) e nenhuma tela as chamava. */}
       {contatos.map((p: any) => (
-        <div key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-2.5 first:border-t-0 first:pt-0">
-          <div className="min-w-0">
-            <p className="text-[15px] text-ink">
-              {p.nome}
-              {p.id === atualId && <span className="text-ink-soft"> · esta ficha</span>}
-            </p>
-            <p className="text-[13px] text-ink-soft">{p.telefone}</p>
-          </div>
-          <div className="flex flex-shrink-0 gap-1.5">
-            {p.paga && <Selo tom="bom">acerta a conta</Selo>}
-            {p.recebeFotos && <Selo tom="neutro">recebe fotos</Selo>}
-          </div>
+        <div key={p.id} className="border-t border-line py-2.5 first:border-t-0 first:pt-0">
+          {editando === p.id ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Campo rotulo="Nome">
+                <Entrada value={ed.nome ?? p.nome}
+                         onChange={(e: any) => setEd({ ...ed, nome: e.target.value })} />
+              </Campo>
+              <Campo rotulo="WhatsApp">
+                <Entrada value={ed.telefone ?? (p.telefone || "")} inputMode="tel"
+                         onChange={(e: any) => setEd({ ...ed, telefone: e.target.value })} />
+              </Campo>
+              <Campo rotulo="Parentesco">
+                <Entrada value={ed.parentesco ?? (p.parentesco || "")} placeholder="filha, neto…"
+                         onChange={(e: any) => setEd({ ...ed, parentesco: e.target.value })} />
+              </Campo>
+              <Campo rotulo="Como tratar">
+                <Entrada value={ed.tratamento ?? (p.tratamento || "")} placeholder="a senhora, o senhor…"
+                         onChange={(e: any) => setEd({ ...ed, tratamento: e.target.value })} />
+              </Campo>
+              <div className="sm:col-span-2 flex flex-wrap gap-2">
+                <Botao tom="principal" disabled={mexendo === p.id}
+                       onClick={() => salvarPessoa(p.id)}>Salvar</Botao>
+                <Botao onClick={() => { setEditando(null); setEd({}); }}>Cancelar</Botao>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[15px] text-ink">
+                  {p.nome}
+                  {p.id === atualId && <span className="text-ink-soft"> · esta ficha</span>}
+                </p>
+                <p className="text-[13px] text-ink-soft">
+                  {[p.telefone, p.parentesco, p.tratamento].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
+                {p.paga && <Selo tom="bom">acerta a conta</Selo>}
+                {p.recebeFotos && <Selo tom="neutro">recebe fotos</Selo>}
+                <button className="text-[13px] text-ink-soft underline decoration-dotted hover:text-brand"
+                        onClick={() => { setEditando(p.id); setEd({}); }}>
+                  editar
+                </button>
+                <button className="text-[13px] text-perigo underline decoration-dotted"
+                        disabled={mexendo === p.id}
+                        onClick={() => removerPessoa(p)}>
+                  remover
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
 

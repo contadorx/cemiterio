@@ -234,8 +234,10 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #             nasce de novo (o retorno ganhou colunas), mas ja existia.
 #   0098  +2  sureya_carimbar_competencia (o gatilho) e
 #             sureya_conferir_evento — o ok por lancamento.
-# Saldo: +40.
-FUNCOES_DELTA=${FUNCOES_DELTA:-40}
+#   0100  +2  sureya_lavagens_no_mes e sureya_valor_da_lavagem — o combinado
+#             e MENSAL e cada lavagem desconta a fracao do mes.
+# Saldo: +42.
+FUNCOES_DELTA=${FUNCOES_DELTA:-42}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

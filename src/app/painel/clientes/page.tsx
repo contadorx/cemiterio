@@ -248,7 +248,21 @@ function VisaoFamilias() {
             <div style={{ ...painel.card, borderLeft: c.atrasado ? "4px solid #dc2626" : `1px solid ${cor.linha}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  <strong style={{ color: cor.navy, fontSize: 16 }}>{c.nome}</strong>
+                  {/* FAMÍLIA E RESPONSÁVEL, antes de abrir a ficha.
+                      A lista mostrava só o nome da PESSOA — e a família
+                      costuma se chamar de outro jeito. Procurar "Alcantara"
+                      não achava nada quando o contato se chama "Clecia". */}
+                  <strong style={{ color: cor.navy, fontSize: 16 }}>
+                    (Família - {c.familia || c.nome})
+                  </strong>
+                  <div style={{ fontSize: 15, color: cor.cinza, marginTop: 2 }}>
+                    (Responsável - {c.nome})
+                    {!c.ehResponsavel && (
+                      <span style={{ color: "rgb(var(--zm-aviso))" }}>
+                        {" "}· esta pessoa não é quem acerta a conta
+                      </span>
+                    )}
+                  </div>
                   {/* A ETAPA, ao lado do nome. Ela diz qual é o PRÓXIMO passo
                       daquela família — e não só um rótulo de estado. Quem abre
                       a lista para trabalhar precisa saber onde continuar. */}

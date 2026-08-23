@@ -73,6 +73,26 @@ export async function PATCH(
     patch.valor_mensal = isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
   }
 
+  // O NOME DA FAMÍLIA.
+  //
+  // Não era editável em LUGAR NENHUM do sistema: nem esta rota o aceitava, nem
+  // tela alguma a chamava. O cartão que dizia "Dados da família" na ficha edita
+  // `clientes` — o CONTATO. Quem quisesse corrigir "Família Andre" para
+  // "Família Nagae" não tinha por onde, e ao tentar mudava o nome da pessoa.
+  //
+  // Vazio é recusado: uma família sem nome some das listas, que ordenam e
+  // procuram por ele.
+  if (b.nome !== undefined) {
+    const nome = String(b.nome || "").trim();
+    if (!nome) {
+      return NextResponse.json(
+        { ok: false, erro: "nome_vazio",
+          mensagem: "A família precisa de um nome — é por ele que ela aparece nas listas." },
+        { status: 400 });
+    }
+    patch.nome = nome;
+  }
+
   if (b.valor_base !== undefined) patch.valor_base = b.valor_base || "mes";
   if (b.modo_cobranca !== undefined) patch.modo_cobranca = b.modo_cobranca || "consumo";
   if (b.freq_pagamento !== undefined) patch.freq_pagamento = b.freq_pagamento || null;

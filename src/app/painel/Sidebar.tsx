@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, MapPin, MessageCircle, Receipt, Settings, Sparkles, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -40,8 +40,16 @@ const CARTEIRA = [
   { href: "/painel/conferencia", label: "Conferência", icon: ClipboardCheck },
 ];
 
+// A CONEXÃO DO WHATSAPP É UMA ABA DE CONFIGURAÇÕES.
+//
+// Ela tinha entrada própria no menu, ao lado de Configurações — duas portas
+// para a mesma casa. O endereço `/painel/whatsapp` continua de pé,
+// redirecionando, porque está em links dentro do sistema (o aviso da fila
+// aponta para lá quando a instância cai).
+//
+// "Ajustes" também sai como grupo: com um item só, o título do grupo era mais
+// alto que o próprio item.
 const AJUSTES = [
-  { href: "/painel/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/painel/config", label: "Configurações", icon: Settings },
 ];
 

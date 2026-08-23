@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [{ data: t }, { data: urg }, { data: servs }] = await Promise.all([
     db.from("tumulos")
       .select("id,identificacao,numero,falecido_nome,rua,rua_id,ordem_na_rua,observacoes,"
-            + "contratado,periodicidade,valor_lavagem,lat,lng,gps_precisao,"
+            + "contratado,periodicidade,valor_lavagem,valor_mensal,lat,lng,gps_precisao,"
             + "foto_referencia_url,foto_enquadramento_url,ultima_lavagem_informada,"
             + "cliente_id,familia_id,quadras(codigo),familias(nome,contratado,inicio_cobranca),"
             + "clientes(nome,telefone)")
@@ -156,16 +156,42 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  // O QUE É DO TÚMULO: o trabalho. O contrato é da família.
+  // ==========================================================================
+  // O CONTRATO VOLTOU PARA O TÚMULO — e isto reverte uma decisão anterior.
   //
-  // `valor_lavagem`, `valor_base`, `freq_pagamento` e `inicio_cobranca` ainda
-  // existem como colunas — são o histórico de quando o plano morava aqui —,
-  // mas o PATCH NÃO os aceita mais.
+  // Havia aqui, escrito: "o contrato é da família... o PATCH NÃO aceita mais
+  // `valor_lavagem`". O motivo era bom na época: o valor morava nos dois
+  // lugares, a cobrança lia a família, e um número gravado no túmulo ficaria
+  // na tela mentindo.
   //
-  // Se aceitasse, a duplicação voltaria pela porta dos fundos: alguém gravaria
-  // um valor no túmulo, nada seria cobrado (a cobrança lê a família) e o
-  // número ficaria na tela mentindo. Melhor recusar em silêncio que guardar
-  // um dado que ninguém lê.
+  // O que mudou não foi o código, foi o negócio: **24 famílias têm mais de um
+  // jazigo** (uma tem três), com ritmos e preços diferentes. Um valor por
+  // família obriga a inventar um rateio na hora de cobrar — e a conversa com a
+  // família nunca foi essa: é "esse aqui é vinte e cinco por mês".
+  //
+  // O risco de duplicação continua real, e o que o desarma é a 0100: existe
+  // UMA função que responde quanto custa uma lavagem
+  // (`sureya_valor_da_lavagem`), e a cobrança inteira passa por ela. O número
+  // gravado aqui é o que ela lê — não há segunda opinião.
+  //
+  // `valor_mensal` é o combinado do mês; `valor_lavagem` é o preço de UMA ida,
+  // para família avulsa, onde não há mês para dividir.
+  // ==========================================================================
+  for (const campo of ["valor_mensal", "valor_lavagem"] as const) {
+    if (body[campo] === undefined) continue;
+    if (body[campo] === null || body[campo] === "") { patch[campo] = null; continue; }
+    const v = Number(String(body[campo]).replace(",", "."));
+    if (!Number.isFinite(v) || v < 0) {
+      return NextResponse.json(
+        { ok: false, erro: "valor_invalido",
+          mensagem: "Informe um valor válido, ou deixe em branco se ainda não combinou." },
+        { status: 400 });
+    }
+    // Zero não é "de graça": é "não combinei". Guardar 0 faria a conferência
+    // dar o item como resolvido e a lavagem sair sem cobrança.
+    patch[campo] = v > 0 ? Math.round(v * 100) / 100 : null;
+  }
+
   if (body.periodicidade !== undefined) {
     patch.periodicidade = body.periodicidade || null;
     // Mudou o ritmo: o ponteiro da agenda volta para hoje. Sem isso, trocar de

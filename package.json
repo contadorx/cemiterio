@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "checar": "node testes/checar-render.js && node testes/checar-enums.js",
+    "checar": "node testes/checar-render.js && node testes/checar-enums.js && node testes/checar-ficha.mjs",
     "tipos": "tsc --noEmit && tsc --noEmit -p testes/tsconfig.real.json",
     "contraprova": "tsx --tsconfig testes/tsconfig.real.json testes/contraprova-autorizacao.ts",
     "migrar-limpo": "bash testes/migrar-limpo.sh",

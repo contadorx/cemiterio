@@ -971,3 +971,144 @@ O plano pendura no cliente e aponta para um jazigo, e nada obriga `tumulo_id` a
 estar preenchido. Buscar só pelo jazigo faria um plano sem jazigo sumir, calado;
 só pelo cliente perderia o plano de uma família cujo responsável mudou. Busca
 pelos dois e tira a repetição.
+
+---
+
+## D-23 · O rótulo mentia: "Dados da família" editava a pessoa
+
+A ficha da Família Andre não deixava corrigir o contato. Fui olhar, e eram
+**três** coisas — uma delas regressão minha.
+
+**1. O nome da família não era editável em lugar nenhum do sistema.** A rota
+`PATCH /api/familias/[id]` existia e **não aceitava `nome`**; e nenhuma tela a
+chamava. O único cartão que parecia servir chamava-se **"Dados da família"** e
+editava `clientes` — o CONTATO. Quem abrisse para corrigir "Família Andre"
+acabava renomeando a pessoa.
+
+O caso é literal: a Família Andre tem **uma pessoa chamada "Nagae"** e um jazigo
+chamado "Nagae". O sobrenome está na pessoa e o primeiro nome está na família —
+trocados, e sem como desfazer pela tela.
+
+O cartão passou a se chamar **"Dados do contato"**, e a família ganhou o seu.
+
+**2. As pessoas eram só leitura.** Dava para *adicionar* contato e *trocar quem
+acerta a conta*, e não dava para corrigir o nome de quem já estava lá nem
+remover ninguém. As rotas `PATCH` e `DELETE` de `/api/familias/[id]/contatos`
+eu tinha escrito na leva anterior — e elas ficaram **órfãs** quando removi a
+ficha reproduzida, que era a única tela que as chamava. Regressão minha, e do
+tipo pior: o código existe, compila, e não está ligado a nada.
+
+**3. O salvar falhava calado.** `await fetch(...)` sem ler a resposta: dando
+erro, a tela fechava o editor, recarregava e mostrava o valor **antigo**. A
+pessoa vê "não aconteceu nada" e não tem como saber por quê. **Falha muda numa
+tela de edição é o mesmo que a edição não existir** — e foi provavelmente o que
+transformou os defeitos 1 e 2 na frase "não consigo editar o contato".
+
+### O portão ganhou uma prova disto
+
+`npm run checar` agora confere que **cada edição da ficha está ligada a uma rota
+que aceita aquele campo**. Compilar não provava nada aqui: o cartão mal rotulado
+compilava, as rotas órfãs compilavam, e o `BarraConferencia` chegou a existir no
+arquivo **sem ser renderizado** — por um lote de edição que morreu antes de
+gravar e que eu não conferi.
+
+São 14 verificações, e três delas pegaram exatamente esses casos.
+
+---
+
+## D-24 · O contrato é do túmulo, e a lavagem desconta o mês
+
+**Duas linhas da ALCANTARA contam a história inteira:**
+
+| data | | valor | o quê |
+|---|---|---|---|
+| 02/08 | crédito | R$ 25,00 | **pagamento** recebido |
+| 08/08 | débito | R$ 40,00 | lavagem do jazigo Alcantara |
+
+O combinado era R$ 25 **por mês**. A lavagem debitou R$ 40 — que não veio de
+lugar nenhum do contrato: `tumulos.valor_lavagem` estava nulo e a cascata caiu
+no último degrau, `coalesce(orgs.valor_referencia, 40)`.
+
+**E havia um erro pior à espera.** A cascata de `sureya_concluir_lavagem` fazia:
+
+```
+if v_valor = 0 and plano_id is not null then
+  v_valor := coalesce(plano.valor_vigente, plano.valor_mensal)
+```
+
+Pega o valor **mensal** e cobra como se fosse o de **uma** lavagem. Um contrato
+de R$ 25/mês com lavagem semanal debitaria R$ 100 no mês — **quatro vezes o
+combinado**. Não apareceu ainda só porque a ALCANTARA não tem plano.
+
+### As decisões
+
+**O valor combinado é mensal e é do túmulo.** 24 famílias têm mais de um jazigo
+(uma tem três), com ritmos e preços diferentes. Guardar o valor na família
+obriga a inventar um rateio na hora de cobrar; guardar no túmulo é o que a
+conversa já é: *"esse aqui é vinte e cinco por mês"*.
+
+**Cada lavagem desconta a fração do mês.** R$ 25/mês semanal = **R$ 6,25** por
+lavagem. É a conta que se faz de cabeça, e passa a ser a que o sistema faz.
+
+**Quatro semanas no mês, e não 4,28.** O calendário diria 30/7; a combinação com
+a família é "quatro vezes por mês". Usar o calendário encheria o extrato de
+centavos que ninguém confere contra o caderno — e conferir contra o caderno é a
+operação inteira do piloto.
+
+**`valor_lavagem` não sai.** Continua sendo o preço de uma ida **avulsa**, onde
+não há mês para dividir. Dois preços porque são dois negócios, e quem decide
+qual vale é o **regime** da família.
+
+**O ritmo virou item obrigatório da conferência**: ele é o divisor. Sem
+periodicidade não há como dividir o mensal, e a lavagem cai no valor cheio.
+
+### Uma decisão anterior foi revertida — de propósito
+
+Em `/api/tumulos/[id]` estava escrito, com todas as letras:
+
+> "o contrato é da família... o PATCH **NÃO** aceita mais `valor_lavagem`. Se
+> aceitasse, a duplicação voltaria pela porta dos fundos."
+
+O motivo era bom. O que mudou não foi o código, foi o negócio: com N túmulos por
+família, um valor por família não descreve o combinado.
+
+O risco de duplicação continua real, e o que o desarma é a 0100: existe **uma**
+função que responde quanto custa uma lavagem (`sureya_valor_da_lavagem`), e a
+cobrança inteira passa por ela. O número gravado no túmulo é o que ela lê — não
+há segunda opinião.
+
+**Um detalhe que quase custou caro:** `periodicidade` é o enum `sureya_cadencia`,
+e o Postgres não converte enum para `text` sozinho na resolução de função. Sem o
+`::text` explícito, `sureya_valor_da_lavagem` estouraria com *"function does not
+exist"* — **e só na hora de cobrar**. Apareceu ao testar contra o dado real.
+
+### O saldo por túmulo
+
+`sureya_saldo_por_tumulo` soma por jazigo. **Isto não muda quem deve**: o devedor
+continua sendo a família (D-10), e `conta_corrente.familia_id` continua NOT NULL.
+O que muda é a atribuição — e é o que permite responder *"esse aqui está pago e
+aquele não"*, a pergunta que aparece quando a família quer cancelar um dos três.
+
+O que não tem túmulo aparece num balde chamado pelo nome. Um pagamento de R$ 100
+não é de nenhum jazigo em particular até alguém dizer que é, e distribuir por
+conta própria seria inventar uma decisão de dinheiro.
+
+---
+
+## D-25 · Quem lava não se decide no cadastro
+
+O campo do ritmo dizia **"A Nina limpa"**. São duas coisas erradas numa frase:
+prende o cadastro a uma pessoa (a equipe não é fixa — D-11, "limpeza é limpeza")
+e mistura o **contrato** com a **escala**.
+
+O que se cadastra ali é o ritmo combinado com a família. Quem vai lavar em cada
+data é decidido na agenda, e pode ser ninguém até alguém começar. O rótulo virou
+**"Este túmulo é lavado"**.
+
+No mesmo espírito: **o WhatsApp saiu do menu**. Ele já é uma aba de
+Configurações desde a D-21, e ter as duas entradas era duas portas para a mesma
+casa. O endereço continua de pé, redirecionando.
+
+E a **lista de famílias** passou a mostrar `(Família - X)` com `(Responsável -
+Y)` embaixo. Ela se chama "Famílias" e mostrava o nome da **pessoa** — procurar
+"Alcantara" não achava nada quando o contato se chama "Clecia".
