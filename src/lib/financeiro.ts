@@ -34,6 +34,22 @@ export function ehDoPeriodo(origem: string | null | undefined): boolean {
 export interface Saldo {
   saldo: number;      // só confirmados: créditos − débitos, no razão da FAMÍLIA
   aConferir: number;  // créditos informados, ainda não batidos com o extrato
+  /**
+   * VENCIDO E A VENCER SÃO COISAS DIFERENTES (0114).
+   *
+   * `conta_corrente.data` é o VENCIMENTO num débito de contrato. Quem paga no
+   * fim do período tem a competência de julho vencendo em dezembro: os dois
+   * meses já prestados são receita de julho e de agosto e não são dívida
+   * nenhuma até o dia 10 de dezembro.
+   *
+   * `saldo` continua sendo a posição inteira (é o que o fechamento e o
+   * histórico leem). Quem pergunta "posso cobrar?" lê `vencido`.
+   *
+   * Mesmo sinal de `saldo`: negativo = deve.
+   */
+  vencido: number;
+  /** Débito já lançado cujo vencimento ainda não chegou. Sempre positivo. */
+  aVencer: number;
   /** true = a pessoa não tem família; o saldo devolvido é zero por ausência de
    *  dado, não por estar em dia. Hoje não ocorre em nenhum dos 298 cadastros. */
   semFamilia?: boolean;
@@ -78,11 +94,11 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
   // Se aparecer, e cadastro incompleto: devolver zero seria dizer "esta em dia"
   // sobre alguem de quem nao se sabe nada. Zero e o unico numero honesto aqui,
   // mas quem chama precisa poder distinguir — dai `semFamilia`.
-  if (!familiaId) return { saldo: 0, aConferir: 0, semFamilia: true };
+  if (!familiaId) return { saldo: 0, aConferir: 0, vencido: 0, aVencer: 0, semFamilia: true };
 
   const { data, error } = await db
     .from("conta_corrente")
-    .select("tipo,valor,status_conc")
+    .select("tipo,valor,status_conc,data")
     .eq("org_id", env.orgId())
     .eq("familia_id", familiaId);
 
@@ -96,6 +112,9 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
 
   let saldo = 0;
   let aConferir = 0;
+  let vencido = 0;
+  let aVencer = 0;
+  const hoje = new Date().toISOString().slice(0, 10);
   for (const m of data || []) {
     const st = (m as any).status_conc;
     const v = Number((m as any).valor) || 0;
@@ -106,9 +125,14 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
       if ((m as any).tipo === "credito") aConferir += v;
       continue;
     }
-    saldo += (m as any).tipo === "credito" ? v : -v;
+    const credito = (m as any).tipo === "credito";
+    saldo += credito ? v : -v;
+    if (!credito && String((m as any).data) > hoje) aVencer += v;
+    else vencido += credito ? v : -v;
   }
-  return { saldo: Math.round(saldo * 100) / 100, aConferir: Math.round(aConferir * 100) / 100 };
+  const cent = (x: number) => Math.round(x * 100) / 100;
+  return { saldo: cent(saldo), aConferir: cent(aConferir),
+           vencido: cent(vencido), aVencer: cent(aVencer) };
 }
 
 /**
@@ -158,7 +182,7 @@ export async function calcularSaldosPorFamilia(
   const db = supabaseAdmin();
   let q = db
     .from("conta_corrente")
-    .select("familia_id,tipo,valor,status_conc")
+    .select("familia_id,tipo,valor,status_conc,data")
     .eq("org_id", env.orgId())
     .in("familia_id", ids);
   if (opts?.ate) q = q.lte("data", opts.ate);
@@ -170,7 +194,11 @@ export async function calcularSaldosPorFamilia(
   // familia inadimplente.
   if (error) throw new Error(`saldo_indisponivel: ${error.message}`);
 
-  for (const fid of ids) fora.set(fid, { saldo: 0, aConferir: 0 });
+  for (const fid of ids) fora.set(fid, { saldo: 0, aConferir: 0, vencido: 0, aVencer: 0 });
+
+  // O CORTE DO VENCIDO ACOMPANHA `opts.ate`. Pedir "o saldo como era em 31/07"
+  // e responder com o vencimento de hoje daria duas leituras da mesma data.
+  const corte = opts?.ate || new Date().toISOString().slice(0, 10);
 
   for (const m of data || []) {
     const fid = (m as any).familia_id as string;
@@ -184,13 +212,19 @@ export async function calcularSaldosPorFamilia(
       if ((m as any).tipo === "credito") acc.aConferir += v;
       continue;
     }
-    acc.saldo += (m as any).tipo === "credito" ? v : -v;
+    const credito = (m as any).tipo === "credito";
+    acc.saldo += credito ? v : -v;
+    if (!credito && String((m as any).data) > corte) acc.aVencer += v;
+    else acc.vencido += credito ? v : -v;
   }
 
   for (const [fid, acc] of fora) {
+    const cent = (x: number) => Math.round(x * 100) / 100;
     fora.set(fid, {
-      saldo: Math.round(acc.saldo * 100) / 100,
-      aConferir: Math.round(acc.aConferir * 100) / 100,
+      saldo: cent(acc.saldo),
+      aConferir: cent(acc.aConferir),
+      vencido: cent(acc.vencido),
+      aVencer: cent(acc.aVencer),
     });
   }
   return fora;
@@ -228,7 +262,8 @@ export async function calcularSaldosEmLote(
   clientes: { id: string; familia_id: string | null }[],
 ): Promise<Map<string, Saldo>> {
   const fora = new Map<string, Saldo>();
-  for (const c of clientes) fora.set(c.id, { saldo: 0, aConferir: 0, semFamilia: !c.familia_id });
+  for (const c of clientes)
+    fora.set(c.id, { saldo: 0, aConferir: 0, vencido: 0, aVencer: 0, semFamilia: !c.familia_id });
 
   const familiaIds = [...new Set(clientes.map((c) => c.familia_id).filter(Boolean))] as string[];
   if (!familiaIds.length) return fora;
@@ -239,7 +274,7 @@ export async function calcularSaldosEmLote(
 
   for (const c of clientes) {
     if (!c.familia_id) continue;
-    fora.set(c.id, porFamilia.get(c.familia_id) || { saldo: 0, aConferir: 0 });
+    fora.set(c.id, porFamilia.get(c.familia_id) || { saldo: 0, aConferir: 0, vencido: 0, aVencer: 0 });
   }
   return fora;
 }
@@ -265,7 +300,9 @@ export async function calcularSaldosEmLote(
 export async function zerarReguaSeQuitou(clienteId: string): Promise<boolean> {
   try {
     const s = await calcularSaldo(clienteId);
-    if (s.saldo < -0.005) return false;      // ainda deve: mantem a regua onde está
+    // O QUE JA VENCEU (0114): debito com vencimento la na frente nao e divida
+    // e nao pode manter a regua queimada.
+    if (s.vencido < -0.005) return false;    // ainda deve: mantem a regua onde está
     const db = supabaseAdmin();
     await db
       .from("clientes")

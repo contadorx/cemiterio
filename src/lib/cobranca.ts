@@ -50,6 +50,8 @@ export async function cobrarContratos(): Promise<ResumoCobranca> {
 export interface ResumoRegua {
   enfileirados: number; ja_existiam: number; sem_degrau: number;
   sem_saldo: number; por_limite_diario: number;
+  /** Devia ser cobrado e não tem número no cadastro (0116). */
+  sem_telefone: number;
 }
 
 /**
@@ -71,11 +73,19 @@ export async function rodarRegua(): Promise<ResumoRegua> {
     p_dia: null, p_org: env.orgId(),
   });
   const l = (Array.isArray(data) ? data[0] : data) || {};
+  // OS NOMES SÃO OS DA FUNÇÃO, e não os que eu gostaria que fossem.
+  //
+  // Três destes liam chaves que a `sureya_regua_do_dia` nunca devolveu
+  // (`ja_existiam`, `sem_saldo`, `por_limite_diario`), e por isso o relatório
+  // do cron dizia zero em três dos cinco contadores desde a 0111 — inclusive
+  // no que conta cobrança que deixou de sair.
   return {
     enfileirados: Number((l as any).enfileirados) || 0,
-    ja_existiam: Number((l as any).ja_existiam) || 0,
+    ja_existiam: Number((l as any).ja_enfileirados) || 0,
     sem_degrau: Number((l as any).sem_degrau) || 0,
-    sem_saldo: Number((l as any).sem_saldo) || 0,
-    por_limite_diario: Number((l as any).por_limite_diario) || 0,
+    sem_saldo: Number((l as any).ja_pagos) || 0,
+    por_limite_diario: Number((l as any).limitados) || 0,
+    // Cadastro sem número: quem devia ser cobrado e não tem como (0116).
+    sem_telefone: Number((l as any).sem_telefone) || 0,
   };
 }

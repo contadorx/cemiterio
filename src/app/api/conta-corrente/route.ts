@@ -18,13 +18,23 @@ export const dynamic = "force-dynamic";
  * Saldo positivo = a família deve. Negativo = crédito a favor dela.
  */
 
-/** Frase escrita para ser dita ao telefone, sem tradução. Nada de "inadimplente". */
-function frasear(saldo: number): string {
+/**
+ * Frase escrita para ser dita ao telefone, sem tradução. Nada de "inadimplente".
+ *
+ * DUAS CONTAS, NÃO UMA (0114). `vencido` é o que já era devido e não foi pago —
+ * é disso que se cobra. `aVencer` é competência já prestada com o vencimento
+ * lá na frente: a Anninha tem seis meses lançados e não deve nada até 10/12.
+ *
+ * Dizer "Em aberto · R$ 240" para ela seria falso, e dizer só "Em dia"
+ * esconderia os R$ 240 que vão entrar.
+ */
+function frasear(vencido: number, aVencer: number): string {
   const dinheiro = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  if (Math.abs(saldo) < 0.005) return "Em dia";
-  if (saldo < 0) return `Pago adiantado · ${dinheiro(-saldo)} a favor`;
-  return `Em aberto · ${dinheiro(saldo)}`;
+  const futuro = aVencer > 0.005 ? ` · ${dinheiro(aVencer)} a vencer` : "";
+  if (vencido < -0.005) return `Pago adiantado · ${dinheiro(-vencido)} a favor${futuro}`;
+  if (vencido > 0.005) return `Em aberto · ${dinheiro(vencido)}${futuro}`;
+  return aVencer > 0.005 ? `Em dia${futuro}` : "Em dia";
 }
 
 export async function GET(req: NextRequest) {
@@ -79,12 +89,28 @@ export async function GET(req: NextRequest) {
   );
   const arredondado = Math.round(saldo * 100) / 100;
 
+  // `data` É O VENCIMENTO desde a 0114. O que ainda não venceu não é dívida:
+  // separar aqui é o que permite lançar a competência do mês prestado sem
+  // transformar quem paga no fim do período em inadimplente.
+  const hoje = new Date().toISOString().slice(0, 10);
+  const vencido = linhas.reduce(
+    (s, l) => s + (l.data <= hoje ? (l.tipo === "debito" ? l.valor : -l.valor) : 0), 0
+  );
+  const aVencer = linhas.reduce(
+    (s, l) => s + (l.tipo === "debito" && l.data > hoje ? l.valor : 0), 0
+  );
+  const cent = (v: number) => Math.round(v * 100) / 100;
+
   return NextResponse.json({
     ok: true,
     saldo: arredondado,
-    frase: frasear(arredondado),
-    emDia: arredondado <= 0.005,
-    linhas,
+    vencido: cent(vencido),
+    aVencer: cent(aVencer),
+    frase: frasear(vencido, aVencer),
+    // "Em dia" passa a significar "nada VENCIDO em aberto", que é a pergunta
+    // que a Sureya faz antes de ligar. Antes significava "nada lançado".
+    emDia: vencido <= 0.005,
+    linhas: linhas.map((l) => ({ ...l, aVencer: l.tipo === "debito" && l.data > hoje })),
   });
 }
 

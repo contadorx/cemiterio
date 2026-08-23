@@ -103,10 +103,27 @@ export async function POST(
 
   if (acao === "novo") {
     const nome = String(b?.nome || "").trim().slice(0, 120);
-    const tel = normalizarTelefone(String(b?.telefone || ""));
-    if (!nome || !tel) {
+    const cru = String(b?.telefone || "").trim();
+    const tel = cru ? normalizarTelefone(cru) : null;
+
+    // NOME É OBRIGATÓRIO. TELEFONE NÃO (0116).
+    //
+    // A ficha é da família, e a lista de contatos é a gente dela: o filho que
+    // mora fora, a irmã que decide e não responde mensagem. Exigir telefone
+    // de todos obrigava a inventar um número — e número inventado numa
+    // allowlist é pior do que campo vazio.
+    if (!nome) {
       return NextResponse.json(
-        { ok: false, erro: "faltou", mensagem: "O contato precisa de nome e telefone." },
+        { ok: false, erro: "faltou", mensagem: "O contato precisa de nome." },
+        { status: 400 },
+      );
+    }
+    // Digitou alguma coisa e não deu telefone: isso é erro, e é diferente de
+    // não ter digitado nada.
+    if (cru && !tel) {
+      return NextResponse.json(
+        { ok: false, erro: "telefone_invalido",
+          mensagem: "Telefone inválido. Use DDD + número, como 11 94013-1413 — ou deixe em branco." },
         { status: 400 },
       );
     }
@@ -203,22 +220,22 @@ export async function PATCH(
 
   if (typeof b?.telefone === "string") {
     const t = b.telefone.trim();
+    // APAGAR O TELEFONE É UMA ESCOLHA VÁLIDA (0116). Antes a resposta era
+    // "remova a pessoa da família" — o sistema mandava apagar gente que
+    // existe porque não sabia guardar a ausência de um número.
     if (!t) {
-      return NextResponse.json(
-        { ok: false, erro: "telefone_vazio",
-          mensagem: "O telefone não pode ficar em branco. Se a pessoa não tem telefone, remova-a da família." },
-        { status: 400 },
-      );
+      campos.telefone = null;
+    } else {
+      const norm = normalizarTelefone(t);
+      if (!norm) {
+        return NextResponse.json(
+          { ok: false, erro: "telefone_invalido",
+            mensagem: "Telefone inválido. Use DDD + número, como 11 94013-1413 — ou deixe em branco." },
+          { status: 400 },
+        );
+      }
+      campos.telefone = norm;
     }
-    const norm = normalizarTelefone(t);
-    if (!norm) {
-      return NextResponse.json(
-        { ok: false, erro: "telefone_invalido",
-          mensagem: "Telefone inválido. Use DDD + número, como 11 94013-1413." },
-        { status: 400 },
-      );
-    }
-    campos.telefone = norm;
   }
 
   // QUEM ACERTA A CONTA — e podem ser VÁRIOS.

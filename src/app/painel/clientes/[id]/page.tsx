@@ -80,8 +80,7 @@ const ERRO_EM_PORTUGUES: Record<string, string> = {
   nada_para_mudar: "Nada mudou — não havia o que salvar.",
   nada_para_atualizar: "Nada mudou — não havia o que salvar.",
   telefone_repetido: "Já existe outra pessoa com este telefone.",
-  telefone_invalido: "Telefone inválido. Use DDD + número.",
-  telefone_vazio: "O telefone não pode ficar em branco.",
+  telefone_invalido: "Telefone inválido. Use DDD + número — ou deixe em branco.",
   nao_e_desta_familia: "Esta pessoa não está nesta família.",
   e_o_responsavel: "Esta pessoa é o titular. Troque o titular antes de removê-la.",
   familia_nao_encontrada: "Não achei esta família.",
@@ -141,8 +140,13 @@ export default function Ficha() {
   // A API de cliente devolve crédito como positivo — o oposto da conta
   // corrente. Invertemos aqui para que "em aberto" signifique a mesma coisa
   // nas duas telas do sistema.
-  const devendo = -d.saldo;
-  const emDia = Math.abs(devendo) < 0.005;
+  // "EM DIA" É SOBRE O QUE VENCEU (0114). A competência do mês prestado nasce
+  // com o vencimento lá na frente; enquanto ele não chega, ela não é dívida.
+  // Antes de separar isso, lançar julho e agosto da Anninha em agosto a
+  // colocaria em "Em aberto · R$ 80" no dia seguinte ao cadastro certo.
+  const vencido = -(d.vencido ?? d.saldo);
+  const aVencer = Number(d.aVencer || 0);
+  const emDia = Math.abs(vencido) < 0.005;
   const fone = String(c?.telefone || "").replace(/\D/g, "");
 
   const pendentes = (d.conferencia || []).filter(
@@ -190,11 +194,19 @@ export default function Ficha() {
         <p className="text-[13px] opacity-80">Situação</p>
         <p className="mt-0.5 text-[28px] font-semibold leading-tight">
           {emDia
-            ? devendo < -0.005
-              ? `Pago adiantado · ${dinheiro(-devendo)} a favor`
+            ? vencido < -0.005
+              ? `Pago adiantado · ${dinheiro(-vencido)} a favor`
               : "Em dia"
-            : `Em aberto · ${dinheiro(devendo)}`}
+            : `Em aberto · ${dinheiro(vencido)}`}
         </p>
+        {/* O QUE JÁ FOI PRESTADO E AINDA VAI SER COBRADO. Sem esta linha,
+            quem paga no fim do período apareceria como "Em dia" sem nenhum
+            sinal de que há R$ 240 a caminho. */}
+        {aVencer > 0.005 && (
+          <p className="mt-1 text-[14px] opacity-80">
+            {dinheiro(aVencer)} a vencer
+          </p>
+        )}
         {d.aConferir > 0.005 && (
           <p className="mt-1 text-[14px] opacity-80">
             {dinheiro(d.aConferir)} aguardando conferência
@@ -1259,6 +1271,11 @@ function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
           <div className="min-w-0">
             <p className="text-[14px] text-ink">{l.descricao}</p>
             <p className="text-[12px] text-ink-soft">
+              {/* `data` é o VENCIMENTO num débito de contrato (0114), e é a
+                  data do fato em tudo o mais. Escrever "vence" só onde vence
+                  evita a leitura errada de que a cobrança de julho da Anninha
+                  aconteceu em dezembro. */}
+              {l.tipo === "debito" && l.origem === "competencia" ? "vence " : ""}
               {new Date(l.data + "T12:00:00").toLocaleDateString("pt-BR")}
               {l.competencia && ` · ${periodo(l.competencia)}`}
               {l.local && ` · ${l.local}`}
@@ -1281,8 +1298,9 @@ function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
             <button
               onClick={() => setEditando(true)}
               className={`flex-shrink-0 text-[14px] font-semibold underline decoration-dotted ${
-                l.tipo === "debito" ? "text-aviso" : "text-positivo"}`}
-              title="Corrigir data, valor ou descrição"
+                l.tipo !== "debito" ? "text-positivo" : l.aVencer ? "text-ink-soft" : "text-aviso"}`}
+              title={l.aVencer ? "Ainda não venceu · corrigir data, valor ou descrição"
+                               : "Corrigir data, valor ou descrição"}
             >
               {l.tipo === "debito" ? "+" : "−"} {dinheiro(l.valor)}
             </button>
@@ -1701,13 +1719,17 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
             <Campo rotulo="Nome">
               <Entrada value={novo.nome} onChange={(e: any) => setNovo({ ...novo, nome: e.target.value })} />
             </Campo>
-            <Campo rotulo="WhatsApp com DDD">
-              <Entrada inputMode="tel" value={novo.telefone}
+            {/* TELEFONE NÃO É OBRIGATÓRIO (0116). Tem gente na família que não
+                responde mensagem — o filho que mora fora, a irmã que decide.
+                Exigir o número obrigava a inventar um, e número inventado
+                numa allowlist é pior do que campo vazio. */}
+            <Campo rotulo="WhatsApp com DDD" dica="pode ficar em branco">
+              <Entrada inputMode="tel" value={novo.telefone} placeholder="sem telefone"
                        onChange={(e: any) => setNovo({ ...novo, telefone: e.target.value })} />
             </Campo>
           </div>
           <div className="mt-3 flex gap-2">
-            <Botao tom="principal" disabled={ocupado || !novo.nome.trim() || !novo.telefone.trim()}
+            <Botao tom="principal" disabled={ocupado || !novo.nome.trim()}
                    onClick={async () => {
                      if (await agir({ acao: "novo", ...novo })) {
                        setNovo({ nome: "", telefone: "" }); setAbrindo(false);
@@ -1742,8 +1764,9 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
                 <Entrada value={ed.nome ?? p.nome}
                          onChange={(e: any) => setEd({ ...ed, nome: e.target.value })} />
               </Campo>
-              <Campo rotulo="WhatsApp">
+              <Campo rotulo="WhatsApp" dica="apagar é permitido">
                 <Entrada value={ed.telefone ?? (p.telefone || "")} inputMode="tel"
+                         placeholder="sem telefone"
                          onChange={(e: any) => setEd({ ...ed, telefone: e.target.value })} />
               </Campo>
               <Campo rotulo="Parentesco">
@@ -1767,8 +1790,11 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
                   {p.nome}
                   {p.id === atualId && <span className="text-ink-soft"> · esta ficha</span>}
                 </p>
+                {/* "sem telefone" ESCRITO, e não um espaço em branco: a
+                    linha vazia lê como dado que não carregou. */}
                 <p className="text-[13px] text-ink-soft">
-                  {[p.telefone, p.parentesco, p.tratamento].filter(Boolean).join(" · ")}
+                  {[p.telefone || "sem telefone", p.parentesco, p.tratamento]
+                    .filter(Boolean).join(" · ")}
                 </p>
               </div>
               <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">

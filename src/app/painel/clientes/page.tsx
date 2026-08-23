@@ -411,13 +411,22 @@ function VisaoFamilias() {
                     {c.faltaData && " ← falta preencher"}
                   </div>
                 </div>
+                {/* O NUMERO E O MESMO QUE DECIDE O `atrasado` (0114): `vencido`.
+                    Mostrar `saldo` aqui e marcar em vermelho pelo vencido
+                    poria a lista a discordar de si mesma na mesma linha. */}
                 <div style={{ textAlign: "right" }}>
-                  <b style={{ color: c.atrasado ? "rgb(var(--zm-perigo))" : c.saldo > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
-                    {c.saldo === 0 ? "em dia" : money(Math.abs(c.saldo))}
+                  <b style={{ color: c.atrasado ? "rgb(var(--zm-perigo))" : c.vencido > 0 ? cor.teal : cor.cinza, fontSize: 16 }}>
+                    {Math.abs(c.vencido) < 0.005 ? "em dia" : money(Math.abs(c.vencido))}
                   </b>
                   <div style={{ fontSize: 14, color: cor.cinza }}>
-                    {c.atrasado ? "em aberto" : c.saldo > 0 ? "de crédito" : ""}
+                    {c.atrasado ? "em aberto" : c.vencido > 0 ? "de crédito" : ""}
                   </div>
+                  {/* Prestado e ainda nao vencido: nem divida, nem invisivel. */}
+                  {c.aVencer > 0.005 && (
+                    <div style={{ fontSize: 13, color: cor.cinza }}>
+                      {money(c.aVencer)} a vencer
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

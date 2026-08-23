@@ -72,7 +72,9 @@ export async function calcularTemperatura(db: SupabaseClient): Promise<Candidato
     const gap = valorAtual > 0 ? (sugerido - valorAtual) / valorAtual : 0;
     if (gap <= 0.02) continue;
 
-    const bomPagador = (saldos.get((p as any).cliente_id)?.saldo ?? 0) >= -0.005;
+    // Bom pagador = nada VENCIDO em aberto (0114). Quem tem o semestre
+    // lancado e o vencimento em dezembro nao e mau pagador.
+    const bomPagador = (saldos.get((p as any).cliente_id)?.vencido ?? 0) >= -0.005;
 
     // temperatura: tempo + defasagem + segurança do pagador
     let t = Math.min(55, meses * 3.5); // ~16 meses -> 55

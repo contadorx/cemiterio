@@ -46,7 +46,8 @@ async function selecionarClientes(publico: Publico): Promise<{ id: string; nome:
     for (const c of base) {
       if (!respondem.has(c.id)) continue;
       const s = await calcularSaldo(c.id);
-      if (s.saldo < -0.005) out.push(c);
+      // Deve o que JA VENCEU (0114) — nao o que ainda vai vencer.
+      if (s.vencido < -0.005) out.push(c);
     }
     return out;
   }

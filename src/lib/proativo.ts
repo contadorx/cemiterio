@@ -61,6 +61,19 @@ async function enfileirar(
   texto: string
 ): Promise<boolean> {
   const db = supabaseAdmin();
+
+  // SEM TELEFONE NÃO HÁ PARA ONDE MANDAR (0116).
+  //
+  // Desde que um contato pode existir sem número, a fila passou a poder
+  // receber mensagem sem destino — que só falharia na hora do envio, no meio
+  // de um lote, e em silêncio. Não entra.
+  //
+  // Isto não esconde a família: quem não tem telefone continua aparecendo na
+  // ficha e na conferência, que é onde se conserta.
+  const { data: quem } = await db
+    .from("clientes").select("telefone").eq("id", clienteId).maybeSingle();
+  if (!String((quem as any)?.telefone || "").trim()) return false;
+
   const { data, error } = await db
     .from("fila_liberacao")
     .insert({
@@ -216,10 +229,12 @@ export async function cobrancaGentil(): Promise<number> {
 
     // "contra_foto": se ainda há lavagem por entregar, não é hora de cobrar —
     // a foto é a prova do serviço, e cobrar antes quebra o combinado.
-    if (temEntregaPendente && s.saldo >= -0.005) continue;
-    if (s.saldo >= -0.005) continue;
+    // O QUE JA VENCEU (0114). Cobrar competencia que ainda nao venceu e
+    // cobrar antes da hora — e a Anninha combinou pagar em dezembro.
+    if (temEntregaPendente && s.vencido >= -0.005) continue;
+    if (s.vencido >= -0.005) continue;
 
-    const valor = Math.abs(s.saldo).toFixed(2);
+    const valor = Math.abs(s.vencido).toFixed(2);
     const nome = (c as any).nome;
 
     // família com mais de um jazigo: o valor é do conjunto, precisa ficar claro

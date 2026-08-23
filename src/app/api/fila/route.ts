@@ -119,12 +119,16 @@ export async function GET(req: NextRequest) {
   // vai para quem já deve, e essa conversa tem outro tom, outro texto e outra
   // urgência. Sem o saldo aqui, a tela não conseguia distinguir e a Sureya
   // liberava as duas com o mesmo clique.
+  //
+  // E o que separa os dois é `vencido`, não `saldo` (0114): a Anninha tem seis
+  // competências lançadas e nada vencido até 10/12. Pelo saldo ela cairia em
+  // INADIMPLENTE no dia em que o mês prestado virasse receita.
   const { data: saldos } = familiaIds.length
-    ? await db.from("saldo_familia").select("familia_id,saldo")
+    ? await db.from("saldo_familia").select("familia_id,vencido")
         .eq("org_id", org).in("familia_id", familiaIds)
     : { data: [] as any[] };
   const saldoDaFamilia = new Map<string, number>(
-    ((saldos || []) as any[]).map((r) => [r.familia_id, Number(r.saldo) || 0]),
+    ((saldos || []) as any[]).map((r) => [r.familia_id, Number(r.vencido) || 0]),
   );
 
   const porFamilia = new Map<string, any>(((ultFam || []) as any[]).map((r) => [r.familia_id, r]));

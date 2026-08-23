@@ -65,6 +65,9 @@ export default function PainelDoMes() {
   if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;
 
   const rec = d.receita, reb = d.recebido, ina = d.inadimplencia;
+  // O QUE JÁ FOI PRESTADO E AINDA NÃO VENCEU (0114). Nem receita do mês, nem
+  // dívida: é o dinheiro reconhecido que ainda vai ser cobrado.
+  const fut = d.a_vencer || { valor: 0, familias: 0 };
   const lav = d.lavagens, cus = d.custos, car = d.carteira, res = d.resultado;
 
   // A COBERTURA DA COBRANÇA. Contratado não é o mesmo que cobrável: falta
@@ -94,7 +97,9 @@ export default function PainelDoMes() {
                 rodape={`${reb.pagamentos} pagamento(s) · por data de entrada`} />
         <Cartao titulo="Em aberto" valor={brl(ina.em_aberto)}
                 tom={Number(ina.em_aberto) > 0 ? "atencao" : "bom"}
-                rodape={`${ina.familias} família(s) devendo`} />
+                rodape={`${ina.familias} família(s) devendo · já venceu`} />
+        <Cartao titulo="A vencer" valor={brl(fut.valor)} tom="neutro"
+                rodape={`${fut.familias} família(s) · prestado, ainda não venceu`} />
       </div>
 
       <p style={nota}>
@@ -103,6 +108,12 @@ export default function PainelDoMes() {
         quase nunca batem, e é assim mesmo: um pagamento de julho que caiu em agosto
         aparece no recebido de agosto e na competência de julho.
       </p>
+      <p style={nota}>
+        <b>Em aberto</b> é o que já <b>venceu</b> e não foi pago — é daí que sai a
+        régua. <b>A vencer</b> é a competência do serviço já prestado cujo
+        vencimento ainda não chegou: quem paga no fim do período (semestre, ano)
+        aparece aqui, e não entre os devedores.
+      </p>
 
       {/* ============================================ 2 · QUEM DEVE */}
       <Faixa titulo="Quem não pagou, e há quanto tempo" />
@@ -110,6 +121,7 @@ export default function PainelDoMes() {
         <div style={painel.card}>
           <p style={{ margin: 0, fontSize: 15, color: cor.cinza }}>
             Ninguém em aberto neste mês.
+            {Number(fut.valor) > 0 && ` ${brl(fut.valor)} a vencer não é atraso.`}
           </p>
         </div>
       ) : (

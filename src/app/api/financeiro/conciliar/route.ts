@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
   // pagamento entrou e quitou? zera a régua de cobrança gentil
   if (aprovar && (comp as any)?.cliente_id) {
     const s = await calcularSaldo((comp as any).cliente_id);
-    if (s.saldo >= -0.005) {
+    // Quitou o que JA VENCEU (0114): uma competencia com vencimento la na
+    // frente nao pode segurar a regua queimada.
+    if (s.vencido >= -0.005) {
       await db
         .from("clientes")
         .update({ cobranca_nivel: 0, cobranca_em: null })

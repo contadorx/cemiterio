@@ -1734,3 +1734,156 @@ Ensaiado em produção e desfeito: 12 competências jan–dez/26, saldo final
 Pôr direto "próxima cobrança em 2027" também deixaria ela em dia — e apagaria
 2026 inteiro: nem a receita dos doze meses no painel, nem o registro de que ela
 pagou. O saldo ficaria certo pelo motivo errado.
+
+---
+
+## D-36 · Competência, vencimento e inadimplência são três coisas (0114)
+
+**Pergunta:** *"da Anninha não deveria lançar os períodos na competência e
+somente não deixar ela inadimplente?"*
+
+Sim — e era falha de modelo, não detalhe.
+
+A Anninha paga em dezembro pelo semestre jul–dez. Em 23/08 julho e agosto **já
+tinham sido prestados**: a receita é de julho e de agosto, mesmo que o dinheiro
+só entre em dezembro. E o razão dela estava **vazio**.
+
+É a distorção da 0112 invertida: em vez de seis meses empilhados em dezembro,
+cinco meses **sumidos** até lá. O painel mostrava R$ 0 de receita dessa família
+em julho e agosto.
+
+O que segurava o lançamento era o outro lado: lançar a faria aparecer
+**inadimplente**, porque "em aberto" era calculado pelo saldo sem perguntar se
+aquilo **já venceu**.
+
+Três coisas que o banco tratava como duas:
+
+| | significa | onde mora |
+|---|---|---|
+| competência | o mês **prestado** | `conta_corrente.competencia` |
+| vencimento | quando o dinheiro é **devido** | `conta_corrente.data` |
+| inadimplência | vencido **e** não pago | ninguém — era derivada errada |
+
+Enquanto o vencimento fosse derivado da competência, "prestado" e "devido" eram
+a mesma data, e um contrato pós-pago não cabe nisso.
+
+O que mudou: `data` passa a ser o vencimento, **escrito** pelo cobrador com o
+dia da casa; no pós-pago cada mês nasce quando é prestado, com o vencimento lá
+na frente; inadimplência e aging só olham o que já venceu, e contam **do
+vencimento**; a régua conta os degraus de `data`.
+
+Medido em produção depois: Anninha com julho e agosto lançados, vencendo
+10/12/2026, **vencido R$ 0,00 e a vencer R$ 80,00**. Painel de agosto: em
+aberto R$ 360 (quatro famílias, ela fora), a vencer R$ 80, receita R$ 280.
+
+As 17 linhas que já existiam foram corrigidas para o vencimento real. Isso
+conserta de quebra a Virgínia: as doze competências dela foram pagas em
+**janeiro**, e a régua velha — derivando o vencimento de cada competência —
+cobraria dela em setembro por um ano já quitado.
+
+`saldo` continua sendo a posição inteira. Quem pergunta *posso cobrar?* passa a
+ler `vencido`. Quem lia `saldo` para decidir isso — lista de famílias, corte de
+INADIMPLENTE na fila, cobrança gentil, bom pagador do reajuste, zerar a régua —
+foi trocado um a um, e há guarda em `checar-ficha.mjs` para cada um.
+
+---
+
+## D-37 · O período começa onde a cobrança começa (0115)
+
+**Pergunta:** *"Analisa a Magda, ela pagou junho, pós, agora ele tem que lançar
+julho e agosto e cobrar em setembro."*
+
+Estava errado, e pelo mesmo tipo de motivo da D-36.
+
+O cobrador derivava o período **contando N meses para trás** a partir de
+`proxima_cobranca`. Com isso `proxima_cobranca` respondia duas perguntas ao
+mesmo tempo: *quando ela paga* e *que meses o pagamento cobre*. Enquanto as
+duas coincidiram, ninguém viu.
+
+| | contando para trás | o combinado |
+|---|---|---|
+| Magda (set, 2 meses, desde jul) | ago + set | **jul + ago** |
+| Anninha (dez, 6 meses, desde jul) | jul a dez | jul a dez |
+
+Duas famílias, a mesma regra, e só uma certa por acaso. O campo
+`inicio_cobranca` — que a tela chama de *"cobrar a partir de"* e que a casa
+preenche desde sempre — não era lido por ninguém.
+
+Passa a valer, **no pós-pago**: `inicio_cobranca` é onde o período começa,
+`proxima_cobranca` é quando ela paga, `meses_entre_cobrancas` é o tamanho. O
+período do ciclo atual é a âncora deslocada pelos ciclos que já fecharam — e
+quantos fecharam se lê do próprio razão, contando as competências já lançadas
+para aquele túmulo. Sem campo novo, e auto-corrigível: apagar um lançamento
+errado faz a âncora andar de volta sozinha.
+
+**No pré-pago a âncora não é lida**, e isso custou um ensaio para descobrir. A
+primeira versão lia nos dois casos; o ensaio em produção mostrou a AUREA
+(`inicio_cobranca` dez/2025, mensal, cobrada por fora até agora) recebendo a
+competência de **dezembro de 2025 vencendo em 10/08/2026** — receita no mês
+errado e o atraso pingando um mês por vez. Cinco famílias na mesma situação.
+Quem paga adiantado paga os meses que vêm **a partir** da data em que paga:
+ali não há pergunta a responder.
+
+### E a prévia parou de ter conta própria
+
+`sureya_cobrancas_a_lancar` tinha a aritmética do período **escrita de novo**,
+em SQL, ao lado da do cobrador. Com a âncora mudando, a ficha diria "2
+competências desde agosto" e o botão lançaria julho e agosto.
+
+É o mesmo defeito de forma que já apareceu cinco vezes neste banco (0092 na
+agenda, 0105 no painel, 0106 lista × ficha, D-33 na competência, e esta).
+Corrigir a segunda conta não resolve — ela volta a divergir na mudança
+seguinte.
+
+Então a prévia deixou de ter conta. Ela **roda o cobrador de verdade** dentro
+de um bloco com exceção — que no PostgreSQL é uma subtransação —, mede o que
+ele escreveu e derruba tudo. As variáveis plpgsql sobrevivem ao rollback; as
+linhas, não. Por construção, o que a tela promete é o que o botão faz.
+
+Só o sentinela `ENSAIO_DA_PREVIA` é engolido: um erro de verdade tem de chegar
+a quem chamou, e não virar "nada a lançar".
+
+Medido em produção: Magda com julho e agosto vencendo **10/09/2026**, vencido
+R$ 0,00, a vencer R$ 200,00, próxima cobrança andando para **novembro** (o
+ciclo jul–ago fechou; set–out se pagam em novembro). Anninha intacta.
+
+---
+
+## D-38 · Tem contato que não tem telefone (0116)
+
+**Pedido:** *"tenho famílias com contatos sem telefone… preciso conseguir
+salvar"*
+
+`clientes.telefone` era NOT NULL desde a 0001, e o comentário de lá explica o
+porquê: *"o telefone É a allowlist: número que não bate aqui = IA muda"*. Fazia
+sentido quando um cliente era, por definição, um número de WhatsApp.
+
+Não faz mais. Desde a 0100 a ficha é da **família**, e `clientes` virou a lista
+de gente dela: o filho que mora fora, a irmã que decide e não responde
+mensagem. Exigir telefone de todos obriga a inventar um número — e número
+inventado numa allowlist é pior do que campo vazio.
+
+A prova de que a regra já estava sendo contornada estava no próprio banco: um
+cadastro com `telefone = ''`, que passa pelo NOT NULL e não é telefone nenhum.
+
+O `''` virou nulo, e não foi detalhe: o índice único `(org_id, telefone)` trata
+nulos como distintos, mas trataria duas strings vazias como repetidas. Sem a
+conversão, o **segundo** contato sem telefone seria recusado por chave
+duplicada — com uma mensagem sobre telefone repetido para quem não digitou
+telefone nenhum.
+
+O que **não** mudou: continua impossível dois contatos com o mesmo número, e a
+família continua precisando de alguém que acerte a conta. Não ter telefone não
+é o mesmo que não existir.
+
+E a ponta de baixo: a régua nunca leu o telefone — grava `cliente_id` e quem
+envia resolve o número depois. Com contato sem número isso viraria uma cobrança
+na fila que só falha **na hora do envio, no meio de um lote e em silêncio**.
+Agora não entra, nem pela régua nem por `proativo.enfileirar` — e entra num
+contador próprio (`sem_telefone`), porque sumir calado é o mesmo defeito da
+fila antiga.
+
+De quebra, três dos cinco contadores da régua liam chaves que
+`sureya_regua_do_dia` nunca devolveu (`ja_existiam`, `sem_saldo`,
+`por_limite_diario`): o relatório do cron dizia zero neles desde a 0111 —
+inclusive no que conta cobrança que deixou de sair.

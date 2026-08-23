@@ -124,14 +124,27 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   let saldo = 0;
   let aConferir = 0;
+  // VENCIDO E A VENCER SÃO COISAS DIFERENTES (0114). `data` é o vencimento
+  // num débito de contrato: a competência de julho da Anninha vence em
+  // dezembro. Somar tudo num número só a faria nascer inadimplente no dia em
+  // que o mês prestado virasse receita.
+  //
+  // Sinal invertido em relação à conta corrente, como o resto deste arquivo:
+  // aqui crédito é positivo.
+  let vencido = 0;
+  let aVencer = 0;
+  const hoje = new Date().toISOString().slice(0, 10);
   const pagamentos: any[] = [];
   for (const m of mov || []) {
     const st = (m as any).status_conc;
     const v = Number((m as any).valor) || 0;
     if (st === "rejeitado") continue;
     if (st === "a_conferir") { if ((m as any).tipo === "credito") aConferir += v; continue; }
-    saldo += (m as any).tipo === "credito" ? v : -v;
-    if ((m as any).tipo === "credito") pagamentos.push({ id: (m as any).id, valor: v, data: (m as any).data });
+    const credito = (m as any).tipo === "credito";
+    saldo += credito ? v : -v;
+    if (String((m as any).data) > hoje && !credito) aVencer += v;
+    else vencido += credito ? v : -v;
+    if (credito) pagamentos.push({ id: (m as any).id, valor: v, data: (m as any).data });
   }
 
   return NextResponse.json({
@@ -151,6 +164,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     tumulos: tumulos || [],
     planos: planos || [],
     saldo: Math.round(saldo * 100) / 100,
+    // `vencido` é o que se cobra; `aVencer` é o que já foi prestado e ainda
+    // não chegou a hora. A tela lê os dois.
+    vencido: Math.round(vencido * 100) / 100,
+    aVencer: Math.round(aVencer * 100) / 100,
     aConferir: Math.round(aConferir * 100) / 100,
     extrato: mov || [],
     // Pessoa sem familia: extrato vazio por AUSENCIA DE DADO, nao por estar em

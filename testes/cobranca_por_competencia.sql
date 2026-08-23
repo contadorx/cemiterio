@@ -284,10 +284,10 @@ values ('ff000000-0000-0000-0000-000000000156','aaaaaaaa-0000-0000-0000-00000000
 on conflict do nothing;
 
 insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
-                     contratado, valor_mensal, proxima_cobranca, cobranca_no_fim)
+                     contratado, valor_mensal, inicio_cobranca, proxima_cobranca, cobranca_no_fim)
 values ('11100000-0000-0000-0000-000000000157','aaaaaaaa-0000-0000-0000-000000000015',
         'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000156','CI-COB-POS',
-        true, 40, '2026-12-01', true)
+        true, 40, '2026-07-01', '2026-12-01', true)
 on conflict do nothing;
 
 select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
@@ -303,10 +303,19 @@ select ci15('e elas sao JULHO a DEZEMBRO, nao dezembro a maio',
     where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'),
   'quem paga depois do servico esta pagando os meses que JA passaram');
 
-select ci15('todas vencendo em dezembro',
-  (select bool_and(data = '2026-12-01'::date) from conta_corrente
+-- O VENCIMENTO E UM SO, e nao e o primeiro de dezembro: e o DIA COMBINADO da
+-- casa (`orgs.dia_vencimento`, padrao 10). Desde a 0114 quem escreve essa data
+-- e o cobrador, e e dela que a regua e a inadimplencia contam.
+select ci15('todas vencendo no dia combinado de dezembro',
+  (select bool_and(data = '2026-12-10'::date) from conta_corrente
     where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'),
-  'ela paga uma vez, em dezembro — o vencimento e um so');
+  'ela paga uma vez, em dezembro — o vencimento e um so, no dia da casa');
+
+select ci15('competencia e vencimento sao COISAS DIFERENTES na mesma linha',
+  (select bool_and(competencia <> data) from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'
+      and competencia <> '2026-12-01'::date),
+  'julho vencendo em julho e o erro que fazia a Anninha nascer inadimplente');
 
 select ci15('e a proxima cobranca vai para junho',
   (select proxima_cobranca = '2027-06-01'::date from tumulos
@@ -319,10 +328,10 @@ values ('ff000000-0000-0000-0000-000000000157','aaaaaaaa-0000-0000-0000-00000000
         'Familia Pre Pago','semestral', true)
 on conflict do nothing;
 insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
-                     contratado, valor_mensal, proxima_cobranca, cobranca_no_fim)
+                     contratado, valor_mensal, inicio_cobranca, proxima_cobranca, cobranca_no_fim)
 values ('11100000-0000-0000-0000-000000000158','aaaaaaaa-0000-0000-0000-000000000015',
         'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000157','CI-COB-PRE',
-        true, 40, '2026-12-01', false)
+        true, 40, '2026-12-01', '2026-12-01', false)
 on conflict do nothing;
 
 select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
@@ -338,3 +347,253 @@ select ci15('a previa conta as linhas, nao os ciclos',
   (select competencias = 6 from sureya_cobrancas_a_lancar(
      'ff000000-0000-0000-0000-000000000157'::uuid, '2027-06-01'::date)),
   'a tela diria "1 competencia" e o botao lancaria 6');
+
+-- ---------------------------------------------------------------------------
+-- 9 · O MES PRESTADO NASCE QUANDO E PRESTADO (0114)
+-- ---------------------------------------------------------------------------
+-- "da anninha nao deveria lancar os periodos na competencia e somente nao
+--  deixar ela inadimplente?"
+--
+-- Sim — e ate aqui o razao dela ficava VAZIO ate dezembro. Julho e agosto ja
+-- foram prestados: a receita e de julho e de agosto. O que nao pode e chamar
+-- isso de divida antes do dia 10 de dezembro.
+--
+-- E a mesma distorcao da 0112 invertida: em vez de seis meses empilhados em
+-- dezembro, cinco meses SUMIDOS ate la.
+insert into familias (id, org_id, nome, freq_pagamento, contratado)
+values ('ff000000-0000-0000-0000-000000000158','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Anninha','semestral', true)
+on conflict do nothing;
+
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, inicio_cobranca, proxima_cobranca, cobranca_no_fim)
+values ('11100000-0000-0000-0000-000000000159','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000158','CI-COB-ACUM',
+        true, 40, '2026-07-01', '2026-12-01', true)
+on conflict do nothing;
+
+-- Estamos em AGOSTO. A cobranca so acontece em dezembro.
+select sureya_cobrar_competencias('2026-08-23'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('em agosto ja existem JULHO e AGOSTO, e mais nada',
+  (select count(*) = 2
+      and min(competencia) = '2026-07-01'::date
+      and max(competencia) = '2026-08-01'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000159' and origem='competencia'),
+  'ou o razao fica vazio ate dezembro, ou setembro nasce antes de acontecer');
+
+select ci15('e as duas vencem la em dezembro',
+  (select bool_and(data = '2026-12-10'::date) from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000159' and origem='competencia'),
+  'lancar a competencia sem empurrar o vencimento e criar um inadimplente');
+
+select ci15('logo ela NAO deve nada hoje',
+  (select coalesce(sum(case when data <= '2026-08-23'::date
+                            then case when tipo='debito' then valor else -valor end
+                            else 0 end), 0) = 0
+     from conta_corrente where familia_id='ff000000-0000-0000-0000-000000000158'),
+  'era exatamente isto: lancar os periodos e nao deixa-la inadimplente');
+
+select ci15('mas os R$ 80 estao la, lancados',
+  (select sum(valor) = 80 from conta_corrente
+    where familia_id='ff000000-0000-0000-0000-000000000158' and tipo='debito'),
+  'tirar a Anninha da inadimplencia nao pode faze-la sumir do painel');
+
+select ci15('a proxima cobranca NAO andou — o periodo ainda esta aberto',
+  (select proxima_cobranca = '2026-12-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000159'),
+  'se a data anda a cada mes prestado, o semestre vira seis semestres');
+
+-- RODAR DE NOVO NO MESMO MES NAO DUPLICA, e o mes seguinte entra sozinho.
+select sureya_cobrar_competencias('2026-08-30'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+select ci15('rodar de novo em agosto continua dando duas linhas',
+  (select count(*) = 2 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000159' and origem='competencia'),
+  'o cobrador roda todo dia no cron: repetir tem de ser inofensivo');
+
+select sureya_cobrar_competencias('2026-09-05'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+select ci15('em setembro entra setembro, e so',
+  (select count(*) = 3 and max(competencia) = '2026-09-01'::date from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000159' and origem='competencia'),
+  'cada mes prestado vira receita no proprio mes');
+
+-- E EM DEZEMBRO O PERIODO FECHA: as seis existem e a data anda.
+select sureya_cobrar_competencias('2026-12-11'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+select ci15('em dezembro o semestre esta completo, sem repetir os tres primeiros',
+  (select count(*) = 6 and sum(valor) = 240 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000159' and origem='competencia'),
+  'julho, agosto e setembro ja existiam: relanca-los dobraria a conta dela');
+
+select ci15('e ai sim a proxima cobranca anda para junho',
+  (select proxima_cobranca = '2027-06-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000159'),
+  'a data so anda quando o periodo fecha');
+
+-- A MESMA LINHA MUDA DE LADO QUANDO A DATA PASSA — e ninguem a reescreve.
+select ci15('antes do dia 10 de dezembro ela nao deve; depois, deve os R$ 240',
+  (select coalesce(sum(case when data <= '2026-12-09'::date
+                            then case when tipo='debito' then valor else -valor end
+                            else 0 end), 0) = 0
+      and coalesce(sum(case when data <= '2026-12-10'::date
+                            then case when tipo='debito' then valor else -valor end
+                            else 0 end), 0) = 240
+     from conta_corrente where familia_id='ff000000-0000-0000-0000-000000000158'),
+  'e o vencimento que decide, e nao um estado gravado que alguem precisa virar');
+
+-- ---------------------------------------------------------------------------
+-- E A VIEW `saldo_familia` FAZ ESSA CONTA (0114)
+-- ---------------------------------------------------------------------------
+-- Datas RELATIVAS a hoje, de proposito: esta e a unica parte do arquivo que
+-- depende de `current_date`, porque a view tambem depende.
+insert into familias (id, org_id, nome)
+values ('ff000000-0000-0000-0000-000000000159','aaaaaaaa-0000-0000-0000-000000000015','Familia Dois Lados')
+on conflict do nothing;
+
+insert into conta_corrente (org_id, familia_id, tipo, origem, competencia, valor, descricao, data)
+values
+ ('aaaaaaaa-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000159',
+  'debito','competencia', date_trunc('month', current_date)::date, 50,'ja vencida', current_date - 30),
+ ('aaaaaaaa-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000159',
+  'debito','competencia', date_trunc('month', current_date)::date, 70,'ainda vai vencer', current_date + 30)
+on conflict do nothing;
+
+select ci15('a view separa o VENCIDO do A VENCER',
+  (select vencido = 50 and a_vencer = 70 and saldo = 120 from saldo_familia
+    where familia_id='ff000000-0000-0000-0000-000000000159'),
+  'quem pergunta "inadimplente?" le `vencido`; `saldo` continua a posicao inteira');
+
+insert into conta_corrente (org_id, familia_id, tipo, origem, competencia, valor, descricao, data)
+values ('aaaaaaaa-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000159',
+        'credito','pagamento', date_trunc('month', current_date)::date, 50,'pagou a vencida', current_date)
+on conflict do nothing;
+
+select ci15('e um pagamento abate o vencido, nao o futuro',
+  (select vencido = 0 and a_vencer = 70 from saldo_familia
+    where familia_id='ff000000-0000-0000-0000-000000000159'),
+  'credito de hoje tem de encostar na divida de hoje');
+
+-- ---------------------------------------------------------------------------
+-- 10 · O PERIODO COMECA ONDE A COBRANCA COMECA (0115)
+-- ---------------------------------------------------------------------------
+-- "ela pagou junho, pos, agora ele tem que lancar julho e agosto e cobrar em
+--  setembro."
+--
+-- O CASO MAGDA. Paga a cada 2 meses, DEPOIS do servico, e a cobranca dela
+-- comecou em julho. O cobrador contava N meses PARA TRAS a partir da data de
+-- pagar, e por isso lancava agosto e setembro: certo pela aritmetica, errado
+-- pelo combinado.
+--
+-- Os dois campos existiam. Um deles nao era lido por ninguem:
+--   inicio_cobranca   ONDE O PERIODO COMECA
+--   proxima_cobranca  QUANDO ELA PAGA
+insert into familias (id, org_id, nome, contratado)
+values ('ff000000-0000-0000-0000-000000000160','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Magda', true)
+on conflict do nothing;
+
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, inicio_cobranca, proxima_cobranca,
+                     meses_entre_cobrancas, cobranca_no_fim)
+values ('11100000-0000-0000-0000-000000000160','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000160','CI-COB-MAGDA',
+        true, 100, '2026-07-01', '2026-09-01', 2, true)
+on conflict do nothing;
+
+-- A PREVIA PROMETE ANTES DE O BOTAO FAZER. Ela roda primeiro de proposito:
+-- se ela cobrasse de verdade, o teste seguinte passaria por acidente.
+select ci15('a previa promete JULHO e AGOSTO, e nao agosto e setembro',
+  (select competencias = 2 and valor = 200 and desde = '2026-07-01'::date
+     from sureya_cobrancas_a_lancar(
+       'ff000000-0000-0000-0000-000000000160'::uuid, '2026-08-23'::date)),
+  'a tela prometeria um periodo e o botao lancaria outro');
+
+select ci15('e a previa NAO cobrou nada ao ser consultada',
+  (select count(*) = 0 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000160'),
+  'abrir a ficha nao pode criar divida — o ensaio tem de desfazer');
+
+select sureya_cobrar_competencias('2026-08-23'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('o botao lanca JULHO e AGOSTO',
+  (select count(*) = 2
+      and min(competencia) = '2026-07-01'::date
+      and max(competencia) = '2026-08-01'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000160' and origem='competencia'),
+  'contar para tras a partir da data de pagar dava agosto e setembro');
+
+select ci15('e os dois vencem em SETEMBRO, no dia da casa',
+  (select bool_and(data = '2026-09-10'::date) from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000160' and origem='competencia'),
+  'ela paga uma vez, em setembro — o periodo inteiro tem um vencimento so');
+
+select ci15('logo ela NAO esta inadimplente hoje',
+  (select coalesce(sum(case when data <= '2026-08-23'::date
+                            then case when tipo='debito' then valor else -valor end
+                            else 0 end), 0) = 0
+     from conta_corrente where familia_id='ff000000-0000-0000-0000-000000000160'),
+  'o servico ja foi prestado, mas a hora de pagar ainda nao chegou');
+
+select ci15('e a proxima cobranca anda para NOVEMBRO',
+  (select proxima_cobranca = '2026-11-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000160'),
+  'o ciclo fechou quando agosto foi prestado: set+out se pagam em novembro');
+
+-- E O CICLO SEGUINTE COMECA ONDE O ANTERIOR PAROU, sem repetir nem pular.
+select sureya_cobrar_competencias('2026-09-15'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('em setembro entra setembro, vencendo em novembro',
+  (select count(*) = 3
+      and max(competencia) = '2026-09-01'::date
+      and (select data from conta_corrente
+            where tumulo_id='11100000-0000-0000-0000-000000000160'
+              and competencia='2026-09-01') = '2026-11-10'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000160' and origem='competencia'),
+  'o periodo novo tem de comecar em setembro e vencer na cobranca dele');
+
+select ci15('e julho e agosto continuam vencendo em setembro',
+  (select count(*) = 2 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000160'
+      and competencia <= '2026-08-01' and data = '2026-09-10'::date),
+  'mexer no ciclo novo nao pode reescrever o vencimento do ciclo fechado');
+
+-- A ANCORA NAO SE MOVE, e e isso que deixa a Sureya corrigir um lancamento
+-- errado sem desalinhar todo o contrato para sempre.
+select ci15('inicio_cobranca continua sendo julho',
+  (select inicio_cobranca = '2026-07-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000160'),
+  'a ancora tem de ficar parada: e ela que diz onde a cobranca comecou');
+
+-- A ANCORA E COISA DO POS-PAGO, E SO DELE.
+--
+-- Este caso e a AUREA de producao: contrato antigo (dez/2025), cobrada por
+-- fora ate agora, mensal, pre-pago, proxima cobranca em agosto. Ler a ancora
+-- aqui lancaria a competencia de DEZEMBRO DE 2025 vencendo em agosto de 2026 —
+-- receita no mes errado, e o atraso pingando um mes por vez.
+insert into familias (id, org_id, nome, contratado)
+values ('ff000000-0000-0000-0000-000000000161','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Aurea', true)
+on conflict do nothing;
+
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, inicio_cobranca, proxima_cobranca,
+                     cobranca_no_fim)
+values ('11100000-0000-0000-0000-000000000161','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000161','CI-COB-AUREA',
+        true, 40, '2025-12-01', '2026-08-01', false)
+on conflict do nothing;
+
+select sureya_cobrar_competencias('2026-08-23'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('pre-pago com contrato antigo cobra AGOSTO, nao dezembro de 2025',
+  (select count(*) = 1 and min(competencia) = '2026-08-01'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000161' and origem='competencia'),
+  'a ancora do pos-pago aplicada no pre-pago poe receita oito meses atras');
+
+select ci15('e vence no dia da casa em agosto',
+  (select data = '2026-08-10'::date from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000161' and origem='competencia'),
+  'quem paga adiantado deve na data em que paga');

@@ -9,6 +9,12 @@ const rotaCli = readFileSync("src/app/api/clientes/[id]/route.ts", "utf8");
 const rotaConv = readFileSync("src/app/api/conversas/route.ts", "utf8");
 const telaConv = readFileSync("src/app/painel/conversas/VisaoConversas.tsx", "utf8");
 const telaConvIndex = readFileSync("src/app/painel/conversas/page.tsx", "utf8");
+const lista       = readFileSync("src/app/painel/clientes/page.tsx", "utf8");
+const rotaLista   = readFileSync("src/app/api/clientes/route.ts", "utf8");
+const rotaCC      = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+const rotaFila    = readFileSync("src/app/api/fila/route.ts", "utf8");
+const libFin      = readFileSync("src/lib/financeiro.ts", "utf8");
+const libProativo = readFileSync("src/lib/proativo.ts", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -110,5 +116,41 @@ ok("a conversa CARREGA a sugestao da IA, nao so o aviso de que existe",
 
 ok("e a tela MOSTRA o texto e o motivo",
    /c\.sugestao/.test(telaConv) && /segurou porque/.test(telaConv));
+
+// ---------------------------------------------------------------------------
+// COMPETENCIA, VENCIMENTO E INADIMPLENCIA SAO TRES COISAS (0114)
+//
+// `conta_corrente.data` e o VENCIMENTO num debito de contrato. A Anninha paga
+// em dezembro pelo semestre jul-dez: os meses ja prestados sao receita de
+// julho e de agosto e nao sao divida nenhuma ate o dia 10 de dezembro.
+//
+// O jeito de perder isso e discreto: alguem soma `saldo` num lugar so e a
+// familia volta a nascer inadimplente no dia em que o mes prestado vira
+// receita. Cada uma das linhas abaixo e um desses lugares.
+ok("o saldo da familia separa VENCIDO de A VENCER",
+   /vencido: number/.test(libFin) && /aVencer: number/.test(libFin));
+
+ok("e quem pergunta 'posso cobrar?' le o vencido",
+   /s\.vencido < -0\.005/.test(libFin));
+
+ok("a lista de familias marca atrasado pelo que VENCEU",
+   /atrasado: Number\(c\.vencido \|\| 0\) < -0\.005/.test(rotaLista)
+   && !/atrasado: c\.saldo/.test(rotaLista));
+
+ok("e mostra o mesmo numero que usou para marcar",
+   /money\(Math\.abs\(c\.vencido\)\)/.test(lista));
+
+ok("a ficha diz 'Em dia' sobre o que venceu, nao sobre o que existe",
+   /emDia: vencido <= 0\.005/.test(rotaCC));
+
+ok("e o que ainda vai vencer aparece, em vez de sumir",
+   /a vencer/.test(rotaCC) && /aVencer/.test(ficha));
+
+ok("o corte de INADIMPLENTE na fila usa vencido, nao saldo",
+   /select\("familia_id,vencido"\)/.test(rotaFila));
+
+ok("a cobranca gentil nao cobra o que ainda nao venceu",
+   /s\.vencido >= -0\.005\) continue/.test(libProativo)
+   && !/s\.saldo >= -0\.005\) continue;\n\n    const valor/.test(libProativo));
 
 process.exit(falhas ? 1 : 0);

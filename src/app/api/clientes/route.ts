@@ -121,6 +121,9 @@ export async function GET(req: NextRequest) {
     const x = porCliente.get(clienteId); if (!x) continue;
     x.saldo = s.saldo;
     x.aConferir = s.aConferir;
+    // `vencido` e o que se pode cobrar; `saldo` e a posicao inteira (0114).
+    x.vencido = s.vencido;
+    x.aVencer = s.aVencer;
   }
 
   // A ETAPA E AS DATAS ENTRAM AQUI, ANTES DOS FILTROS.
@@ -143,6 +146,8 @@ export async function GET(req: NextRequest) {
     return {
       ...c,
       saldo: Math.round(c.saldo * 100) / 100,
+      vencido: Math.round(Number(c.vencido || 0) * 100) / 100,
+      aVencer: Math.round(Number(c.aVencer || 0) * 100) / 100,
       mensal: Math.round(Number(e?.mensal ?? c.mensal) * 100) / 100,
       cadencias,
       cadenciasRotulo: cadencias.length
@@ -152,7 +157,9 @@ export async function GET(req: NextRequest) {
       proximaCobranca,
       quadras: [...new Set(c.jazigos.map((j: any) => j.quadra).filter(Boolean))],
       ruas: [...new Set(c.jazigos.map((j: any) => j.rua).filter(Boolean))],
-      atrasado: c.saldo < -0.005,
+      // ATRASADO E SOBRE O QUE VENCEU (0114). Pelo saldo, quem paga no fim do
+      // periodo nascia atrasado no dia em que o mes prestado virava receita.
+      atrasado: Number(c.vencido || 0) < -0.005,
       // Só faz sentido cobrar data de quem TEM contrato: quem ainda não
       // combinou nada não está com data faltando, está sem contrato — e é
       // outra etapa, com outro próximo passo.
@@ -217,7 +224,7 @@ export async function GET(req: NextRequest) {
   const totais = {
     quantidade: lista.length,
     mensal: Math.round(lista.reduce((s, c) => s + c.mensal, 0) * 100) / 100,
-    emAberto: Math.round(lista.filter((c) => c.atrasado).reduce((s, c) => s + Math.abs(c.saldo), 0) * 100) / 100,
+    emAberto: Math.round(lista.filter((c) => c.atrasado).reduce((s, c) => s + Math.abs(c.vencido), 0) * 100) / 100,
     atrasados: lista.filter((c) => c.atrasado).length,
     faltaData: lista.filter((c) => c.faltaData).length,
   };
