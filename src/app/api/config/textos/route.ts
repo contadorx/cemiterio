@@ -17,7 +17,23 @@ export const dynamic = "force-dynamic";
  * `{nome}` vira o primeiro nome de quem recebe, COM o tratamento ("Sr. André",
  * não "Sr." nem "André"). `{jazigo}` vira o código do jazigo.
  */
-const TIPOS = ["foto", "cobranca", "lembrete", "agradecimento"] as const;
+/**
+ * OS CINCO TEXTOS DE MEMÓRIA entraram aqui na 0103.
+ *
+ * A 0096 semeou os cinco no banco (`sureya_semear_textos_memoria`) e esta
+ * lista os barrava: existiam, eram usados pelo motor, e não havia tela em
+ * lugar nenhum para lê-los ou corrigi-los. Texto que fala de luto e que
+ * ninguém da casa consegue reler é o pior candidato a ficar escondido.
+ *
+ * Eles usam chaves de dois pares — {{nome_familiar}}, {{nome_falecido}},
+ * {{data_evento}}, {{anos}} — e quem as substitui é `sureya_texto_memoria`,
+ * não o mesmo trecho que troca {nome} nos textos de foto.
+ */
+const TIPOS = [
+  "foto", "cobranca", "lembrete", "agradecimento",
+  "memoria_falecimento", "memoria_marco", "memoria_nascimento",
+  "memoria_agrupado", "memoria_sem_oferta",
+] as const;
 
 export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();

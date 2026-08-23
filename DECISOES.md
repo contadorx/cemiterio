@@ -1164,3 +1164,143 @@ famílias com mais de um marcado, zero titulares sem a marca, zero famílias com
 gente e sem pagador. Dado limpo — não havia o que consertar, só o que liberar.
 E o motivo de o teto nunca ter aparecido: **nenhuma família tinha mais de um
 contato**. O limite só apareceria no dia em que a Sureya cadastrasse o segundo.
+
+---
+
+## D-27 · Havia dois motores de data, e o que rodava era o errado
+
+O produto de memória estava **inteiro no banco e invisível no app**. As 0095 e
+0096 criaram `falecidos`, `eventos_memoria`, as quatro supressões e a biblioteca
+de textos — e nenhum arquivo do app citava nada disso. Nem tela, nem rota, nem
+job.
+
+Ao ligar, apareceu o que estava embaixo: **dois motores de data**.
+
+| | `gatilhosDeData` (2024) | o da 0096 |
+|---|---|---|
+| lê | `tumulos.datas_gatilho` | `falecidos` |
+| formato | MM-DD, **sem ano** | `date`, com ano e precisão |
+| grão | uma lista por **túmulo** | uma linha por **pessoa** |
+| antecedência | sempre 7 dias | 10 · 20 (marco) · 3 · 15 |
+| textos | dentro do TypeScript | biblioteca no banco |
+| supressões | **nenhuma** | as quatro obrigatórias |
+
+O que rodava todo dia no cron era o da esquerda. A especificação diz, sobre os
+limites de luto e frequência: *"são obrigatórios, não configuráveis para cima"*.
+Aquele motor não os tem — mandaria a mensagem de aniversário para quem enterrou
+alguém há três semanas.
+
+Ele nunca fez isso porque `datas_gatilho` está vazio nos 270 túmulos. Não era
+um recurso funcionando: era uma **arma carregada** esperando alguém preencher o
+campo. E as duas memórias estavam vazias — o momento mais barato que existe para
+ficar com uma verdade só. O da 0096 assumiu; o velho ficou no arquivo, sem
+chamador, com a nota do porquê.
+
+### O ano não é detalhe
+
+`datas_gatilho` guardava só o dia do ano. Sem o ano não há *"completam-se 7
+anos"*, não há marco de 1 ano, e — o que decide — **não há como saber se o luto
+é recente**. A zona de silêncio (< 90 dias bloqueia tudo, < 6 meses bloqueia
+oferta) é uma conta com a data real. Em MM-DD ela é impossível.
+
+### O motor não conseguia rodar onde precisava
+
+As duas funções abrem com `v_org := current_org_id()`, que é
+`select org_id from membros where user_id = auth.uid()`. Numa sessão do painel
+resolve; **num cron não** — a service role tem `auth.uid()` nulo, e a chamada
+morria em `sem_org` antes da primeira linha de trabalho. O motor foi escrito
+para uma sessão e agendado para um job. A 0103 acrescentou `p_org`.
+
+O erro era alto, e isso é bom. O problema não era silêncio — era não haver
+caminho nenhum.
+
+### O que destrava tudo é o cadastro
+
+Medido em 23/08: os **65 falecidos** vieram do texto `tumulos.falecido_nome` e
+chegaram **sem nenhuma data** — zero nascimentos, zero falecimentos. O motor
+está certo e faminto. Por isso a tela `/painel/memoria` põe *"quem ainda não tem
+data"* **antes** do calendário: um calendário vazio, sozinho, parece defeito; ao
+lado da lista de quem falta, vira fila de trabalho.
+
+E os cinco textos de memória, semeados pela 0096, estavam barrados por uma lista
+de tipos em `/api/config/textos`. Existiam, eram usados, e ninguém da casa
+conseguia relê-los. Texto que fala de luto é o pior candidato a ficar escondido.
+
+---
+
+## D-28 · A cobrança é do contrato; a limpeza é entrega
+
+O razão respondia por duas perguntas ao mesmo tempo:
+
+| | |
+|---|---|
+| **dinheiro** | quanto a família deve pelo contrato |
+| **serviço** | quais limpezas aconteceram |
+
+Enquanto a limpeza lançava o débito, a segunda escrevia na primeira. As
+consequências não eram teóricas:
+
+- uma limpeza **adiada barateava o mês**
+- uma limpeza **anotada em atraso virava dívida retroativa**
+- e o **contrato virava o resultado da operação**, quando é o contrário: ele é
+  o combinado, e a operação é o que a casa entrega por ele
+
+O código já sabia. Dentro de `sureya_concluir_lavagem`, no bloco 4, estava
+escrito: *"Quem gera a dívida é a competência. Se a lavagem também lançasse
+valor, a família seria cobrada duas vezes pelo mesmo serviço."* O caminho da
+competência existia, era o certo, e **nada o alimentava**.
+
+Agora alimenta: `sureya_cobrar_competencias` lança, por túmulo, o valor
+combinado do período, na periodicidade de pagamento da família. A limpeza não
+encosta mais no saldo.
+
+### O teto que ninguém via (de novo)
+
+Havia **dois** índices únicos para o mesmo `origem='competencia'`:
+
+```
+idx_cc_competencia_familia   (familia_id, competencia)
+idx_cc_competencia_unica     (tumulo_id,  competencia)
+```
+
+O primeiro limita a família a **uma** cobrança por mês — e a D-24 diz que
+contrato, pagamento e lavagem são por túmulo, *"pois tem famílias com N
+túmulos"*. Ensaiado em produção e desfeito: a segunda cobrança do mesmo mês
+volta com `duplicate key ... idx_cc_competencia_familia`. Com ele de pé, o
+modelo novo não tinha como existir. É a mesma forma da D-26.
+
+### Duas datas que eram uma
+
+`inicio_cobranca` respondia por *quando o dinheiro começa* e *quando a rota
+começa*. Elas não coincidem — a família assina hoje, a primeira limpeza é
+semana que vem, a cobrança começa no mês que vem. Separadas em
+`proxima_cobranca` (que o cobrador **anda sozinho**) e `inicio_agendamento`.
+
+### Meses parados saem um a um
+
+Se a casa passar meses sem rodar o cron, somar tudo num lançamento com a data
+de hoje perderia a competência de cada mês — e o relatório por competência, que
+é o que a Sureya confere, mentiria. O cobrador anda mês a mês.
+
+### O que se mediu, e o que se estornou
+
+O razão inteiro tinha **11 lançamentos**, todos em 2026-08: 5 débitos de
+lavagem (R$ 121,25), 4 pagamentos, 1 abertura, 1 avulso. **Nenhuma competência.**
+Os 5 débitos foram **estornados** (não apagados): eles cobravam limpezas que a
+competência de agosto cobraria de novo. Apagar deixaria o saldo certo e a
+história muda.
+
+**Um índice quase estragou o estorno, e o harness não pegou.** A primeira versão
+estornava com `origem='ajuste'`, e `idx_cc_ajuste_mes` é único por
+(familia_id, competencia): uma família tinha três débitos no mesmo mês, e o
+segundo estorno colidia. No banco limpo as famílias do teste eram distintas, e
+a colisão só existe quando a mesma família repete competência — o caso real. O
+estorno passou a nascer com a mesma origem do que reverte, e com `servico_id`
+nulo: o vínculo certo é o ponteiro `estorna_lancamento`, não a repetição da
+chave do serviço.
+
+### Estado hoje
+
+270 túmulos, **5 contratados**, **2 com valor** — e os dois vencem em 01/09.
+Ensaiado em produção e desfeito: em 01/09 o cobrador lança R$ 25 (Alcantara) e
+R$ 30 (Bruniera), e a segunda rodada lança zero.

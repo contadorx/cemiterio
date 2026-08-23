@@ -241,8 +241,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0102  +1  sureya_guarda_quem_acerta_a_conta — o teto de UM pagador caiu,
 #             entao o PISO de um passa a precisar de guarda propria. Antes ele
 #             vinha de graca do indice unico: com um so, desmarcar era trocar.
-# Saldo: +43.
-FUNCOES_DELTA=${FUNCOES_DELTA:-43}
+#   0104  +2  sureya_meses_da_cobranca e sureya_cobrar_competencias — a divida
+#             passa a ser do CONTRATO, lancada por competencia. Antes quem
+#             gerava dinheiro era a lavagem, e nada alimentava a competencia.
+# Saldo: +45.
+FUNCOES_DELTA=${FUNCOES_DELTA:-45}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -454,6 +457,43 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/agenda.sql 2>&1); then
   echo "$saida" | grep -E "AGENDA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "O aviso da agenda vai voltar a ficar na tela para sempre."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# A COBRANCA E DO CONTRATO
+#
+# O razao respondia por duas perguntas: quanto a familia deve, e quais limpezas
+# aconteceram. Enquanto a lavagem lancava o debito, a segunda escrevia na
+# primeira — limpeza adiada baixava o mes, limpeza anotada em atraso virava
+# divida retroativa. A 0104 separa as duas.
+# ---------------------------------------------------------------------------
+echo "COBRANCA — a divida e do contrato, por competencia"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/cobranca_por_competencia.sql 2>&1); then
+  echo "$saida" | grep -E "COBRANCA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Ou a familia e cobrada duas vezes, ou nao e cobrada."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O MOTOR DE MEMORIA RODA
+#
+# A 0096 escreveu o motor inteiro e ele nunca foi executado. Um motor que trata
+# de luto nao pode estrear na casa de alguem: aqui ele roda pela primeira vez,
+# com as supressoes obrigatorias sendo cobradas uma a uma.
+# ---------------------------------------------------------------------------
+echo "MEMORIA — datas, luto e a chave geral"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/memoria.sql 2>&1); then
+  echo "$saida" | grep -E "MEMORIA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Lembrete de luto e o erro que nao se desfaz."
   echo "============================================================"
   exit 1
 fi

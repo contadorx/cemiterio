@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ClipboardCheck, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -38,6 +38,11 @@ const CARTEIRA = [
   // no dia a dia de propósito: é trabalho de preparação, feito uma vez por
   // família, não algo que se abre todo dia.
   { href: "/painel/conferencia", label: "Conferência", icon: ClipboardCheck },
+  // As datas de memória. Fica ao lado da conferência porque é da mesma
+  // natureza: preparação, não expediente. O que sai dela chega à Sureya pela
+  // fila de liberação, junto com todo o resto — esta tela é onde se olha o
+  // calendário e se entende por que uma data foi segurada.
+  { href: "/painel/memoria", label: "Memória", icon: Flower2 },
 ];
 
 // A CONEXÃO DO WHATSAPP É UMA ABA DE CONFIGURAÇÕES.

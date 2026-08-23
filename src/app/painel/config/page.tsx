@@ -1194,7 +1194,7 @@ function Mensagens() {
   const [dias, setDias] = useState("");
   const [diasSalvo, setDiasSalvo] = useState("");
   const [modelos, setModelos] = useState<any[]>([]);
-  const [tipo, setTipo] = useState<"foto" | "cobranca" | "lembrete" | "agradecimento">("foto");
+  const [tipo, setTipo] = useState<string>("foto");
   const [rascunho, setRascunho] = useState("");
   const [edicao, setEdicao] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState(false);
@@ -1270,7 +1270,18 @@ function Mensagens() {
   const rotuloTipo: Record<string, string> = {
     foto: "Foto do serviço", cobranca: "Cobrança",
     lembrete: "Lembrete", agradecimento: "Agradecimento",
+    // Os cinco de memória (0096) existiam no banco sem tela nenhuma.
+    memoria_falecimento: "Memória · aniversário",
+    memoria_marco: "Memória · um ano",
+    memoria_nascimento: "Memória · nascimento",
+    memoria_agrupado: "Memória · duas datas juntas",
+    memoria_sem_oferta: "Memória · sem oferta",
   };
+  const TIPOS_TEXTO = [
+    "foto", "cobranca", "lembrete", "agradecimento",
+    "memoria_falecimento", "memoria_marco", "memoria_nascimento",
+    "memoria_agrupado", "memoria_sem_oferta",
+  ];
 
   return (
     <>
@@ -1341,13 +1352,24 @@ function Mensagens() {
         </p>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}>
-          {(["foto", "cobranca", "lembrete", "agradecimento"] as const).map((t) => (
+          {TIPOS_TEXTO.map((t) => (
             <button key={t} onClick={() => setTipo(t)}
                     style={tipo === t ? painel.botao : painel.botaoSec}>
               {rotuloTipo[t]}
             </button>
           ))}
         </div>
+
+        {tipo.startsWith("memoria_") && (
+          <p style={{ fontSize: 13.5, color: cor.cinza, lineHeight: 1.5,
+                      background: "rgb(var(--zm-fundo))", border: `1px solid ${cor.linha}`,
+                      borderRadius: 10, padding: 10, margin: "0 0 12px" }}>
+            Estes são os textos de <b>memória</b>, e usam chaves de dois pares:{" "}
+            <b>{"{{nome_familiar}}"}</b>, <b>{"{{nome_falecido}}"}</b>,{" "}
+            <b>{"{{data_evento}}"}</b> e <b>{"{{anos}}"}</b> — não as mesmas dos textos de foto.
+            Eles saem <b>na fila de liberação</b>, nunca direto: alguém lê antes de a família ler.
+          </p>
+        )}
 
         {modelos.length === 0 && (
           <p style={{ color: cor.cinza, fontSize: 14 }}>

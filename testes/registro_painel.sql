@@ -96,16 +96,23 @@ select ci6('a data da lavagem continua sendo a informada',
   (current_date - 40)::text);
 
 -- E OS EFEITOS TEM DE TER NASCIDO, como nasceriam pelo campo.
-select ci6b('o debito da lavagem foi lancado',
-  (select count(*) > 0 from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000061'
-      and origem::text='lavagem' and tipo::text='debito'),
-  'a limpeza registrada pelo painel nao gerou lancamento nenhum');
-
-select ci6b('e vale o do jazigo, nao a referencia da casa',
-  (select bool_or(valor = 45) from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000061' and origem::text='lavagem'),
-  'o valor saiu diferente do valor_lavagem do tumulo');
+--
+-- MUDOU NA 0104. Ate aqui este trecho cobrava o DEBITO da limpeza e depois
+-- perseguia a data dele: uma lavagem de 40 dias atras lancava no razao com
+-- `current_date`, caindo na competencia errada, e `sureya_datar_lavagem`
+-- existia para arrastar o lancamento de volta.
+--
+-- Esse problema inteiro deixou de existir. A limpeza nao gera mais dinheiro —
+-- quem cobra e o contrato, pela competencia. Nao ha lancamento para datar,
+-- entao nao ha como ele cair no mes errado. Era isto que o pedido chamou de
+-- "a cobranca caminha em separado dos registros de servicos".
+--
+-- O que continua valendo, e continua cobrado aqui: a DATA DO SERVICO (o campo
+-- registra o que aconteceu, e aconteceu ha 40 dias) e a FOTO para a familia.
+select ci6b('a limpeza do painel nao gera lancamento nenhum',
+  not exists (select 1 from conta_corrente
+               where servico_id='99999999-0000-0000-0000-000000000061'),
+  'a lavagem voltou a escrever no razao');
 
 select ci6b('a mensagem entrou na fila de liberacao',
   (select count(*) = 1 from fila_liberacao
@@ -117,37 +124,21 @@ select ci6b('e com um texto da casa, nao a frase de reserva',
     where servico_id='99999999-0000-0000-0000-000000000061'),
   'chegou na fila o bilhete de sistema de novo');
 
--- ---------------------------------------------------------------------------
--- A DATA DO LANCAMENTO — o buraco que a 0088 fecha
---
--- Ate aqui o lancamento carimbou `current_date`: a lavagem e de 40 dias atras e
--- a cobranca cairia no mes de hoje.
--- ---------------------------------------------------------------------------
-select ci6('antes de datar, o lancamento esta no dia de HOJE',
-  (select distinct data::text from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000061' and origem::text='lavagem'),
-  current_date::text);
-
+-- `sureya_datar_lavagem` continua existindo e continua consertando a data do
+-- SERVICO. O que ela nao tem mais e lancamento para ajustar — e zero aqui e o
+-- resultado certo, nao um conserto que falhou.
 select * from sureya_datar_lavagem('99999999-0000-0000-0000-000000000061'::uuid,
                                    (current_date - 40));
 
-select ci6('depois de datar, o lancamento esta no dia da lavagem',
-  (select distinct data::text from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000061' and origem::text='lavagem'),
-  (current_date - 40)::text);
-
-select ci6('e a competencia deixou de ser a de hoje',
-  (select (date_trunc('month', min(data))::date <> date_trunc('month', current_date)::date)::text
-     from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000061' and origem::text='lavagem'),
-  'true');
-
--- Rodar de novo nao muda mais nada: e o que permite a rota chamar sem medo
--- depois de uma falha parcial.
-select ci6('datar duas vezes nao mexe em nada na segunda',
+select ci6('nao ha lancamento para datar, e isso esta certo',
   (select lancamentos_ajustados::text from sureya_datar_lavagem(
      '99999999-0000-0000-0000-000000000061'::uuid, (current_date - 40))),
   '0');
+
+select ci6('e a data do servico continua sendo a informada',
+  (select (data_executada at time zone 'America/Sao_Paulo')::date::text
+     from servicos where id='99999999-0000-0000-0000-000000000061'),
+  (current_date - 40)::text);
 
 -- ---------------------------------------------------------------------------
 -- O QUE A FUNCAO TEM DE RECUSAR

@@ -27,7 +27,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [{ data: t }, { data: urg }, { data: servs }] = await Promise.all([
     db.from("tumulos")
       .select("id,identificacao,numero,falecido_nome,rua,rua_id,ordem_na_rua,observacoes,"
-            + "contratado,periodicidade,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,lat,lng,gps_precisao,"
+            + "contratado,periodicidade,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,"
+            + "proxima_cobranca,inicio_agendamento,lat,lng,gps_precisao,"
             + "foto_referencia_url,foto_enquadramento_url,ultima_lavagem_informada,"
             + "cliente_id,familia_id,quadras(codigo),familias(nome,contratado,inicio_cobranca),"
             + "clientes(nome,telefone)")
@@ -207,6 +208,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // comparação com "2026-03-01" falhar em silêncio.
     const v = String(body.inicio_cobranca || "");
     patch.inicio_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
+  }
+
+  // AS DUAS DATAS QUE ERAM UMA (0104).
+  //
+  // `inicio_cobranca` respondia por duas perguntas ao mesmo tempo: quando o
+  // dinheiro começa e quando a rota começa. Elas não coincidem — a família
+  // assina hoje, a primeira limpeza é semana que vem, a cobrança começa no mês
+  // que vem. Misturadas, mexer numa mexia na outra sem avisar.
+  //
+  // `proxima_cobranca` é o ponteiro que o cobrador ANDA sozinho a cada
+  // competência lançada. Editá-la aqui é dizer "cobre a partir daqui" — e é
+  // por isso que ela também cai no dia 1.
+  if (body.proxima_cobranca !== undefined) {
+    const v = String(body.proxima_cobranca || "");
+    patch.proxima_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
+  }
+
+  // Esta NÃO cai no dia 1: a rota começa num dia, não num mês.
+  if (body.inicio_agendamento !== undefined) {
+    const v = String(body.inicio_agendamento || "");
+    patch.inicio_agendamento = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   }
 
   if (body.periodicidade !== undefined) {

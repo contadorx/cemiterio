@@ -105,6 +105,31 @@ export async function PATCH(
     patch.inicio_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
   }
 
+  // LEMBRETES DE MEMÓRIA, POR FAMÍLIA.
+  //
+  // "Chave para ligar e desligar geral e por família." A geral fica em
+  // /painel/memoria; esta é a da família, e é a que atende o pedido que chega
+  // por telefone: "não me mandem mais nada sobre isso".
+  //
+  // `null` não é o mesmo que `false`: nulo é "segue a casa", falso é "esta
+  // família pediu para não receber". Guardar o pedido como ausência de
+  // preferência faria a próxima mudança da chave geral desfazer o pedido.
+  // Os três estados chegam como a string da tela, igual a `enviar_fotos`.
+  if (b.lembretes_memoria !== undefined) {
+    patch.lembretes_memoria =
+      b.lembretes_memoria === null || b.lembretes_memoria === "" || b.lembretes_memoria === "geral"
+        ? null
+        : b.lembretes_memoria === true || b.lembretes_memoria === "sim";
+  }
+
+  // PAUSA COM PRAZO. Serve para o luto que a casa conhece mas o cadastro
+  // ainda não: a família enterrou alguém agora, e o silêncio vale por um
+  // tempo, sem precisar desligar para sempre e lembrar de religar.
+  if (b.lembretes_pausados_ate !== undefined) {
+    const v = String(b.lembretes_pausados_ate || "");
+    patch.lembretes_pausados_ate = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  }
+
   if (!Object.keys(patch).length) {
     return NextResponse.json({ ok: false, erro: "nada_para_mudar" }, { status: 400 });
   }

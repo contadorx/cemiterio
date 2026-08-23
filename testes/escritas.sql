@@ -212,9 +212,18 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- lavagem
--- O debito da limpeza sai do razao antigo e passa a depender do MODO DE
--- COBRANCA da familia — a regra que antes emergia de uma colisao de indice
--- unico entre o espelho e a linha de valor zero da 0066.
+-- MUDOU NA 0104. Ate aqui a limpeza gerava dinheiro: em modo `consumo` ela
+-- lancava o debito, e em `competencia` lancava uma linha de valor zero so
+-- para aparecer no extrato. Este trecho cobrava esses dois comportamentos.
+--
+-- A decisao inverteu de proposito. O razao respondia por duas perguntas —
+-- quanto a familia DEVE e quais limpezas ACONTECERAM — e a segunda escrevia
+-- na primeira: limpeza adiada baixava o mes, limpeza anotada em atraso virava
+-- divida retroativa. Agora quem gera divida e o CONTRATO, pela competencia
+-- (sureya_cobrar_competencias); a limpeza e entrega, e nao encosta no saldo.
+--
+-- O que se cobra aqui passou a ser o silencio: a limpeza roda inteira — marca
+-- executada, guarda foto, calcula remuneracao — e o saldo NAO se mexe.
 select ci2_zera();
 insert into cemiterios (id, org_id, nome)
   values ('a2000000-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','C')
@@ -229,7 +238,9 @@ insert into tumulos (id, org_id, cliente_id, familia_id, quadra_id, identificaca
           'a3000000-0000-0000-0000-000000000001','Q1-R1-001', 55)
   on conflict (id) do nothing;
 
--- modo CONSUMO: cada limpeza vira divida
+-- Em QUALQUER modo, a limpeza nao mexe no saldo. O `modo_cobranca` deixou de
+-- decidir dinheiro na 0104; os dois valores continuam sendo exercitados aqui
+-- para provar que nenhum deles reabre a porta.
 update familias set modo_cobranca = 'consumo' where id='bbbbbbbb-0000-0000-0000-000000000001';
 insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
   values ('a5000000-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001',
@@ -237,16 +248,21 @@ insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
           'agendado', current_date)
   on conflict (id) do nothing;
 select sureya_concluir_lavagem('a5000000-0000-0000-0000-000000000001','foto.jpg');
-select ci2('modo consumo: a limpeza vira divida', ci2_saldo(), -55);
+select ci2('a limpeza NAO vira divida (modo consumo)', ci2_saldo(), 0);
 select ci2('a limpeza nao toca no razao antigo', (select count(*) from movimentos), 0);
-select ci2('uma linha de lavagem por servico',
+select ci2('e nao deixa linha nenhuma no conta corrente',
            (select count(*) from conta_corrente
-             where servico_id='a5000000-0000-0000-0000-000000000001'), 1);
--- concluir de novo nao cobra de novo
-select sureya_concluir_lavagem('a5000000-0000-0000-0000-000000000001','foto.jpg');
-select ci2('concluir duas vezes nao cobra duas vezes', ci2_saldo(), -55);
+             where servico_id='a5000000-0000-0000-0000-000000000001'), 0);
 
--- modo COMPETENCIA: a limpeza e so registro; quem cobra e o fechamento do mes
+-- mas ela ACONTECEU: o servico fica executado, senao o teste acima passaria
+-- por um caminho que simplesmente nao rodou.
+select ci2('e mesmo assim a limpeza foi registrada',
+           (select count(*) from servicos
+             where id='a5000000-0000-0000-0000-000000000001' and status = 'executado'), 1);
+
+select sureya_concluir_lavagem('a5000000-0000-0000-0000-000000000001','foto.jpg');
+select ci2('concluir duas vezes continua sem cobrar', ci2_saldo(), 0);
+
 select ci2_zera();
 update familias set modo_cobranca = 'competencia' where id='bbbbbbbb-0000-0000-0000-000000000001';
 insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
@@ -255,10 +271,10 @@ insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
           'agendado', current_date)
   on conflict (id) do nothing;
 select sureya_concluir_lavagem('a5000000-0000-0000-0000-000000000002','foto.jpg');
-select ci2('modo competencia: a limpeza NAO vira divida', ci2_saldo(), 0);
-select ci2('mas fica registrada no extrato da familia',
+select ci2('modo competencia: a limpeza tambem nao vira divida', ci2_saldo(), 0);
+select ci2('e some do extrato do dinheiro (a linha de R$ 0,00 saiu)',
            (select count(*) from conta_corrente
-             where servico_id='a5000000-0000-0000-0000-000000000002'), 1);
+             where servico_id='a5000000-0000-0000-0000-000000000002'), 0);
 update familias set modo_cobranca = 'consumo' where id='bbbbbbbb-0000-0000-0000-000000000001';
 
 -- ---------------------------------------------------------------- heranca
@@ -289,7 +305,11 @@ insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
           'agendado', current_date)
   on conflict (id) do nothing;
 select sureya_concluir_lavagem('a7000000-0000-0000-0000-000000000001','foto.jpg');
-select ci2('a lavagem no jazigo importado COBRA a familia', ci2_saldo(), -55);
+-- O saldo era o atalho para provar "funcionou ponta a ponta". Na 0104 a
+-- limpeza deixou de gerar dinheiro, entao a prova passou a ser o servico
+-- executado (linha abaixo) — e o que se cobra do dinheiro e o contrario:
+-- que ele NAO se mexeu.
+select ci2('a lavagem no jazigo importado nao cobra a familia', ci2_saldo(), 0);
 select ci2('e o servico fica marcado como executado',
            (select count(*) from servicos
              where id='a7000000-0000-0000-0000-000000000001' and status::text='executado'), 1);

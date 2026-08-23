@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cronAutorizado } from "@/lib/cron-auth";
-import { avisosSaldoBaixo, cobrancaGentil, gatilhosDeData } from "@/lib/proativo";
+import { avisosSaldoBaixo, cobrancaGentil } from "@/lib/proativo";
+import { rotinaDeMemoria } from "@/lib/memoria";
+import { cobrarContratos } from "@/lib/cobranca";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { registrarErro } from "@/lib/monitor";
 import { carimbarRotina } from "@/lib/rotinas";
@@ -33,16 +35,42 @@ export async function GET(req: NextRequest) {
     resultado.rascunhos = {
       saldo: await avisosSaldoBaixo(),
       cobranca: await cobrancaGentil(),
-      gatilhos: await gatilhosDeData(),
     };
   } catch (e) {
     await registrarErro("cron_diario_proativos", e);
     resultado.rascunhos = { erro: true };
   }
 
+  // A COBRANÇA DO CONTRATO (0104). Etapa própria: cobrar é a coisa mais
+  // delicada que a rotina faz, e não pode cair junto com a agenda nem levá-la.
+  //
+  // Antes daqui não havia etapa nenhuma — quem gerava dívida era a limpeza, um
+  // efeito colateral de um evento de campo. Agora é uma decisão de dinheiro
+  // explícita, com hora marcada e resultado registrado.
+  try {
+    resultado.cobranca = await cobrarContratos();
+  } catch (e) {
+    await registrarErro("cron_diario_cobranca", e);
+    resultado.cobranca = { erro: true };
+  }
+
+  // AS DATAS DE MEMÓRIA. Etapa própria, com try próprio: uma falha aqui não
+  // pode levar a agenda do dia junto — e o inverso também não.
+  //
+  // Saiu daqui `gatilhosDeData()`, o motor velho: MM-DD sem ano, por túmulo,
+  // sem nenhuma supressão de luto ou frequência. Ver a nota em `proativo.ts`.
+  // O de agora é o da 0096, que não tem caminho para furar os limites.
+  try {
+    resultado.memoria = await rotinaDeMemoria();
+  } catch (e) {
+    await registrarErro("cron_diario_memoria", e);
+    resultado.memoria = { erro: true };
+  }
+
   // "ok" so quando NENHUMA etapa falhou: meia rotina nao pode passar por
   // rotina inteira no painel.
-  const tudoOk = !resultado.agenda?.erro && !resultado.rascunhos?.erro;
+  const tudoOk = !resultado.agenda?.erro && !resultado.rascunhos?.erro
+                 && !resultado.memoria?.erro && !resultado.cobranca?.erro;
   await carimbarRotina("diario", tudoOk, resultado,
     tudoOk ? undefined : "uma das etapas falhou — veja erros_log");
 

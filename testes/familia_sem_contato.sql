@@ -78,11 +78,18 @@ select ci8('e sai da lista de jazigos orfaos',
     where id='ffffffff-0000-0000-0000-000000000081'), '0');
 
 -- ---------------------------------------------------------------------------
--- 3 · O EFEITO QUE NAO APARECE EM TELA: a lavagem TEM de virar cobranca
+-- 3 · O EFEITO QUE NAO APARECE EM TELA: familia sem contato TEM de ser cobrada
 --
--- Antes desta migration o debito era decidido por `v_s.cliente_id is not null`.
--- Sem contato, a limpeza acontecia, a foto saia, e a cobranca simplesmente nao
--- existia — sem erro. Este e o teste que prova o conserto.
+-- O medo original: o debito era decidido por `v_s.cliente_id is not null`, e
+-- sem contato a limpeza acontecia, a foto saia, e a cobranca simplesmente nao
+-- existia — sem erro. A familia sumia do dinheiro calada.
+--
+-- MUDOU O MECANISMO NA 0104, NAO A PREOCUPACAO. Quem cobra deixou de ser a
+-- limpeza e passou a ser o CONTRATO, por competencia. O medo continua o mesmo
+-- e o teste continua: uma familia sem contato tem de ser cobrada igual, com o
+-- lancamento preso a ELA e o contato em branco.
+--
+-- (E a limpeza, agora, nao pode gerar dinheiro nenhum — cobrado ao fim.)
 -- ---------------------------------------------------------------------------
 insert into servicos (id, org_id, tumulo_id, status, data_prevista, data_executada, foto_depois_url)
 values ('99999999-0000-0000-0000-000000000081','aaaaaaaa-0000-0000-0000-000000000008',
@@ -92,16 +99,27 @@ values ('99999999-0000-0000-0000-000000000081','aaaaaaaa-0000-0000-0000-00000000
 select * from sureya_concluir_lavagem('99999999-0000-0000-0000-000000000081'::uuid,
                                       'https://exemplo/n1.jpg', null, null, null, null);
 
-select ci8b('lavagem de familia SEM contato gera cobranca',
-  (select count(*) > 0 from conta_corrente
-    where servico_id='99999999-0000-0000-0000-000000000081'
-      and origem::text='lavagem' and tipo::text='debito'),
-  'a limpeza aconteceu e o dinheiro sumiu calado — o conserto nao pegou');
+select ci8b('a limpeza NAO gera mais dinheiro',
+  not exists (select 1 from conta_corrente
+               where servico_id='99999999-0000-0000-0000-000000000081'),
+  'a lavagem voltou a escrever no razao — quem cobra e o contrato');
+
+-- Agora o contrato. A familia continua SEM contato neste ponto do arquivo.
+update familias set contratado = true, freq_pagamento = 'mensal'
+ where id='bbbbbbbb-0000-0000-0000-000000000081';
+update tumulos set contratado = true, valor_mensal = 55,
+       proxima_cobranca = date_trunc('month', current_date)::date
+ where id='ffffffff-0000-0000-0000-000000000081';
+
+select ci8b('o contrato de familia SEM contato e cobrado igual',
+  (select lancados > 0
+     from sureya_cobrar_competencias(current_date, 'aaaaaaaa-0000-0000-0000-000000000008')),
+  'a familia sem contato sumiu do dinheiro — era exatamente o defeito antigo');
 
 select ci8b('e o lancamento e da familia, com o contato em branco',
   (select bool_and(familia_id='bbbbbbbb-0000-0000-0000-000000000081' and cliente_id is null)
-     from conta_corrente where servico_id='99999999-0000-0000-0000-000000000081'
-      and origem::text='lavagem' and tipo::text='debito'),
+     from conta_corrente
+    where tumulo_id='ffffffff-0000-0000-0000-000000000081' and origem::text='competencia'),
   'o lancamento saiu sem familia, ou inventou um contato');
 
 -- ---------------------------------------------------------------------------

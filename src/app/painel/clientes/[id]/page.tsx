@@ -266,6 +266,12 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
       ? "geral" : (fam.enviar_fotos ? "sim" : "nao"),
     freq_pagamento: fam?.freq_pagamento || "",
     modo_cobranca: fam?.modo_cobranca || "consumo",
+    // "geral" é ausência de preferência (segue a casa); "nao" é um pedido
+    // desta família. Guardar o pedido como ausência faria a próxima mudança
+    // da chave geral desfazê-lo sem ninguém perceber.
+    lembretes_memoria: fam?.lembretes_memoria === null || fam?.lembretes_memoria === undefined
+      ? "geral" : (fam.lembretes_memoria ? "sim" : "nao"),
+    lembretes_pausados_ate: fam?.lembretes_pausados_ate || "",
   });
   const [salvando, setSalvando] = useState(false);
 
@@ -275,6 +281,9 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
     try {
       const r = await fetch(`/api/familias/${familiaId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
+        // As duas chaves de três estados viajam como a string que a tela usa
+        // ("geral" | "sim" | "nao"). Quem traduz é a rota, num lugar só —
+        // traduzir aqui também criaria duas regras para a mesma pergunta.
         body: JSON.stringify(f),
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
@@ -332,6 +341,24 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
                 <option value="consumo">cada limpeza desconta do que foi pago</option>
                 <option value="competencia">o mês inteiro entra de uma vez</option>
               </Selecao>
+            </Campo>
+
+            {/* LEMBRETES DE MEMÓRIA — a chave desta família.
+                É aqui que se atende o pedido que chega por telefone: "não me
+                mandem mais nada sobre isso". A pausa com prazo existe para o
+                luto que a casa já sabe e o cadastro ainda não. */}
+            <Campo rotulo="Lembretes de memória" dica="datas de nascimento e falecimento">
+              <Selecao value={f.lembretes_memoria}
+                       onChange={(e: any) => setF({ ...f, lembretes_memoria: e.target.value })}>
+                <option value="geral">segue a chave da casa</option>
+                <option value="sim">esta família recebe</option>
+                <option value="nao">esta família pediu para não receber</option>
+              </Selecao>
+            </Campo>
+            <Campo rotulo="Pausar até" dica="silêncio com prazo, sem desligar para sempre">
+              <input type="date" className="zm-input"
+                     value={f.lembretes_pausados_ate || ""}
+                     onChange={(e) => setF({ ...f, lembretes_pausados_ate: e.target.value })} />
             </Campo>
           </div>
           <div className="mt-3 flex gap-2">
@@ -506,6 +533,10 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
     valor_lavagem: t.valor_lavagem ?? "",
     valor_base: t.valor_base ?? "mes",
     inicio_cobranca: t.inicio_cobranca ?? "",
+    // AS DUAS DATAS QUE ERAM UMA (0104). O dinheiro e a rota não começam
+    // juntos, e enquanto foram um campo só, mexer numa mexia na outra.
+    proxima_cobranca: t.proxima_cobranca ?? "",
+    inicio_agendamento: t.inicio_agendamento ?? "",
   });
   const [salvando, setSalvando] = useState(false);
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
@@ -659,6 +690,21 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               <Entrada type="month" value={String(f.inicio_cobranca || "").slice(0, 7)}
                        onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })} />
             </Campo>
+
+            {/* O ESTADO INICIAL, EM DOIS CAMPOS.
+                A cobrança anda sozinha daqui em diante: a cada competência
+                lançada, o sistema empurra esta data para o período seguinte.
+                Editá-la é dizer "cobre a partir daqui". */}
+            <Campo rotulo="Próxima cobrança"
+                   dica="o sistema empurra sozinho a cada competência lançada">
+              <Entrada type="month" value={String(f.proxima_cobranca || "").slice(0, 7)}
+                       onChange={(e: any) => setF({ ...f, proxima_cobranca: e.target.value })} />
+            </Campo>
+            <Campo rotulo="Início dos agendamentos"
+                   dica="quando a agenda passa a gerar limpezas — não tem relação com a cobrança">
+              <Entrada type="date" value={String(f.inicio_agendamento || "").slice(0, 10)}
+                       onChange={(e: any) => setF({ ...f, inicio_agendamento: e.target.value })} />
+            </Campo>
             <Campo rotulo="Endereço, foto e falecido">
               <a
                 href={`/painel/jazigos?rua=${encodeURIComponent(t.ruas?.nome || "")}`}
@@ -668,6 +714,13 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               </a>
             </Campo>
           </div>
+
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+            A cobrança é do <b>contrato</b>, não das limpezas: entra o valor combinado
+            do período, na periodicidade de pagamento da família. As limpezas são a{" "}
+            <b>entrega</b> e não mexem no saldo — uma adiada não baixa o mês, uma
+            anotada em atraso não vira dívida retroativa.
+          </p>
 
           {/* O QUE ESTA CAIXA FAZ, e não quem lava.
               Dizia "A Nina limpa este túmulo" — o nome de uma pessoa numa

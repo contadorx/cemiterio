@@ -227,6 +227,34 @@ export async function cobrancaGentil(): Promise<number> {
 
 // ----------------------------------------------------------------------------
 // E1 — Gatilhos de data: Finados e aniversários (7 dias antes), 1x por ano.
+//
+// ⚠ APOSENTADO NA 0103. Não é mais chamado pelo cron. Ver `rotinaDeMemoria`
+//   em `lib/memoria.ts`.
+//
+// HAVIA DOIS MOTORES DE DATA, e este era o que rodava.
+//
+//   este (2024)                       o da 0096
+//   ─────────────────────────────     ─────────────────────────────────────
+//   lê tumulos.datas_gatilho          lê falecidos (0095)
+//   MM-DD, sem ano                    date de verdade, com ano e precisão
+//   uma lista por TÚMULO              uma linha por PESSOA
+//   sempre 7 dias antes               10 · 20 (marco) · 3 (nascimento) · 15
+//   textos dentro do TypeScript       biblioteca no banco, editável
+//   NENHUMA supressão                 as quatro obrigatórias
+//
+// A última linha é a que decide. A especificação diz, sobre os limites de
+// luto e frequência: "são obrigatórios, não configuráveis para cima". Este
+// motor não os tem — ele mandaria a mensagem de aniversário para quem
+// enterrou alguém há três semanas, e mandaria quantas fossem.
+//
+// Ele nunca fez isso porque `datas_gatilho` está vazio nos 270 túmulos
+// (medido em 23/08). Não é um recurso funcionando: é uma arma carregada
+// esperando alguém preencher o campo. A hora de descarregá-la é agora, antes
+// da primeira data ser digitada.
+//
+// A função fica no arquivo, sem chamador, porque `gatilhos_disparados` ainda
+// guarda o histórico dela e apagá-la junto perderia o registro do que já
+// saiu. Não a ligue de volta: ligue o motor da 0096.
 // ----------------------------------------------------------------------------
 export async function gatilhosDeData(): Promise<number> {
   const db = supabaseAdmin();

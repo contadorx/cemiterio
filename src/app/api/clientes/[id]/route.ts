@@ -71,12 +71,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const [{ data: tumulos }, { data: mov }, { data: msgs },
          { data: familia }, { data: pessoas }, { data: checklist }] = await Promise.all([
-    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
+    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,proxima_cobranca,inicio_agendamento,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
     db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem,competencia,canal,conferido_em,servico_id")
       .eq("familia_id", chaveFam)
       .order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
-    db.from("familias").select("id,nome,responsavel_id,regime,contratado,conferida_em,enviar_fotos,silenciar")
+    db.from("familias").select("id,nome,responsavel_id,regime,contratado,conferida_em,enviar_fotos,silenciar,"
+                             + "freq_pagamento,modo_cobranca,lembretes_memoria,lembretes_pausados_ate")
       .eq("id", chaveFam).maybeSingle(),
     // TODAS AS PESSOAS DA FAMÍLIA, e não só a que abriu a ficha. Era isso que
     // fazia a tela "confundir a família com o contato": ela mostrava uma
