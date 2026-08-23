@@ -4,33 +4,7 @@ import { orgAtual } from "@/lib/org";
 import { normalizarTelefone } from "@/lib/evolution";
 import { diaOperacao } from "@/lib/vencimento";
 import { resolverCemiterio, explicarErroJazigo } from "@/lib/jazigo";
-
-/**
- * Dinheiro de planilha em pt-BR. Devolve NaN quando NAO entende — nunca 0 e
- * nunca um valor de conveniencia. O codigo antigo fazia `Number(col) || 40`:
- * celula vazia, "R$ 60" e "60,00" viravam todos R$ 40 no banco, calados, e
- * viravam honorario real na primeira cobranca.
- */
-function numeroPlanilha(bruto: string): number {
-  let t = String(bruto ?? "").replace(/R\$/gi, "").replace(/\s/g, "").trim();
-  if (!t) return NaN;
-  const temPonto = t.includes("."), temVirgula = t.includes(",");
-  if (temPonto && temVirgula) {
-    // quem manda e o separador MAIS A DIREITA: "1.500,00" e pt-BR, "1,500.00" e
-    // planilha exportada em ingles. Assumir pt-BR sempre lia R$ 1.500 como 1,50.
-    if (t.lastIndexOf(",") > t.lastIndexOf(".")) t = t.replace(/\./g, "").replace(",", ".");
-    else t = t.replace(/,/g, "");
-  }
-  else if (temVirgula) t = t.replace(",", ".");
-  else if (temPonto) {
-    // "60.00" e centavo de export; "1.500" e ambiguo (mil e quinhentos ou 1,5?)
-    const dep = t.slice(t.lastIndexOf(".") + 1);
-    if (dep.length !== 2) return NaN;
-  }
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return NaN;
-  const n = Number(t);
-  return isFinite(n) ? n : NaN;
-}
+import { numeroPlanilha } from "@/lib/planilha";
 
 /**
  * `%` e `_` sao curingas do ilike: sem escapar, "L_128" casa com "L-128".
@@ -60,6 +34,18 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const csv = (body?.csv || "").trim();
+
+  // A PRÉVIA — nada é escrito.
+  //
+  // Esta rota escrevia direto: você cola o CSV e ele grava. Para 250 cadastros
+  // recolhidos à mão no cemitério, um cabeçalho trocado cria 250 registros
+  // errados em produção — e desfazer isso é pior que refazer a coleta.
+  //
+  // Com `previa: true` ela percorre exatamente as mesmas linhas, faz as mesmas
+  // consultas de reconhecimento, e devolve o que FARIA. Uma linha por linha do
+  // arquivo, dizendo qual das quatro coisas acontece: cria, liga a um jazigo
+  // que já existe, não faz nada porque já está tudo lá, ou recusa e diz por quê.
+  const previa = body?.previa === true;
   if (!csv) return NextResponse.json({ ok: false, erro: "csv_vazio" }, { status: 400 });
 
   const linhas = csv.split(/\r?\n/).filter((l: string) => l.trim());
@@ -102,6 +88,11 @@ export async function POST(req: NextRequest) {
   const clienteCache = new Map<string, string>();
   const res = { clientes: 0, tumulos: 0, planos: 0 };
   const erros: { linha: number; motivo: string }[] = [];
+  /** Uma linha por linha do CSV, só no modo prévia. */
+  const plano: {
+    linha: number; quadra: string; jazigo: string; familia: string;
+    acao: string; detalhe: string;
+  }[] = [];
   const cadenciasOk = ["mensal", "bimestral", "trimestral", "semestral", "anual", "avulso"];
 
   for (let i = 1; i < linhas.length; i++) {
@@ -131,7 +122,11 @@ export async function POST(req: NextRequest) {
           .eq("codigo", quadra)
           .maybeSingle();
         if (q) quadraId = (q as any).id;
-        else {
+        else if (previa) {
+          // Quadra que não existe: nada abaixo dela pode existir também. O
+          // sentinela evita consultar o banco por um id que não há.
+          quadraId = "NOVA";
+        } else {
           const { data: nq, error } = await db
             .from("quadras")
             .insert({ org_id: org, cemiterio_id: cemId, codigo: quadra })
@@ -153,13 +148,17 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
         if (c) clienteId = (c as any).id;
         else {
-          const { data: nc, error } = await db
-            .from("clientes")
-            .insert({ org_id: org, nome, telefone: tel, modo: "copiloto", ativo_ia: true })
-            .select("id")
-            .single();
-          if (error) throw new Error(`cliente: ${error.message}`);
-          clienteId = (nc as any).id;
+          if (!previa) {
+            const { data: nc, error } = await db
+              .from("clientes")
+              .insert({ org_id: org, nome, telefone: tel, modo: "copiloto", ativo_ia: true })
+              .select("id")
+              .single();
+            if (error) throw new Error(`cliente: ${error.message}`);
+            clienteId = (nc as any).id;
+          } else {
+            clienteId = "NOVO";
+          }
           res.clientes++;
         }
         clienteCache.set(tel, clienteId!);
@@ -168,14 +167,19 @@ export async function POST(req: NextRequest) {
       // Tumulo: mesma identificacao na mesma quadra = o MESMO jazigo do mundo
       // real. maybeSingle() aqui estourava quando ja havia duplicata no banco,
       // o erro era descartado e a importacao INSERIA uma terceira copia.
-      const { data: cands, error: eBusca } = await db
-        .from("tumulos")
-        .select("id,cliente_id,identificacao")
-        .eq("quadra_id", quadraId)
-        .ilike("identificacao", paraIlike(ident))
-        .order("identificacao")
-        .limit(50);
-      if (eBusca) throw new Error(`tumulo: ${eBusca.message}`);
+      // Quadra nova (só na prévia) => o jazigo é necessariamente novo, e não
+      // há id real para consultar.
+      const cands = quadraId === "NOVA" ? [] : await (async () => {
+        const { data, error } = await db
+          .from("tumulos")
+          .select("id,cliente_id,identificacao")
+          .eq("quadra_id", quadraId)
+          .ilike("identificacao", paraIlike(ident))
+          .order("identificacao")
+          .limit(50);
+        if (error) throw new Error(`tumulo: ${error.message}`);
+        return data || [];
+      })();
       const alvoIdent = ident.trim().toLowerCase();
       const iguais = (cands || []).filter(
         (t: any) => String(t.identificacao || "").trim().toLowerCase() === alvoIdent
@@ -185,6 +189,8 @@ export async function POST(req: NextRequest) {
       }
       const tExiste = iguais[0] as any | undefined;
       let tumuloId = tExiste?.id as string | undefined;
+      let acao = "", detalhe = "";
+
       if (tumuloId) {
         const dono = tExiste.cliente_id as string | null;
         if (dono && dono !== clienteId) {
@@ -192,24 +198,39 @@ export async function POST(req: NextRequest) {
           throw new Error(`o jazigo "${ident}" da quadra ${quadra} ja e de outra familia`);
         }
         if (!dono) {
-          const { error } = await db.from("tumulos").update({ cliente_id: clienteId }).eq("id", tumuloId);
-          if (error) throw new Error(`tumulo: ${error.message}`);
+          acao = "ligar";
+          detalhe = "o jazigo já existe sem dono — passa a ser desta família";
+          if (!previa) {
+            const { error } = await db.from("tumulos").update({ cliente_id: clienteId }).eq("id", tumuloId);
+            if (error) throw new Error(`tumulo: ${error.message}`);
+          }
+        } else {
+          acao = "nada a fazer";
+          detalhe = "o jazigo já é desta família";
         }
       }
       if (!tumuloId) {
-        const { data: nt, error } = await db
-          .from("tumulos")
-          .insert({
-            org_id: org,
-            quadra_id: quadraId,
-            cliente_id: clienteId,
-            identificacao: ident,
-            falecido_nome: falecido,
-          })
-          .select("id")
-          .single();
-        if (error) throw new Error(`tumulo: ${error.message}`);
-        tumuloId = (nt as any).id;
+        acao = "criar";
+        detalhe = clienteId === "NOVO"
+          ? "jazigo e família novos"
+          : "jazigo novo para família que já existe";
+        if (!previa) {
+          const { data: nt, error } = await db
+            .from("tumulos")
+            .insert({
+              org_id: org,
+              quadra_id: quadraId,
+              cliente_id: clienteId,
+              identificacao: ident,
+              falecido_nome: falecido,
+            })
+            .select("id")
+            .single();
+          if (error) throw new Error(`tumulo: ${error.message}`);
+          tumuloId = (nt as any).id;
+        } else {
+          tumuloId = "NOVO";
+        }
         res.tumulos++;
       }
 
@@ -223,13 +244,16 @@ export async function POST(req: NextRequest) {
         if (!isFinite(val) || val <= 0) {
           throw new Error(`valor "${cols[iVal] ?? ""}" nao entendido — jazigo importado, plano NAO criado (use 60 ou 60,00)`);
         }
-        const { data: pExiste } = await db
-          .from("planos")
-          .select("id")
-          .eq("tumulo_id", tumuloId)
-          .eq("ativo", true)
-          .maybeSingle();
+        const pExiste = tumuloId === "NOVO" ? null : await (async () => {
+          const { data } = await db
+            .from("planos").select("id")
+            .eq("tumulo_id", tumuloId).eq("ativo", true).maybeSingle();
+          return data;
+        })();
         if (!pExiste) {
+          detalhe += ` · plano ${cad} de R$ ${val.toFixed(2).replace(".", ",")}`;
+          if (previa) { res.planos++; }
+          else {
           const { error } = await db.from("planos").insert({
             org_id: org,
             cliente_id: clienteId,
@@ -244,11 +268,39 @@ export async function POST(req: NextRequest) {
           });
           if (error) throw new Error(`plano: ${error.message}`);
           res.planos++;
+          }
         }
       }
+
+      if (previa) plano.push({ linha: i + 1, quadra, jazigo: ident, familia: nome, acao, detalhe });
     } catch (e: any) {
-      erros.push({ linha: i + 1, motivo: String(e?.message || e).slice(0, 200) });
+      const motivo = String(e?.message || e).slice(0, 200);
+      erros.push({ linha: i + 1, motivo });
+      if (previa) {
+        plano.push({ linha: i + 1, quadra, jazigo: ident || "—", familia: nome || "—",
+                     acao: "RECUSA", detalhe: motivo });
+      }
     }
+  }
+
+  if (previa) {
+    // O RESUMO É O QUE SE OLHA; A LISTA É PARA CONFERIR A LINHA SUSPEITA.
+    const conta = (a: string) => plano.filter((p) => p.acao === a).length;
+    return NextResponse.json({
+      ok: true,
+      previa: true,
+      resumo: {
+        linhas: linhas.length - 1,
+        criar: conta("criar"),
+        ligar: conta("ligar"),
+        nadaAFazer: conta("nada a fazer"),
+        recusadas: conta("RECUSA"),
+        familiasNovas: res.clientes,
+        planosNovos: res.planos,
+      },
+      plano,
+      erros,
+    });
   }
 
   return NextResponse.json({ ok: true, criados: res, erros });

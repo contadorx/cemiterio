@@ -1,5 +1,8 @@
 # Build 7 — o piloto, em produção
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** roteiro pronto. O piloto roda **no banco de produção**, com famílias
 reais, decisão da responsável.
 
@@ -308,3 +311,105 @@ Cada uma roda uma semana antes de a próxima ligar. Robô conversando com pessoa
 idosa quebra exatamente o que faz o cliente ficar — e a decisão D-02 (o botão de
 cadastrar jazigo fica no campo) veio da mesma raiz: o produto é a relação, não a
 automação.
+
+---
+
+## 9. A importação da carteira — achado às vésperas
+
+A responsável foi ao cemitério recolher os cadastros. Fui olhar o caminho por
+onde eles entram, e ele estava quebrado para o modelo de família.
+
+### 9.1 O jazigo importado nascia sem família
+
+`api/tumulos/importar` cria o jazigo assim:
+
+```ts
+insert into tumulos (org_id, quadra_id, cliente_id, identificacao, ...)
+```
+
+Sem `familia_id`. E **nenhum gatilho preenchia** — conferido em produção: os
+únicos gatilhos de `tumulos` eram o do cemitério e o de `updated_at`.
+
+O cliente ganha família sozinho desde a 0049. O jazigo não. E desde o Build 4 o
+sistema inteiro é no grão da família.
+
+**Reproduzido em banco limpo**, importando um jazigo pelo caminho exato da rota
+e mandando concluir a lavagem:
+
+```
+a conclusao FALHOU: null value in column "familia_id" of relation
+                    "conta_corrente" violates not-null constraint
+razao da familia:   0 linha(s), R$ 0
+servico executado:  0
+```
+
+**A lavagem não acontece.** Não é "a cobrança falha e o resto segue": a transação
+inteira desfaz. A Nina toca em concluir, recebe um erro que não diz nada para
+ela, e não fica registro de nada — nem a foto.
+
+Hoje não mordia porque os 57 jazigos com dono vieram pela tela, que preenche os
+dois campos. **A importação da carteira inteira entraria toda pelo caminho
+quebrado.**
+
+`0081` põe a herança no banco, não na rota: são três portas que criam jazigo
+(importar, vincular-lote, cadastro do campo) e nada impede a quarta. A regra é
+do dado — *jazigo com dono pertence à família do dono*.
+
+Depois dela, em produção: 0 jazigos com dono e sem família, 0 discordando do
+dono, os 68 intactos.
+
+### 9.2 O import não tinha prévia
+
+Você colava o CSV e ele **escrevia**. Para 250 cadastros recolhidos à mão, um
+cabeçalho trocado cria 250 registros errados em produção — e desfazer isso é
+pior que refazer a coleta.
+
+Agora aceita `previa: true`: percorre as mesmas linhas, faz as mesmas consultas
+de reconhecimento e devolve **o que faria**, sem escrever nada. Uma linha por
+linha do arquivo, com uma de quatro ações:
+
+| Ação | Quando |
+|---|---|
+| `criar` | jazigo novo (e diz se a família também é nova) |
+| `ligar` | o jazigo já existe **sem dono** e passaria a ser desta família |
+| `nada a fazer` | o jazigo já é desta família |
+| `RECUSA` | e o motivo — jazigo de outra família, valor ilegível, duplicata |
+
+Mais o resumo: quantas criar, quantas ligar, quantas recusadas, quantas famílias
+novas, quantos planos.
+
+**Confira o resumo antes de rodar de verdade.** Se "criar" vier 250 e você
+esperava 40, o cabeçalho está trocado.
+
+### 9.3 O parser de dinheiro ganhou teste
+
+`numeroPlanilha` decide quanto cada família paga. O código antigo fazia
+`Number(col) || 40` — célula vazia, `R$ 60` e `60,00` viravam **todos R$ 40**,
+calados, e viravam honorário real na primeira cobrança.
+
+Ele já estava correto, mas sem teste. Agora tem 11, incluindo os que **recusam**:
+
+```
+ok  1.500,00 e mil e quinhentos      ok  celula vazia e recusada
+ok  1,500.00 tambem                  ok  1.500 (ambiguo) e recusado
+ok  R$ 60,00 vira 60                 ok  nada vira 40 por conveniencia
+```
+
+Recusar é devolver NaN e deixar a linha dita, nunca um número de conveniência:
+valor chutado vira dinheiro cobrado de uma família.
+
+Saiu da rota para `src/lib/planilha.ts` — rota do Next só pode exportar handler,
+e o `tsc` pegou isso.
+
+### 9.4 O formato do CSV
+
+```
+quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor
+Q1;Q1-R5-007;Maria Aparecida;João Silva;11988887777;mensal;1;60,00
+```
+
+- **obrigatórias:** `identificacao`, `cliente_nome`, `telefone`
+- `quadra` vazia cai em `S/Q` — e jazigo em `S/Q` foi como o mesmo jazigo virou
+  dois registros antes. Preencha;
+- `cadencia` sem `valor` **não cria plano**, e a linha é dita;
+- `;` ou `,` como separador, cabeçalho obrigatório, máximo 500 linhas por vez.

@@ -1,5 +1,8 @@
 # Build 1 — acesso e proteção de dados
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** **1a entregue**. **1b parcialmente entregue** — o acesso anônimo às
 funções está fechado (0057) e o contrato voltou a chegar no jazigo (0058). As
 *policies* por papel seguem bloqueadas aguardando a **Consulta A**.
@@ -202,14 +205,14 @@ nome.
 | Contraprova executável, independente da interface | ✅ `npm run contraprova` |
 | Funções fechadas para anônimo/`PUBLIC` | ✅ `0057` |
 | Contrato escrito em `planos` chega em `tumulos` | ✅ `0058` |
-| Policies por operação | ❌ **depende da Consulta A** |
-| Guarda `is_admin()` dentro das ~35 funções administrativas | ❌ próximo lote |
-| Campo escreve só no serviço atribuído a ele | ❌ 1b |
-| Grants e RPCs `security definer` revisados | ❌ 1b — depende da Consulta A |
-| Revogação de sessão no Auth ao desligar | ❌ 1b |
-| Senha/convite/MFA | ❌ 1b |
-| Segredo fora de query string | ❌ 1b |
-| Matriz anônimo/campo/admin passando | ❌ espera-se falhar hoje; é a linha de base |
+| Policies por operação | ✅ `0067` — 48 restritivas em produção (conferido 22/08) |
+| Guarda `is_admin()` dentro das ~35 funções administrativas | ✅ `0060` — 30 funções (conferido 22/08) |
+| Campo escreve só no serviço atribuído a ele | ✅ `0067` + `0068` |
+| Grants e RPCs `security definer` revisados | ✅ zero funções `sureya_` executáveis pelo anônimo (conferido 22/08) |
+| Revogação de sessão no Auth ao desligar | ⚠️ a sessão do Auth sobrevive, mas `0055` e `autenticar()` a deixam sem acesso a nada |
+| Senha/convite/MFA | ❌ **continua aberto** — ver `PENDENCIAS.md` §2.3g |
+| Segredo fora de query string | ❌ **continua aberto** — ver `PENDENCIAS.md` §2.2c |
+| Matriz anônimo/campo/admin passando | ✅ **9 de 9 em produção** — e achou o buraco do DELETE, ver `BUILD_7.md` §2.1 |
 
 **Parecer: Build 1 não fecha.** A fundação está de pé e uma falha real de acesso
 foi fechada. A fronteira por papel — o P0 de fato — depende de três JSON.

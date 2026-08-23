@@ -287,9 +287,6 @@ begin
     return new;
   end if;
 
-<<<<<<< Updated upstream
-  -- (b) Chegou só o dono (importação): a família se deduz dele.
-=======
   -- (b) TIRARAM A FAMÍLIA DE PROPÓSITO.
   --
   -- Sem este caso, limpar `familia_id` numa tela seria desfeito no mesmo
@@ -309,7 +306,6 @@ begin
   end if;
 
   -- (c) Chegou só o dono (importação): a família se deduz dele.
->>>>>>> Stashed changes
   if new.cliente_id is not null then
     select c.familia_id into v_fam from clientes c where c.id = new.cliente_id;
     new.familia_id := v_fam;

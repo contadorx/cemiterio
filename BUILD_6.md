@@ -1,5 +1,8 @@
 # Build 6 — a fila lembra o que aconteceu
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** outbox e alertas entregues e provados em banco limpo. `0076` e
 `0077` aplicadas em produção. Entregas 1, 2, 5 e 6 feitas; a 3 foi encerrada por
 decisão (`DECISOES.md` D-03). Entrega 4 e 7 escritas (`POLITICA_DADOS.md`, `RUNBOOKS.md`); falta ensaiar a

@@ -76,10 +76,36 @@ async function eventoJaVisto(msgId: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  const segredo =
-    req.headers.get("x-webhook-secret") || req.nextUrl.searchParams.get("secret");
+  // O SEGREDO DEVE VIR NO HEADER.
+  //
+  // A URL do webhook fica gravada na configuração da instância e viaja em todo
+  // request: um segredo ali aparece no log de acesso do servidor, no log do
+  // proxy, e para quem abrir a configuração da Evolution.
+  //
+  // Desde a mudança de 22/08 o registro manda `x-webhook-secret` (Evolution v2).
+  // O `?secret=` continua sendo aceito por um motivo só: instância **v1** não
+  // tem campo de header, e recusar ali seria trocar "segredo no log" por
+  // "webhook sem autenticação nenhuma" — qualquer um postando mensagem em nome
+  // da família.
+  //
+  // Quando ele é usado, o sistema AVISA. Sem isso, o caminho legado sobrevive
+  // para sempre porque ninguém tem como saber que ainda está em uso.
+  const noHeader = req.headers.get("x-webhook-secret");
+  const naUrl = req.nextUrl.searchParams.get("secret");
+  const segredo = noHeader || naUrl;
+
   if (segredo !== env.webhookSecret()) {
     return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
+  if (!noHeader && naUrl) {
+    // Não espera: o aviso não pode atrasar o recebimento da mensagem.
+    void registrarErro("webhook/segredo-na-url", "o webhook chegou com o segredo na URL", {
+      comoResolver:
+        "Abra Configurações → WhatsApp e clique em configurar o webhook. Se a "
+        + "instância for v2, o segredo passa para o header e este aviso some. "
+        + "Se continuar aparecendo, a instância é v1 e precisa ser atualizada.",
+    });
   }
 
   let body: any;

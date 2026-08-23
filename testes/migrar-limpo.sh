@@ -127,41 +127,22 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #             autor. Antes, "fechado" era so a lembranca de quem apertou o botao.
 #   0085  +1  modelos_mensagem — os textos da casa viram um CONJUNTO. A frase
 #             de reserva escrita dentro da funcao chegou na tela em producao.
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-TABELAS_DELTA=${TABELAS_DELTA:-2}
-=======
 #   0091  +1  familia_responsavel_log — "muda ano apos ano" e um fato com data
 TABELAS_DELTA=${TABELAS_DELTA:-3}
->>>>>>> Stashed changes
-=======
-#   0091  +1  familia_responsavel_log — "muda ano apos ano" e um fato com data
-TABELAS_DELTA=${TABELAS_DELTA:-3}
->>>>>>> Stashed changes
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
 # DELTA DELIBERADO DE GATILHOS
 #   0058  +1  trg_espelha_plano_no_jazigo   (ja contado no 14 de producao)
 #   0071  +2  trg_espelha_movimento_na_conta, trg_espelha_status_movimento
+#   0081  +1  trg_jazigo_herda_familia — jazigo com dono pertence a familia do
+#             dono, e sem isso a lavagem no jazigo importado falha inteira
 #   0074  -2  os dois da 0071 sao APOSENTADOS: com `movimentos` congelado nao ha
 #             mais o que espelhar, e gatilho que nunca dispara engana quem le o
 #             esquema depois.
 # Soma zero. Enquanto a 0074 nao subir, producao tera 2 gatilhos a MAIS que o
 # repositorio — e este numero volta a fechar quando ela subir.
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-GATILHOS_DELTA=${GATILHOS_DELTA:-0}
-=======
-GATILHOS_DELTA=${GATILHOS_DELTA:-3}
->>>>>>> Stashed changes
-=======
 GATILHOS_DELTA=${GATILHOS_DELTA:-4}
->>>>>>> Stashed changes
-=======
-GATILHOS_DELTA=${GATILHOS_DELTA:-4}
->>>>>>> Stashed changes
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -193,36 +174,16 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0085  +1   trg_fila_politica_de_foto — a chave de envio e o texto de
 #              reserva aplicados na PORTA da fila, valendo para todo caminho
 #   0089  +1   trg_textos_iniciais — organizacao nova nascia sem texto nenhum
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
 #   0091  +1   trg_primeiro_contato_assume — familia criada sozinha ganha dono
->>>>>>> Stashed changes
-=======
-#   0091  +1   trg_primeiro_contato_assume — familia criada sozinha ganha dono
->>>>>>> Stashed changes
 #   0075  +2   competencias_org e competencias_so_admin_escreve
 #   0079  +5   as restritivas de DELETE que faltavam (clientes, tumulos,
 #              membros, orgs, movimentos) — a 0067 tinha posto a guarda so no
 #              WITH CHECK, que o DELETE nao consulta
 #   0085  +4   modelos_mensagem: a de org mais uma restritiva POR COMANDO
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-#              (insert, update, delete) — de novo a licao da 0079
-# Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-53}
-=======
 #   0091  +4   familia_responsavel_log, mesmo desenho
 #              (insert, update, delete) — de novo a licao da 0079
 # Ajuste no mesmo commit em que criar ou remover policy.
 POLICIES_DELTA=${POLICIES_DELTA:-57}
->>>>>>> Stashed changes
-=======
-#   0091  +4   familia_responsavel_log, mesmo desenho
-#              (insert, update, delete) — de novo a licao da 0079
-# Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-57}
->>>>>>> Stashed changes
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -236,27 +197,6 @@ POLICIES_DELTA=${POLICIES_DELTA:-57}
 #             sureya_fila_destravar
 #   0078  +2  sureya_arquivos_do_cliente, sureya_expurgo_previa
 #   0080  +1  sureya_conferencia_cadastro
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-# Saldo: +14. As demais migrations desta
-# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
-# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-14}
-=======
-#   0081  +1  sureya_jazigo_herda_familia
-#   0082  +2  sureya_reordenar_dia, sureya_priorizar_servico
-#   0085  +4  sureya_texto_modelo, sureya_envia_fotos, sureya_primeiro_nome,
-#             sureya_fila_politica_de_foto (o gatilho da porta da fila)
-#   0086  +1  sureya_textos_do_tipo — a lista que a tela oferece
-#   0088  +1  sureya_datar_lavagem — a limpeza anotada depois cai no mes certo
-#   0089  +2  sureya_semear_textos e a casca sureya_textos_iniciais
-# Saldo: +25. As demais migrations desta
-# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
-# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-25}
->>>>>>> Stashed changes
-=======
 #   0081  +1  sureya_jazigo_herda_familia
 #   0082  +2  sureya_reordenar_dia, sureya_priorizar_servico
 #   0085  +4  sureya_texto_modelo, sureya_envia_fotos, sureya_primeiro_nome,
@@ -270,22 +210,6 @@ FUNCOES_DELTA=${FUNCOES_DELTA:-25}
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
 FUNCOES_DELTA=${FUNCOES_DELTA:-28}
->>>>>>> Stashed changes
-=======
-#   0081  +1  sureya_jazigo_herda_familia
-#   0082  +2  sureya_reordenar_dia, sureya_priorizar_servico
-#   0085  +4  sureya_texto_modelo, sureya_envia_fotos, sureya_primeiro_nome,
-#             sureya_fila_politica_de_foto (o gatilho da porta da fila)
-#   0086  +1  sureya_textos_do_tipo — a lista que a tela oferece
-#   0088  +1  sureya_datar_lavagem — a limpeza anotada depois cai no mes certo
-#   0089  +2  sureya_semear_textos e a casca sureya_textos_iniciais
-#   0091  +3  sureya_definir_responsavel (+ o miolo _interno) e
-#             sureya_primeiro_contato_assume
-# Saldo: +28. As demais migrations desta
-# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
-# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-28}
->>>>>>> Stashed changes
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -396,11 +320,6 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
 # A FAMILIA EXISTE SEM CONTATO
 #
 # O efeito que nao aparece em tela: a lavagem de uma familia sem contato tem de
@@ -419,10 +338,6 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 # O CONTATO DO SITE TEM PARA ONDE IR
 #
 # O formulario publico prometia "respondemos no mesmo dia" e avisava apontando

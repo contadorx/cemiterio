@@ -1,5 +1,8 @@
 # Build 5 — a home diz de quando é o número, e o mês pode recusar
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** entregue e provado em banco limpo. `0075` aplicada em produção.
 
 ---

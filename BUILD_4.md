@@ -1,5 +1,8 @@
 # Build 4 — verdade financeira
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** concluído em 22/08/2026. Um razão só — `conta_corrente`, por
 família. `movimentos` congelado como histórico.
 

@@ -1,5 +1,8 @@
 # Build 2 — lavagem confiável ponta a ponta
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Estado:** núcleo e lote 2 entregues e testados em banco limpo. Falta a
 conferência no ambiente real.
 
@@ -186,7 +189,7 @@ literal*. Sete concatenações ganharam `::text`.
 | Falha injetada é reparada | ✅ convergência testada |
 | Reconciliação diária | ✅ view criada |
 | Upload fora da transação | ✅ |
-| Rodar tudo no ambiente real | ❌ **falta** |
+| Rodar tudo no ambiente real | ✅ `0066` e `0068` em produção; a matriz de autorização rodou lá (`BUILD_7.md` §2.1) |
 | `concluir-admin` usando a mesma função | ✅ lote 2 |
 | `iniciar` validando atribuição | ✅ `0068`, testado |
 | Correlação por `servico_id` e etapa | ❌ Build 6 |

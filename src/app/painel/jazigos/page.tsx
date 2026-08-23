@@ -338,9 +338,14 @@ function Cartao({
 
         <div style={{ flex: 1, minWidth: 280 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-            <b style={{ color: cor.navy, fontSize: 17 }}>
-              {j.quadra || "?"} · {j.identificacao}
-            </b>
+            {/* A LISTA PASSA A TER PARA ONDE IR.
+                Antes ela era o fim da linha: dava para editar ali mesmo e nada
+                mais. A ficha (`/painel/jazigos/[id]`) é onde estão a idade de
+                lavagem, o lugar no roteiro, o histórico e as pendências. */}
+            <Link href={`/painel/jazigos/${j.id}`}
+                  style={{ color: cor.navy, fontSize: 17, fontWeight: 700, textDecoration: "none" }}>
+              {j.quadra || "?"} · {j.identificacao} →
+            </Link>
             <span style={{ color: cor.cinza, fontSize: 14 }}>
               {j.cemiterio || ""} · cadastrado {quando(j.criadoEm)}
             </span>

@@ -48,6 +48,16 @@ begin
   raise notice '  ok  %', nome;
 end $$;
 
+/** Mesma coisa da ci2, para quando a resposta e texto (uma sequencia). */
+create or replace function ci2t(nome text, real_ text, esperado text) returns void
+language plpgsql as $$
+begin
+  if real_ is distinct from esperado then
+    raise exception 'ESCRITAS FALHOU — %: veio %, esperado %', nome, real_, esperado;
+  end if;
+  raise notice '  ok  %', nome;
+end $$;
+
 create or replace function ci2_saldo() returns numeric language sql as $$
   select coalesce(sum(case when tipo::text='credito' then valor else -valor end),0)
     from conta_corrente
@@ -251,11 +261,106 @@ select ci2('mas fica registrada no extrato da familia',
              where servico_id='a5000000-0000-0000-0000-000000000002'), 1);
 update familias set modo_cobranca = 'consumo' where id='bbbbbbbb-0000-0000-0000-000000000001';
 
+-- ---------------------------------------------------------------- heranca
+-- O JAZIGO IMPORTADO TEM DE NASCER COM FAMILIA.
+--
+-- `api/tumulos/importar` cria o jazigo so com `cliente_id`. Sem a heranca da
+-- 0081, `conta_corrente.familia_id` vem nulo e a conclusao da lavagem falha
+-- INTEIRA — nem a foto fica. Era o caminho de toda a importacao da carteira.
+select ci2_zera();
+insert into tumulos (id, org_id, quadra_id, cliente_id, identificacao, valor_lavagem)
+  values ('a6000000-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001',
+          'a3000000-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000001',
+          'IMPORTADO-01', 55)
+  on conflict (id) do nothing;
+select ci2('jazigo criado so com dono ja nasce com familia',
+           (select count(*) from tumulos
+             where id='a6000000-0000-0000-0000-000000000001' and familia_id is not null), 1);
+select ci2('e a familia e a do dono',
+           (select count(*) from tumulos t join clientes c on c.id=t.cliente_id
+             where t.id='a6000000-0000-0000-0000-000000000001'
+               and t.familia_id = c.familia_id), 1);
+
+-- E a lavagem nele funciona ponta a ponta.
+update familias set modo_cobranca='consumo' where id='bbbbbbbb-0000-0000-0000-000000000002';
+insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista)
+  values ('a7000000-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001',
+          'cccccccc-0000-0000-0000-000000000001','a6000000-0000-0000-0000-000000000001',
+          'agendado', current_date)
+  on conflict (id) do nothing;
+select sureya_concluir_lavagem('a7000000-0000-0000-0000-000000000001','foto.jpg');
+select ci2('a lavagem no jazigo importado COBRA a familia', ci2_saldo(), -55);
+select ci2('e o servico fica marcado como executado',
+           (select count(*) from servicos
+             where id='a7000000-0000-0000-0000-000000000001' and status::text='executado'), 1);
+
+-- Trocar o dono leva a familia junto: `cliente_id` e `familia_id` discordando
+-- significa que o dinheiro do jazigo vai para uma familia e quem responde e de
+-- outra.
+update tumulos set cliente_id='cccccccc-0000-0000-0000-000000000002'
+ where id='a6000000-0000-0000-0000-000000000001';
+select ci2('trocar o dono nao deixa a familia para tras',
+           (select count(*) from tumulos t join clientes c on c.id=t.cliente_id
+             where t.id='a6000000-0000-0000-0000-000000000001'
+               and t.familia_id = c.familia_id), 1);
+
+-- ---------------------------------------------------------------- ordem do dia
+-- Reordenar a mao e priorizar um jazigo. O que precisa ser verdade nao e "a
+-- funcao roda": e que reordenar TRES nao embaralhe os outros, e que priorizar
+-- desca o resto em vez de empatar.
+select ci2_zera();
+delete from servicos where org_id='aaaaaaaa-0000-0000-0000-000000000001';
+insert into servicos (id, org_id, cliente_id, tumulo_id, status, data_prevista, ordem_dia)
+select ('a8000000-0000-0000-0000-00000000000' || i)::uuid,
+       'aaaaaaaa-0000-0000-0000-000000000001','cccccccc-0000-0000-0000-000000000001',
+       'a4000000-0000-0000-0000-000000000001','agendado', '2026-09-10', i
+  from generate_series(1,5) i;
+
+-- inverte so os tres primeiros
+select sureya_reordenar_dia('2026-09-10', array[
+  'a8000000-0000-0000-0000-000000000003',
+  'a8000000-0000-0000-0000-000000000002',
+  'a8000000-0000-0000-0000-000000000001']::uuid[]);
+
+select ci2t('reordenar poe os listados em 1,2,3',
+  (select string_agg(right(id::text,1), '' order by ordem_dia)
+     from servicos where data_prevista='2026-09-10' and ordem_dia <= 3), '321');
+select ci2t('e os NAO listados mantem a ordem relativa, depois',
+  (select string_agg(right(id::text,1), '' order by ordem_dia)
+     from servicos where data_prevista='2026-09-10' and ordem_dia > 3), '45');
+select ci2('ninguem fica sem posicao',
+  (select count(*) from servicos where data_prevista='2026-09-10' and ordem_dia is null), 0);
+select ci2('e nao ha posicao repetida',
+  (select count(distinct ordem_dia) from servicos where data_prevista='2026-09-10'), 5);
+
+-- priorizar o ultimo
+select sureya_priorizar_servico('a8000000-0000-0000-0000-000000000005');
+select ci2('priorizado vira o primeiro',
+  (select ordem_dia from servicos where id='a8000000-0000-0000-0000-000000000005'), 1);
+select ci2('e o resto desceu, sem empate',
+  (select count(distinct ordem_dia) from servicos where data_prevista='2026-09-10'), 5);
+select ci2('o que era primeiro agora e segundo',
+  (select ordem_dia from servicos where id='a8000000-0000-0000-0000-000000000003'), 2);
+
+-- id de outro dia derruba a chamada inteira: renumerar dia errado so apareceria
+-- na manha seguinte
+do $$
+begin
+  begin
+    perform sureya_reordenar_dia('2026-09-11', array['a8000000-0000-0000-0000-000000000001']::uuid[]);
+    raise exception 'ESCRITAS FALHOU — reordenou com id de outro dia';
+  exception when others then
+    if sqlerrm not like '%ids_de_outro_dia%' then raise; end if;
+  end;
+  raise notice '  ok  id de outro dia e recusado';
+end $$;
+
 -- ---------------------------------------------------------------- limpeza
 select ci2_zera();
 delete from pedidos_extras where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from entradas_banco where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from servicos where org_id='aaaaaaaa-0000-0000-0000-000000000001';
+delete from fila_liberacao where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from tumulos where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from quadras where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from cemiterios where org_id='aaaaaaaa-0000-0000-0000-000000000001';
@@ -265,5 +370,6 @@ delete from membros where org_id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from orgs where id='aaaaaaaa-0000-0000-0000-000000000001';
 delete from auth.users where id='f0f0f0f0-0000-0000-0000-000000000001';
 drop function ci2(text, numeric, numeric);
+drop function ci2t(text, text, text);
 drop function ci2_saldo();
 drop function ci2_zera();

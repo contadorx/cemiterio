@@ -1,5 +1,8 @@
 # Build 0 — base verificável
 
+> **A lista de pendências deste arquivo pode estar velha.** O inventário
+> conferido e atualizado é o `PENDENCIAS.md`.
+
 **Data:** 21/08/2026
 **Gate:** nenhuma mudança crítica de segurança, banco ou financeiro começa antes
 deste build fechar.

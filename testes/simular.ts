@@ -346,8 +346,6 @@ async function rodar() {
          st.baldeDaUrl(`${base}/servicos/o/s/1.jpg`) === "servicos" &&
          st.baldeDaUrl("https://exemplo.com/x.jpg") === null);
 
-<<<<<<< Updated upstream
-=======
   // ---- O DINHEIRO DA PLANILHA
   //
   // Este parser vira COBRANCA REAL. O codigo antigo fazia `Number(col) || 40`:
@@ -450,13 +448,6 @@ async function rodar() {
   checar("fala 'hoje', 'ontem', e nunca 'ha 1 dias'",
          dt.faz(0) === "hoje" && dt.faz(1) === "ontem" && dt.faz(8) === "há 8 dias");
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   console.log("\n=== 2. CAPACIDADE ===");
   const cap = await import("../src/lib/capacidade");
   const c = await cap.calcularCapacidade();

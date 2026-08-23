@@ -8,7 +8,7 @@ import InstalarApp from "../InstalarApp";
 import Assistente from "./Assistente";
 import Materiais from "./Materiais";
 import NaoDeu from "./NaoDeu";
-import CapturarJazigo from "./CapturarJazigo";
+import CapturarJazigo, { type JazigoSalvo } from "./CapturarJazigo";
 import ComoChegar from "./ComoChegar";
 
 interface Aviso { tipo: string; texto: string }
@@ -72,6 +72,20 @@ export default function Campo() {
   const [naoDeu, setNaoDeu] = useState<Item | null>(null);
   const [pedirMaterial, setPedirMaterial] = useState(false);
   const [capturarJazigo, setCapturarJazigo] = useState(false);
+  /**
+   * A CONFIRMAÇÃO DO ÚLTIMO JAZIGO, E A CONTA DA SESSÃO.
+   *
+   * Concluir o cadastro fechava a janela e voltava para a lista — o mesmo
+   * resultado de tocar no ✕ para desistir. Cadastrando um atrás do outro, não
+   * havia como saber se o último entrou sem sair do campo e abrir o painel.
+   *
+   * A conta importa tanto quanto o aviso: quem vai cadastrar a quadra inteira
+   * precisa de ritmo, e "7 cadastrados" dá isso melhor que sete avisos iguais
+   * que somem.
+   */
+  const [ultimoJazigo, setUltimoJazigo] = useState<JazigoSalvo | null>(null);
+  const [reordenando, setReordenando] = useState(false);
+  const [quantosJazigos, setQuantosJazigos] = useState(0);
   const [indo, setIndo] = useState<Item | null>(null);
   // Qual cartão puxar para a tela e realçar. Substitui os modais que abriam
   // sozinhos: com a câmera dentro do botão, não há mais tela intermediária
@@ -223,9 +237,48 @@ export default function Campo() {
   const total = lista.length;
 
   // Agrupa por cemitério, quadra e rua — é assim que se anda no cemitério.
+  //
+  // A ORDEM DOS GRUPOS DEPENDE DE `lista` VIR ORDENADA. `Map` guarda a ordem de
+  // inserção, e `lista` chega do servidor por `ordem_dia`: o primeiro item
+  // encontrado cria o primeiro grupo. É isso que faz "Fazer este agora"
+  // funcionar na tela — o serviço vira `ordem_dia = 1`, e com ele a rua dele
+  // sobe para o topo.
+  //
+  // Quem for mexer aqui: ordenar `pendentesLista` por qualquer outra coisa
+  // (nome, distância) quebra o "agora" sem quebrar teste nenhum — o botão passa
+  // a salvar no banco e a não mover nada na tela.
   // O nome do cemitério só entra no título quando o dia tem mais de um (0044):
   // com um só, repetir o nome em toda faixa seria ruído.
   const varios = new Set(pendentesLista.map((x) => x.cemiterio).filter(Boolean)).size > 1;
+  /**
+   * FAZER ESTE AGORA.
+   *
+   * Recarrega em vez de reordenar na tela: a ordem verdadeira é a do banco, e
+   * a função lá desce todo o resto do dia. Reordenar só aqui daria uma tela
+   * certa por cima de um banco diferente — e a diferença só apareceria no
+   * próximo carregamento, no meio do cemitério.
+   */
+  async function fazerAgora(it: Item) {
+    if (reordenando) return;
+    setReordenando(true);
+    try {
+      const r = await fetch("/api/agenda/ordem", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ servicoId: it.id }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) {
+        alert(r?.erro?.includes("ja_executado")
+          ? "Este já foi feito."
+          : r?.erro?.includes("outra_executora")
+            ? "Este serviço é de outra pessoa."
+            : "Não consegui mudar a ordem agora. Tente de novo.");
+        return;
+      }
+      await carregar();
+    } finally { setReordenando(false); }
+  }
+
   const grupos = new Map<string, Item[]>();
   for (const it of pendentesLista) {
     const chave = [varios ? it.cemiterio : null, it.quadra, it.rua]
@@ -304,6 +357,41 @@ export default function Campo() {
         ➕ Cadastrar jazigo (GPS e fotos)
       </button>
 
+      {/* A CONFIRMAÇÃO FICA ATÉ A PESSOA FECHAR.
+          Aviso que some sozinho não serve no cemitério: a pessoa guarda o
+          celular no bolso, anda até o próximo túmulo, e quando olha de novo já
+          passou. Fica com o ✕. */}
+      {ultimoJazigo && (
+        <div style={s.jazigoSalvo}>
+          <button style={s.jazigoSalvoFechar} onClick={() => setUltimoJazigo(null)}>✕</button>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
+            ✓ Jazigo {ultimoJazigo.jaExistia ? "atualizado" : "cadastrado"}
+          </p>
+          <p style={{ margin: "4px 0 0", fontSize: 17 }}>
+            {ultimoJazigo.quadra} · {ultimoJazigo.identificacao}
+          </p>
+
+          {/* O QUE FALTOU, DITO NA HORA.
+              A tela do cadastro convida a concluir sem foto ("dá para completar
+              depois na ficha"). Sem dizer aqui o que ficou faltando, a lacuna
+              só aparece semanas depois, quando a Nina chega no túmulo e não tem
+              foto para reconhecer. */}
+          {(!ultimoJazigo.comGps || !ultimoJazigo.comFoto) && (
+            <p style={{ margin: "8px 0 0", fontSize: 15, lineHeight: 1.4 }}>
+              Ficou sem {[!ultimoJazigo.comGps && "localização", !ultimoJazigo.comFoto && "foto"]
+                .filter(Boolean).join(" nem ")}
+              . Dá para completar depois na ficha do jazigo.
+            </p>
+          )}
+
+          {quantosJazigos > 1 && (
+            <p style={{ margin: "8px 0 0", fontSize: 15, opacity: 0.85 }}>
+              {quantosJazigos} cadastrados nesta ida.
+            </p>
+          )}
+        </div>
+      )}
+
       {[...grupos.entries()].map(([local, itens]) => (
         <section key={local}>
           <div style={s.tituloRua}>{local}</div>
@@ -316,6 +404,8 @@ export default function Campo() {
               onIniciar={(foto) => iniciar(it, foto)}
               onFinalizar={(foto) => terminar(it, foto)}
               onNaoDeu={() => setNaoDeu(it)}
+              onAgora={() => fazerAgora(it)}
+              primeiro={it.ordem === 1}
               destacado={destaque === it.id}
             />
           ))}
@@ -343,7 +433,12 @@ export default function Campo() {
       {capturarJazigo && (
         <CapturarJazigo
           onFechar={() => setCapturarJazigo(false)}
-          onPronto={() => { setCapturarJazigo(false); carregar(); }}
+          onPronto={(salvo) => {
+            setCapturarJazigo(false);
+            setUltimoJazigo(salvo);
+            setQuantosJazigos((n) => n + 1);
+            carregar();
+          }}
         />
       )}
 
@@ -416,12 +511,15 @@ function Fotos({ it }: { it: Item }) {
  * treinamento formal e usa isto de pé, no sol: se o botão precisa de
  * explicação, o botão está errado.
  */
-function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, destacado }: {
+function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, primeiro, destacado }: {
   it: Item; ocupado: boolean;
   onIndo: () => void;
   onIniciar: (foto: FotoPronta) => void;
   onFinalizar: (foto: FotoPronta) => void;
   onNaoDeu: () => void;
+  /** Põe este como o próximo do dia. Só aparece se ele já não for o primeiro. */
+  onAgora: () => void;
+  primeiro: boolean;
   destacado?: boolean;
 }) {
   const emAndamento = !!it.iniciadoEm;
@@ -529,6 +627,17 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, destacado
             {preparando || ocupado ? "Salvando…" : "📷  TIRAR FOTO E COMEÇAR"}
           </button>
         )}
+        {/* FAZER ESTE AGORA.
+            A roteirização automática é por sequência de quadra e rua, e é boa —
+            mas o dia vira. A família liga, tem visita marcada, ou quem está no
+            chão vê que dá para emendar diferente. Um toque põe este como o
+            próximo e desce o resto.
+
+            Não aparece no que já é o primeiro: botão que não faz nada ensina a
+            desconfiar dos que fazem. */}
+        {!primeiro && !it.iniciadoEm && (
+          <button style={s.botaoAgora} onClick={onAgora}>⬆ Fazer este agora</button>
+        )}
         <button style={s.botaoNaoDeu} onClick={onNaoDeu}>Não deu para fazer</button>
       </div>
     </div>
@@ -559,6 +668,16 @@ const s: Record<string, React.CSSProperties> = {
   botaoMaterial: { width: "100%", minHeight: 60, padding: 18, background: "#fff", color: NAVY,
                    border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 17, fontWeight: 600,
                    cursor: "pointer", marginBottom: 12 },
+  jazigoSalvo: {
+    position: "relative", margin: "12px 0", padding: "16px 44px 16px 16px",
+    borderRadius: 14, background: "#ecfdf5", border: "2px solid #059669",
+    color: "#064e3b",
+  },
+  jazigoSalvoFechar: {
+    position: "absolute", top: 8, right: 8, width: 36, height: 36,
+    border: "none", background: "transparent", color: "#064e3b",
+    fontSize: 20, lineHeight: 1, cursor: "pointer",
+  },
   botaoCadastrar: { width: "100%", minHeight: 60, padding: 18, background: "#0f766e", color: "#fff",
                     border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700,
                     cursor: "pointer", marginBottom: 16 },
@@ -593,6 +712,11 @@ const s: Record<string, React.CSSProperties> = {
               padding: "12px 14px", margin: "12px 0 0", fontSize: 16, color: "#8B2020" },
   botaoTerminar: { background: "#1565C0" },
   cartaoDestacado: { outline: "3px solid #1565C0", outlineOffset: 2 },
+  botaoAgora: {
+    width: "100%", minHeight: 52, marginTop: 10, padding: 14,
+    background: "#fff", color: "#12284b", border: "2px solid #12284b",
+    borderRadius: 12, fontSize: 17, fontWeight: 700, cursor: "pointer",
+  },
   botaoNaoDeu: { minHeight: 64, padding: "18px 22px", background: "#fff", color: "#475569",
                  border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 16, cursor: "pointer" },
   feitosBox: { background: "#f0fdf4", color: "#166534", padding: 18, borderRadius: 14,

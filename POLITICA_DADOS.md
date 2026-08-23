@@ -189,7 +189,12 @@ Desde a migração do Build 4 ele leva **os dois razões**, e o da família vai
 identificado como tal — porque é um extrato **compartilhado** entre os membros,
 não um registro individual, e quem lê o arquivo precisa saber disso.
 
-**Não inclui as fotos.** Deve incluir: são dado pessoal e são o produto. Falta.
+**Inclui as fotos** desde 22/08, com a origem de cada uma ("depois da limpeza",
+"comprovante de pagamento").
+
+Usa a **mesma** lista que a remoção (`sureya_arquivos_do_cliente`), de propósito:
+se as duas divergirem, passa a existir arquivo que se exporta e não se apaga, ou
+o contrário — e qualquer um dos dois é pior que não ter nenhum dos dois.
 
 ---
 
@@ -220,7 +225,7 @@ público, e está em aberto.
 | Fotos com link permanente declarado | ✅ (seção 3) |
 | Prazos de retenção | ⚠️ definidos e **medidos** (`sureya_expurgo_previa`); a função que apaga entra quando houver o que apagar |
 | Remoção a pedido | ✅ alcança Storage, `telefones_cliente`, fila e indicações |
-| Direito de acesso | ⚠️ existe, **sem as fotos** |
+| Direito de acesso | ✅ inclui as fotos, com a origem de cada uma |
 | Versão de termo aceito | ❌ não registrada |
 | Procedimento de incidente | ❌ operacional em `RUNBOOKS.md`, legal em aberto |
 

@@ -198,8 +198,6 @@ select ci8b('e o jazigo fica sem dono junto, sem apontar para quem saiu',
   (select cliente_id is null from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
   'o jazigo ficou apontando para quem nao e mais responsavel');
 
-<<<<<<< Updated upstream
-=======
 -- ---------------------------------------------------------------------------
 -- 6 · DESVINCULAR TEM DE FUNCIONAR
 --
@@ -237,5 +235,4 @@ select ci8('jazigo que recebe so o dono ainda deduz a familia',
   (select familia_id::text from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
   'bbbbbbbb-0000-0000-0000-000000000081');
 
->>>>>>> Stashed changes
 do $$ begin raise notice 'FAMILIA SEM CONTATO: todas as conferencias passaram'; end $$;

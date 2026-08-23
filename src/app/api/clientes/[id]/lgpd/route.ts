@@ -98,6 +98,19 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .from("clientes").select("familia_id").eq("id", params.id).maybeSingle();
   const familiaId = (cli as any)?.familia_id as string | null;
 
+  // AS FOTOS SÃO DADO PESSOAL, E SÃO O PRODUTO.
+  //
+  // A exportação levava cadastro, jazigos, serviços, os dois razões e as
+  // mensagens — e não as fotos. Numa operação em que o que a família recebe é
+  // uma foto do túmulo do pai, exportar tudo menos a foto é entregar o direito
+  // de acesso pela metade.
+  //
+  // Vai a mesma lista que a REMOÇÃO usa (`sureya_arquivos_do_cliente`), de
+  // propósito: se as duas divergirem, existe arquivo que se exporta e não se
+  // apaga, ou o contrário — e qualquer um dos dois é pior que não ter nenhum.
+  const { data: arquivos } = await db
+    .rpc("sureya_arquivos_do_cliente", { p_cliente: params.id });
+
   const [{ data: cliente }, { data: tumulos }, { data: servicos }, { data: movimentos }, { data: contaCorrente }, { data: mensagens }] =
     await Promise.all([
       db.from("clientes").select("nome,telefone,consentimento_em,codigo_indicacao,created_at").eq("id", params.id).maybeSingle(),
@@ -119,6 +132,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       contaCorrenteDaFamilia: contaCorrente || [],
       movimentosLegado: movimentos,
       mensagens,
+      // Cada arquivo com a origem ("depois da limpeza", "comprovante de
+      // pagamento"). São links públicos e permanentes — ver DECISOES.md D-03 e
+      // POLITICA_DADOS.md §3.
+      arquivos: (arquivos || []) as any[],
       geradoEm: new Date().toISOString(),
     },
   });

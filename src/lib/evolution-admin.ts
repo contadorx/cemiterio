@@ -94,25 +94,54 @@ export async function desconectar(): Promise<{ ok: boolean; detalhe?: string }> 
   return { ok: false, detalhe: r.texto.slice(0, 300) };
 }
 
-// Aponta o webhook da instância para o nosso endpoint (tenta formato v2, depois v1).
-export async function configurarWebhook(urlWebhook: string): Promise<{ ok: boolean; detalhe?: string }> {
+/**
+ * Aponta o webhook da instância para o nosso endpoint.
+ *
+ * O SEGREDO VAI NO HEADER, NÃO NA URL
+ * ---------------------------------------------------------------------------
+ * A versão anterior registrava `.../api/webhook/evolution?secret=<segredo>`. A
+ * URL de webhook fica **gravada na configuração da instância** e viaja em todo
+ * request — ou seja, o segredo ficava no log de acesso do nosso servidor, no log
+ * do proxy, e legível para quem abrisse a configuração da Evolution.
+ *
+ * A Evolution v2 aceita `webhook.headers`. Quando ela aceita, a URL vai limpa e
+ * o segredo vai em `x-webhook-secret`.
+ *
+ * A v1 **não tem** campo de header. Numa instância v1 não há para onde mover o
+ * segredo, e a única saída seria deixar de autenticar o webhook — o que é pior.
+ * Nesse caso o registro cai para a URL com `?secret=`, e a função DIZ isso em
+ * `formato: "v1"`, para quem chamou avisar em vez de a exposição continuar sem
+ * ninguém saber.
+ */
+export async function configurarWebhook(
+  urlLimpa: string,
+  segredo: string,
+): Promise<{ ok: boolean; formato?: "v2" | "v1"; detalhe?: string }> {
   const eventos = ["MESSAGES_UPSERT"];
 
-  // v2: corpo aninhado
+  // v2: corpo aninhado, com header — a URL não carrega segredo nenhum.
   let r = await req("POST", `/webhook/set/${inst()}`, {
-    webhook: { enabled: true, url: urlWebhook, events: eventos, base64: true, byEvents: false },
+    webhook: {
+      enabled: true,
+      url: urlLimpa,
+      headers: { "x-webhook-secret": segredo },
+      events: eventos,
+      base64: true,
+      byEvents: false,
+    },
   });
-  if (r.ok) return { ok: true };
+  if (r.ok) return { ok: true, formato: "v2" };
 
-  // v1: corpo plano
+  // v1: corpo plano, sem suporte a header. O segredo volta para a URL porque a
+  // alternativa é webhook sem autenticação — qualquer um postando mensagem.
   r = await req("POST", `/webhook/set/${inst()}`, {
     enabled: true,
-    url: urlWebhook,
+    url: `${urlLimpa}?secret=${encodeURIComponent(segredo)}`,
     events: eventos,
     webhook_by_events: false,
     webhook_base64: true,
   });
-  if (r.ok) return { ok: true };
+  if (r.ok) return { ok: true, formato: "v1" };
 
   return { ok: false, detalhe: r.texto.slice(0, 300) };
 }

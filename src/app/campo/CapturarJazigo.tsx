@@ -11,9 +11,18 @@ import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
  * Pensado para a fase de captura das quadras: a pessoa está de pé no cemitério,
  * então é um passo de cada vez, botão grande e nada obrigatório além do essencial.
  */
+/** O que foi realmente salvo, para a tela de trás poder confirmar. */
+export interface JazigoSalvo {
+  identificacao: string;
+  quadra: string;
+  jaExistia: boolean;
+  comGps: boolean;
+  comFoto: boolean;
+}
+
 export default function CapturarJazigo({ onFechar, onPronto }: {
   onFechar: () => void;
-  onPronto: () => void;
+  onPronto: (salvo: JazigoSalvo) => void;
 }) {
   // dados
   const [cemiterios, setCemiterios] = useState<any[]>([]);
@@ -96,14 +105,17 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
    */
   async function criarJazigo(escolha?: "mesmo" | "outro") {
     setErro("");
+    // A ORDEM DAS COBRANÇAS SEGUE A ORDEM DA TELA — quadra, rua, e só então o
+    // que está escrito na pedra. Reclamar de um campo que ainda está abaixo do
+    // dedo faz a pessoa procurar o erro no lugar errado.
     if (!quadra.trim()) return setErro("Diga a quadra (ex.: Q-12).");
+    // A rua deixou de ser opcional: é dela que sai a ordem da caminhada. Sem
+    // rua, o jazigo fica fora do roteiro e a Nina só descobre andando.
+    if (!rua.trim()) return setErro("Escolha a rua do jazigo.");
     // Sem obrigar: o túmulo não tem número gravado, e exigir um valor que não
     // existe no mundo faz a pessoa inventar. Quem identifica é o código
     // gerado e a foto.
     const numero = escolha === "outro" ? novoNumero.trim() : identificacao.trim();
-    // A rua deixou de ser opcional: é dela que sai a ordem da caminhada. Sem
-    // rua, o jazigo fica fora do roteiro e a Nina só descobre andando.
-    if (!rua.trim()) return setErro("Escolha a rua do jazigo.");
     setSalvando(true);
     const r = await fetch("/api/tumulos", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -243,7 +255,27 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
       <div style={s.modal}>
         <div style={s.topo}>
           <strong style={{ fontSize: 20 }}>Capturar jazigo</strong>
-          <button style={s.fechar} onClick={onFechar}>✕</button>
+          {/* O ✕ NÃO DESFAZ NADA DEPOIS DE CRIADO.
+              O jazigo entra no banco no momento em que a etapa 1 termina. A
+              partir daí o ✕ parece "cancelar" mas não cancela — e sair por ele
+              deixava a pessoa achando que tinha desistido de um cadastro que
+              está lá. Depois de criado ele sai pelo MESMO caminho do Concluir,
+              e a confirmação aparece igual. */}
+          <button
+            style={s.fechar}
+            onClick={() => {
+              if (!tumuloId) return onFechar();
+              onPronto({
+                identificacao,
+                quadra,
+                jaExistia,
+                comGps: gpsEstado === "ok",
+                comFoto: enqOk || refOk,
+              });
+            }}
+          >
+            ✕
+          </button>
         </div>
 
         {/* ETAPA 1 — dados (só até criar) */}
@@ -267,12 +299,6 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
             </div>
 
             <div>
-              <div style={s.rotulo}>Nome escrito na pedra (opcional)</div>
-              <input style={s.input} value={identificacao} onChange={(e) => setIdentificacao(e.target.value)}
-                     placeholder="Ex.: Almeida" />
-            </div>
-
-            <div>
               <div style={s.rotulo}>Rua</div>
               <select style={s.input} value={rua} onChange={(e) => setRua(e.target.value)}
                       disabled={!quadra || !ruasDaQuadra.length}>
@@ -286,6 +312,22 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
               <p style={{ ...s.dica, marginTop: 4 }}>
                 A rua é o que coloca o jazigo na ordem da caminhada do dia.
               </p>
+            </div>
+
+            {/* A IDENTIFICAÇÃO VEM DEPOIS DE QUADRA E RUA — e só abre depois delas.
+                É a ordem de quem está de pé na frente do túmulo: primeiro se
+                sabe ONDE se está, depois se lê o que está escrito na pedra.
+                Preencher o nome antes de escolher o lugar deixa a pessoa com o
+                dado na mão e sem onde pendurar — e é assim que jazigo cai no
+                balde "S/Q". */}
+            <div>
+              <div style={s.rotulo}>Nome escrito na pedra (opcional)</div>
+              <input style={s.input} value={identificacao}
+                     onChange={(e) => setIdentificacao(e.target.value)}
+                     disabled={!quadra || !rua}
+                     placeholder={!quadra ? "Escolha a quadra primeiro"
+                                : !rua ? "Escolha a rua primeiro"
+                                : "Ex.: Almeida"} />
             </div>
 
             <div>
@@ -406,7 +448,27 @@ export default function CapturarJazigo({ onFechar, onPronto }: {
               onTentarDeNovo={() => reenviar("referencia")}
             />
 
-            <button style={s.principal} onClick={onPronto}>Concluir</button>
+            {/* O QUE O BOTÃO DEVOLVE.
+                Antes ele só fechava a janela — o MESMO efeito de tocar no ✕
+                para desistir. Quem cadastra cem jazigos seguidos não tem como
+                saber se o último entrou, e a única forma de conferir é sair do
+                campo e abrir o painel.
+
+                Agora ele leva o que foi salvo, inclusive o que FALTOU: a dica
+                abaixo convida a concluir sem foto, e sem isso escrito a pessoa
+                descobre a lacuna semanas depois. */}
+            <button
+              style={s.principal}
+              onClick={() => onPronto({
+                identificacao,
+                quadra,
+                jaExistia,
+                comGps: gpsEstado === "ok",
+                comFoto: enqOk || refOk,
+              })}
+            >
+              Concluir
+            </button>
             <p style={s.dica}>Pode concluir mesmo sem todas as fotos — dá para completar depois na ficha.</p>
           </>
         )}

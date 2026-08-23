@@ -17,6 +17,30 @@ interface Item {
   fixado?: boolean;
 }
 
+/**
+ * MOVER UMA LAVAGEM DENTRO DO DIA.
+ *
+ * A roteirização automática é por sequência de quadra e rua, com serpentina —
+ * ruas alternadas percorridas ao contrário, para uma emendar na outra. Isso
+ * continua sendo o padrão, e é bom.
+ *
+ * Isto é o ajuste por cima: a véspera em que se sabe que a família vai visitar
+ * de manhã, ou que aquele canto está em obra.
+ *
+ * Manda a lista INTEIRA do dia, na ordem nova. A função no banco confere que
+ * todos os ids são daquele dia antes de renumerar — mandar só o que mudou
+ * dependeria de a tela e o banco concordarem sobre o resto, e eles nem sempre
+ * concordam.
+ */
+async function reordenarDia(data: string, ids: string[]) {
+  const r = await fetch("/api/agenda/ordem", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data, ids }),
+  }).then((x) => x.json()).catch(() => null);
+  return r?.ok === true ? null : (r?.erro || "não consegui mudar a ordem");
+}
+
 export default function AgendaPage() {
   const [dias, setDias] = useState<Record<string, Item[]>>({});
   const [carregando, setCarregando] = useState(true);
@@ -28,6 +52,23 @@ export default function AgendaPage() {
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
   const [diag, setDiag] = useState<any>(null);
+  const [movendo, setMovendo] = useState<string | null>(null);
+
+  /** Sobe ou desce uma lavagem uma posição dentro do dia. */
+  async function mover(dia: string, id: string, direcao: -1 | 1) {
+    const lista = (dias[dia] || []).map((x) => x.id);
+    const i = lista.indexOf(id);
+    const j = i + direcao;
+    if (i < 0 || j < 0 || j >= lista.length) return;
+    [lista[i], lista[j]] = [lista[j], lista[i]];
+
+    setMovendo(id);
+    const erro = await reordenarDia(dia, lista);
+    setMovendo(null);
+    if (erro) { alert(erro); return; }
+    // Recarrega em vez de reordenar na tela: a ordem verdadeira é a do banco.
+    await carregar();
+  }
   const [mesAlvo, setMesAlvo] = useState(mesOperacao());
   const [incluirAvulsos, setIncluirAvulsos] = useState(false);
   const [dataAvulsos, setDataAvulsos] = useState("");
@@ -279,7 +320,7 @@ export default function AgendaPage() {
                 month: "2-digit",
               })}
             </strong>
-            {dias[d].map((s) => (
+            {dias[d].map((s, idx) => (
               <div
                 key={s.id}
                 style={{
@@ -293,7 +334,35 @@ export default function AgendaPage() {
                   marginTop: 10,
                 }}
               >
-                <div>
+                {/* SETAS DE ORDEM.
+                    Arrastar seria mais bonito, mas quebra em toque e em leitor
+                    de tela, e esta lista é mexida na véspera, no computador,
+                    com pressa. Duas setas fazem o mesmo e não têm como falhar
+                    pela metade.
+
+                    Só aparecem no que ainda não foi executado: mudar a ordem do
+                    que já aconteceu não quer dizer nada. */}
+                {s.status !== "executado" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <button
+                      onClick={() => mover(d, s.id, -1)}
+                      disabled={idx === 0 || movendo === s.id}
+                      title="Fazer antes"
+                      style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
+                    >▲</button>
+                    <button
+                      onClick={() => mover(d, s.id, 1)}
+                      disabled={idx === dias[d].length - 1 || movendo === s.id}
+                      title="Fazer depois"
+                      style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
+                    >▼</button>
+                  </div>
+                )}
+
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <span style={{ color: cor.cinza, fontSize: 14, fontWeight: 700 }}>
+                    {idx + 1}º
+                  </span>{" "}
                   <span style={{ color: cor.navy, fontWeight: 600 }}>
                     Q{s.quadra} · {s.tumulo}
                   </span>{" "}

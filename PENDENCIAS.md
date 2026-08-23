@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 # O que falta — inventário conferido em 22/08/2026
 
 As listas dentro de cada `BUILD_*.md` foram escritas no dia daquele build e
@@ -164,8 +163,6 @@ preço praticado. Os dois dependem de você, não de código.
 qualquer descuido que ligue `ativo` publica isso. Precisa do nome oficial, do
 bairro e da confirmação da cidade antes de virar página.
 
-<<<<<<< Updated upstream
-=======
 **v) O gatilho que cria família a partir do contato continua ligado.**
 `sureya_familia_para_cliente` (0062) ainda batiza uma família nova a cada contato
 que nasce sem `familia_id` — é o que mantinha o um-para-um. Depois da 0091 ele
@@ -180,7 +177,6 @@ partir do contato financeiro. As leituras existentes continuam certas, mas uma
 escrita direta em `cliente_id` seria sobrescrita na próxima troca de responsável
 sem aviso. Um `comment on column` já ajudaria; o certo é ir tirando as escritas.
 
->>>>>>> Stashed changes
 **m) A remoção a pedido nunca foi exercitada.** É a etapa 4 do roteiro
 (`BUILD_7.md` §6) e vale fazer com uma família de teste **antes** da primeira
 real pedir.
@@ -203,5 +199,3 @@ real pedir.
 **O sistema não está bloqueando o piloto — o cadastro está.** Os dois itens que
 dependiam de código meu (c, d) foram fechados em 22/08. O que segura a data é
 você ter 5 famílias prontas.
-=======
->>>>>>> Stashed changes
