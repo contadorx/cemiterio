@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Cartao, Botao, Selo } from "../pecas";
+import VisaoRelatorio from "./VisaoRelatorio";
 
 /**
  * A DUPLA CONFERÊNCIA DO CADASTRO.
@@ -58,6 +59,13 @@ const ROTULO_REGIME: Record<string, string> = {
 };
 
 export default function Conferencia() {
+  // DUAS ABAS. Conferir o CADASTRO (falta telefone? falta quadra?) e conferir
+  // os EVENTOS (o que foi lançado, em que competência, por qual porta) são o
+  // mesmo trabalho em dois tempos — e quem faz o segundo é quem acabou de
+  // fazer o primeiro. Duas telas separadas fariam a segunda ser esquecida,
+  // que é o que já aconteceu com o `conferido_em` dos lançamentos: a coluna
+  // existia desde a 0073 e nenhuma tela a escrevia.
+  const [aba, setAba] = useState<"cadastro" | "relatorio">("cadastro");
   const [dados, setDados] = useState<any>(null);
   const [erro, setErro] = useState("");
   const [itens, setItens] = useState<Record<string, Item[]>>({});
@@ -80,6 +88,11 @@ export default function Conferencia() {
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("aba");
+    if (q === "relatorio") setAba("relatorio");
+  }, []);
 
   async function alternar(f: Fam) {
     setFechadas((s) => {
@@ -120,7 +133,27 @@ export default function Conferencia() {
 
   return (
     <>
-      <h1 className="text-[22px] font-semibold text-ink">Conferência de cadastro</h1>
+      <h1 className="text-[22px] font-semibold text-ink">Conferência</h1>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {([["cadastro", "Cadastro"], ["relatorio", "Relatório de eventos"]] as const).map(([v, rot]) => (
+          <button key={v}
+                  onClick={() => {
+                    setAba(v);
+                    window.history.replaceState(null, "",
+                      v === "cadastro" ? "/painel/conferencia" : `/painel/conferencia?aba=${v}`);
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-[14px] ${
+                    aba === v ? "border-brand bg-brand text-white"
+                              : "border-line bg-card text-ink hover:border-brand"}`}>
+            {rot}
+          </button>
+        ))}
+      </div>
+
+      {aba === "relatorio" && <VisaoRelatorio />}
+
+      {aba === "cadastro" && (<>
       <p className="mb-4 text-[14px] text-ink-soft">
         Da família mais simples para a mais complicada. Comece pelas de cima:
         se a mais simples já dá problema, o problema é do sistema, não do cadastro.
@@ -195,10 +228,14 @@ export default function Conferencia() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <button onClick={() => alternar(f)} className="min-w-0 flex-1 text-left">
                 {/* O TÍTULO: família — quem responde. */}
+                {/* POR EXTENSO. "ALCANTARA — CLECIA" economiza duas palavras e
+                    custa a certeza: quem lê rápido não sabe se o segundo nome
+                    é o responsável, o falecido ou outra família. */}
                 <span className="text-[16px] font-medium text-ink">
-                  {f.familia}
-                  {f.responsavel ? <span className="text-ink-soft"> — {f.responsavel}</span>
-                                 : <span className="text-aviso"> — sem responsável</span>}
+                  (Família - {f.familia}){" "}
+                  {f.responsavel
+                    ? <span className="text-ink-soft">(Responsável - {f.responsavel})</span>
+                    : <span className="text-aviso">(Responsável - não definido)</span>}
                 </span>
                 <span className="block text-[13px] text-ink-soft">
                   {f.jazigos} jazigo{f.jazigos === 1 ? "" : "s"} · {f.pessoas} pessoa{f.pessoas === 1 ? "" : "s"}
@@ -287,6 +324,7 @@ export default function Conferencia() {
           </Cartao>
         );
       })}
+      </>)}
     </>
   );
 }

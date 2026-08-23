@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
+import ConexaoWhatsapp from "./ConexaoWhatsapp";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  // A ABA VEM DO ENDERECO. Sem isto, o redirecionamento de /painel/whatsapp
+  // cairia sempre em "A Casa" — e quem clicou em "Reconectar" na fila teria de
+  // procurar a aba, justamente na hora em que o WhatsApp esta fora do ar.
+  // Leitura no window dentro do useEffect, e nao useSearchParams: no Next 14
+  // isso exigiria um <Suspense> em volta da pagina inteira so por causa disto.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("aba");
+    if (q) setAba(q as any);
+  }, []);
+
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/config" />
@@ -18,6 +29,11 @@ export default function Config() {
             ["cemiterios", "Cemitérios"],
             ["campo", "Campo"],
             ["mensagens", "Mensagens"],
+            // O WHATSAPP MORA AQUI AGORA. Estava numa rota solta, fora do
+            // menu — e e a unica tela onde se reconecta a instancia que
+            // entrega as fotos. Quando ele cai, o que se procura e
+            // "configuracoes", nao um endereco decorado.
+            ["whatsapp", "WhatsApp"],
             ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
@@ -37,7 +53,9 @@ export default function Config() {
         {aba === "cemiterios" && <Cemiterios />}
         {aba === "campanhas" && <Campanhas />}
         {aba === "mensagens" && <Mensagens />}
-        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada" && aba !== "mensagens" && <Agregados aba={aba} />}
+        {aba === "whatsapp" && <ConexaoWhatsapp />}
+        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada"
+          && aba !== "mensagens" && aba !== "whatsapp" && <Agregados aba={aba} />}
       </div>
     </div>
   );

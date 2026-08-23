@@ -148,7 +148,9 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 # repositorio — e este numero volta a fechar quando ela subir.
 #   0095  +1  trg_falecido_espelha — mantem tumulos.falecido_nome, que 21
 #             arquivos leem, igual ao nome do falecido principal.
-GATILHOS_DELTA=${GATILHOS_DELTA:-5}
+#   0098  +1  trg_cc_competencia — a competencia estava NULA em 100% dos
+#             lancamentos; sem ela nao ha relatorio por competencia.
+GATILHOS_DELTA=${GATILHOS_DELTA:-6}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -230,8 +232,10 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0097  +1  sureya_conferir_familia — o ok da conferencia vira um fato com
 #             data e autor. sureya_conferencia_cadastro nao entra: ela cai e
 #             nasce de novo (o retorno ganhou colunas), mas ja existia.
-# Saldo: +38.
-FUNCOES_DELTA=${FUNCOES_DELTA:-38}
+#   0098  +2  sureya_carimbar_competencia (o gatilho) e
+#             sureya_conferir_evento — o ok por lancamento.
+# Saldo: +40.
+FUNCOES_DELTA=${FUNCOES_DELTA:-40}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

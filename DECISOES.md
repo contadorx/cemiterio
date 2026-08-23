@@ -808,3 +808,98 @@ trezentas. Na prática o link não abria nada.
 conferência cobra — pessoas, quem responde, regime, consentimento, jazigos com o
 que falta — e nada além. O caminho de volta está em cima **e** embaixo: quem
 corrige três coisas não vai rolar até o topo para voltar.
+
+---
+
+## D-20 · Canal e competência: as duas colunas que faltavam para conferir
+
+**O que se mediu em produção, em 23/08/2026, antes de mexer:**
+
+**1. `conta_corrente.competencia` estava NULA em 100% dos lançamentos.** A coluna
+existe desde a 0073 e nunca foi preenchida — nem nos oito lançamentos que há. E
+`competencias` tem zero linhas: nenhum mês foi fechado. **Relatório por
+competência era impossível: não havia por onde agrupar.**
+
+**2. Lavagem registrada fora do campo não virava dinheiro.** As três lavagens do
+jazigo Nagae:
+
+| dia | valor | veio do campo? | lançamento |
+|---|---|---|---|
+| 03/08 | — | não | **nenhum** |
+| 10/08 | — | não | **nenhum** |
+| 22/08 | R$ 25,00 | sim | sim |
+
+Duas de três aconteceram e a família nunca foi cobrada. **Não há erro em lugar
+nenhum**: o serviço foi marcado como executado por fora, sem valor, e o dinheiro
+simplesmente não existiu. São R$ 50,00 da Família Andre.
+
+### Canal é um eixo diferente de origem
+
+`origem` diz **por que** o dinheiro se mexeu (lavagem, pagamento, ajuste,
+abertura). `canal` diz **como o registro chegou**: automático (a esteira da
+competência), campo (o aplicativo), manual_adm (alguém digitou) ou importação
+(veio do caderno).
+
+A tentação era enfiar os dois no mesmo enum. Daria uma lista de dez valores em
+que não se filtra nem um nem outro — e para conferir precisa-se dos **dois ao
+mesmo tempo**: *"as lavagens (origem) que entraram pelo campo (canal) em
+agosto (competência)"*.
+
+O que já existia ganhou canal **pelo que se pode provar**, não por chute: quem
+tem `iniciado_em` passou pelo campo (só `sureya_iniciar_lavagem` carimba
+aquilo); o resto foi registrado no painel; a abertura de saldo veio do caderno.
+
+### A competência nunca mais é nula
+
+Gatilho `BEFORE INSERT OR UPDATE` carimba a partir da data, e **sempre o
+primeiro dia do mês** — guardar 17/08 e 03/08 como competências diferentes
+faria "agosto" virar trinta grupos no relatório. Está no banco e não na
+aplicação porque vale para todo caminho de escrita, inclusive os que ainda vão
+nascer.
+
+### A lavagem sem cobrança fica visível, não é corrigida sozinha
+
+`sureya_lavagens_sem_cobranca` mostra quais são. **Não lança sozinha**: qual é o
+valor certo — o do jazigo, o do plano, uma cortesia? — é decisão de quem está
+conferindo. A tela sugere o do jazigo e a pessoa confirma.
+
+Quando ela confirma, o lançamento passa pela **mesma porta do resto do dinheiro**
+(`sureya_lancar`, D-01), e na **competência do dia da lavagem**, não na de hoje:
+lançar em agosto uma limpeza de agosto conferida em setembro é o que mantém o
+mês fechado fechado.
+
+### O ok por evento
+
+`conta_corrente.conferido_em` existia desde a 0073 e **nenhuma tela a escrevia**.
+Agora escreve — no extrato da família e no relatório, nos dois lugares em que se
+está olhando o lançamento.
+
+### O relatório não é o export da contabilidade
+
+Já havia `/api/financeiro/export`: CSV do mês por `data`, para o contador. Este
+responde a pergunta da conferência, com três colunas que o outro não tem
+(competência, canal, conferido).
+
+**Excel sem biblioteca.** SpreadsheetML 2003 escrito à mão. As alternativas
+eram: uma dependência de planilha para um export só (num projeto que cuida do
+tamanho da superfície, não se paga) ou a tabela HTML servida como Excel — que
+abre com aviso de "formato não corresponde à extensão" toda vez e **transforma
+número em texto**, que é exatamente o que quebra a conferência.
+
+**Exportar leva o filtro junto.** Um botão que exporta sempre tudo, ao lado de
+filtros que mostram uma parte, entrega um arquivo que não é o que está na tela —
+e quem confere descobre isso depois de somar a coluna errada.
+
+---
+
+## D-21 · O WhatsApp mora em Configurações
+
+Estava em `/painel/whatsapp`, rota solta, fora do menu, alcançável só por link.
+Ficou assim quando o agente de IA foi desligado — a tela foi junto — e depois
+voltou a ser essencial: é a única onde se reconecta a instância da Evolution,
+que é quem entrega as fotos do antes e depois.
+
+Uma tela essencial que só se acha por link é uma tela que ninguém acha na hora
+que precisa. Quando o WhatsApp cai, o que se procura é "configurações", não um
+endereço decorado. A rota antiga continua de pé, redirecionando — ela está em
+links dentro do sistema, inclusive no aviso da fila.

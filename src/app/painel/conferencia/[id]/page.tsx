@@ -50,16 +50,19 @@ export default function FichaDaConferencia() {
   const [form, setForm] = useState<any>({});
   const [novo, setNovo] = useState({ nome: "", telefone: "" });
   const [itens, setItens] = useState<any[]>([]);
+  const [valores, setValores] = useState<Record<string, string>>({});
+  const [datas, setDatas] = useState<Record<string, any>>({});
+  const [lancando, setLancando] = useState<Record<string, string>>({});
 
   const carregar = useCallback(async () => {
     setErro("");
-    const [r, c] = await Promise.all([
-      fetch(`/api/familias/${id}/contatos`).then((x) => x.json()).catch(() => null),
-      fetch(`/api/conferencia?familiaId=${id}`).then((x) => x.json()).catch(() => null),
-    ]);
+    // UMA CHAMADA SÓ. Quem abre esta tela veio corrigir, e uma tela que carrega
+    // em pedaços faz a pessoa corrigir o que apareceu primeiro e ir embora
+    // antes do resto aparecer.
+    const r = await fetch(`/api/familias/${id}/ficha`).then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setErro(r?.erro || "não deu para carregar"); return; }
     setD(r);
-    if (c?.ok) setItens(c.itens || []);
+    setItens(r.conferencia || []);
   }, [id]);
 
   useEffect(() => { if (id) carregar(); }, [id, carregar]);
@@ -125,6 +128,48 @@ export default function FichaDaConferencia() {
     } finally { setOcupado(null); }
   }
 
+  /** Corrige o que a conferência cobra e não é pessoa: valor e datas. */
+  async function corrigir(corpo: any, chave: string) {
+    setOcupado(chave);
+    try {
+      const r = await fetch(`/api/familias/${id}/ficha`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+      await carregar();
+    } finally { setOcupado(null); }
+  }
+
+  /** Lança a lavagem que aconteceu e não virou dinheiro. */
+  async function lancar(servicoId: string, sugerido: number | null) {
+    const valor = Number(String(lancando[servicoId] ?? sugerido ?? "").replace(",", "."));
+    if (!Number.isFinite(valor) || valor <= 0) { alert("Informe o valor da lavagem."); return; }
+    if (!confirm(`Lançar R$ ${valor.toFixed(2)} desta lavagem?\n\nEntra na competência do dia em que ela foi feita.`)) return;
+    setOcupado(servicoId);
+    try {
+      const r = await fetch("/api/relatorio", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ servicoId, valor }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui lançar"); return; }
+      alert(r.mensagem);
+      await carregar();
+    } finally { setOcupado(null); }
+  }
+
+  const dinheiro = (v: any) =>
+    Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const dia = (iso: string | null) =>
+    iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+  const mes = (iso: string | null) =>
+    iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "—";
+
+  const ROTULO_CANAL: Record<string, string> = {
+    campo: "campo", manual_adm: "painel", automatico: "automático",
+    importacao: "importado", "nao marcado": "sem canal",
+  };
+
   const Voltar = () => (
     <Link href="/painel/conferencia" className="text-[14px] underline text-ink-soft">
       ← voltar para a conferência
@@ -149,14 +194,25 @@ export default function FichaDaConferencia() {
     <>
       <div className="mb-2"><Voltar /></div>
 
+      {/* O TÍTULO, escrito por extenso.
+          "ALCANTARA — CLECIA" economiza duas palavras e custa a certeza: quem
+          lê rápido não sabe se o segundo nome é o responsável, o falecido ou
+          outra família. Dizer o que cada nome é resolve, e o espaço existe. */}
       <h1 className="text-[22px] font-semibold text-ink">
-        {d.familia.nome}
-        {d.familia.responsavelId && (
-          <span className="text-ink-soft">
-            {" — "}{contatos.find((c) => c.id === d.familia.responsavelId)?.nome}
-          </span>
-        )}
+        (Família - {d.familia.nome}){" "}
+        {d.familia.responsavel
+          ? <>(Responsável - {d.familia.responsavel})</>
+          : <span className="text-aviso">(Responsável - não definido)</span>}
       </h1>
+      {d.saldo && (
+        <p className="mb-3 text-[14px] text-ink-soft">
+          Saldo da família:{" "}
+          <b className={Number(d.saldo.valor) < 0 ? "text-perigo" : "text-positivo"}>
+            {Number(d.saldo.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </b>
+          {Number(d.saldo.valor) < 0 ? " em aberto" : Number(d.saldo.valor) > 0 ? " adiantado" : ""}
+        </p>
+      )}
 
       {/* O QUE AINDA FALTA, no topo. Quem chegou aqui veio consertar alguma
           coisa — dizer o que é logo evita procurar. */}
@@ -341,19 +397,187 @@ export default function FichaDaConferencia() {
                   {[j.quadra, j.rua, j.codigo].filter(Boolean).join(" · ") || "sem quadra"}
                 </span>
               </span>
-              <span className="flex flex-shrink-0 items-center gap-2">
-                <Selo tom={Number(j.valor) > 0 ? "bom" : "atencao"}>
-                  {Number(j.valor) > 0
-                    ? `R$ ${Number(j.valor).toFixed(2)}`
-                    : "sem valor de limpeza"}
-                </Selo>
+              <span className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                {/* O VALOR SE CORRIGE AQUI. Era um link para a tela de jazigos,
+                    de onde não se volta para a conferência — e o valor é a
+                    pendência mais comum. Um campo resolve. */}
+                <span className="flex items-center gap-1">
+                  <span className="text-[13px] text-ink-soft">R$</span>
+                  <input
+                    value={valores[j.id] ?? (j.valor != null ? String(j.valor) : "")}
+                    onChange={(e) => setValores({ ...valores, [j.id]: e.target.value })}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    className="w-24 rounded-lg border border-line bg-card px-2 py-1 text-[14px] text-ink"
+                  />
+                  <Botao tom="secundario" disabled={ocupado === j.id}
+                         onClick={() => corrigir(
+                           { jazigoId: j.id, valor: Number(String(valores[j.id] ?? j.valor ?? "").replace(",", ".")) },
+                           j.id)}>
+                    Salvar
+                  </Botao>
+                </span>
+                {!(Number(j.valor) > 0) && <Selo tom="atencao">sem valor</Selo>}
                 {!j.completo && <Selo tom="atencao">falta quadra ou identificação</Selo>}
                 <Link href="/painel/jazigos" className="text-[13px] underline text-ink-soft">
-                  corrigir
+                  abrir no cadastro
                 </Link>
               </span>
             </div>
           ))
+        )}
+      </Cartao>
+
+      {/* ------------------------------------------------------- O PLANO
+          Só aparece com contrato: avulso não usa plano, e mostrar um bloco
+          vazio de plano numa família avulsa é convidar a criar um. */}
+      {d.familia.regime === "contrato" && (
+        <Cartao>
+          <h2 className="mb-1 text-[16px] font-medium text-ink">Plano</h2>
+          {(d.planos || []).length === 0 ? (
+            <p className="text-[14px] text-aviso">
+              Família com contrato e sem plano ativo — não vai gerar nem cobrança nem agenda.{" "}
+              <Link href="/painel/clientes" className="underline">criar o plano</Link>
+            </p>
+          ) : (
+            (d.planos || []).map((p: any) => (
+              <div key={p.id} className="border-b border-line py-3 last:border-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[15px] text-ink">
+                    {p.cadencia}{p.qtdPorPassagem > 1 ? ` · ${p.qtdPorPassagem}x por passagem` : ""}
+                  </span>
+                  {p.valor != null && <Selo tom="neutro">{dinheiro(p.valor)}</Selo>}
+                  {!p.ativo && <Selo tom="neutro">inativo</Selo>}
+                  {p.semData && <Selo tom="atencao">falta data</Selo>}
+                </div>
+                {/* AS DUAS DATAS QUE A CONFERÊNCIA COBRA. Sem elas o plano
+                    existe e não faz nada: nem cobra, nem entra na agenda. */}
+                <div className="flex flex-wrap items-end gap-2">
+                  <Campo rotulo="Próxima cobrança">
+                    <input type="date"
+                           value={datas[p.id]?.cob ?? (p.proximaCobranca || "")}
+                           onChange={(e) => setDatas({ ...datas, [p.id]: { ...datas[p.id], cob: e.target.value } })}
+                           className="rounded-lg border border-line bg-card px-2 py-1.5 text-[14px] text-ink" />
+                  </Campo>
+                  <Campo rotulo="Próximo serviço">
+                    <input type="date"
+                           value={datas[p.id]?.serv ?? (p.proximoServico || "")}
+                           onChange={(e) => setDatas({ ...datas, [p.id]: { ...datas[p.id], serv: e.target.value } })}
+                           className="rounded-lg border border-line bg-card px-2 py-1.5 text-[14px] text-ink" />
+                  </Campo>
+                  <Botao tom="secundario" disabled={ocupado === p.id}
+                         onClick={() => corrigir({
+                           planoId: p.id,
+                           proximaCobranca: datas[p.id]?.cob ?? (p.proximaCobranca || ""),
+                           proximoServico: datas[p.id]?.serv ?? (p.proximoServico || ""),
+                         }, p.id)}>
+                    Salvar as datas
+                  </Botao>
+                </div>
+              </div>
+            ))
+          )}
+        </Cartao>
+      )}
+
+      {/* ------------------------------- A LAVAGEM QUE NÃO VIROU DINHEIRO
+          Fica ANTES do extrato porque é o que está errado. No extrato ela
+          não aparece — é justamente isso que a torna invisível: um serviço
+          que aconteceu e não deixou linha nenhuma no razão. */}
+      {(d.semCobranca || []).length > 0 && (
+        <Cartao>
+          <h2 className="mb-1 text-[16px] font-medium text-perigo">
+            {d.semCobranca.length} lavagem(ns) sem cobrança
+          </h2>
+          <p className="mb-3 text-[13px] text-ink-soft">
+            A limpeza aconteceu e nenhum lançamento foi feito. Não há erro em lugar
+            nenhum: o serviço foi marcado como executado sem valor, e o dinheiro
+            simplesmente não existiu. O valor sugerido é o do jazigo — confirme ou troque.
+          </p>
+          {(d.semCobranca || []).map((l: any) => (
+            <div key={l.servico_id}
+                 className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2 last:border-0">
+              <span className="min-w-0">
+                <span className="text-[15px] text-ink">{l.jazigo}</span>
+                <span className="block text-[13px] text-ink-soft">
+                  lavada em {dia(l.dia)} · competência {mes(l.competencia)} ·
+                  registrada pelo {ROTULO_CANAL[l.canal] || l.canal}
+                </span>
+              </span>
+              <span className="flex flex-shrink-0 items-center gap-2">
+                <span className="text-[13px] text-ink-soft">R$</span>
+                <input
+                  value={lancando[l.servico_id] ?? (l.valor_sugerido != null ? String(l.valor_sugerido) : "")}
+                  onChange={(e) => setLancando({ ...lancando, [l.servico_id]: e.target.value })}
+                  inputMode="decimal"
+                  className="w-24 rounded-lg border border-line bg-card px-2 py-1 text-[14px] text-ink"
+                />
+                <Botao tom="principal" disabled={ocupado === l.servico_id}
+                       onClick={() => lancar(l.servico_id, l.valor_sugerido)}>
+                  Lançar
+                </Botao>
+              </span>
+            </div>
+          ))}
+        </Cartao>
+      )}
+
+      {/* --------------------------------------------------- O EXTRATO
+          Competência, origem e canal em cada linha: é com essas três que
+          se confere. E o ok fica no evento, não numa lista à parte. */}
+      <Cartao>
+        <h2 className="mb-1 text-[16px] font-medium text-ink">Eventos desta família</h2>
+        <p className="mb-3 text-[13px] text-ink-soft">
+          Por competência, com a porta por onde cada registro entrou.
+        </p>
+        {(d.eventos || []).length === 0 ? (
+          <p className="text-[14px] text-ink-soft">Nenhum lançamento ainda.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-[13px]">
+              <thead>
+                <tr className="border-b border-line text-left text-ink-soft">
+                  <th className="py-2 pr-3">competência</th>
+                  <th className="py-2 pr-3">data</th>
+                  <th className="py-2 pr-3">origem</th>
+                  <th className="py-2 pr-3">canal</th>
+                  <th className="py-2 pr-3">jazigo</th>
+                  <th className="py-2 pr-3 text-right">valor</th>
+                  <th className="py-2 pr-3">ok</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(d.eventos || []).map((e: any) => (
+                  <tr key={e.id} className="border-b border-line last:border-0">
+                    <td className="py-2 pr-3 text-ink">{mes(e.competencia)}</td>
+                    <td className="py-2 pr-3 text-ink-soft">{dia(e.data)}</td>
+                    <td className="py-2 pr-3 text-ink-soft">
+                      {e.origem}{e.e_estorno ? " (estorno)" : ""}
+                    </td>
+                    <td className="py-2 pr-3 text-ink-soft">{ROTULO_CANAL[e.canal] || e.canal}</td>
+                    <td className="py-2 pr-3 text-ink-soft">{e.jazigo || "—"}</td>
+                    <td className={`py-2 pr-3 text-right ${
+                      Number(e.valor_com_sinal) < 0 ? "text-perigo" : "text-positivo"}`}>
+                      {dinheiro(e.valor_com_sinal)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <button
+                        onClick={async () => {
+                          await fetch("/api/relatorio", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ lancamentoId: e.id, ok: !e.conferido_em }),
+                          });
+                          carregar();
+                        }}
+                        className={e.conferido_em ? "text-positivo" : "text-ink-soft underline"}>
+                        {e.conferido_em ? "✓ conferido" : "dar ok"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Cartao>
 
