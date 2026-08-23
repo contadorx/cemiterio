@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # O que falta — inventário conferido em 22/08/2026
 
 As listas dentro de cada `BUILD_*.md` foram escritas no dia daquele build e
@@ -202,3 +203,5 @@ real pedir.
 **O sistema não está bloqueando o piloto — o cadastro está.** Os dois itens que
 dependiam de código meu (c, d) foram fechados em 22/08. O que segura a data é
 você ter 5 famílias prontas.
+=======
+>>>>>>> Stashed changes

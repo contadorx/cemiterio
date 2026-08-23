@@ -18,7 +18,9 @@ export default function BuscaSelect({
   valor, opcoes, aoEscolher, vazio = "— nenhum —", largura,
 }: {
   valor: string;
-  opcoes: { id: string; nome: string }[];
+  /** `nota` é uma segunda linha discreta: serve para dizer, por exemplo,
+      que uma família ainda não tem com quem falar (0091). */
+  opcoes: { id: string; nome: string; nota?: string | null }[];
   aoEscolher: (id: string) => void;
   vazio?: string;
   largura?: number;
@@ -101,6 +103,11 @@ export default function BuscaSelect({
                 style={itemEstilo(o.id === valor)}
               >
                 {o.nome}
+                {o.nota && (
+                  <span style={{ display: "block", fontSize: 12, color: cor.cinza, marginTop: 1 }}>
+                    {o.nota}
+                  </span>
+                )}
               </button>
             ))}
 

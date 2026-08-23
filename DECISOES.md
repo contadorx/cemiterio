@@ -270,7 +270,10 @@ mora numa função só (`sureya_semear_textos`), que o gatilho e o povoamento da
 antigas chamam — duas cópias da lista neste repositório seria o começo de duas
 listas diferentes.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 
 ---
 
@@ -321,4 +324,7 @@ definição viva, troca a condição e falha se não reconhecer o texto original
 **O log existe porque "muda ano após ano" é um fato com data.** Um campo sozinho
 só sabe o presente, e a pergunta que aparece é sempre sobre o passado: *para quem
 foi a cobrança de março?*
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes

@@ -451,6 +451,9 @@ async function rodar() {
          dt.faz(0) === "hoje" && dt.faz(1) === "ontem" && dt.faz(8) === "há 8 dias");
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes

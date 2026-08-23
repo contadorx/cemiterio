@@ -128,7 +128,12 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0085  +1  modelos_mensagem — os textos da casa viram um CONJUNTO. A frase
 #             de reserva escrita dentro da funcao chegou na tela em producao.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 TABELAS_DELTA=${TABELAS_DELTA:-2}
+=======
+#   0091  +1  familia_responsavel_log — "muda ano apos ano" e um fato com data
+TABELAS_DELTA=${TABELAS_DELTA:-3}
+>>>>>>> Stashed changes
 =======
 #   0091  +1  familia_responsavel_log — "muda ano apos ano" e um fato com data
 TABELAS_DELTA=${TABELAS_DELTA:-3}
@@ -146,9 +151,13 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 # repositorio — e este numero volta a fechar quando ela subir.
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 GATILHOS_DELTA=${GATILHOS_DELTA:-0}
 =======
 GATILHOS_DELTA=${GATILHOS_DELTA:-3}
+>>>>>>> Stashed changes
+=======
+GATILHOS_DELTA=${GATILHOS_DELTA:-4}
 >>>>>>> Stashed changes
 =======
 GATILHOS_DELTA=${GATILHOS_DELTA:-4}
@@ -185,6 +194,10 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #              reserva aplicados na PORTA da fila, valendo para todo caminho
 #   0089  +1   trg_textos_iniciais — organizacao nova nascia sem texto nenhum
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+#   0091  +1   trg_primeiro_contato_assume — familia criada sozinha ganha dono
+>>>>>>> Stashed changes
 =======
 #   0091  +1   trg_primeiro_contato_assume — familia criada sozinha ganha dono
 >>>>>>> Stashed changes
@@ -194,9 +207,16 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #              WITH CHECK, que o DELETE nao consulta
 #   0085  +4   modelos_mensagem: a de org mais uma restritiva POR COMANDO
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 #              (insert, update, delete) — de novo a licao da 0079
 # Ajuste no mesmo commit em que criar ou remover policy.
 POLICIES_DELTA=${POLICIES_DELTA:-53}
+=======
+#   0091  +4   familia_responsavel_log, mesmo desenho
+#              (insert, update, delete) — de novo a licao da 0079
+# Ajuste no mesmo commit em que criar ou remover policy.
+POLICIES_DELTA=${POLICIES_DELTA:-57}
+>>>>>>> Stashed changes
 =======
 #   0091  +4   familia_responsavel_log, mesmo desenho
 #              (insert, update, delete) — de novo a licao da 0079
@@ -218,6 +238,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-57}
 #   0080  +1  sureya_conferencia_cadastro
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 # Saldo: +14. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
@@ -234,6 +255,21 @@ FUNCOES_DELTA=${FUNCOES_DELTA:-14}
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
 FUNCOES_DELTA=${FUNCOES_DELTA:-25}
+>>>>>>> Stashed changes
+=======
+#   0081  +1  sureya_jazigo_herda_familia
+#   0082  +2  sureya_reordenar_dia, sureya_priorizar_servico
+#   0085  +4  sureya_texto_modelo, sureya_envia_fotos, sureya_primeiro_nome,
+#             sureya_fila_politica_de_foto (o gatilho da porta da fila)
+#   0086  +1  sureya_textos_do_tipo — a lista que a tela oferece
+#   0088  +1  sureya_datar_lavagem — a limpeza anotada depois cai no mes certo
+#   0089  +2  sureya_semear_textos e a casca sureya_textos_iniciais
+#   0091  +3  sureya_definir_responsavel (+ o miolo _interno) e
+#             sureya_primeiro_contato_assume
+# Saldo: +28. As demais migrations desta
+# leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
+# por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
+FUNCOES_DELTA=${FUNCOES_DELTA:-28}
 >>>>>>> Stashed changes
 =======
 #   0081  +1  sureya_jazigo_herda_familia
@@ -361,7 +397,10 @@ echo
 
 # ---------------------------------------------------------------------------
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 # A FAMILIA EXISTE SEM CONTATO
 #
 # O efeito que nao aparece em tela: a lavagem de uma familia sem contato tem de
@@ -380,6 +419,9 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 # O CONTATO DO SITE TEM PARA ONDE IR
 #

@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  */
 
 const BASE =
-  "id,identificacao,quadra_id,cliente_id,falecido_nome,observacoes,lat,lng,foto_referencia_url,created_at,updated_at";
+  "id,identificacao,quadra_id,cliente_id,familia_id,falecido_nome,observacoes,lat,lng,foto_referencia_url,created_at,updated_at";
 // colunas que nasceram depois (0013/0017/0026) — se faltarem, a tela funciona sem
 const EXTRAS = ",rua,numero,gps_precisao,gps_amostras,gps_atualizado_em,foto_enquadramento_url";
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   const montar = (cols: string) => {
     let s = db
       .from("tumulos")
-      .select(`${cols},quadras(id,codigo,cemiterio_id,cemiterios(nome)),clientes(id,nome)`)
+      .select(`${cols},quadras(id,codigo,cemiterio_id,cemiterios(nome)),clientes(id,nome),familias(id,nome)`)
       .order("created_at", { ascending: false })
       .limit(limite);
     if (quadraId) s = s.eq("quadra_id", quadraId);
@@ -118,6 +118,11 @@ export async function GET(req: NextRequest) {
       cemiterio: t.quadras?.cemiterios?.nome || null,
       clienteId: t.cliente_id,
       cliente: t.clientes?.nome || null,
+      // A FAMÍLIA é o vínculo desde a 0091; o contato é derivado dela. A tela
+      // precisa dos dois: o nome da família para escolher, e o do contato para
+      // dizer com quem se fala — que pode não haver ninguém.
+      familiaId: t.familia_id,
+      familia: t.familias?.nome || null,
       falecido: t.falecido_nome || null,
       observacoes: t.observacoes || null,
       lat: t.lat ?? null,
@@ -140,7 +145,7 @@ export async function GET(req: NextRequest) {
     if (filtro === "semfoto" && (j.fotoLapide || j.fotoLonge)) return false;
     if (filtro === "semgps" && j.lat !== null) return false;
     if (!busca) return true;
-    const alvo = [j.identificacao, j.rua, j.numero, j.falecido, j.cliente, j.quadra]
+    const alvo = [j.identificacao, j.rua, j.numero, j.falecido, j.cliente, j.familia, j.quadra]
       .filter(Boolean).join(" ").toLowerCase();
     return alvo.includes(busca);
   });
@@ -149,7 +154,13 @@ export async function GET(req: NextRequest) {
   const [{ data: quads }, { data: cems }, { data: cli }] = await Promise.all([
     db.from("quadras").select("id,codigo,cemiterio_id").order("ordem"),
     db.from("cemiterios").select("id,nome").order("nome"),
-    db.from("clientes").select("id,nome").order("nome").limit(1000),
+    // AS FAMÍLIAS, e não os contatos. Vinha de `clientes` porque a família era
+    // o apelido de um contato; desde a 0091 ela é a entidade, e a lista PRECISA
+    // incluir as que ainda não têm com quem falar — são elas que resolvem os
+    // jazigos capturados de quem não se tem telefone.
+    db.from("familias")
+      .select("id,nome,responsavel_id,clientes!familias_responsavel_id_fkey(nome)")
+      .order("nome").limit(2000),
   ]);
 
   return NextResponse.json({
@@ -163,7 +174,15 @@ export async function GET(req: NextRequest) {
       codigo: q.codigo,
       cemiterio: ((cems as any[]) || []).find((c) => c.id === q.cemiterio_id)?.nome || null,
     })),
-    clientes: ((cli as any[]) || []).map((c) => ({ id: c.id, nome: c.nome })),
+    // O nome continua `clientes` na resposta para não quebrar chamada antiga,
+    // mas o conteúdo agora é de FAMÍLIAS. Cada uma diz se tem contato: a tela
+    // marca as que não têm, em vez de deixar a Sureya descobrir na cobrança.
+    clientes: ((cli as any[]) || []).map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      contato: c.clientes?.nome || null,
+      semContato: !c.responsavel_id,
+    })),
     // As ruas que EXISTEM nos jazigos carregados. Listar as 39 do cadastro
     // ofereceria filtros que não achariam nada — quem escolhe uma opção espera
     // que ela traga resultado.

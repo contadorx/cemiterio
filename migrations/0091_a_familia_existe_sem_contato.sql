@@ -287,7 +287,29 @@ begin
     return new;
   end if;
 
+<<<<<<< Updated upstream
   -- (b) Chegou só o dono (importação): a família se deduz dele.
+=======
+  -- (b) TIRARAM A FAMÍLIA DE PROPÓSITO.
+  --
+  -- Sem este caso, limpar `familia_id` numa tela seria desfeito no mesmo
+  -- instante: o passo (c) abaixo veria `cliente_id` ainda preenchido e
+  -- devolveria a família dele. O campo voltaria sozinho, e quem tentou
+  -- desvincular acharia que o sistema não salvou.
+  --
+  -- Só vale quando o contato NÃO mudou na mesma alteração: se mudaram os dois,
+  -- a escolha de quem mexeu é que manda. E o contato sai junto — ele é derivado
+  -- da família desde esta migration, e um jazigo sem família com dono seria a
+  -- discordância que a 0081 existia para impedir.
+  if tg_op = 'UPDATE'
+     and old.familia_id is not null
+     and new.cliente_id is not distinct from old.cliente_id then
+    new.cliente_id := null;
+    return new;
+  end if;
+
+  -- (c) Chegou só o dono (importação): a família se deduz dele.
+>>>>>>> Stashed changes
   if new.cliente_id is not null then
     select c.familia_id into v_fam from clientes c where c.id = new.cliente_id;
     new.familia_id := v_fam;

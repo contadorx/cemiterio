@@ -32,6 +32,9 @@ interface Jazigo {
   cemiterio: string | null;
   clienteId: string | null;
   cliente: string | null;
+  /** O vínculo de verdade desde a 0091. `cliente` é o contato derivado dela. */
+  familiaId: string | null;
+  familia: string | null;
   falecido: string | null;
   observacoes: string | null;
   lat: number | null;
@@ -48,7 +51,9 @@ interface Jazigo {
 }
 
 interface Quadra { id: string; codigo: string; cemiterio: string | null }
-interface Cliente { id: string; nome: string }
+/** A lista continua se chamando `Cliente` na resposta da API, mas desde a
+    0091 o conteúdo é de FAMÍLIAS — inclusive as que ainda não têm contato. */
+interface Cliente { id: string; nome: string; contato?: string | null; semContato?: boolean }
 
 const VERMELHO = "#b91c1c";
 const AMBAR = "#b45309";
@@ -217,13 +222,73 @@ function Cartao({
     numero: j.numero || "",
     quadra_id: j.quadraId,
     falecido_nome: j.falecido || "",
-    cliente_id: j.clienteId || "",
+    familia_id: j.familiaId || "",
     observacoes: j.observacoes || "",
   });
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
   const [separando, setSeparando] = useState(false);
+  const [criandoFamilia, setCriandoFamilia] = useState(false);
+  const [nova, setNova] = useState({ nome: "", contatoNome: "", contatoTel: "" });
+  const [aviso, setAviso] = useState("");
+
+  /**
+   * CRIAR A FAMÍLIA E JÁ LIGAR ESTE JAZIGO A ELA.
+   *
+   * Dois passos, um toque. Criar a família e depois pedir para a pessoa achar o
+   * jazigo de novo no meio de duzentos é o que fazia o vínculo ficar para
+   * depois — e depois vira nunca.
+   *
+   * O CONTATO É OPCIONAL, e é o ponto: desde a 0091 a família existe sem
+   * ninguém, e as limpezas dela viram cobrança do mesmo jeito. Exigir telefone
+   * aqui reconstruiria a parede que a 0091 derrubou.
+   *
+   * Se a família for criada e o vínculo falhar, a tela DIZ — em vez de deixar
+   * uma família órfã no cadastro sem ninguém saber que ela nasceu.
+   */
+  async function criarFamiliaEVincular() {
+    const nome = nova.nome.trim();
+    if (!nome) return;
+    setSalvando(true); setErro(""); setMsg(""); setAviso("");
+    try {
+      const corpo: any = { nome };
+      if (nova.contatoNome.trim() || nova.contatoTel.trim()) {
+        corpo.contato = { nome: nova.contatoNome.trim(), telefone: nova.contatoTel.trim() };
+      }
+      const r = await fetch("/api/familias", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "não consegui criar a família"); return; }
+      if (r.avisoContato) setAviso(r.avisoContato);
+      // Nome repetido não é erro — mas a pessoa precisa saber, ou o cemitério
+      // acaba com duas "Família Silva" e a conta partida ao meio.
+      if (r.homonimas?.length) {
+        setAviso((a) => [a, `Atenção: já existe "${r.homonimas[0]}" com o mesmo nome.`]
+          .filter(Boolean).join(" "));
+      }
+
+      const v = await fetch(`/api/tumulos/${j.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familia_id: r.familiaId }),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!v?.ok) {
+        setErro(`A família "${nome}" foi criada, mas não consegui ligar o jazigo a ela. `
+                + `Procure a família na lista acima e salve.`);
+        onMudou();
+        return;
+      }
+
+      setF((x) => ({ ...x, familia_id: r.familiaId }));
+      setMsg(`família "${nome}" criada e ligada a este jazigo`);
+      setCriandoFamilia(false);
+      setNova({ nome: "", contatoNome: "", contatoTel: "" });
+      onMudou();
+    } finally { setSalvando(false); }
+  }
 
   const mudou =
     f.identificacao !== (j.identificacao || "") ||
@@ -231,7 +296,7 @@ function Cartao({
     f.numero !== (j.numero || "") ||
     f.quadra_id !== j.quadraId ||
     f.falecido_nome !== (j.falecido || "") ||
-    f.cliente_id !== (j.clienteId || "") ||
+    f.familia_id !== (j.familiaId || "") ||
     f.observacoes !== (j.observacoes || "");
 
   async function patch(corpo: Record<string, any>, sucesso: string) {
@@ -279,12 +344,21 @@ function Cartao({
             <span style={{ color: cor.cinza, fontSize: 14 }}>
               {j.cemiterio || ""} · cadastrado {quando(j.criadoEm)}
             </span>
-            {j.clienteId ? (
-              <Link href={`/painel/clientes/${j.clienteId}`} style={{ color: cor.teal, fontSize: 14 }}>
-                {j.cliente}
+            {j.familiaId ? (
+              <Link
+                href={j.clienteId ? `/painel/clientes/${j.clienteId}` : `/painel/clientes?familia=${j.familiaId}`}
+                style={{ color: cor.teal, fontSize: 14 }}
+              >
+                {j.familia || j.cliente}
               </Link>
             ) : (
               <span style={{ color: AMBAR, fontSize: 14 }}>sem família</span>
+            )}
+            {/* FAMÍLIA SEM CONTATO É ESTADO LEGÍTIMO (0091) — e precisa
+                aparecer aqui, senão a Sureya só descobre quando a mensagem não
+                chega em ninguém. */}
+            {j.familiaId && !j.clienteId && (
+              <span style={{ color: AMBAR, fontSize: 13 }}>· sem contato</span>
             )}
           </div>
 
@@ -330,13 +404,89 @@ function Cartao({
               {/* São quase 300 famílias: o `select` do navegador não filtra e
                   não diz quantas existem. */}
               <BuscaSelect
-                valor={f.cliente_id}
-                opcoes={clientes}
+                valor={f.familia_id}
+                // A nota diz COM QUEM se fala nesta família — ou que não há
+                // ninguém. Duas "Família Silva" na lista são indistinguíveis
+                // sem isso, e escolher a errada manda a cobrança para a casa
+                // errada.
+                opcoes={clientes.map((c) => ({
+                  id: c.id,
+                  nome: c.nome,
+                  nota: c.semContato ? "ainda sem contato" : c.contato || null,
+                }))}
                 vazio="— sem família —"
-                aoEscolher={(id) => setF({ ...f, cliente_id: id })}
+                aoEscolher={(id) => setF({ ...f, familia_id: id })}
               />
+              {/* O CAMINHO QUE FALTAVA.
+                  A busca só acha o que já existe. Cadastrando o cemitério, a
+                  família de um jazigo quase sempre AINDA NÃO EXISTE — e sair
+                  desta tela para criá-la em outra, e voltar para achar o mesmo
+                  jazigo no meio de duzentos, é o trabalho que fazia a pessoa
+                  deixar o vínculo para depois. Depois vira nunca: são 75
+                  jazigos sem família hoje. */}
+              <button
+                style={{ ...painel.botaoMiniSec, marginTop: 6, width: "100%" }}
+                onClick={() => setCriandoFamilia((x) => !x)}
+              >
+                {criandoFamilia ? "cancelar" : "+ Nova família"}
+              </button>
             </Campo>
           </div>
+
+          {criandoFamilia && (
+            <div style={{
+              marginTop: 10, padding: 12, borderRadius: 12,
+              border: `1px solid ${cor.linha}`, background: "rgb(var(--zm-fundo))",
+            }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <Campo rotulo="Nome da família" largura={240}>
+                  <input
+                    style={{ ...painel.input, margin: 0 }}
+                    autoFocus
+                    placeholder="ex.: Família Nagae"
+                    value={nova.nome}
+                    onChange={(e) => setNova({ ...nova, nome: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter" && nova.nome.trim()) criarFamiliaEVincular(); }}
+                  />
+                </Campo>
+                {/* CONTATO OPCIONAL, e o rótulo diz isso.
+                    Um campo que parece obrigatório é obrigatório na prática:
+                    quem não tem o número desiste da linha inteira em vez de
+                    cadastrar a família e voltar depois. */}
+                <Campo rotulo="Contato (se tiver)" largura={180}>
+                  <input
+                    style={{ ...painel.input, margin: 0 }}
+                    placeholder="nome de quem fala"
+                    value={nova.contatoNome}
+                    onChange={(e) => setNova({ ...nova, contatoNome: e.target.value })}
+                  />
+                </Campo>
+                <Campo rotulo="WhatsApp (se tiver)" largura={170}>
+                  <input
+                    style={{ ...painel.input, margin: 0 }}
+                    inputMode="tel"
+                    placeholder="com DDD"
+                    value={nova.contatoTel}
+                    onChange={(e) => setNova({ ...nova, contatoTel: e.target.value })}
+                  />
+                </Campo>
+                <button
+                  style={nova.nome.trim() ? painel.botaoMini : painel.botaoMiniSec}
+                  disabled={!nova.nome.trim() || salvando}
+                  onClick={criarFamiliaEVincular}
+                >
+                  {salvando ? "Criando…" : "Criar e ligar a este jazigo"}
+                </button>
+              </div>
+              <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 2px 0", lineHeight: 1.45 }}>
+                Sem contato a família é criada assim mesmo e o jazigo fica ligado a ela.
+                As limpezas <b>viram cobrança normalmente</b> — o telefone entra quando aparecer.
+              </p>
+              {aviso && (
+                <p style={{ fontSize: 13, color: AMBAR, margin: "6px 2px 0" }}>{aviso}</p>
+              )}
+            </div>
+          )}
 
           <div style={{ marginTop: 8 }}>
             <Campo rotulo="Observações" largura={520}>
@@ -363,7 +513,7 @@ function Cartao({
               style={mudou ? painel.botaoMini : painel.botaoMiniSec}
               disabled={!mudou || salvando}
               onClick={() => patch(
-                { ...f, cliente_id: f.cliente_id || null, rua: f.rua || null, numero: f.numero || null },
+                { ...f, familia_id: f.familia_id || null, rua: f.rua || null, numero: f.numero || null },
                 "salvo",
               )}
             >

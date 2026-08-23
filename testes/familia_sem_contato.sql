@@ -198,4 +198,44 @@ select ci8b('e o jazigo fica sem dono junto, sem apontar para quem saiu',
   (select cliente_id is null from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
   'o jazigo ficou apontando para quem nao e mais responsavel');
 
+<<<<<<< Updated upstream
+=======
+-- ---------------------------------------------------------------------------
+-- 6 · DESVINCULAR TEM DE FUNCIONAR
+--
+-- Este caso nasceu de um defeito que a propria 0091 criou: como o jazigo passou
+-- a ser vinculado pela FAMILIA, a tela deixou de mandar `cliente_id`. Limpar a
+-- familia caia no ramo "chegou so o dono", que deduzia a familia do contato que
+-- ainda estava la — e o campo voltava sozinho, sem erro, dando a impressao de
+-- que o sistema nao tinha salvado.
+-- ---------------------------------------------------------------------------
+insert into clientes (id, org_id, nome, telefone, familia_id)
+values ('cccccccc-0000-0000-0000-000000000083','aaaaaaaa-0000-0000-0000-000000000008',
+        'Terceiro Nagae','5511900000083','bbbbbbbb-0000-0000-0000-000000000081');
+
+select ci8b('preparo: o jazigo esta com familia e com dono',
+  (select familia_id is not null and cliente_id is not null from tumulos
+    where id='ffffffff-0000-0000-0000-000000000081'),
+  'o preparo do teste nao ficou como esperado');
+
+update tumulos set familia_id = null where id='ffffffff-0000-0000-0000-000000000081';
+
+select ci8b('tirar a familia REALMENTE tira',
+  (select familia_id is null from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
+  'a familia voltou sozinha — o gatilho desfez o que a tela pediu');
+
+select ci8b('e o contato derivado sai junto',
+  (select cliente_id is null from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
+  'o jazigo ficou sem familia mas com dono, que e a discordancia que a 0081 impedia');
+
+-- E a porta da importacao continua valendo: jazigo que chega so com dono deduz
+-- a familia dele. Sem isto o conserto acima teria quebrado a planilha.
+update tumulos set cliente_id = 'cccccccc-0000-0000-0000-000000000083'
+ where id='ffffffff-0000-0000-0000-000000000081';
+
+select ci8('jazigo que recebe so o dono ainda deduz a familia',
+  (select familia_id::text from tumulos where id='ffffffff-0000-0000-0000-000000000081'),
+  'bbbbbbbb-0000-0000-0000-000000000081');
+
+>>>>>>> Stashed changes
 do $$ begin raise notice 'FAMILIA SEM CONTATO: todas as conferencias passaram'; end $$;
