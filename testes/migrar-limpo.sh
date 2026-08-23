@@ -206,10 +206,13 @@ POLICIES_DELTA=${POLICIES_DELTA:-57}
 #   0089  +2  sureya_semear_textos e a casca sureya_textos_iniciais
 #   0091  +3  sureya_definir_responsavel (+ o miolo _interno) e
 #             sureya_primeiro_contato_assume
-# Saldo: +28. As demais migrations desta
+#   0092  +1  sureya_agenda_fora_do_lugar — a UNICA definicao de "fora do
+#             lugar". sureya_reorganizar_agenda nao entra na conta: ela cai e
+#             nasce de novo (o retorno ganhou colunas), mas ja existia.
+# Saldo: +29. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-28}
+FUNCOES_DELTA=${FUNCOES_DELTA:-29}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -401,6 +404,26 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/roteiro.sql 2>&1); then
   echo "$saida" | grep -E "ROTEIRO FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "A Nina pode estar andando a mesma rua duas vezes no mesmo dia."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# REORGANIZAR A AGENDA — contador e movedor tem de dar o mesmo numero
+#
+# O botao "Reorganizar a agenda" nao funcionava, e nao por acaso: a tela
+# contava com uma regra e o banco movia com outra. Duas lavagens numa segunda
+# passada eram "fora do lugar" para o contador (estavam no passado) e estavam
+# no lugar para o movedor (segunda e dia de trabalho). O aviso nunca zerava.
+# Este teste monta o mesmo cenario e cobra que as duas pontas concordem.
+# ---------------------------------------------------------------------------
+echo "AGENDA — o que o aviso conta e o que o botao move"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/agenda.sql 2>&1); then
+  echo "$saida" | grep -E "AGENDA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "O aviso da agenda vai voltar a ficar na tela para sempre."
   echo "============================================================"
   exit 1
 fi

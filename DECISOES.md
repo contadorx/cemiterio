@@ -319,8 +319,6 @@ definição viva, troca a condição e falha se não reconhecer o texto original
 **O log existe porque "muda ano após ano" é um fato com data.** Um campo sozinho
 só sabe o presente, e a pergunta que aparece é sempre sobre o passado: *para quem
 foi a cobrança de março?*
-<<<<<<< Updated upstream
-=======
 
 ---
 
@@ -430,4 +428,102 @@ de liberação, e pelo mesmo motivo.
 **Na leitura, de onde veio a mensagem importa** e está escrito em cada balão:
 áudio transcrito não é o que a pessoa digitou; o que saiu do celular dela não
 passou por esta tela; e o que a IA respondeu na época do robô não foi ela.
->>>>>>> Stashed changes
+
+---
+
+## D-13 · Uma lavagem por jazigo por dia — e uma definição só de "fora do lugar"
+
+**O que se mediu**, em produção, em 23/08/2026, antes de mexer em qualquer coisa:
+
+| jazigo | data marcada | data que o plano pedia |
+|---|---|---|
+| Perrela | 24/08 | 01/08 |
+| Perrela | 24/08 | 09/08 |
+| Perrela | 24/08 | 17/08 |
+| Perrela | 24/08 | 25/08 |
+| Souza | 17/08 *(passou)* | 17/08 |
+| Nagae | 17/08 *(passou)* | 17/08 |
+
+Quatro lavagens do mesmo jazigo no mesmo dia, e duas paradas numa segunda-feira
+que já tinha passado.
+
+**Por que o botão "Reorganizar a agenda" não resolvia.** Não era intermitente,
+era aritmética. A tela contava com uma regra e o banco movia com outra:
+
+- o contador chamava de fora do lugar tudo que caísse em dia não trabalhado
+  **ou** que já tivesse passado;
+- `sureya_reorganizar_agenda` só mexia no que caísse em dia não trabalhado.
+
+17/08/2026 foi uma **segunda-feira** — dia de trabalho. O contador via as duas
+(estavam no passado); a função não via nenhuma. As duas respostas estavam certas
+para perguntas diferentes, e por isso o aviso nunca podia zerar.
+
+E havia um terceiro estado que ninguém contava nem movia: a pilha do Perrela.
+
+**A decisão.** A regra passa a existir **uma vez**, no banco
+(`sureya_agenda_fora_do_lugar`, 0092), e as duas pontas leem dela. A tela não
+decide mais nada sobre isso — só pergunta. Uma lavagem está fora do lugar quando
+está **atrasada**, **repetida no mesmo jazigo no mesmo dia**, ou **em dia que não
+se trabalha**; e o aviso nomeia qual das três, porque são três conversas
+diferentes.
+
+**Uma lavagem por jazigo por dia** não é preferência de rota: é o que o serviço
+é. Lavar o mesmo túmulo duas vezes na mesma manhã não entrega nada na segunda
+vez, e a família é cobrada pelas duas. A regra entrou no alocador
+(`src/lib/agenda.ts`) e como piso na função do banco.
+
+**Por que nos dois lugares.** A função do banco sozinha não converge: as três
+excedentes do Perrela têm data de plano no passado, então "o dia mais cedo
+possível" é o **mesmo dia** para as três — elas voltavam para a fila empilhadas
+do jeito que estavam, e cada clique repetia "3 movidas" para sempre. A função
+garante o piso (não empilhar); o alocador escolhe **bem** o dia, porque é ele
+que conhece capacidade, rua e serpentina.
+
+**O alocador passou a enxergar o que não remexe.** Ele só reescreve o que está
+`pendente` e solto, mas contava a capacidade do dia como se estivesse vazio — o
+que já estava `agendado`, e o que alguém fixou à mão (D-04/0041), não ocupavam
+lugar nenhum na conta. Um dia com 20 vagas e 12 lavagens marcadas recebia mais
+20. Agora a ocupação existente entra na conta, por dia e por jazigo.
+
+**O que o "reorganizar" faz e o que não faz.** Ele devolve as lavagens para
+`pendente` com a data que o plano pedia — `data_plano`, nunca `data_prevista`,
+que é reescrita pelo alocador a cada passada e faria a função ler a data que ela
+mesma escreveu. Quem escolhe o dia é o alocador, que roda logo em seguida. Duas
+cabeças decidindo o mesmo dia foi o que produziu a pilha.
+
+---
+
+## D-14 · A agenda abre pela família, não pelo contato
+
+A linha da agenda mostrava jazigo, contato e valor — e escrevia `Q{quadra}` sobre
+um código que já vinha `"Quadra 1"`, produzindo **"QQuadra 1"** em toda linha.
+
+Faltavam as duas coisas que ela precisa para montar o dia:
+
+- **a família**, que desde D-10 é a entidade: o contato pode não existir, ou ser
+  outro no ano que vem. Uma agenda que abre pelo contato mostra o que muda e
+  esconde o que fica;
+- **a rua**, de onde sai a ordem do dia (0047). Sem ela, 1º, 2º e 3º parecem
+  arbitrários — não dá para ver que são a mesma caminhada.
+
+O prefixo da quadra passou a morar na API, não na tela: o nome de uma quadra é o
+que o banco diz que ele é, e não pode haver duas opiniões sobre isso.
+
+**O atraso virou número visível.** `atrasoDias` compara `data_plano` com o dia em
+que a lavagem caiu. É o único sinal que denuncia a lavagem empurrada — antes ele
+só aparecia quando a família reclamava.
+
+**Gerar ganhou períodos curtos (3, 7, 14 dias).** Existiam só 30, 60 e 90: para
+conferir se a régua de um jazigo estava certa era preciso despejar um trimestre
+inteiro na agenda e limpar na mão depois. Gerando pouco, a janela da tela
+acompanha o que foi gerado — senão o resultado aparece diluído em trinta dias e
+parece que nada aconteceu.
+
+**Os controles.** Eram quatro botões e uma caixa de seleção em toda linha, com
+`Excluir` em vermelho sempre à vista: o que se faz todo dia (remarcar) tinha o
+mesmo peso do que quase nunca se faz e não se desfaz. Ficou `Remarcar` à mostra e
+o resto atrás de "mais".
+
+**O estorno foi ligado.** A rota `/api/servico/[id]/estornar` existia e **nenhuma
+tela a chamava** — a função estava escrita na página, completa, e nunca foi
+ligada a um botão. Uma lavagem registrada por engano só se desfazia no banco.

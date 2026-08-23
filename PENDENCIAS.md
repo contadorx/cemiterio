@@ -181,6 +181,26 @@ sem aviso. Um `comment on column` já ajudaria; o certo é ir tirando as escrita
 (`BUILD_7.md` §6) e vale fazer com uma família de teste **antes** da primeira
 real pedir.
 
+**x) O nome da rua mora em dois lugares.** `tumulos.rua` (texto livre) e
+`ruas.nome` (via `rua_id`) guardam a mesma coisa. Hoje **não divergem em nenhum
+dos 270 jazigos** — medido em 23/08 —, e por isso não mexi: o app de campo lê o
+texto livre e está mostrando a rua certa. Mas nada obriga os dois a
+concordarem, e o roteiro é montado a partir de `rua_id`. No dia em que alguém
+editar um e não o outro, a Nina vai andar por um nome e o sistema vai ordenar
+por outro. O conserto é o campo texto virar derivado ou sair.
+
+**y) O app de campo não mostra a família.** `/api/agenda/dia` devolve jazigo,
+quadra, falecido e contato — não a família, que desde a D-10 é a entidade. São
+205 dos 270 jazigos com família cadastrada. Não incluí nesta leva porque a tela
+de campo acabou de receber outra mudança (navegação) e misturar as duas
+atrapalharia a conferência no cemitério.
+
+**z) `ConcluirAdmin.tsx` ficou órfão.** O componente existe em
+`src/app/painel/agenda/` e não é importado por ninguém — já estava assim antes
+desta leva (a página antiga importava e nunca renderizava). Não apaguei: se a
+intenção era concluir uma lavagem pela agenda, o lugar disso é uma decisão sua,
+não uma limpeza minha.
+
 ---
 
 ## 3. O que NÃO vamos fazer, e por quê

@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-<<<<<<< Updated upstream
-import { MessageCircle, Phone, Check, X, Clock, AlertTriangle } from "lucide-react";
-=======
 import { MessageCircle, Phone, Check, X, Clock, AlertTriangle, Send, ArrowLeft, Search } from "lucide-react";
->>>>>>> Stashed changes
 import { Cartao, Botao, Selo, Campo, Entrada } from "../pecas";
 import { diasDesde, faz } from "@/lib/datas";
 
@@ -57,8 +53,6 @@ function espera(horas: number, iso: string): string {
   return d === null ? `há ${horas} horas` : faz(d);
 }
 
-<<<<<<< Updated upstream
-=======
 /**
  * "há 3 horas", "ontem 14:20", "14/08 09:30" — o jeito que se lê uma conversa.
  *
@@ -77,7 +71,6 @@ function quando(iso: string | null): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${hora}`;
 }
 
->>>>>>> Stashed changes
 function telBonito(t: string) {
   const d = String(t || "").replace(/\D/g, "").replace(/^55/, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -86,8 +79,6 @@ function telBonito(t: string) {
 }
 
 export default function Contatos() {
-<<<<<<< Updated upstream
-=======
   // DUAS ABAS, UMA TELA.
   //
   // "Esperando" é a fila de quem escreveu e ainda não foi atendido — o trabalho
@@ -127,7 +118,6 @@ export default function Contatos() {
 }
 
 function Esperando() {
->>>>>>> Stashed changes
   const [pendentes, setPendentes] = useState<Contato[]>([]);
   const [feitos, setFeitos] = useState<any[]>([]);
   const [resumo, setResumo] = useState<any>(null);
@@ -161,14 +151,6 @@ function Esperando() {
 
   return (
     <>
-<<<<<<< Updated upstream
-      <h1 className="text-[22px] font-semibold text-ink">Contatos</h1>
-      <p className="mb-4 text-[14px] text-ink-soft">
-        Quem escreveu pelo site e ainda espera resposta.
-      </p>
-
-=======
->>>>>>> Stashed changes
       {resumo && (pendentes.length > 0) && (
         <div className="mb-4 flex flex-wrap gap-2">
           <Selo tom="neutro">{resumo.total} esperando</Selo>
@@ -317,8 +299,6 @@ function Esperando() {
     </>
   );
 }
-<<<<<<< Updated upstream
-=======
 
 /* ------------------------------------------------------------------ */
 
@@ -547,4 +527,3 @@ function Fio1({ fio, aoVoltar }: { fio: Fio; aoVoltar: () => void }) {
     </>
   );
 }
->>>>>>> Stashed changes

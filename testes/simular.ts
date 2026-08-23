@@ -566,6 +566,61 @@ async function rodar() {
          futuro.data_prevista !== devidoAgora.data_prevista,
          `ambas em ${devidoAgora.data_prevista}`);
 
+  // ---- UMA LAVAGEM POR JAZIGO POR DIA
+  //
+  // Medido em producao em 23/08/2026: o jazigo Perrela com QUATRO lavagens no
+  // dia 24, com datas de plano 01/08, 09/08, 17/08 e 25/08. Tres estavam
+  // atrasadas, e `devidoEm` respondeu "hoje" para as tres — o que esta CERTO,
+  // atraso nao se recupera andando para tras. O que faltava era a regra de que
+  // o mesmo tumulo nao se lava duas vezes na mesma manha: a segunda passada
+  // nao entrega nada e a familia e cobrada pelas duas.
+  //
+  // No chao, a mesma lapide aparecia quatro vezes seguidas na lista da Nina.
+  for (const s of banco.servicos) { if (s.status === "agendado") s.status = "executado"; }
+  const atrasadas = ["-22", "-14", "-6", "0"];
+  atrasadas.forEach((n, i) => {
+    banco.servicos.push({
+      id: `pilha-${i}`, org_id: ORG, tumulo_id: "t1", plano_id: "p1", cliente_id: "c-cec",
+      data_prevista: daquiA(Number(n)), data_plano: daquiA(Number(n)), status: "pendente",
+      valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null,
+    });
+  });
+  await ag.alocarAgenda();
+  const pilha = banco.servicos.filter((s) => s.id.startsWith("pilha-"));
+  const diasDaPilha = pilha.map((s) => s.data_prevista);
+  checar("quatro lavagens atrasadas do MESMO jazigo caem em quatro dias diferentes",
+         new Set(diasDaPilha).size === 4, `cairam em ${JSON.stringify(diasDaPilha)}`);
+  checar("e nenhuma delas foi escondida num dia que ja passou",
+         diasDaPilha.every((d) => String(d) >= hoje), JSON.stringify(diasDaPilha));
+  checar("todas continuam na agenda — a que nao coube andou, nao sumiu",
+         pilha.every((s) => s.status === "agendado"),
+         JSON.stringify(pilha.map((s) => s.status)));
+
+  // ---- O QUE JA ESTA AGENDADO OCUPA O DIA
+  //
+  // O alocador so reescreve o que esta `pendente` e solto, mas contava a
+  // capacidade do dia como se ele estivesse vazio. Depois de "reorganizar",
+  // as lavagens devolvidas para a fila voltavam para o mesmo dia onde a que
+  // ficou `agendado` ja estava — e a pilha se remontava.
+  for (const s of banco.servicos) { if (s.status === "agendado") s.status = "executado"; }
+  const diaTomado = daquiA(9);
+  banco.servicos.push(
+    { id: "preso-1", org_id: ORG, tumulo_id: "t3", plano_id: "p1", cliente_id: "c-cec",
+      data_prevista: diaTomado, data_plano: diaTomado, status: "agendado",
+      valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: 1 },
+    { id: "solto-1", org_id: ORG, tumulo_id: "t3", plano_id: "p1", cliente_id: "c-cec",
+      data_prevista: diaTomado, data_plano: diaTomado, status: "pendente",
+      valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null },
+  );
+  await ag.alocarAgenda();
+  const preso = banco.servicos.find((s) => s.id === "preso-1")!;
+  const solto = banco.servicos.find((s) => s.id === "solto-1")!;
+  checar("o alocador nao mexe no que ja estava agendado",
+         preso.data_prevista === diaTomado, `mudou para ${preso.data_prevista}`);
+  checar("e nao empilha a solta no dia que o mesmo jazigo ja ocupava",
+         solto.data_prevista !== diaTomado,
+         `as duas do jazigo t3 ficaram em ${diaTomado}`);
+
   console.log("\n=== 4. PROATIVOS (cobrança / aviso de saldo / gatilhos) ===");
   const pro = await import("../src/lib/proativo");
   const nCob = await pro.cobrancaGentil();

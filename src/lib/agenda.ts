@@ -335,6 +335,12 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 // ----------------------------------------------------------------------------
 interface ServicoPend {
   id: string;
+  /**
+   * O JAZIGO — precisa estar aqui por causa de UMA regra: uma lavagem por
+   * jazigo por dia. Sem o id, o alocador nao tem como saber que as quatro
+   * linhas que ele esta empilhando no dia 24 sao do MESMO tumulo.
+   */
+  tumulo_id: string | null;
   data_prevista: string | null;
   /**
    * A DATA TEÓRICA DO PLANO — congelada no momento em que o serviço nasceu.
@@ -524,13 +530,13 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   // ---- pendentes (com o cemitério, quando a coluna existir) -----------------
   const SEL_NOVO =
-    "id,data_prevista,data_plano,data_desejada,prioridade,cemiterio_id," +
+    "id,tumulo_id,data_prevista,data_plano,data_desejada,prioridade,cemiterio_id," +
     "tumulos(identificacao,lat,lng,cemiterio_id,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem,cemiterio_id))";
   const SEL_SEM_FIXADO =
-    "id,data_prevista,data_desejada,prioridade," +
+    "id,tumulo_id,data_prevista,data_desejada,prioridade," +
     "tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem,cemiterio_id))";
   const SEL_ANTIGO =
-    "id,data_prevista,prioridade,tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem))";
+    "id,tumulo_id,data_prevista,prioridade,tumulos(identificacao,lat,lng,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem))";
 
   // O que foi decidido por uma PESSOA não entra aqui (0041): remarcação manual
   // fica onde está, em vez de ser desfeita pelo alocador na madrugada seguinte.
@@ -564,6 +570,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   const itens: ServicoPend[] = (pend || []).map((s: any) => ({
     id: s.id,
+    tumulo_id: s.tumulo_id ?? null,
     data_prevista: s.data_prevista,
     data_plano: s.data_plano ?? null,
     data_desejada: s.data_desejada ?? null,
@@ -586,6 +593,54 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   const jornada = await carregarJornada();
   const primeiroDia = proximoDiaUtil(isoHoje(), jornada);
+
+  // ==========================================================================
+  // O QUE JA ESTA NO DIA E NAO VAI SER REMEXIDO
+  //
+  // O alocador so reescreve o que esta `pendente` e solto. Mas o que ele NAO
+  // reescreve continua ocupando o dia: a lavagem ja `agendado` e a que alguem
+  // fixou a mao (0041). Ele nao enxergava nada disso — contava a capacidade do
+  // dia como se estivesse vazio.
+  //
+  // Dois estragos, os dois vistos em producao:
+  //
+  //   · CAPACIDADE INFLADA. Um dia com 20 lugares e 12 lavagens ja agendadas
+  //     recebia mais 20, e a rota nascia impossivel de cumprir.
+  //   · JAZIGO REPETIDO. Depois de "reorganizar", tres lavagens do Perrela
+  //     voltavam para `pendente` e o alocador as punha de novo no dia 24 —
+  //     onde a quarta, que ficou `agendado`, ja estava.
+  //
+  // A lista e montada por diferenca: tudo que esta pendente/agendado no
+  // horizonte e NAO esta em `itens` e ocupacao. Assim nao ha uma segunda copia
+  // da regra de "o que o alocador remexe" para sair do lugar depois.
+  // ==========================================================================
+  const { data: ocupRaw } = await db
+    .from("servicos")
+    .select("id,tumulo_id,data_prevista")
+    .eq("org_id", org)
+    .in("status", ["pendente", "agendado"])
+    .gte("data_prevista", primeiroDia);
+
+  const aAlocar = new Set(itens.map((i) => i.id));
+  /** dia -> quantas lavagens ja estao presas naquele dia */
+  const cargaExistente = new Map<string, number>();
+  /** dia -> jazigos que ja tem lavagem naquele dia */
+  const jazigoNoDia = new Map<string, Set<string>>();
+
+  const marcarJazigo = (d: string, tumuloId: string | null) => {
+    if (!tumuloId) return;
+    const set = jazigoNoDia.get(d) || new Set<string>();
+    set.add(tumuloId);
+    jazigoNoDia.set(d, set);
+  };
+
+  for (const o of ((ocupRaw as any[]) || [])) {
+    if (aAlocar.has(o.id)) continue;
+    const d = o.data_prevista as string | null;
+    if (!d) continue;
+    cargaExistente.set(d, (cargaExistente.get(d) || 0) + 1);
+    marcarJazigo(d, o.tumulo_id ?? null);
+  }
 
   // ---- os grupos a alocar, um por cemitério --------------------------------
   // Sem multi-cemitério configurado, isto vira UM grupo com tudo dentro — e o
@@ -649,18 +704,44 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
     const vagas = (d: string) => {
       if (!diaServe(d)) return 0;
       const jaNoSlot = slots.get(d)?.length || 0;
+      // o que ja estava preso naquele dia antes desta rodada
+      const jaNoBanco = cargaExistente.get(d) || 0;
       const total = turnosDoGrupo.reduce((s, t) => s + restaDoTurno(d, t), 0);
-      return total - jaNoSlot;
+      return total - jaNoSlot - jaNoBanco;
     };
+
+    /**
+     * UMA LAVAGEM POR JAZIGO POR DIA.
+     *
+     * Nao e uma preferencia de rota: e o que o servico e. Lavar o mesmo tumulo
+     * duas vezes na mesma manha nao entrega nada na segunda vez, e a familia e
+     * cobrada pelas duas.
+     *
+     * O que se via em producao (23/08/2026): o jazigo Perrela com QUATRO
+     * lavagens no dia 24, com datas de plano 01/08, 09/08, 17/08 e 25/08. Tres
+     * estavam atrasadas; `devidoEm` respondeu "hoje" para as tres — o que esta
+     * certo, atraso nao se recupera andando para tras — e sem esta regra o dia
+     * aceitou as quatro. No campo, a mesma lapide aparecia quatro vezes
+     * seguidas na lista.
+     *
+     * A lavagem que nao cabe nao some: anda para o proximo dia com vaga, que e
+     * o mesmo tratamento do dia cheio.
+     */
+    const jazigoLivre = (d: string, it: ServicoPend) =>
+      !it.tumulo_id || !jazigoNoDia.get(d)?.has(it.tumulo_id);
+
+    const cabe = (d: string, it: ServicoPend) => vagas(d) > 0 && jazigoLivre(d, it);
+
     const por = (d: string, it: ServicoPend) => {
       const arr = slots.get(d) || [];
       arr.push(it);
       slots.set(d, arr);
+      marcarJazigo(d, it.tumulo_id);
     };
-    const primeiraVagaDe = (de: string) => {
+    const primeiraVagaDe = (de: string, it: ServicoPend) => {
       let d = proximoDiaDoGrupo(de);
       let guarda = 0;
-      while (vagas(d) <= 0 && guarda < 400) { d = proximoDiaDoGrupo(addDias(d, 1)); guarda++; }
+      while (!cabe(d, it) && guarda < 400) { d = proximoDiaDoGrupo(addDias(d, 1)); guarda++; }
       return d;
     };
 
@@ -688,21 +769,21 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       const alvoBruto = it.data_desejada! < primeiroDia ? primeiroDia : it.data_desejada!;
       const alvo = proximoDiaDoGrupo(alvoBruto);
 
-      if (vagas(alvo) > 0) { por(alvo, it); continue; }
+      if (cabe(alvo, it)) { por(alvo, it); continue; }
 
       // dia cheio: anda para trás, nunca para frente
       let d = diaAnteriorDoGrupo(alvo);
       let achou: string | null = null;
       let guarda = 0;
       while (d >= primeiroDia && guarda < 400) {
-        if (vagas(d) > 0) { achou = d; break; }
+        if (cabe(d, it)) { achou = d; break; }
         d = diaAnteriorDoGrupo(d);
         guarda++;
       }
       if (achou) { por(achou, it); continue; }
 
       estourados.add(it.id);
-      por(primeiraVagaDe(primeiroDia), it);
+      por(primeiraVagaDe(primeiroDia, it), it);
     }
 
     // ------------------------------------------------------------------
@@ -751,7 +832,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       });
 
     for (const it of semData) {
-      por(primeiraVagaDe(devidoEm(it)), it);
+      por(primeiraVagaDe(devidoEm(it), it), it);
     }
 
     // ---- grava ------------------------------------------------------------

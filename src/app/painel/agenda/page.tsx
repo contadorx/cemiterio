@@ -1,23 +1,69 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
-import ConcluirAdmin from "./ConcluirAdmin";
 import { mesOperacao } from "@/lib/vencimento";
+
+/**
+ * AGENDA — a mesa de onde a semana é montada.
+ *
+ * O QUE ESTA TELA PRECISA RESPONDER, e não respondia
+ * ---------------------------------------------------------------------------
+ * Auditada em 23/08/2026 contra a produção. Os defeitos não eram de gosto:
+ *
+ *  · "QQuadra 1" — a tela escrevia `Q{quadra}` e o código da quadra já vinha
+ *    "Quadra 1". O prefixo saiu daqui; o nome da quadra é o que o banco diz.
+ *  · A linha mostrava jazigo, contato e valor. Faltavam FAMÍLIA e RUA — que
+ *    são a entidade (0091) e a ordem da caminhada (0047). Sem as duas, a
+ *    sequência do dia parece arbitrária.
+ *  · O mesmo jazigo aparecia quatro vezes no dia 24 e nada na tela dizia isso.
+ *  · O aviso "N lavagens em dia que não se trabalha" não zerava nunca, porque
+ *    contador e movedor usavam regras diferentes (ver 0092). E a causa quase
+ *    nunca era a jornada: era atraso e repetição, que o aviso nem nomeava.
+ *  · Gerar só ia de 30 em 30 dias — não dava para experimentar sem despejar um
+ *    trimestre inteiro na agenda e depois limpar na mão.
+ *
+ * O QUE ELA MOSTRA AGORA, em ordem de urgência: o que está errado, o tamanho
+ * do período, como gerar, e só então os dias.
+ */
 
 interface Item {
   id: string;
   status: string;
-  tumulo: string;
-  quadra: string;
+  tumuloId: string | null;
+  jazigo: string;
+  quadra: string | null;
+  rua: string | null;
+  familia: string | null;
   falecido: string | null;
-  cliente: string | null;
+  contato: string | null;
   valor: number | null;
+  dataPlano: string | null;
+  /** dias entre a data teórica do plano e o dia em que a lavagem caiu */
+  atrasoDias: number;
   /** data escolhida à mão: a geração automática não mexe nesta lavagem (0041) */
   fixado?: boolean;
   /** Quem vai limpar. Nulo é o NORMAL: o alocador não nomeia ninguém. */
   executoraId?: string | null;
+  estornadoEm?: string | null;
+  motivoEstorno?: string | null;
 }
+
+interface Saude {
+  foraDaJornada: number;
+  diaNaoUtil: number;
+  atrasadas: number;
+  repetidas: number;
+  primeiraData: string | null;
+}
+
+const dinheiro = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const dataBonita = (iso: string) =>
+  new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long", day: "2-digit", month: "2-digit",
+  });
 
 /**
  * MOVER UMA LAVAGEM DENTRO DO DIA.
@@ -45,16 +91,24 @@ async function reordenarDia(data: string, ids: string[]) {
 
 export default function AgendaPage() {
   const [dias, setDias] = useState<Record<string, Item[]>>({});
+  const [capacidadeDia, setCapacidadeDia] = useState(20);
   const [carregando, setCarregando] = useState(true);
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
   const [replanejar, setReplanejar] = useState(true);
-  const [concluindo, setConcluindo] = useState<any>(null);
+  const [maisDe, setMaisDe] = useState<string | null>(null);
 
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
   const [diag, setDiag] = useState<any>(null);
   const [movendo, setMovendo] = useState<string | null>(null);
+
+  // ---- filtros ------------------------------------------------------------
+  // Numa agenda de trinta linhas ninguém procura com o olho. Os três recortes
+  // aqui são os que se pede em voz alta: "cadê a lavagem dos Perrela",
+  // "o que está atrasado" e "o que ainda está sem ninguém".
+  const [busca, setBusca] = useState("");
+  const [recorte, setRecorte] = useState<"tudo" | "atrasadas" | "aberto" | "pessoa">("tudo");
 
   /**
    * QUEM LIMPA — marcado em lote, e sempre opcional.
@@ -71,8 +125,75 @@ export default function AgendaPage() {
   const [quem, setQuem] = useState<string>("");
   const [atribuindo, setAtribuindo] = useState(false);
 
+  const [mesAlvo, setMesAlvo] = useState(mesOperacao());
+  const [incluirAvulsos, setIncluirAvulsos] = useState(false);
+  const [dataAvulsos, setDataAvulsos] = useState("");
+  const [saude, setSaude] = useState<Saude | null>(null);
+
   const nomeDe = (id: string | null) =>
     (id && equipe.find((m) => m.id === id)?.nome) || null;
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    const qs = new URLSearchParams();
+    if (periodo.inicio) qs.set("inicio", periodo.inicio);
+    if (periodo.fim) qs.set("fim", periodo.fim);
+    qs.set("dias", String(periodo.dias));
+    const r = await fetch(`/api/agenda/semana?${qs}`).then((x) => x.json()).catch(() => null);
+    setDias(r?.dias || {});
+    setEquipe(r?.equipe || []);
+    if (r?.capacidadeDia) setCapacidadeDia(r.capacidadeDia);
+    setCarregando(false);
+  }, [periodo]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  // o que está fora do lugar — a regra é a do banco (0092), não daqui
+  const verSaude = useCallback(() => {
+    fetch("/api/agenda/reorganizar")
+      .then((x) => x.json())
+      .then((r) => r?.ok && setSaude(r))
+      .catch(() => null);
+  }, []);
+  useEffect(() => { verSaude(); }, [dias, verSaude]);
+
+  // ---- o que aparece depois dos filtros ------------------------------------
+  const visiveis = useMemo(() => {
+    const t = busca.trim().toLowerCase();
+    const passa = (s: Item) => {
+      if (recorte === "atrasadas" && s.atrasoDias <= 0) return false;
+      if (recorte === "aberto" && s.executoraId) return false;
+      if (recorte === "pessoa" && !s.executoraId) return false;
+      if (!t) return true;
+      return [s.familia, s.jazigo, s.rua, s.quadra, s.falecido, s.contato]
+        .some((x) => (x || "").toLowerCase().includes(t));
+    };
+    const out: Record<string, Item[]> = {};
+    for (const [d, lista] of Object.entries(dias)) {
+      const f = lista.filter(passa);
+      if (f.length) out[d] = f;
+    }
+    return out;
+  }, [dias, busca, recorte]);
+
+  const filtrando = busca.trim() !== "" || recorte !== "tudo";
+
+  // ---- o resumo do período ------------------------------------------------
+  // O número que ela procura ao abrir a tela não é "quantas linhas": é quanto
+  // trabalho e quanto dinheiro tem a semana, e quanto disso ainda não tem dono.
+  const resumo = useMemo(() => {
+    const todos = Object.values(visiveis).flat();
+    const ativos = todos.filter((s) => s.status !== "executado" && !s.estornadoEm);
+    return {
+      total: todos.length,
+      dias: Object.keys(visiveis).length,
+      valor: todos.reduce((a, s) => a + (Number(s.valor) || 0), 0),
+      emAberto: ativos.filter((s) => !s.executoraId).length,
+      comPessoa: ativos.filter((s) => !!s.executoraId).length,
+      atrasadas: todos.filter((s) => s.atrasoDias > 0).length,
+      executadas: todos.filter((s) => s.status === "executado").length,
+    };
+  }, [visiveis]);
 
   function alternar(id: string) {
     setMarcados((m) => {
@@ -111,6 +232,8 @@ export default function AgendaPage() {
 
   /** Sobe ou desce uma lavagem uma posição dentro do dia. */
   async function mover(dia: string, id: string, direcao: -1 | 1) {
+    // A ordem verdadeira é a do dia INTEIRO, não a da lista filtrada: mandar a
+    // lista curta apagaria do roteiro tudo que o filtro escondeu.
     const lista = (dias[dia] || []).map((x) => x.id);
     const i = lista.indexOf(id);
     const j = i + direcao;
@@ -124,32 +247,6 @@ export default function AgendaPage() {
     // Recarrega em vez de reordenar na tela: a ordem verdadeira é a do banco.
     await carregar();
   }
-  const [mesAlvo, setMesAlvo] = useState(mesOperacao());
-  const [incluirAvulsos, setIncluirAvulsos] = useState(false);
-  const [dataAvulsos, setDataAvulsos] = useState("");
-  const [fora, setFora] = useState(0);
-
-  const carregar = useCallback(async () => {
-    setCarregando(true);
-    const qs = new URLSearchParams();
-    if (periodo.inicio) qs.set("inicio", periodo.inicio);
-    if (periodo.fim) qs.set("fim", periodo.fim);
-    qs.set("dias", String(periodo.dias));
-    const r = await fetch(`/api/agenda/semana?${qs}`).then((x) => x.json()).catch(() => null);
-    setDias(r?.dias || {});
-    setEquipe(r?.equipe || []);
-    setCarregando(false);
-  }, [periodo]);
-
-  useEffect(() => { carregar(); }, [carregar]);
-
-  // quantas lavagens ficaram em dia que não se trabalha (ou já passaram)
-  useEffect(() => {
-    fetch("/api/agenda/reorganizar")
-      .then((x) => x.json())
-      .then((r) => r?.ok && setFora(r.foraDaJornada || 0))
-      .catch(() => null);
-  }, [dias]);
 
   async function reorganizar() {
     setGerando(true); setDiag(null);
@@ -158,14 +255,24 @@ export default function AgendaPage() {
       body: JSON.stringify({ diasAFrente: 120 }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    if (r?.ok) {
-      alert(
-        `${r.movidos} lavagem(ns) movida(s) para dias de trabalho.\n` +
-        `${r.agendados} redistribuída(s) em ${r.dias} dia(s).`
-      );
-      setFora(0);
-      carregar();
-    } else alert("Não consegui reorganizar.");
+    if (!r?.ok) { alert(r?.erro || "Não consegui reorganizar."); return; }
+
+    // Contar POR CAUSA: "5 movidas" não diz se o problema era atraso, repetição
+    // ou jornada — e são três conversas diferentes com quem vai ao campo.
+    const causas = [
+      r.porAtraso > 0 && `${r.porAtraso} atrasada(s)`,
+      r.porRepeticao > 0 && `${r.porRepeticao} repetida(s) no mesmo jazigo`,
+      r.porDiaRuim > 0 && `${r.porDiaRuim} em dia que não se trabalha`,
+    ].filter(Boolean).join(", ");
+
+    alert(
+      r.movidos === 0
+        ? "Nada fora do lugar — a agenda já está como deveria."
+        : `${r.movidos} lavagem(ns) devolvida(s) para a fila (${causas}).\n` +
+          `${r.agendados} redistribuída(s) em ${r.dias} dia(s).`
+    );
+    await carregar();
+    verSaude();
   }
 
   async function gerarDias(n: number) {
@@ -175,8 +282,12 @@ export default function AgendaPage() {
       body: JSON.stringify({ horizonteDias: n }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    if (r?.ok) { setDiag({ ...r.geracao, ...r.alocacao }); carregar(); }
-    else alert("Falhou ao gerar.");
+    if (!r?.ok) { alert("Falhou ao gerar."); return; }
+    setDiag({ ...r.geracao, ...r.alocacao, horizonte: n });
+    // Gerou três dias e a tela está mostrando trinta: o resultado aparece
+    // diluído e parece que nada aconteceu. A janela acompanha o que foi gerado.
+    if (n <= 14) setPeriodo({ dias: n, inicio: "", fim: "" });
+    else carregar();
   }
 
   async function gerarMes() {
@@ -190,9 +301,20 @@ export default function AgendaPage() {
     else alert("Falhou ao gerar o mês.");
   }
 
-  async function estornar(id: string, tumulo: string) {
+  /**
+   * ESTORNAR UMA LAVAGEM JÁ EXECUTADA.
+   *
+   * A rota `/api/servico/[id]/estornar` existia e NENHUMA tela a chamava: a
+   * função estava escrita aqui, completa, e nunca foi ligada a um botão. Uma
+   * lavagem registrada por engano só se desfazia no banco.
+   *
+   * Fica no "mais" da linha executada, atrás de confirmação e pedindo o
+   * motivo: o motivo vai para o extrato da família, que é onde alguém vai
+   * procurar quando estranhar a cobrança.
+   */
+  async function estornar(id: string, jazigo: string) {
     const motivo = prompt(
-      `Estornar a lavagem de ${tumulo}?\n\n` +
+      `Estornar a lavagem de ${jazigo}?\n\n` +
       `A lavagem é anulada e o valor cobrado volta como crédito para a família.\n` +
       `O registro continua visível com o motivo — o extrato dela mostra que houve\n` +
       `um erro e que foi corrigido.\n\nO que aconteceu?`,
@@ -208,8 +330,9 @@ export default function AgendaPage() {
 
     if (r?.ok) {
       alert(r.valorEstornado > 0
-        ? `Estornada. R$ ${Number(r.valorEstornado).toFixed(2)} devolvidos para a família.`
+        ? `Estornada. ${dinheiro(Number(r.valorEstornado))} devolvidos para a família.`
         : "Estornada. Não havia cobrança lançada.");
+      setMaisDe(null);
       carregar();
     } else alert(r?.erro || "Não consegui estornar.");
   }
@@ -239,33 +362,81 @@ export default function AgendaPage() {
       );
     }
     setRemarcando(null);
+    setMaisDe(null);
     setNovaData("");
     carregar();
   }
 
-  const chaves = Object.keys(dias).sort();
+  const chaves = Object.keys(visiveis).sort();
   const statusCor: Record<string, string> = {
     agendado: cor.teal,
+    pendente: cor.cinza,
     alocado: cor.teal,
     executado: "rgb(var(--zm-positivo))",
     pulado: "rgb(var(--zm-aviso))",
   };
 
+  const chip = (ativo: boolean): React.CSSProperties => ({
+    ...(ativo ? painel.botaoMini : painel.botaoMiniSec),
+    minHeight: 34, padding: "0 12px",
+  });
+
   return (
     <div style={painel.wrap}>
       <PainelNav atual="/painel/agenda" />
       <main style={painel.conteudo}>
-        <h1 style={painel.h1}>
-          Agenda{periodo.fim ? "" : ` — próximo${periodo.dias > 1 ? `s ${periodo.dias} dias` : " dia"}`}
-        </h1>
+        <h1 style={painel.h1}>Agenda</h1>
 
+        {/* ========================================================= SAÚDE
+            Primeiro item da tela porque é o único que pede uma decisão hoje.
+            E nomeia a causa: "fora do lugar" sozinho não diz o que fazer. */}
+        {saude && saude.foraDaJornada > 0 && (
+          <div style={{ ...painel.card, borderLeft: "4px solid #d97706",
+                        background: "rgb(var(--zm-aviso) / 0.08)" }}>
+            <strong style={{ color: "rgb(var(--zm-aviso))" }}>
+              {saude.foraDaJornada} lavagem(ns) fora do lugar
+            </strong>
+            <ul style={{ color: "rgb(var(--zm-aviso))", fontSize: 15,
+                         margin: "8px 0 12px", paddingLeft: 20, lineHeight: 1.6 }}>
+              {saude.atrasadas > 0 && (
+                <li><b>{saude.atrasadas} atrasada(s)</b> — o dia marcado já passou.</li>
+              )}
+              {saude.repetidas > 0 && (
+                <li>
+                  <b>{saude.repetidas} repetida(s)</b> — mais de uma lavagem do
+                  mesmo jazigo no mesmo dia. Lavar duas vezes na mesma manhã não
+                  entrega nada na segunda, e a família é cobrada pelas duas.
+                </li>
+              )}
+              {saude.diaNaoUtil > 0 && (
+                <li>
+                  <b>{saude.diaNaoUtil} em dia que não se trabalha</b> — acontece
+                  quando os dias da jornada mudam e o que já estava marcado fica
+                  no dia antigo.
+                </li>
+              )}
+            </ul>
+            <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 14,
+                        margin: "0 0 12px", lineHeight: 1.5 }}>
+              Reorganizar devolve essas lavagens para a fila com a data que o
+              plano pedia e redistribui pelos dias de trabalho, respeitando a
+              capacidade e uma lavagem por jazigo por dia. O que você fixou à
+              mão (📌) não é tocado.
+            </p>
+            <button style={painel.botao} onClick={reorganizar} disabled={gerando}>
+              {gerando ? "Reorganizando…" : "Reorganizar a agenda"}
+            </button>
+          </div>
+        )}
+
+        {/* ================================================ PERÍODO E FILTRO */}
         <div style={{ ...painel.card, padding: 12 }}>
           <div data-filtros style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 15, color: cor.cinza, marginRight: 4 }}>Mostrar:</span>
             {[[1, "Amanhã"], [3, "3 dias"], [7, "7 dias"], [14, "14 dias"], [30, "30 dias"], [90, "90 dias"]]
               .map(([v, rot]) => (
                 <button key={String(v)}
-                  style={periodo.dias === v && !periodo.fim ? painel.botao : painel.botaoSec}
+                  style={chip(periodo.dias === v && !periodo.fim)}
                   onClick={() => setPeriodo({ dias: Number(v), inicio: "", fim: "" })}>
                   {rot}
                 </button>
@@ -276,31 +447,89 @@ export default function AgendaPage() {
             <input type="date" style={{ ...painel.input, width: 150 }} value={periodo.fim}
                    onChange={(e) => setPeriodo({ ...periodo, fim: e.target.value })} />
           </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center",
+                        marginTop: 10, paddingTop: 10, borderTop: `1px solid ${cor.linha}` }}>
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="procurar família, jazigo, rua…"
+              style={{ ...painel.input, width: 260 }}
+            />
+            {([["tudo", "tudo"], ["atrasadas", "atrasadas"],
+               ["aberto", "sem pessoa"], ["pessoa", "com pessoa"]] as const).map(([v, rot]) => (
+              <button key={v} style={chip(recorte === v)} onClick={() => setRecorte(v)}>
+                {rot}
+              </button>
+            ))}
+            {filtrando && (
+              <button style={chip(false)}
+                      onClick={() => { setBusca(""); setRecorte("tudo"); }}>
+                limpar filtro
+              </button>
+            )}
+          </div>
         </div>
 
-        {fora > 0 && (
-          <div style={{ ...painel.card, borderLeft: "4px solid #d97706", background: "rgb(var(--zm-aviso) / 0.08)" }}>
-            <strong style={{ color: "rgb(var(--zm-aviso))" }}>
-              {fora} lavagem(ns) marcada(s) em dia que não se trabalha
-            </strong>
-            <p style={{ color: "rgb(var(--zm-aviso))", fontSize: 15, margin: "6px 0 12px", lineHeight: 1.5 }}>
-              Acontece quando você muda os dias da jornada: o que já estava marcado continua
-              no dia antigo. Reorganizar move tudo para o próximo dia de trabalho e redistribui
-              respeitando a capacidade.
-            </p>
-            <button style={painel.botao} onClick={reorganizar} disabled={gerando}>
-              {gerando ? "Reorganizando…" : "Reorganizar a agenda"}
-            </button>
+        {/* ========================================================= RESUMO
+            O que se quer saber de relance: tamanho, dinheiro e quanto ainda
+            não tem dono. */}
+        {!carregando && resumo.total > 0 && (
+          <div style={{ ...painel.card, display: "flex", gap: 20, flexWrap: "wrap",
+                        alignItems: "baseline", padding: 14 }}>
+            {[
+              [`${resumo.total}`, resumo.total === 1 ? "lavagem" : "lavagens"],
+              [`${resumo.dias}`, resumo.dias === 1 ? "dia" : "dias"],
+              [dinheiro(resumo.valor), "no período"],
+              [`${resumo.emAberto}`, "sem pessoa definida"],
+              ...(resumo.comPessoa > 0 ? [[`${resumo.comPessoa}`, "com pessoa"]] : []),
+              ...(resumo.executadas > 0 ? [[`${resumo.executadas}`, "já feitas"]] : []),
+              ...(resumo.atrasadas > 0 ? [[`${resumo.atrasadas}`, "atrasadas"]] : []),
+            ].map(([n, rot], i) => (
+              <div key={i}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: cor.navy }}>{n}</div>
+                <div style={{ fontSize: 13, color: cor.cinza }}>{rot}</div>
+              </div>
+            ))}
+            {filtrando && (
+              <div style={{ fontSize: 13, color: cor.cinza, alignSelf: "center" }}>
+                (do que o filtro está mostrando)
+              </div>
+            )}
           </div>
         )}
 
+        {/* ================================================= GERAR LIMPEZAS */}
         <div style={painel.card}>
           <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
           <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
             Cria o que os planos devem e distribui pelos dias de trabalho. Pode clicar à
             vontade: nunca duplica.
           </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+
+          {/* PERÍODOS CURTOS.
+              Existiam só 30, 60 e 90 dias. Para conferir se a régua de um
+              jazigo está certa, era preciso despejar um trimestre inteiro na
+              agenda e limpar depois na mão. Três dias respondem a mesma
+              pergunta e cabem numa tela. */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92 }}>Para conferir:</span>
+            {[3, 7, 14].map((n) => (
+              <button key={n} style={{ ...painel.botaoMiniSec, minHeight: 38 }}
+                      disabled={gerando} onClick={() => gerarDias(n)}>
+                {n} dias
+              </button>
+            ))}
+            <span style={{ fontSize: 13, color: cor.cinza }}>
+              gera pouco e já mostra o resultado na tela
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                        marginTop: 10, paddingTop: 10, borderTop: `1px solid ${cor.linha}` }}>
+            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92, alignSelf: "center" }}>
+              Operação:
+            </span>
             {[30, 60, 90].map((n) => (
               <button key={n} style={painel.botaoSec} disabled={gerando} onClick={() => gerarDias(n)}>
                 Próximos {n} dias
@@ -362,7 +591,9 @@ export default function AgendaPage() {
         {!carregando && chaves.length === 0 && (
           <section style={painel.card}>
             <p style={{ color: cor.cinza, margin: 0 }}>
-              Nada agendado no período. Gere a agenda na tela Início (ou aguarde o robô diário).
+              {filtrando
+                ? "Nada bate com o filtro neste período."
+                : "Nada agendado no período. Gere as limpezas aqui em cima — comece com 7 dias."}
             </p>
           </section>
         )}
@@ -401,197 +632,296 @@ export default function AgendaPage() {
           </section>
         )}
 
-        {chaves.map((d) => (
-          <section key={d} style={painel.card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <strong style={{ color: cor.navy, fontSize: 16 }}>
-                {new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
-                  weekday: "long",
-                  day: "2-digit",
-                  month: "2-digit",
-                })}
-              </strong>
-              {/* MARCAR O DIA INTEIRO — é como ela pensa: "quinta é da Ana".
-                  Marcar quinze linhas uma a uma para dizer isso é o trabalho
-                  que o lote existe para tirar. */}
-              {dias[d].some((x) => x.status !== "executado") && (
-                <button
-                  style={{ ...painel.botaoMiniSec, minHeight: 30, padding: "0 10px" }}
-                  onClick={() => {
-                    const doDia = dias[d].filter((x) => x.status !== "executado").map((x) => x.id);
-                    const todosMarcados = doDia.every((id) => marcados.has(id));
-                    setMarcados((m) => {
-                      const n = new Set(m);
-                      for (const id of doDia) { if (todosMarcados) n.delete(id); else n.add(id); }
-                      return n;
-                    });
-                  }}
-                >
-                  {dias[d].filter((x) => x.status !== "executado").every((x) => marcados.has(x.id))
-                    ? "desmarcar o dia" : "marcar o dia"}
-                </button>
-              )}
-            </div>
-            {dias[d].map((s, idx) => (
-              <div
-                key={s.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
-                  flexWrap: "wrap",
-                  borderTop: `1px solid ${cor.linha}`,
-                  paddingTop: 10,
-                  marginTop: 10,
-                }}
-              >
-                {/* SETAS DE ORDEM.
-                    Arrastar seria mais bonito, mas quebra em toque e em leitor
-                    de tela, e esta lista é mexida na véspera, no computador,
-                    com pressa. Duas setas fazem o mesmo e não têm como falhar
-                    pela metade.
+        {chaves.map((d) => {
+          const doDia = visiveis[d];
+          const naoFeitas = doDia.filter((x) => x.status !== "executado");
+          const valorDia = doDia.reduce((a, s) => a + (Number(s.valor) || 0), 0);
+          const todosMarcados = naoFeitas.length > 0 && naoFeitas.every((x) => marcados.has(x.id));
+          const cheio = (dias[d] || []).length >= capacidadeDia;
 
-                    Só aparecem no que ainda não foi executado: mudar a ordem do
-                    que já aconteceu não quer dizer nada. */}
-                {/* A CAIXA DE SELEÇÃO. Só no que ainda não foi executado —
-                    ali `executora_id` é o registro de quem lavou, e trocar
-                    pagaria uma pessoa pelo trabalho de outra. */}
-                {s.status !== "executado" && (
-                  <input
-                    type="checkbox"
-                    checked={marcados.has(s.id)}
-                    onChange={() => alternar(s.id)}
-                    aria-label={`Marcar ${s.tumulo}`}
-                    style={{ width: 20, height: 20, flexShrink: 0, cursor: "pointer" }}
-                  />
+          return (
+            <section key={d} style={painel.card}>
+              {/* CABEÇALHO DO DIA — o dia é a unidade de trabalho, então ele
+                  carrega o próprio placar: quantas de quantas cabem, e quanto
+                  vale. "13" sozinho não diz se o dia está tranquilo ou no
+                  limite; "13 de 20" diz. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <strong style={{ color: cor.navy, fontSize: 16 }}>{dataBonita(d)}</strong>
+                <span style={{ fontSize: 14, color: cheio ? "rgb(var(--zm-aviso))" : cor.cinza,
+                               fontWeight: cheio ? 700 : 400 }}>
+                  {(dias[d] || []).length} de {capacidadeDia} {cheio ? "· dia cheio" : ""}
+                </span>
+                {valorDia > 0 && (
+                  <span style={{ fontSize: 14, color: cor.cinza }}>{dinheiro(valorDia)}</span>
                 )}
-
-                {s.status !== "executado" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <button
-                      onClick={() => mover(d, s.id, -1)}
-                      disabled={idx === 0 || movendo === s.id}
-                      title="Fazer antes"
-                      style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
-                    >▲</button>
-                    <button
-                      onClick={() => mover(d, s.id, 1)}
-                      disabled={idx === dias[d].length - 1 || movendo === s.id}
-                      title="Fazer depois"
-                      style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
-                    >▼</button>
-                  </div>
+                {filtrando && doDia.length !== (dias[d] || []).length && (
+                  <span style={{ fontSize: 13, color: cor.cinza }}>
+                    ({doDia.length} no filtro)
+                  </span>
                 )}
+                {/* MARCAR O DIA INTEIRO — é como ela pensa: "quinta é da Ana".
+                    Marcar quinze linhas uma a uma para dizer isso é o trabalho
+                    que o lote existe para tirar. */}
+                {naoFeitas.length > 0 && (
+                  <button
+                    style={{ ...painel.botaoMiniSec, minHeight: 30, padding: "0 10px" }}
+                    onClick={() => {
+                      const ids = naoFeitas.map((x) => x.id);
+                      setMarcados((m) => {
+                        const n = new Set(m);
+                        for (const id of ids) { if (todosMarcados) n.delete(id); else n.add(id); }
+                        return n;
+                      });
+                    }}
+                  >
+                    {todosMarcados ? "desmarcar o dia" : "marcar o dia"}
+                  </button>
+                )}
+              </div>
 
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <span style={{ color: cor.cinza, fontSize: 14, fontWeight: 700 }}>
-                    {idx + 1}º
-                  </span>{" "}
-                  <span style={{ color: cor.navy, fontWeight: 600 }}>
-                    Q{s.quadra} · {s.tumulo}
-                  </span>{" "}
-                  <span style={{ color: statusCor[s.status] || cor.cinza, fontSize: 15 }}>({s.status})</span>
-                  {/* QUEM LIMPA, quando alguém foi definido. Sem selo quando
-                      está em aberto: "em aberto" é o normal, e um selo em toda
-                      linha vira ruído em vez de informação. */}
-                  {s.executoraId && nomeDe(s.executoraId) && (
-                    <span title="Quem vai limpar — definido por você na agenda"
-                          style={{ marginLeft: 6, fontSize: 13, fontWeight: 600, color: cor.navy,
-                                   background: "rgb(var(--zm-fundo))", border: `1px solid ${cor.linha}`,
-                                   borderRadius: 999, padding: "2px 8px" }}>
-                      {nomeDe(s.executoraId)}
-                    </span>
-                  )}
-                  {s.fixado && (
-                    <span title="Data escolhida por você — a geração automática não mexe nesta lavagem"
-                          style={{ marginLeft: 6, fontSize: 13, fontWeight: 700, color: "#0f766e",
-                                   background: "#ecfdf5", border: "1px solid #99f6e4",
-                                   borderRadius: 999, padding: "2px 8px" }}>
-                      📌 data sua
-                    </span>
-                  )}
-                  <p style={{ color: cor.cinza, fontSize: 15, margin: "2px 0 0" }}>
-                    {s.falecido ? `${s.falecido} · ` : ""}
-                    {s.cliente || "sem cliente"}
-                    {s.valor ? ` · R$ ${Number(s.valor).toFixed(2)}` : ""}
-                  </p>
-                </div>
-                {s.status !== "executado" && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    {remarcando === s.id ? (
-                      <>
-                        <input
-                          type="date"
-                          value={novaData}
-                          onChange={(e) => setNovaData(e.target.value)}
-                          style={{ ...painel.input, width: 160, padding: 8 }}
-                        />
+              {doDia.map((s) => {
+                // O número da parada é o do ROTEIRO do dia, não o da lista
+                // filtrada: filtrar não muda a ordem em que se caminha.
+                const bruto = dias[d] || [];
+                const idx = bruto.findIndex((x) => x.id === s.id);
+                const executado = s.status === "executado";
+
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap",
+                      borderTop: `1px solid ${cor.linha}`, paddingTop: 10, marginTop: 10,
+                      opacity: s.estornadoEm ? 0.6 : 1,
+                    }}
+                  >
+                    {/* A CAIXA DE SELEÇÃO. Só no que ainda não foi executado —
+                        ali `executora_id` é o registro de quem lavou, e trocar
+                        pagaria uma pessoa pelo trabalho de outra. */}
+                    {!executado && (
+                      <input
+                        type="checkbox"
+                        checked={marcados.has(s.id)}
+                        onChange={() => alternar(s.id)}
+                        aria-label={`Marcar ${s.familia || s.jazigo}`}
+                        style={{ width: 20, height: 20, flexShrink: 0, cursor: "pointer",
+                                 marginTop: 4 }}
+                      />
+                    )}
+
+                    {/* SETAS DE ORDEM.
+                        Arrastar seria mais bonito, mas quebra em toque e em
+                        leitor de tela, e esta lista é mexida na véspera, no
+                        computador, com pressa. Duas setas fazem o mesmo e não
+                        têm como falhar pela metade.
+
+                        Com filtro ligado elas ficam desligadas: a ordem é do
+                        dia inteiro, e subir uma linha "uma posição" dentro de
+                        uma lista recortada moveria para um lugar que não é o
+                        que se está vendo. */}
+                    {!executado && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <button
-                          style={painel.botao}
-                          onClick={() => novaData && acao(s.id, {
-                            acao: "remarcar", novaData, replanejar,
-                          })}
-                        >
-                          Salvar
-                        </button>
-                        <button style={painel.botaoSec} onClick={() => setRemarcando(null)}>
-                          Cancelar
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button style={painel.botaoSec} onClick={() => setRemarcando(s.id)}>
-                          Remarcar
-                        </button>
+                          onClick={() => mover(d, s.id, -1)}
+                          disabled={idx <= 0 || movendo === s.id || filtrando}
+                          title={filtrando ? "Limpe o filtro para reordenar o dia" : "Fazer antes"}
+                          style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
+                        >▲</button>
+                        <button
+                          onClick={() => mover(d, s.id, 1)}
+                          disabled={idx === bruto.length - 1 || movendo === s.id || filtrando}
+                          title={filtrando ? "Limpe o filtro para reordenar o dia" : "Fazer depois"}
+                          style={{ ...painel.botaoMiniSec, minHeight: 26, padding: "0 8px", lineHeight: 1 }}
+                        >▼</button>
+                      </div>
+                    )}
+
+                    <div style={{ flex: 1, minWidth: 240 }}>
+                      {/* LINHA 1 — DE QUEM É.
+                          A família vem primeiro porque é a entidade (0091): o
+                          contato pode não existir, ou ser outro no ano que vem.
+                          Uma agenda que abre pelo contato mostra o que muda e
+                          esconde o que fica. */}
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ color: cor.cinza, fontSize: 14, fontWeight: 700 }}>
+                          {idx + 1}º
+                        </span>
+                        <span style={{ color: cor.navy, fontWeight: 700, fontSize: 16 }}>
+                          {s.familia || "família não definida"}
+                        </span>
+                        {s.executoraId && nomeDe(s.executoraId) && (
+                          <span title="Quem vai limpar — definido por você na agenda"
+                                style={{ fontSize: 13, fontWeight: 600, color: cor.navy,
+                                         background: "rgb(var(--zm-fundo))", border: `1px solid ${cor.linha}`,
+                                         borderRadius: 999, padding: "2px 8px" }}>
+                            {nomeDe(s.executoraId)}
+                          </span>
+                        )}
                         {s.fixado && (
-                          <button style={painel.botaoSec}
-                                  title="Devolve esta lavagem para a distribuição automática"
-                                  onClick={() => {
-                                    if (!confirm(
-                                      `Devolver ${s.tumulo} para a agenda automática?\n\n` +
-                                      "A data que você escolheu deixa de ser respeitada: na próxima " +
-                                      "geração ela pode mudar de dia."
-                                    )) return;
-                                    acao(s.id, { acao: "desfixar" });
-                                  }}>
-                            Soltar data
+                          <span title="Data escolhida por você — a geração automática não mexe nesta lavagem"
+                                style={{ fontSize: 13, fontWeight: 700, color: "#0f766e",
+                                         background: "#ecfdf5", border: "1px solid #99f6e4",
+                                         borderRadius: 999, padding: "2px 8px" }}>
+                            📌 data sua
+                          </span>
+                        )}
+                        {/* O ATRASO. Sai de data_plano contra o dia em que a
+                            lavagem caiu — é o único número que denuncia a
+                            lavagem empurrada antes de a família reclamar. */}
+                        {s.atrasoDias > 0 && !executado && (
+                          <span title={`O plano pedia ${new Date(s.dataPlano + "T12:00:00").toLocaleDateString("pt-BR")}`}
+                                style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--zm-aviso))",
+                                         background: "rgb(var(--zm-aviso) / 0.12)",
+                                         borderRadius: 999, padding: "2px 8px" }}>
+                            {s.atrasoDias} dia(s) de atraso
+                          </span>
+                        )}
+                      </div>
+
+                      {/* LINHA 2 — ONDE FICA.
+                          Jazigo, quadra e rua, nesta ordem, que é a de quem
+                          procura no chão. A quadra vem do banco já escrita
+                          "Quadra 1": a tela não põe mais um "Q" na frente. */}
+                      <div style={{ color: "rgb(var(--zm-ink))", fontSize: 15, marginTop: 2 }}>
+                        {s.jazigo || "jazigo sem identificação"}
+                        {s.quadra ? ` · ${s.quadra}` : ""}
+                        {s.rua ? ` · ${s.rua}` : (
+                          <span title="Sem rua cadastrada: esta lavagem cai no fim do dia, fora do roteiro"
+                                style={{ color: "rgb(var(--zm-aviso))" }}> · sem rua</span>
+                        )}
+                      </div>
+
+                      {/* LINHA 3 — o resto: quem está no túmulo, quem atende,
+                          quanto custa, em que pé está. */}
+                      <div style={{ color: cor.cinza, fontSize: 14, marginTop: 2 }}>
+                        {s.falecido ? `${s.falecido} · ` : ""}
+                        {s.contato || "sem contato"}
+                        {s.valor ? ` · ${dinheiro(Number(s.valor))}` : ""}
+                        {" · "}
+                        <span style={{ color: statusCor[s.status] || cor.cinza }}>{s.status}</span>
+                      </div>
+
+                      {s.estornadoEm && (
+                        <div style={{ color: "rgb(var(--zm-perigo))", fontSize: 14, marginTop: 2 }}>
+                          estornada{s.motivoEstorno ? ` — ${s.motivoEstorno}` : ""}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ------------------------------------------- controles
+                        Eram quatro botões e uma caixa de seleção em toda linha,
+                        com Excluir em vermelho sempre à vista. Numa lista de
+                        vinte, o que se faz todo dia (remarcar) tinha o mesmo
+                        peso do que quase nunca se faz e não se desfaz.
+
+                        Fica Remarcar à mostra; o resto entra em "mais". */}
+                    {!executado && (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        {remarcando === s.id ? (
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            <input
+                              type="date"
+                              value={novaData}
+                              onChange={(e) => setNovaData(e.target.value)}
+                              style={{ ...painel.input, width: 160, padding: 8 }}
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 6,
+                                            fontSize: 14, color: cor.cinza }}>
+                              <input type="checkbox" checked={replanejar}
+                                     onChange={(e) => setReplanejar(e.target.checked)} />
+                              mover também as próximas deste jazigo
+                            </label>
+                            <button
+                              style={painel.botaoMini}
+                              onClick={() => novaData && acao(s.id, {
+                                acao: "remarcar", novaData, replanejar,
+                              })}
+                            >
+                              Salvar
+                            </button>
+                            <button style={painel.botaoMiniSec} onClick={() => setRemarcando(null)}>
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button style={painel.botaoMiniSec}
+                                    onClick={() => { setRemarcando(s.id); setMaisDe(null); }}>
+                              Remarcar
+                            </button>
+                            <button style={painel.botaoMiniSec}
+                                    aria-expanded={maisDe === s.id}
+                                    onClick={() => setMaisDe(maisDe === s.id ? null : s.id)}>
+                              mais ⌄
+                            </button>
+                            {maisDe === s.id && (
+                              <div style={{ display: "flex", gap: 8, alignItems: "center",
+                                            flexWrap: "wrap", padding: "6px 8px",
+                                            background: "rgb(var(--zm-fundo))",
+                                            border: `1px solid ${cor.linha}`, borderRadius: 10 }}>
+                                {s.fixado && (
+                                  <button style={painel.botaoMiniSec}
+                                          title="Devolve esta lavagem para a distribuição automática"
+                                          onClick={() => {
+                                            if (!confirm(
+                                              `Devolver ${s.jazigo} para a agenda automática?\n\n` +
+                                              "A data que você escolheu deixa de ser respeitada: na próxima " +
+                                              "geração ela pode mudar de dia."
+                                            )) return;
+                                            acao(s.id, { acao: "desfixar" });
+                                          }}>
+                                    Soltar data
+                                  </button>
+                                )}
+                                <button style={painel.botaoMiniSec}
+                                        onClick={() => {
+                                          const motivo = prompt(
+                                            "Pular esta lavagem?\n\n" +
+                                            "A próxima do jazigo já vem no ciclo seguinte.\n" +
+                                            "Motivo (opcional):", "");
+                                          if (motivo !== null) acao(s.id, { acao: "pular", motivo });
+                                        }}>
+                                  Pular
+                                </button>
+                                <button style={painel.botaoMiniPerigo}
+                                        onClick={() => {
+                                          if (!confirm(
+                                            `Excluir a lavagem de ${s.jazigo}?\n\n` +
+                                            `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
+                                          excluir(s.id);
+                                        }}>
+                                  Excluir
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {executado && (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <Avaliar servicoId={s.id} />
+                        {!s.estornadoEm && (
+                          <button style={painel.botaoMiniSec}
+                                  aria-expanded={maisDe === s.id}
+                                  onClick={() => setMaisDe(maisDe === s.id ? null : s.id)}>
+                            mais ⌄
                           </button>
                         )}
-                        <label style={{ display: "flex", alignItems: "center", gap: 6,
-                                        fontSize: 14, color: cor.cinza }}>
-                          <input type="checkbox" checked={replanejar}
-                                 onChange={(e) => setReplanejar(e.target.checked)} />
-                          mover também as próximas deste jazigo
-                        </label>
-                        <button style={painel.botaoSec}
-                                onClick={() => {
-                                  const motivo = prompt(
-                                    "Pular esta lavagem?\n\n" +
-                                    "A próxima do jazigo já vem no ciclo seguinte.\n" +
-                                    "Motivo (opcional):", "");
-                                  if (motivo !== null) acao(s.id, { acao: "pular", motivo });
-                                }}>
-                          Pular
-                        </button>
-                        <button style={painel.botaoPerigo}
-                                onClick={() => {
-                                  if (!confirm(
-                                    `Excluir a lavagem de ${s.tumulo}?\n\n` +
-                                    `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
-                                  excluir(s.id);
-                                }}>
-                          Excluir
-                        </button>
-                      </>
+                        {maisDe === s.id && !s.estornadoEm && (
+                          <button style={painel.botaoMiniPerigo}
+                                  onClick={() => estornar(s.id, s.jazigo || "este jazigo")}>
+                            Estornar
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-                {s.status === "executado" && <Avaliar servicoId={s.id} />}
-              </div>
-            ))}
-          </section>
-        ))}
+                );
+              })}
+            </section>
+          );
+        })}
       </main>
     </div>
   );
