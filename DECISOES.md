@@ -903,3 +903,71 @@ Uma tela essencial que só se acha por link é uma tela que ninguém acha na hor
 que precisa. Quando o WhatsApp cai, o que se procura é "configurações", não um
 endereço decorado. A rota antiga continua de pé, redirecionando — ela está em
 links dentro do sistema, inclusive no aviso da fila.
+
+---
+
+## D-22 · A ficha da família é uma só — reproduzi-la foi decisão errada
+
+Eu tinha feito, em `/painel/conferencia/[id]`, uma "bancada de conserto":
+pessoas, regime e jazigos. A ideia era não duplicar a ficha grande. O efeito foi
+o oposto do pretendido: **uma segunda verdade sobre a mesma família**, sem
+contrato, sem limpezas, sem fechamento do mês — e cada coisa que faltasse
+mandava quem estava corrigindo para a ficha original no meio do serviço.
+
+Reverti. A ficha de verdade é `/painel/clientes/[id]`, e o botão de conferido
+mora nela, ao lado do que se corrige.
+
+### O que fazia a ficha confundir família com contato
+
+Ela era endereçada pela **pessoa**, e as consultas seguiam:
+
+| bloco | vinha por | devia vir por |
+|---|---|---|
+| extrato | família *(corrigido antes)* | família |
+| **jazigos** | **`cliente_id`** | família |
+| **planos** | **`cliente_id`** | família |
+
+`tumulos.cliente_id` é, desde a 0091, o contato **derivado** da família. Medido
+em 23/08:
+
+- **25 jazigos** pertencem a uma família e têm `cliente_id` nulo — **não
+  apareciam em ficha nenhuma**;
+- **24 famílias** não têm responsável — e como o endereço exigia um id de
+  pessoa, **essas famílias não tinham ficha**.
+
+E havia um efeito mudo, pior que os dois: trocar quem responde pela família
+fazia os jazigos "mudarem de dono" na tela, porque o campo derivado é reescrito
+junto. A ficha dizia coisas diferentes antes e depois de uma troca que não mexeu
+em jazigo nenhum.
+
+**Agora o grão de tudo é a família.** `cliente_id` sobrou para as mensagens, que
+são de uma pessoa mesmo — quem escreveu foi ela.
+
+### O endereço aceita os dois
+
+`/painel/clientes/<id>` tenta cliente primeiro (é o caminho antigo, e o que
+chega nos links guardados) e, não achando, tenta família. Abrindo pela família,
+a ficha usa o responsável para o que é de pessoa — WhatsApp, régua de cobrança,
+instruções da IA — e funciona **sem nenhum**, que é estado legítimo desde a 0091
+e antes derrubava a tela na primeira linha (`c.telefone` de cara).
+
+### O ok mora onde se corrige
+
+Corrigir e carimbar são o mesmo minuto de trabalho. Ir até a conferência para
+dar o ok no que se acabou de arrumar é uma viagem que ninguém faz — foi assim
+que `conferido_em` existiu desde a 0073 sem nenhuma tela escrevendo nele.
+
+A barra na ficha mostra o que falta em palavras de quem vai fazer, traz a
+escolha **contrato ou avulso** (a decisão que mais falta e não tinha onde ser
+tomada ali), e o botão só acende sem pendência obrigatória — a recusa é do
+banco, não da tela.
+
+`?de=conferencia` é o caminho de volta: quem chegou pela conferência volta para
+ela; quem chegou pela lista volta para a lista.
+
+### Os planos vêm pelos dois caminhos
+
+O plano pendura no cliente e aponta para um jazigo, e nada obriga `tumulo_id` a
+estar preenchido. Buscar só pelo jazigo faria um plano sem jazigo sumir, calado;
+só pelo cliente perderia o plano de uma família cujo responsável mudou. Busca
+pelos dois e tira a repetição.

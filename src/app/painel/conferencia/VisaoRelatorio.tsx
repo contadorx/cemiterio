@@ -172,7 +172,7 @@ export default function VisaoRelatorio() {
                 </span>
               </span>
               {l.familia_id && (
-                <Link href={`/painel/conferencia/${l.familia_id}`}>
+                <Link href={`/painel/clientes/${l.familia_id}?de=conferencia`}>
                   <Botao tom="secundario">Abrir e lançar</Botao>
                 </Link>
               )}
@@ -253,7 +253,7 @@ export default function VisaoRelatorio() {
                     <td className="py-2 pr-3 text-ink">{mes(e.competencia)}</td>
                     <td className="py-2 pr-3 text-ink-soft">{dia(e.data)}</td>
                     <td className="py-2 pr-3">
-                      <Link href={`/painel/conferencia/${e.familia_id}`}
+                      <Link href={`/painel/clientes/${e.familia_id}?de=conferencia`}
                             className="text-ink underline">{e.familia}</Link>
                       {e.jazigo && <span className="text-ink-soft"> · {e.jazigo}</span>}
                     </td>

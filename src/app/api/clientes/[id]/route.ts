@@ -11,30 +11,108 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const id = params.id;
 
-  const { data: cliente } = await db
-    .from("clientes")
-    .select("id,nome,apelido,foto_url,telefone,familia_id,responsavel_financeiro,parentesco,recebe_fotos,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes,consentimento_em,codigo_indicacao,tratamento,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,cobranca_nivel,ativacao_ativa,ativacao_meses,ultima_ativacao_em,cobranca_antecipada,envio_automatico")
-    .eq("id", id)
-    .maybeSingle();
-  if (!cliente) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
+  const CAMPOS_PESSOA =
+    "id,nome,apelido,foto_url,telefone,familia_id,responsavel_financeiro,parentesco," +
+    "recebe_fotos,modo,score,ativo_ia,instrucoes_ia,perfil_ia,observacoes,consentimento_em," +
+    "codigo_indicacao,tratamento,regua_cobranca,dias_entre_cobrancas,max_lembretes," +
+    "orientacao_cobranca,cobranca_nivel,ativacao_ativa,ativacao_meses,ultima_ativacao_em," +
+    "cobranca_antecipada,envio_automatico";
 
-  // O EXTRATO E DA FAMILIA (DECISOES.md D-01).
+  // ==========================================================================
+  // O `id` PODE SER DE UMA FAMÍLIA OU DE UMA PESSOA.
   //
-  // Antes esta ficha listava `movimentos` da PESSOA. O resultado pratico: a
-  // ficha da Anninha mostrava extrato vazio e saldo zero enquanto a familia
-  // dela devia R$ 240,00 — o lancamento estava no razao novo, que a ficha nao
-  // lia. Agora as duas pessoas da mesma familia veem o MESMO extrato, que e o
-  // que a operacao ja dizia em voz alta ("a familia esta devendo").
-  const familiaId = (cliente as any).familia_id as string | null;
+  // Esta ficha nasceu quando família era o apelido de um contato: o endereço
+  // era o da PESSOA e tudo pendurava nela. Desde a 0091 a família é a
+  // entidade, e chegou a hora de o endereço poder ser o dela — a conferência
+  // é por família, e mandar quem confere procurar "qual pessoa abre esta
+  // família" é justamente a confusão que se está tentando desfazer.
+  //
+  // Tenta cliente primeiro (é o caminho antigo, e o que mais chega em links
+  // guardados). Não achando, tenta família — e aí a ficha abre pelo
+  // responsável, ou sem pessoa nenhuma, que é estado legítimo desde a 0091.
+  // ==========================================================================
+  let { data: cliente } = await db
+    .from("clientes").select(CAMPOS_PESSOA).eq("id", id).maybeSingle();
 
-  const [{ data: tumulos }, { data: planos }, { data: mov }, { data: msgs }] = await Promise.all([
-    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,ruas(nome),quadras(codigo)").eq("cliente_id", id),
-    db.from("planos").select("id,tumulo_id,cadencia,qtd_por_passagem,lavagens_por_ciclo,valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate,proxima_cobranca,proximo_servico,migrado_em,momento_cobranca").eq("cliente_id", id),
-    db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem")
-      .eq("familia_id", familiaId || "00000000-0000-0000-0000-000000000000")
+  let familiaId: string | null = (cliente as any)?.familia_id ?? null;
+
+  if (!cliente) {
+    const { data: fam } = await db
+      .from("familias").select("id,responsavel_id").eq("id", id).maybeSingle();
+    if (!fam) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
+    familiaId = (fam as any).id;
+    if ((fam as any).responsavel_id) {
+      const { data: resp } = await db
+        .from("clientes").select(CAMPOS_PESSOA).eq("id", (fam as any).responsavel_id).maybeSingle();
+      cliente = resp as any;
+    }
+  }
+
+  // ==========================================================================
+  // TUDO QUE É DA FAMÍLIA VEM PELA FAMÍLIA.
+  //
+  // ⚠ O DEFEITO QUE ESTAVA AQUI
+  //
+  // O extrato já era por família (D-01). Mas os JAZIGOS e os PLANOS continuavam
+  // vindo por `cliente_id` — a ficha mostrava o dinheiro da família e as pedras
+  // da pessoa. Desde a 0091 `tumulos.cliente_id` é o contato DERIVADO da
+  // família: um jazigo de família sem responsável tem esse campo nulo, e não
+  // aparecia em ficha nenhuma. Eram 6 jazigos assim em 23/08.
+  //
+  // E o efeito pior era mudo: trocar quem responde pela família fazia os
+  // jazigos "mudarem de dono" na tela, porque o campo derivado é reescrito
+  // junto. A ficha dizia coisas diferentes antes e depois de uma troca que não
+  // mexeu em jazigo nenhum.
+  //
+  // O grão de tudo aqui é a FAMÍLIA. `cliente_id` sobrou para as mensagens,
+  // que são de uma pessoa mesmo — quem escreveu foi ela.
+  // ==========================================================================
+  const chaveFam = familiaId || "00000000-0000-0000-0000-000000000000";
+
+  const [{ data: tumulos }, { data: mov }, { data: msgs },
+         { data: familia }, { data: pessoas }, { data: checklist }] = await Promise.all([
+    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
+    db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem,competencia,canal,conferido_em,servico_id")
+      .eq("familia_id", chaveFam)
       .order("data", { ascending: false }),
     db.from("mensagens").select("autor,texto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(15),
+    db.from("familias").select("id,nome,responsavel_id,regime,contratado,conferida_em,enviar_fotos,silenciar")
+      .eq("id", chaveFam).maybeSingle(),
+    // TODAS AS PESSOAS DA FAMÍLIA, e não só a que abriu a ficha. Era isso que
+    // fazia a tela "confundir a família com o contato": ela mostrava uma
+    // pessoa e chamava aquilo de família.
+    db.from("clientes").select("id,nome,telefone,responsavel_financeiro,parentesco,tratamento,consentimento_em")
+      .eq("familia_id", chaveFam).order("created_at"),
+    familiaId
+      ? db.rpc("sureya_conferencia_cadastro", { p_familia: familiaId })
+      : Promise.resolve({ data: [] } as any),
   ]);
+
+  // OS PLANOS VÊM PELOS DOIS CAMINHOS, e a razão é chata: o plano pendura no
+  // CLIENTE (herança de quando a família era o apelido de um contato) e aponta
+  // para um jazigo — mas nada obriga `tumulo_id` a estar preenchido.
+  //
+  // Buscar só pelo jazigo faria um plano sem jazigo sumir da ficha, calado.
+  // Buscar só pelo cliente perderia o plano de uma família cujo responsável
+  // mudou. Os dois, e depois tira a repetição.
+  const idsPessoas = ((pessoas as any[]) || []).map((c) => c.id);
+  const idsJazigos = ((tumulos as any[]) || []).map((t) => t.id);
+  const SEL_PLANO =
+    "id,tumulo_id,cliente_id,cadencia,qtd_por_passagem,lavagens_por_ciclo," +
+    "valor_vigente,valor_mensal,data_valor_vigente,ativo,pago_ate," +
+    "proxima_cobranca,proximo_servico,migrado_em,momento_cobranca";
+
+  const [{ data: pA }, { data: pB }] = await Promise.all([
+    idsPessoas.length
+      ? db.from("planos").select(SEL_PLANO).in("cliente_id", idsPessoas)
+      : Promise.resolve({ data: [] } as any),
+    idsJazigos.length
+      ? db.from("planos").select(SEL_PLANO).in("tumulo_id", idsJazigos)
+      : Promise.resolve({ data: [] } as any),
+  ]);
+  const porId = new Map<string, any>();
+  for (const p of [...((pA as any[]) || []), ...((pB as any[]) || [])]) porId.set(p.id, p);
+  const planos = [...porId.values()];
 
   let saldo = 0;
   let aConferir = 0;
@@ -51,6 +129,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({
     ok: true,
     cliente,
+    // A FAMÍLIA é o assunto desta ficha. `cliente` continua existindo porque
+    // meia tela ainda fala com uma pessoa (WhatsApp, régua de cobrança,
+    // instruções da IA) — mas o título, os jazigos e o dinheiro são dela.
+    familia: familia || null,
+    pessoas: pessoas || [],
+    // O checklist da conferência vem junto para o botão "conferido" poder
+    // existir AQUI, que é onde se corrige. Ir até a conferência para dar um ok
+    // no que se acabou de arrumar é uma viagem que ninguém faz.
+    conferencia: (checklist as any[]) || [],
     tumulos: tumulos || [],
     planos: planos || [],
     saldo: Math.round(saldo * 100) / 100,

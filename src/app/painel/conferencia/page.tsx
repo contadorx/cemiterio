@@ -289,7 +289,11 @@ export default function Conferencia() {
                 ))}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Link href={`/painel/conferencia/${f.familia_id}`}>
+                  {/* A FICHA DE VERDADE, e não uma cópia dela. Reproduzir a
+                      ficha aqui criava uma segunda verdade sobre a mesma
+                      família — e cada coisa que faltasse na cópia mandava a
+                      pessoa para a original no meio da correção. */}
+                  <Link href={`/painel/clientes/${f.familia_id}?de=conferencia`}>
                     <Botao tom="secundario">Abrir a ficha da família</Botao>
                   </Link>
                   {f.conferida_em ? (

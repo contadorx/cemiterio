@@ -75,6 +75,12 @@ export default function Ficha() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // De onde a pessoa veio, para saber para onde devolver.
+  const [veioDaConferencia, setVeio] = useState(false);
+  useEffect(() => {
+    setVeio(new URLSearchParams(window.location.search).get("de") === "conferencia");
+  }, []);
+
   if (erro) return <p className="text-[15px] text-perigo">{erro}</p>;
   if (!d) return <p className="text-[15px] text-ink-soft">Carregando…</p>;
 
@@ -140,20 +146,148 @@ export default function Ficha() {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * A BARRA DE CONFERÊNCIA — o ok mora onde se corrige.
+ *
+ * A conferência tinha tela própria e a ficha era outra. Quem via a pendência
+ * numa vinha corrigir na outra, e para carimbar o ok tinha de voltar. Ninguém
+ * volta: é assim que se confere o cadastro e nunca se marca nada como
+ * conferido.
+ *
+ * Aqui a barra mostra o que ainda falta (em palavras de quem vai fazer), e o
+ * botão só acende quando não falta nada obrigatório — a recusa é do banco
+ * (`sureya_conferir_familia`), não da tela, porque ok em cadastro incompleto é
+ * pior que nenhum ok: fica registrado que foi conferido.
+ */
+function BarraConferencia({ familiaId, fam, pendentes, aoMudar }: {
+  familiaId: string; fam: any; pendentes: any[]; aoMudar: () => void;
+}) {
+  const [ocupado, setOcupado] = useState(false);
+
+  async function darOk(ok: boolean) {
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/conferencia", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId, ok }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+      aoMudar();
+    } finally { setOcupado(false); }
+  }
+
+  async function definirRegime(regime: string) {
+    setOcupado(true);
+    try {
+      const r = await fetch("/api/conferencia", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId, regime }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.erro || "não consegui salvar"); return; }
+      aoMudar();
+    } finally { setOcupado(false); }
+  }
+
+  const conferida = !!fam?.conferida_em;
+  const regime = fam?.regime || "nao_definido";
+
+  return (
+    <section className="mb-3 rounded-xl2 border border-line bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[15px] font-medium text-ink">
+            Conferência do cadastro
+            {conferida && (
+              <span className="ml-2 text-[13px] font-normal text-positivo">
+                ✓ conferida em {new Date(fam.conferida_em).toLocaleDateString("pt-BR")}
+              </span>
+            )}
+          </p>
+          {pendentes.length > 0 ? (
+            <ul className="mt-1 list-disc pl-5 text-[13px] text-aviso">
+              {pendentes.map((i: any) => (
+                <li key={i.item}><b>{i.item}</b> — {i.acao}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-0.5 text-[13px] text-ink-soft">
+              Nada obrigatório faltando.
+            </p>
+          )}
+        </div>
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          {conferida ? (
+            <button className="text-[13px] underline text-ink-soft" disabled={ocupado}
+                    onClick={() => darOk(false)}>
+              tirar o ok
+            </button>
+          ) : (
+            <button
+              disabled={ocupado || pendentes.length > 0}
+              onClick={() => darOk(true)}
+              className={`rounded-lg px-4 py-2.5 text-[15px] font-medium ${
+                pendentes.length > 0
+                  ? "cursor-not-allowed border border-line bg-surface text-ink-soft"
+                  : "bg-brand text-sobre hover:opacity-90"}`}>
+              {pendentes.length > 0 ? `Faltam ${pendentes.length}` : "Dar o ok nesta família"}
+            </button>
+          )}
+          <Link href="/painel/conferencia"
+                className="text-[13px] underline text-ink-soft">
+            ir para a conferência
+          </Link>
+        </div>
+      </div>
+
+      {/* CONTRATO OU AVULSO — a decisão que mais falta, e que não tinha onde
+          ser tomada nesta ficha. "Sem contrato" era ambíguo: não dava para
+          separar a família que ninguém decidiu da que é avulsa de propósito. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <span className="text-[13px] text-ink-soft">Como se cobra:</span>
+        {([["contrato", "Contrato"], ["avulso", "Avulso"]] as const).map(([v, rot]) => (
+          <button key={v} disabled={ocupado} onClick={() => definirRegime(v)}
+                  className={`rounded-full border px-3 py-1 text-[13px] ${
+                    regime === v ? "border-brand bg-brand text-sobre"
+                                 : "border-line bg-card text-ink hover:border-brand"}`}>
+            {rot}
+          </button>
+        ))}
+        {regime === "nao_definido" && (
+          <span className="text-[13px] text-aviso">ainda não decidido</span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
 function Tumulos({ tumulos, clienteId, aoMudar }: {
-  tumulos: any[]; clienteId: string; aoMudar: () => void;
+  // NULO É LEGÍTIMO: família sem contato (0091). Os jazigos são da família e
+  // aparecem do mesmo jeito — o que não dá para fazer sem uma pessoa é
+  // adicionar jazigo por esta porta, que é a de "cadastrar para o fulano".
+  tumulos: any[]; clienteId: string | null; aoMudar: () => void;
 }) {
   const [novo, setNovo] = useState(false);
   return (
     <Cartao
       titulo={tumulos.length === 1 ? "Túmulo" : "Túmulos"}
       acao={
-        <Botao onClick={() => setNovo((x) => !x)}>
-          <Plus size={16} /> Adicionar
-        </Botao>
+        // SEM PESSOA NÃO HÁ ESTA PORTA. Ela cadastra o jazigo "para o fulano",
+        // e numa família sem contato não há fulano. Os jazigos continuam
+        // aparecendo — eles são da família —, e ligar um jazigo novo se faz
+        // pela tela de Jazigos, que é a que trabalha sem contato.
+        clienteId ? (
+          <Botao onClick={() => setNovo((x) => !x)}>
+            <Plus size={16} /> Adicionar
+          </Botao>
+        ) : (
+          <Link href="/painel/jazigos" className="text-[13px] underline text-ink-soft">
+            ligar um jazigo
+          </Link>
+        )
       }
     >
-      {novo && (
+      {novo && clienteId && (
         <AdicionarTumulo
           clienteId={clienteId}
           aoPronto={() => { setNovo(false); aoMudar(); }}
@@ -691,7 +825,7 @@ function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => 
 /* ------------------------------------------------------------------ */
 
 function ContaCorrente({ familiaId, clienteId, aoMudar }: {
-  familiaId: string | null; clienteId: string; aoMudar: () => void;
+  familiaId: string | null; clienteId: string | null; aoMudar: () => void;
 }) {
   const [dados, setDados] = useState<any>(null);
   // O comprovante entra AQUI, junto com o pagamento — e não num fluxo à
@@ -976,7 +1110,7 @@ function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function Limpezas({ clienteId, tumulos, aoMudar }: {
-  clienteId: string; tumulos: any[]; aoMudar: () => void;
+  clienteId: string | null; tumulos: any[]; aoMudar: () => void;
 }) {
   const [lista, setLista] = useState<any[]>([]);
   const [lancando, setLancando] = useState(false);
