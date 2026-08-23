@@ -485,16 +485,86 @@ async function rodar() {
          `${foraDaJornada.length} caíram em fim de semana`);
   checar("alocou serviços", alo.agendados > 0, JSON.stringify(alo));
   const agendados = banco.servicos.filter((s) => s.status === "agendado");
-  const porExec = new Set(agendados.map((s) => s.executora_id));
-  checar("distribuiu entre as ajudantes ativas", porExec.size >= 2,
-         `executoras usadas: ${[...porExec].join(", ")}`);
-  checar("ajudante INATIVA não recebe rota", !porExec.has("u-ex"), "u-ex está inativa");
+  // ---- O ALOCADOR NAO NOMEIA NINGUEM
+  //
+  // "Limpeza e limpeza": a equipe nao e fixa, e uma limpeza que nasce com o nome
+  // de alguem colado pressupoe escala. Quem lava vira verdade quando alguem
+  // COMECA o servico — `sureya_iniciar_lavagem` faz
+  // `executora_id = coalesce(executora_id, quem_chamou)`.
+  //
+  // ESTE TESTE SUBSTITUI UM QUE PASSAVA POR ACASO: ele conferia
+  // `new Set(agendados.map(s => s.executora_id)).size >= 2` e passava com
+  // `{null, undefined}` — dois "vazios" diferentes contam como dois elementos.
+  // Ele afirmava "distribuiu entre as ajudantes" enquanto ninguem estava
+  // atribuido.
+  const comNome = agendados.filter((s) => !!s.executora_id);
+  checar("o alocador NAO carimba o nome de ninguem", comNome.length === 0,
+         `${comNome.length} servicos sairam com executora`);
+
+  // A capacidade da equipe continua valendo — o que saiu foi o nome, nao o
+  // limite. Nina 10 + Ana 6 = 16 por dia; a inativa (8) nao entra na conta.
+  const porDia = new Map<string, number>();
+  for (const s of agendados) porDia.set(s.data_prevista, (porDia.get(s.data_prevista) || 0) + 1);
+  const maiorDia = Math.max(...porDia.values());
+  checar("a capacidade da equipe ATIVA continua limitando o dia", maiorDia <= 16,
+         `um dia recebeu ${maiorDia}, e o teto das ativas e 16`);
+
+  // E o que uma PESSOA decidiu, fica: o alocador nao desfaz atribuicao manual,
+  // do mesmo jeito que ja respeita `fixado_em`.
+  banco.servicos.push({ id: "amao-1", org_id: ORG, tumulo_id: "t1", plano_id: "p1",
+    cliente_id: "c-cec", data_prevista: hoje, data_plano: hoje, status: "pendente",
+    valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: "u-ana", ordem_dia: null });
+  await ag.alocarAgenda();
+  const aMao = banco.servicos.find((s) => s.id === "amao-1")!;
+  checar("quem foi definido A MAO continua definido depois de alocar",
+         aMao.executora_id === "u-ana", `virou ${aMao.executora_id}`);
+  checar("e mesmo assim entrou na rota do dia",
+         aMao.status === "agendado" && !!aMao.ordem_dia,
+         `status ${aMao.status}, ordem ${aMao.ordem_dia}`);
   const s3 = banco.servicos.find((s) => s.id === "s3")!;
   const primeiroDia = agendados.map((s) => s.data_prevista).sort()[0];
   checar("backlog adiado 3x entra no PRIMEIRO dia", s3.data_prevista === primeiroDia,
          `s3 ficou em ${s3.data_prevista}, primeiro dia é ${primeiroDia}`);
   const diasUsados = [...new Set(agendados.map((s) => s.data_prevista))];
   checar("excedente vai para os dias seguintes", diasUsados.length >= 1, `dias: ${diasUsados.length}`);
+
+  // ---- A DATA DO PLANO E' O DIA MAIS CEDO, NAO UMA SUGESTAO
+  //
+  // Medido em producao em 23/08: os 8 servicos pendentes eram TRES do jazigo
+  // "Souza" e CINCO do "Nagae" — as visitas semanais e quinzenais geradas para
+  // 17/08, 24/08, 31/08, 07/09 e 14/09 —, TODAS com data_prevista = 18/08. A
+  // lavagem devida em setembro estava marcada para agosto.
+  //
+  // No chao: o app de campo mostrava o mesmo jazigo cinco vezes seguidas. A
+  // ordenacao por endereco estava certa e nao tinha o que ordenar — parecia que
+  // a roteirizacao nao funcionava, e o que nao funcionava era a data.
+  //
+  // Antecipar por semanas nao e otimizar: e lavar (e cobrar) fora do combinado.
+  for (const s of banco.servicos) { if (s.status === "agendado") s.status = "executado"; }
+  const daquiA = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  banco.servicos.push(
+    { id: "futuro-1", org_id: ORG, tumulo_id: "t1", plano_id: "p1", cliente_id: "c-cec",
+      data_prevista: daquiA(35), data_plano: daquiA(35), status: "pendente",
+      valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null },
+    { id: "agora-1", org_id: ORG, tumulo_id: "t3", plano_id: "p1", cliente_id: "c-cec",
+      data_prevista: hoje, data_plano: hoje, status: "pendente",
+      valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null },
+  );
+  await ag.alocarAgenda();
+  const futuro = banco.servicos.find((s) => s.id === "futuro-1")!;
+  const devidoAgora = banco.servicos.find((s) => s.id === "agora-1")!;
+
+  checar("lavagem devida daqui a 35 dias NAO e puxada para hoje",
+         String(futuro.data_prevista) >= daquiA(30),
+         `ficou em ${futuro.data_prevista}, e o plano era ${daquiA(35)}`);
+  checar("e a devida hoje continua sendo para agora",
+         String(devidoAgora.data_prevista) <= daquiA(3),
+         `ficou em ${devidoAgora.data_prevista}`);
+  // A capacidade tinha vaga de sobra: se a data fosse ignorada, as duas cairiam
+  // no mesmo dia — que era exatamente o defeito.
+  checar("as duas NAO caem no mesmo dia so porque havia vaga",
+         futuro.data_prevista !== devidoAgora.data_prevista,
+         `ambas em ${devidoAgora.data_prevista}`);
 
   console.log("\n=== 4. PROATIVOS (cobrança / aviso de saldo / gatilhos) ===");
   const pro = await import("../src/lib/proativo");

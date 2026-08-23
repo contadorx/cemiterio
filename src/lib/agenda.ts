@@ -336,6 +336,14 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
 interface ServicoPend {
   id: string;
   data_prevista: string | null;
+  /**
+   * A DATA TEÓRICA DO PLANO — congelada no momento em que o serviço nasceu.
+   *
+   * É diferente de `data_prevista`, que o alocador REESCREVE a cada passada.
+   * Sem ela, numa segunda rodada o alocador não teria como saber quando aquela
+   * lavagem era devida: ele leria a data que ele mesmo escreveu.
+   */
+  data_plano?: string | null;
   data_desejada?: string | null;   // a data que a família pediu (0037) — nunca reescrita
   prioridade?: number;
   cemiterio_id?: string | null;    // 0044 — a rota do dia é por cemitério
@@ -516,7 +524,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   // ---- pendentes (com o cemitério, quando a coluna existir) -----------------
   const SEL_NOVO =
-    "id,data_prevista,data_desejada,prioridade,cemiterio_id," +
+    "id,data_prevista,data_plano,data_desejada,prioridade,cemiterio_id," +
     "tumulos(identificacao,lat,lng,cemiterio_id,rua_id,ordem_na_rua,ruas(ordem,chave_fisica),quadras(ordem,cemiterio_id))";
   const SEL_SEM_FIXADO =
     "id,data_prevista,data_desejada,prioridade," +
@@ -557,6 +565,7 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   const itens: ServicoPend[] = (pend || []).map((s: any) => ({
     id: s.id,
     data_prevista: s.data_prevista,
+    data_plano: s.data_plano ?? null,
     data_desejada: s.data_desejada ?? null,
     prioridade: s.prioridade || 0,
     // o cemitério vem da coluna nova; sem ela, da quadra do túmulo
@@ -696,12 +705,53 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       por(primeiraVagaDe(primeiroDia), it);
     }
 
-    // 2ª passada — o resto ocupa o que sobrou
-    const semData = grupo.itens.filter((i) => !i.data_desejada).sort(ordemPadrao);
-    let cursor = primeiroDia;
+    // ------------------------------------------------------------------
+    // 2ª passada — o resto ocupa o que sobrou, A PARTIR DO DIA EM QUE É DEVIDO
+    //
+    // ⚠ O QUE ESTAVA ERRADO AQUI, e como apareceu
+    //
+    // Isto empacotava TUDO a partir do primeiro dia com vaga: `cursor` começava
+    // em `primeiroDia` e só andava quando o dia enchia. Com capacidade de 20 por
+    // dia e poucos serviços, o horizonte inteiro caía no mesmo dia.
+    //
+    // Medido em produção em 23/08: os 8 serviços pendentes eram TRÊS do jazigo
+    // "Souza" e CINCO do "Nagae" — as visitas semanais e quinzenais geradas para
+    // 17/08, 24/08, 31/08, 07/09 e 14/09 —, todas com `data_prevista = 18/08`.
+    // A lavagem devida em setembro estava marcada para agosto.
+    //
+    // O efeito no chão: o app de campo mostrava o mesmo jazigo cinco vezes
+    // seguidas. A ordenação por endereço estava certa e não tinha o que ordenar
+    // — parecia que a roteirização não funcionava, e o que não funcionava era a
+    // data.
+    //
+    // Antecipar por semanas não é otimizar: é lavar (e cobrar) fora do
+    // combinado. A data do plano passa a ser o dia MAIS CEDO possível; atrasar
+    // quando o dia está cheio continua valendo, adiantar não.
+    //
+    // `data_plano` e não `data_prevista`: o alocador REESCREVE `data_prevista` a
+    // cada passada, então numa segunda rodada ele leria a data que ele mesmo
+    // escreveu. `data_plano` é a teórica, congelada no nascimento do serviço.
+    // Sem a coluna (banco antigo), cai em `data_prevista` — que na primeira
+    // passada ainda é a data do plano.
+    // ------------------------------------------------------------------
+    const devidoEm = (i: ServicoPend) => {
+      const d = i.data_plano || i.data_prevista || primeiroDia;
+      // Serviço atrasado é devido HOJE, não no passado: puxá-lo para trás não
+      // recupera o tempo, só o esconde num dia que já passou.
+      return d < primeiroDia ? primeiroDia : d;
+    };
+
+    const semData = grupo.itens
+      .filter((i) => !i.data_desejada)
+      .sort((a, b) => {
+        const da = devidoEm(a);
+        const db_ = devidoEm(b);
+        if (da !== db_) return da < db_ ? -1 : 1;
+        return ordemPadrao(a, b);
+      });
+
     for (const it of semData) {
-      cursor = primeiraVagaDe(cursor);
-      por(cursor, it);
+      por(primeiraVagaDe(devidoEm(it)), it);
     }
 
     // ---- grava ------------------------------------------------------------
@@ -721,9 +771,34 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
       // vezes no mesmo dia.
       const sequencia: ServicoPend[] = ordenarPorEndereco(doDia);
 
-      // reparte entre quem pode trabalhar aqui, em blocos contíguos, respeitando
-      // o que cada uma JÁ recebeu neste dia (inclusive de outro cemitério)
+      // ==================================================================
+      // O ALOCADOR NÃO NOMEIA NINGUÉM.
+      //
+      // Ele escrevia `executora_id: turno.userId` — toda limpeza nascia com o
+      // nome de alguém colado nela. Isso pressupõe equipe fixa, e não é o caso:
+      // "limpeza é limpeza", e quem lava pode ser gente que não está na escala.
+      //
+      // Agora o campo `executora_id` NÃO É TOCADO aqui. Consequências, todas
+      // desejadas:
+      //
+      //   · serviço sem dono aparece para toda a equipe — `/api/agenda/dia` já
+      //     devolve `executora_id is null` para quem estiver logado;
+      //   · QUEM COMEÇA, ASSUME: `sureya_iniciar_lavagem` (0068) faz
+      //     `executora_id = coalesce(executora_id, quem_chamou)`. Duas pessoas
+      //     no mesmo dia não fazem o mesmo jazigo duas vezes, e a remuneração
+      //     vai para quem realmente lavou;
+      //   · quem foi definido À MÃO na agenda continua definido — o alocador
+      //     não desfaz decisão de gente, do mesmo jeito que já respeita
+      //     `fixado_em`.
+      //
+      // A capacidade da equipe continua valendo: os turnos ainda dizem quantas
+      // limpezas cabem no dia. O que sai é só o nome no papel.
+      // ==================================================================
       let pos = 0;
+      // A ordem do dia agora é do DIA, não de cada pessoa: é a sequência em que
+      // se anda pelo cemitério. Por pessoa, duas listas começavam em "1" e a
+      // ordem deixava de ser um roteiro.
+      let ordem = 1;
       for (const turno of turnosDoGrupo) {
         const cabe = restaDoTurno(dia, turno);
         if (cabe <= 0) continue;
@@ -732,14 +807,11 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
         pos += bloco.length;
         usado.set(chave(dia, turno.userId), (usado.get(chave(dia, turno.userId)) || 0) + bloco.length);
 
-        // a ordem do dia continua de 1 em diante POR PESSOA
-        let ordem = (usado.get(chave(dia, turno.userId)) || 0) - bloco.length + 1;
         for (const it of bloco) {
           const campos: Record<string, any> = {
             data_prevista: dia,
             ordem_dia: ordem,
             status: "agendado",
-            executora_id: turno.userId,
           };
           if (temDesejada) campos.desejada_estourada = estourados.has(it.id);
           if (temCemiterio && it.cemiterio_id) campos.cemiterio_id = it.cemiterio_id;

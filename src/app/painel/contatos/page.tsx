@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+<<<<<<< Updated upstream
 import { MessageCircle, Phone, Check, X, Clock, AlertTriangle } from "lucide-react";
+=======
+import { MessageCircle, Phone, Check, X, Clock, AlertTriangle, Send, ArrowLeft, Search } from "lucide-react";
+>>>>>>> Stashed changes
 import { Cartao, Botao, Selo, Campo, Entrada } from "../pecas";
 import { diasDesde, faz } from "@/lib/datas";
 
@@ -53,6 +57,27 @@ function espera(horas: number, iso: string): string {
   return d === null ? `há ${horas} horas` : faz(d);
 }
 
+<<<<<<< Updated upstream
+=======
+/**
+ * "há 3 horas", "ontem 14:20", "14/08 09:30" — o jeito que se lê uma conversa.
+ *
+ * Hora exata no que é de hoje (é o que decide se ainda dá para responder agora),
+ * e data no que é antigo (ali a hora não muda nada).
+ */
+function quando(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  const hora = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const dias = diasDesde(iso);
+  if (dias === 0) return hora;
+  if (dias === 1) return `ontem ${hora}`;
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${hora}`;
+}
+
+>>>>>>> Stashed changes
 function telBonito(t: string) {
   const d = String(t || "").replace(/\D/g, "").replace(/^55/, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -61,6 +86,48 @@ function telBonito(t: string) {
 }
 
 export default function Contatos() {
+<<<<<<< Updated upstream
+=======
+  // DUAS ABAS, UMA TELA.
+  //
+  // "Esperando" é a fila de quem escreveu e ainda não foi atendido — o trabalho
+  // do dia. "Conversas" é o histórico de WhatsApp de quem já tem contato com a
+  // casa, para ler e responder sem sair daqui.
+  //
+  // A aba começa em "esperando" de propósito: quem abre esta tela veio ver o
+  // que falta, não navegar por conversas.
+  const [aba, setAba] = useState<"esperando" | "conversas">("esperando");
+
+  return (
+    <>
+      <h1 className="text-[22px] font-semibold text-ink">Contatos</h1>
+      <p className="mb-4 text-[14px] text-ink-soft">
+        Quem escreveu pelo site ou pelo WhatsApp — e a conversa com cada um.
+      </p>
+
+      <div className="mb-4 flex gap-2">
+        {(["esperando", "conversas"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setAba(v)}
+            className={`rounded-lg border px-3 py-2 text-[14px] font-medium transition-colors ${
+              aba === v
+                ? "border-transparent bg-brand text-sobre"
+                : "border-line bg-card text-ink hover:bg-surface"
+            }`}
+          >
+            {v === "esperando" ? "Esperando resposta" : "Conversas"}
+          </button>
+        ))}
+      </div>
+
+      {aba === "esperando" ? <Esperando /> : <Conversas />}
+    </>
+  );
+}
+
+function Esperando() {
+>>>>>>> Stashed changes
   const [pendentes, setPendentes] = useState<Contato[]>([]);
   const [feitos, setFeitos] = useState<any[]>([]);
   const [resumo, setResumo] = useState<any>(null);
@@ -94,11 +161,14 @@ export default function Contatos() {
 
   return (
     <>
+<<<<<<< Updated upstream
       <h1 className="text-[22px] font-semibold text-ink">Contatos</h1>
       <p className="mb-4 text-[14px] text-ink-soft">
         Quem escreveu pelo site e ainda espera resposta.
       </p>
 
+=======
+>>>>>>> Stashed changes
       {resumo && (pendentes.length > 0) && (
         <div className="mb-4 flex flex-wrap gap-2">
           <Selo tom="neutro">{resumo.total} esperando</Selo>
@@ -247,3 +317,234 @@ export default function Contatos() {
     </>
   );
 }
+<<<<<<< Updated upstream
+=======
+
+/* ------------------------------------------------------------------ */
+
+type Fio = {
+  chave: string; tipo: "cliente" | "lead"; id: string;
+  nome: string; telefone: string | null;
+  ultima: string | null; ultimaEm: string | null; ultimoAutor: string | null;
+  esperando: boolean; familiaId: string | null;
+};
+
+/**
+ * AS CONVERSAS — o módulo que estava escondido, de volta só na parte que serve.
+ *
+ * `/painel/conversas` foi desligada junto com o agente de IA: era uma tela de
+ * CRM, com abas de leads, rascunhos e gestão de atendimento. O webhook nunca
+ * parou — toda mensagem que chega continua sendo gravada e o áudio continua
+ * sendo transcrito. A conversa existia e ninguém conseguia ler.
+ *
+ * O que volta é a lista de quem já tem contato com a casa, e a caixa de
+ * resposta. Nada mais: o CRM continua desligado.
+ */
+function Conversas() {
+  const [fios, setFios] = useState<Fio[]>([]);
+  const [resumo, setResumo] = useState<{ total: number; esperando: number } | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [busca, setBusca] = useState("");
+  const [aberta, setAberta] = useState<Fio | null>(null);
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const q = busca.trim() ? `?q=${encodeURIComponent(busca.trim())}` : "";
+      const r = await fetch(`/api/contatos/conversas${q}`).then((x) => x.json());
+      if (r?.ok) { setFios(r.fios || []); setResumo(r.resumo || null); }
+    } finally { setCarregando(false); }
+  }, [busca]);
+
+  useEffect(() => {
+    // Espera a digitação parar: buscar a cada tecla numa lista de duzentos é
+    // uma consulta por letra.
+    const t = setTimeout(carregar, busca ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [carregar, busca]);
+
+  if (aberta) {
+    return <Fio1 fio={aberta} aoVoltar={() => { setAberta(null); carregar(); }} />;
+  }
+
+  return (
+    <>
+      <div className="mb-3 flex items-center gap-2 rounded-xl2 border border-line bg-card px-3">
+        <Search size={16} className="flex-shrink-0 text-ink-soft" />
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Procurar por nome ou telefone"
+          className="w-full bg-transparent py-2.5 text-[15px] text-ink outline-none"
+        />
+      </div>
+
+      {resumo && resumo.esperando > 0 && (
+        <p className="mb-3">
+          <Selo tom="atencao">{resumo.esperando} esperando resposta</Selo>
+        </p>
+      )}
+
+      {carregando && <p className="text-[15px] text-ink-soft">Carregando…</p>}
+
+      {!carregando && !fios.length && (
+        <Cartao>
+          <p className="text-[15px] text-ink-soft">
+            {busca
+              ? "Ninguém com esse nome ou telefone nas conversas."
+              : "Nenhuma conversa ainda. Elas aparecem aqui assim que alguém escrever no WhatsApp da casa."}
+          </p>
+          {/* A lista só mostra quem JÁ trocou mensagem. Para começar uma
+              conversa nova, o caminho é a ficha da família — é lá que está o
+              telefone certo e o contexto. Dizer isso evita procurar aqui uma
+              pessoa que nunca escreveu e concluir que ela sumiu. */}
+          <p className="mt-2 text-[14px] text-ink-soft">
+            Aqui aparece só quem já trocou mensagem. Para começar uma conversa
+            nova, abra a <a href="/painel/clientes" className="text-brand underline decoration-dotted">ficha da família</a>.
+          </p>
+        </Cartao>
+      )}
+
+      {fios.map((f) => (
+        <button
+          key={f.chave}
+          onClick={() => setAberta(f)}
+          className="mb-2 block w-full rounded-xl2 border border-line bg-card p-3 text-left hover:bg-surface"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-medium text-ink">{f.nome}</span>
+            <span className="text-[13px] text-ink-soft">{telBonito(f.telefone || "")}</span>
+            {/* Quem ainda não é da casa aparece marcado: a conversa é a mesma,
+                mas o que se responde a um lead é outra coisa. */}
+            {f.tipo === "lead" && <Selo tom="neutro">ainda não é cliente</Selo>}
+            {f.esperando && <Selo tom="atencao">esperando</Selo>}
+            <span className="flex-1" />
+            {f.ultimaEm && (
+              <span className="text-[13px] text-ink-soft">{quando(f.ultimaEm)}</span>
+            )}
+          </div>
+          {f.ultima && (
+            <p className="mt-1 truncate text-[14px] text-ink-soft">
+              {f.ultimoAutor === "cliente" ? "" : "você: "}{f.ultima}
+            </p>
+          )}
+        </button>
+      ))}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+type Msg = {
+  id: string; minha: boolean; autor: string; texto: string;
+  em: string | null; transcrita: boolean; peloCelular: boolean;
+};
+
+/** Uma conversa aberta: o histórico e a caixa de resposta. */
+function Fio1({ fio, aoVoltar }: { fio: Fio; aoVoltar: () => void }) {
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [quem, setQuem] = useState<any>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const r = await fetch(`/api/contatos/conversa?tipo=${fio.tipo}&id=${fio.id}`)
+        .then((x) => x.json());
+      if (r?.ok) { setMsgs(r.mensagens || []); setQuem(r.quem || null); }
+      else setErro(r?.erro || "Não consegui abrir a conversa.");
+    } finally { setCarregando(false); }
+  }, [fio.tipo, fio.id]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function enviar() {
+    const t = texto.trim();
+    if (!t) return;
+    setEnviando(true); setErro("");
+    try {
+      const r = await fetch("/api/contatos/conversa", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: fio.tipo, id: fio.id, texto: t }),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui enviar."); return; }
+      // A mensagem SAIU mas não entrou no histórico. Dizer isso evita ela mandar
+      // de novo achando que não foi.
+      if (r.avisoHistorico) {
+        setErro("A mensagem foi enviada, mas não consegui gravá-la no histórico. Não mande de novo.");
+      }
+      setTexto("");
+      await carregar();
+    } finally { setEnviando(false); }
+  }
+
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button onClick={aoVoltar}
+                className="inline-flex items-center gap-1 text-[14px] text-ink-soft hover:text-brand">
+          <ArrowLeft size={16} /> voltar
+        </button>
+        <span className="text-[16px] font-medium text-ink">{fio.nome}</span>
+        <span className="text-[14px] text-ink-soft">{telBonito(fio.telefone || "")}</span>
+        {quem?.familiaId && (
+          <a href={`/painel/clientes?familiaId=${quem.familiaId}`}
+             className="text-[14px] text-brand underline decoration-dotted">
+            ver a família
+          </a>
+        )}
+      </div>
+
+      <Cartao>
+        {carregando && <p className="text-[15px] text-ink-soft">Carregando…</p>}
+        {!carregando && !msgs.length && (
+          <p className="text-[15px] text-ink-soft">Nenhuma mensagem guardada nesta conversa.</p>
+        )}
+
+        {(msgs || []).map((m) => (
+          <div key={m.id} className={`mb-2 flex ${m.minha ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[85%] rounded-xl2 px-3 py-2 text-[15px] leading-relaxed ${
+              m.minha ? "bg-brand text-sobre" : "border border-line bg-surface text-ink"}`}>
+              <p className="whitespace-pre-wrap">{m.texto}</p>
+              <p className={`mt-1 text-[11px] ${m.minha ? "opacity-75" : "text-ink-soft"}`}>
+                {quando(m.em)}
+                {/* De onde veio importa na leitura: o áudio transcrito não é o
+                    que a pessoa digitou, e o que saiu do celular dela não passou
+                    por esta tela. */}
+                {m.transcrita && " · áudio transcrito"}
+                {m.peloCelular && " · mandada do seu celular"}
+                {m.autor === "ia" && " · resposta automática (da época do robô)"}
+                {m.autor === "campo" && " · do app de campo"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </Cartao>
+
+      <div className="mt-3">
+        <textarea
+          rows={3}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder={`Escrever para ${fio.nome.split(" ")[0]}…`}
+          className="w-full rounded-lg border border-line bg-card p-3 text-[15px] leading-relaxed text-ink focus:border-brand focus:outline-none"
+        />
+        {erro && <p className="mt-1 text-[13px] text-perigo">{erro}</p>}
+        <div className="mt-2 flex items-center gap-2">
+          <Botao tom="principal" disabled={enviando || !texto.trim()} onClick={enviar}>
+            <Send size={16} /> {enviando ? "Enviando…" : "Enviar no WhatsApp"}
+          </Botao>
+          <span className="text-[13px] text-ink-soft">
+            Sai do WhatsApp da casa. Nada é enviado sozinho.
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+>>>>>>> Stashed changes

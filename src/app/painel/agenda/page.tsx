@@ -15,6 +15,8 @@ interface Item {
   valor: number | null;
   /** data escolhida à mão: a geração automática não mexe nesta lavagem (0041) */
   fixado?: boolean;
+  /** Quem vai limpar. Nulo é o NORMAL: o alocador não nomeia ninguém. */
+  executoraId?: string | null;
 }
 
 /**
@@ -54,6 +56,59 @@ export default function AgendaPage() {
   const [diag, setDiag] = useState<any>(null);
   const [movendo, setMovendo] = useState<string | null>(null);
 
+  /**
+   * QUEM LIMPA — marcado em lote, e sempre opcional.
+   *
+   * O alocador não nomeia mais ninguém: "limpeza é limpeza", e a equipe não é
+   * fixa. Mas há dias em que ela já sabe quem vai, e marcar um por um numa rota
+   * de vinte é trabalho que ninguém faz — então fica em lote.
+   *
+   * Serviço já executado não entra na seleção: ali `executora_id` deixou de ser
+   * plano e virou o registro de quem lavou, que é de onde sai a remuneração.
+   */
+  const [equipe, setEquipe] = useState<{ id: string; nome: string; papel: string }[]>([]);
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [quem, setQuem] = useState<string>("");
+  const [atribuindo, setAtribuindo] = useState(false);
+
+  const nomeDe = (id: string | null) =>
+    (id && equipe.find((m) => m.id === id)?.nome) || null;
+
+  function alternar(id: string) {
+    setMarcados((m) => {
+      const n = new Set(m);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  async function definirQuemLimpa() {
+    if (!marcados.size) return;
+    const emAberto = quem === "";
+    const nome = emAberto ? "em aberto (qualquer pessoa da equipe)" : nomeDe(quem) || "essa pessoa";
+    if (!confirm(
+      `Marcar ${marcados.size} ${marcados.size === 1 ? "limpeza" : "limpezas"} como ${nome}?`
+      + (emAberto ? "\n\nElas voltam a aparecer para toda a equipe." : "")
+    )) return;
+
+    setAtribuindo(true);
+    try {
+      const r = await fetch("/api/agenda/executora", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...marcados], executoraId: emAberto ? null : quem }),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      // Dizer quantos ficaram de fora evita o silêncio de marcar vinte e mudar
+      // dezoito sem ninguém saber quais dois.
+      if (r.ignorados > 0) {
+        alert(`${r.mexidos} alteradas. ${r.ignorados} ficaram como estavam — já foram executadas.`);
+      }
+      setMarcados(new Set());
+      await carregar();
+    } finally { setAtribuindo(false); }
+  }
+
   /** Sobe ou desce uma lavagem uma posição dentro do dia. */
   async function mover(dia: string, id: string, direcao: -1 | 1) {
     const lista = (dias[dia] || []).map((x) => x.id);
@@ -82,6 +137,7 @@ export default function AgendaPage() {
     qs.set("dias", String(periodo.dias));
     const r = await fetch(`/api/agenda/semana?${qs}`).then((x) => x.json()).catch(() => null);
     setDias(r?.dias || {});
+    setEquipe(r?.equipe || []);
     setCarregando(false);
   }, [periodo]);
 
@@ -311,15 +367,71 @@ export default function AgendaPage() {
           </section>
         )}
 
+        {/* ------------------------------------------------------ quem limpa
+            Só aparece com alguém marcado: uma barra permanente no topo de uma
+            tela que já tem período, gerar e reorganizar seria mais um lugar
+            para o olho tropeçar todo dia. */}
+        {marcados.size > 0 && (
+          <section style={{ ...painel.card, position: "sticky", top: 8, zIndex: 5,
+                            borderLeft: `5px solid ${cor.navy}` }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <strong style={{ color: cor.navy }}>
+                {marcados.size} {marcados.size === 1 ? "limpeza marcada" : "limpezas marcadas"}
+              </strong>
+              <select style={{ ...painel.input, margin: 0, width: "auto", minWidth: 200 }}
+                      value={quem} onChange={(e) => setQuem(e.target.value)}>
+                {/* "Em aberto" é a PRIMEIRA opção porque é o estado normal —
+                    a limpeza aparece para toda a equipe e quem começa assume. */}
+                <option value="">deixar em aberto (qualquer pessoa)</option>
+                {equipe.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nome}</option>
+                ))}
+              </select>
+              <button style={painel.botaoMini} disabled={atribuindo} onClick={definirQuemLimpa}>
+                {atribuindo ? "Salvando…" : "Aplicar"}
+              </button>
+              <button style={painel.botaoMiniSec} onClick={() => setMarcados(new Set())}>
+                Desmarcar
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0", lineHeight: 1.45 }}>
+              Definir quem limpa é opcional. Em aberto, a limpeza aparece para toda a
+              equipe e <b>quem começa assume</b> — inclusive quem não é fixo.
+            </p>
+          </section>
+        )}
+
         {chaves.map((d) => (
           <section key={d} style={painel.card}>
-            <strong style={{ color: cor.navy, fontSize: 16 }}>
-              {new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
-                weekday: "long",
-                day: "2-digit",
-                month: "2-digit",
-              })}
-            </strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <strong style={{ color: cor.navy, fontSize: 16 }}>
+                {new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "2-digit",
+                })}
+              </strong>
+              {/* MARCAR O DIA INTEIRO — é como ela pensa: "quinta é da Ana".
+                  Marcar quinze linhas uma a uma para dizer isso é o trabalho
+                  que o lote existe para tirar. */}
+              {dias[d].some((x) => x.status !== "executado") && (
+                <button
+                  style={{ ...painel.botaoMiniSec, minHeight: 30, padding: "0 10px" }}
+                  onClick={() => {
+                    const doDia = dias[d].filter((x) => x.status !== "executado").map((x) => x.id);
+                    const todosMarcados = doDia.every((id) => marcados.has(id));
+                    setMarcados((m) => {
+                      const n = new Set(m);
+                      for (const id of doDia) { if (todosMarcados) n.delete(id); else n.add(id); }
+                      return n;
+                    });
+                  }}
+                >
+                  {dias[d].filter((x) => x.status !== "executado").every((x) => marcados.has(x.id))
+                    ? "desmarcar o dia" : "marcar o dia"}
+                </button>
+              )}
+            </div>
             {dias[d].map((s, idx) => (
               <div
                 key={s.id}
@@ -342,6 +454,19 @@ export default function AgendaPage() {
 
                     Só aparecem no que ainda não foi executado: mudar a ordem do
                     que já aconteceu não quer dizer nada. */}
+                {/* A CAIXA DE SELEÇÃO. Só no que ainda não foi executado —
+                    ali `executora_id` é o registro de quem lavou, e trocar
+                    pagaria uma pessoa pelo trabalho de outra. */}
+                {s.status !== "executado" && (
+                  <input
+                    type="checkbox"
+                    checked={marcados.has(s.id)}
+                    onChange={() => alternar(s.id)}
+                    aria-label={`Marcar ${s.tumulo}`}
+                    style={{ width: 20, height: 20, flexShrink: 0, cursor: "pointer" }}
+                  />
+                )}
+
                 {s.status !== "executado" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <button
@@ -367,6 +492,17 @@ export default function AgendaPage() {
                     Q{s.quadra} · {s.tumulo}
                   </span>{" "}
                   <span style={{ color: statusCor[s.status] || cor.cinza, fontSize: 15 }}>({s.status})</span>
+                  {/* QUEM LIMPA, quando alguém foi definido. Sem selo quando
+                      está em aberto: "em aberto" é o normal, e um selo em toda
+                      linha vira ruído em vez de informação. */}
+                  {s.executoraId && nomeDe(s.executoraId) && (
+                    <span title="Quem vai limpar — definido por você na agenda"
+                          style={{ marginLeft: 6, fontSize: 13, fontWeight: 600, color: cor.navy,
+                                   background: "rgb(var(--zm-fundo))", border: `1px solid ${cor.linha}`,
+                                   borderRadius: 999, padding: "2px 8px" }}>
+                      {nomeDe(s.executoraId)}
+                    </span>
+                  )}
                   {s.fixado && (
                     <span title="Data escolhida por você — a geração automática não mexe nesta lavagem"
                           style={{ marginLeft: 6, fontSize: 13, fontWeight: 700, color: "#0f766e",

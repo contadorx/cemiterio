@@ -319,3 +319,115 @@ definição viva, troca a condição e falha se não reconhecer o texto original
 **O log existe porque "muda ano após ano" é um fato com data.** Um campo sozinho
 só sabe o presente, e a pergunta que aparece é sempre sobre o passado: *para quem
 foi a cobrança de março?*
+<<<<<<< Updated upstream
+=======
+
+---
+
+## D-11 · A limpeza não tem dono; quem começa, assume
+
+**O que ele disse, 23/08:** *"Nos serviços está o nome da Nina — na verdade não
+quero nomear. Limpeza é limpeza. No calendário posso ou não definir a usuária
+que vai lavar, até porque tenho pessoas não fixas. Quero deixar que a limpeza
+aconteça, e a possibilidade de definir em lote quem limpa na agenda."*
+
+**O que o alocador fazia:** escrevia `executora_id: turno.userId` em toda
+lavagem que agendava. Toda limpeza nascia com o nome de alguém colado nela —
+o que pressupõe equipe fixa.
+
+**Agora ele não toca no campo.** Três consequências, todas desejadas:
+
+| | |
+|---|---|
+| serviço sem dono | aparece para **toda** a equipe — `/api/agenda/dia` e o briefing já devolviam `executora_id is null` |
+| quem começa, assume | `sureya_iniciar_lavagem` (0068) já fazia `executora_id = coalesce(executora_id, quem_chamou)` |
+| decisão de gente fica | o alocador não desfaz atribuição manual, do mesmo jeito que já respeita `fixado_em` |
+
+Ou seja: **quem lavou deixa de ser um plano e passa a ser um fato**, registrado
+no momento em que a pessoa toca em "começar". É o que serve para gente não fixa,
+e é o que faz a remuneração ir para quem realmente trabalhou.
+
+**A capacidade continua valendo.** Os turnos ainda dizem quantas limpezas cabem
+no dia; o que saiu foi o nome no papel, não o limite.
+
+**A ordem do dia virou do DIA.** Ela era numerada de 1 em diante **por pessoa** —
+com duas ajudantes, duas listas começavam em "1" e a ordem deixava de ser um
+roteiro. Agora é 1..N para o dia inteiro, que é a sequência em que se anda pelo
+cemitério.
+
+**Em lote, na agenda.** Caixa por linha, "marcar o dia" no cabeçalho de cada dia
+(é como ela pensa: *"quinta é da Ana"*), e uma barra com a equipe ativa. A
+primeira opção da lista é **"deixar em aberto"**, porque é o estado normal.
+Serviço já executado fica fora da seleção: ali `executora_id` é o registro de
+quem lavou, e reescrever pagaria uma pessoa pelo trabalho de outra.
+
+---
+
+### Um teste que passava por acaso
+
+Ao trocar isso, o teste *"distribuiu entre as ajudantes ativas"* continuou verde
+— e não deveria. Ele conferia
+`new Set(agendados.map(s => s.executora_id)).size >= 2`, e passava com
+`{null, undefined}`: dois "vazios" diferentes contam como dois elementos no
+`Set`. Ele afirmava que a distribuição acontecia enquanto ninguém estava
+atribuído.
+
+Substituído por quatro conferências que cobram o comportamento de verdade: o
+alocador não carimba ninguém, a capacidade da equipe ativa continua limitando o
+dia, a atribuição manual sobrevive à alocação, e mesmo atribuída a lavagem entra
+na rota.
+
+---
+
+## D-12 · A conversa volta, o CRM não
+
+**O que ele pediu, 23/08:** *"Em Contatos quero que entre todas as conversas e
+respostas de WhatsApp com o módulo de conversa que ficou escondido, somente de
+contatos e celulares registrados. Isso vai facilitar a comunicação."* — e, em
+seguida: *"inclua nesse os contatos do site também."*
+
+**O que estava acontecendo.** `/painel/conversas` foi desligada junto com o
+agente de IA — era tela de CRM, com abas de leads, rascunhos e gestão de
+atendimento. Mas **o webhook nunca parou**: toda mensagem que chega continua
+sendo gravada, o áudio continua sendo transcrito, e o que ela responde direto do
+celular continua entrando como saída.
+
+Ou seja: a conversa existia e ninguém conseguia ler. Medido em 23/08 — **15
+conversas com mensagem, 5 delas esperando resposta**, invisíveis.
+
+**"Somente de contatos e celulares registrados" já é como o sistema funciona**,
+por construção e não por filtro:
+
+| telefone | vira |
+|---|---|
+| reconhecido | `conversas` + `mensagens` |
+| não reconhecido | `leads` — que é de onde vem o contato do site |
+
+As duas fontes aparecem na mesma lista, porque as duas são gente com quem a casa
+já tem contato. Quem não está em nenhum dos dois lugares não existe para esta
+tela.
+
+**Duas abas em Contatos:** *Esperando resposta* (a fila do site, que já existia)
+e *Conversas* (o histórico, para ler e responder). Começa em "esperando" de
+propósito: quem abre esta tela veio ver o que falta.
+
+**Conversa sem mensagem não é conversa.** São 162 linhas em `conversas` e 15 com
+mensagem — a tabela ganhou uma linha por família na época da IA, escrevendo
+alguém ou não. Listar todas encheria a tela com 147 nomes vazios e as cinco que
+importam sumiriam no meio. A lista mostra só quem já trocou mensagem, e o vazio
+diz onde começar uma conversa nova.
+
+**Enviar primeiro, gravar depois.** Ao contrário, um erro do WhatsApp deixaria no
+histórico uma mensagem que a família nunca recebeu — e é justamente o histórico
+que ela usa para decidir o que dizer em seguida. Se a mensagem sai e a gravação
+falha, a tela diz **"foi enviada, não mande de novo"** em vez de fingir que nada
+aconteceu.
+
+**O que NÃO voltou:** rascunhos da IA, escalonamento, abas de gestão, resposta
+automática. Nada sai sem alguém escrever e tocar em enviar — mesma regra da fila
+de liberação, e pelo mesmo motivo.
+
+**Na leitura, de onde veio a mensagem importa** e está escrito em cada balão:
+áudio transcrito não é o que a pessoa digitou; o que saiu do celular dela não
+passou por esta tela; e o que a IA respondeu na época do robô não foi ela.
+>>>>>>> Stashed changes

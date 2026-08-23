@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from("servicos")
-    .select("id,data_prevista,ordem_dia,status,valor,estornado_em,motivo_estorno,fixado_em,tumulos(identificacao,falecido_nome,quadras(codigo)),clientes(nome)")
+    .select("id,data_prevista,ordem_dia,status,valor,estornado_em,motivo_estorno,fixado_em,executora_id,tumulos(identificacao,falecido_nome,quadras(codigo)),clientes(nome)")
     .gte("data_prevista", inicio)
     .lte("data_prevista", fim)
     // cancelada some da agenda, MENOS quando foi estorno: aí precisa aparecer
@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
       quadra: (s as any).tumulos?.quadras?.codigo || "—",
       falecido: (s as any).tumulos?.falecido_nome || null,
       cliente: (s as any).clientes?.nome || null,
+      // QUEM LIMPA — quase sempre nulo, e isso é o normal desde que o alocador
+      // parou de nomear. A tela precisa do id para poder marcar em lote.
+      executoraId: (s as any).executora_id || null,
       valor: (s as any).valor,
       estornadoEm: (s as any).estornado_em || null,
       motivoEstorno: (s as any).motivo_estorno || null,
@@ -50,5 +53,19 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: true, inicio, fim, dias: porDia });
+  // A EQUIPE VAI JUNTO, para a tela poder oferecer "quem limpa" sem uma segunda
+  // ida ao servidor — e só quem está ATIVO: oferecer alguém que saiu da equipe
+  // é criar uma rota que ninguém vai ver.
+  // A RLS já limita `membros` à organização da sessão — o filtro aqui é só de
+  // situação.
+  const { data: equipe } = await db
+    .from("membros").select("user_id,nome,papel,ativo")
+    .eq("ativo", true).order("nome");
+
+  return NextResponse.json({
+    ok: true, inicio, fim, dias: porDia,
+    equipe: ((equipe as any[]) || []).map((m) => ({
+      id: m.user_id, nome: m.nome || "sem nome", papel: m.papel,
+    })),
+  });
 }
