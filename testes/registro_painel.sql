@@ -169,3 +169,112 @@ exception when sqlstate '22004' then
 end $$;
 
 do $$ begin raise notice 'REGISTRO PELO PAINEL: todas as conferencias passaram'; end $$;
+
+-- ============================================================================
+-- A CONFERENCIA SEPARA O QUE TRAVA DO QUE AVISA (0097)
+--
+-- Da ficha da familia ALCANTARA, em producao: "contrato — sem contrato, as
+-- limpezas serao cobradas como avulso — atencao". Duas coisas diferentes no
+-- mesmo lugar: "sem contrato" e uma LACUNA, "avulso" e uma DECISAO. Enquanto
+-- moraram no mesmo `contratado = false`, a familia que ninguem decidiu
+-- aparecia verde.
+-- ============================================================================
+insert into orgs (id, nome) values ('aaaaaaaa-0000-0000-0000-000000000097','CI Conferencia')
+  on conflict (id) do nothing;
+insert into auth.users (id, email)
+  values ('f0f0f0f0-0000-0000-0000-000000000097','conf@sureya.test') on conflict (id) do nothing;
+insert into membros (org_id, user_id, papel, ativo)
+  values ('aaaaaaaa-0000-0000-0000-000000000097','f0f0f0f0-0000-0000-0000-000000000097','admin', true)
+  on conflict do nothing;
+select set_config('request.jwt.claim.sub','f0f0f0f0-0000-0000-0000-000000000097', false);
+
+insert into cemiterios (id, org_id, nome)
+  values ('dddddddd-0000-0000-0000-000000000097','aaaaaaaa-0000-0000-0000-000000000097','CI Cem Conf')
+  on conflict (id) do nothing;
+insert into quadras (id, org_id, cemiterio_id, codigo, ordem)
+  values ('eeeeeeee-0000-0000-0000-000000000097','aaaaaaaa-0000-0000-0000-000000000097',
+          'dddddddd-0000-0000-0000-000000000097','Q Conf', 1) on conflict (id) do nothing;
+insert into familias (id, org_id, nome, modo_cobranca)
+  values ('bbbbbbbb-0000-0000-0000-000000000097','aaaaaaaa-0000-0000-0000-000000000097',
+          'ALCANTARA','consumo') on conflict (id) do nothing;
+insert into clientes (id, org_id, familia_id, nome, telefone)
+  values ('cccccccc-0000-0000-0000-000000000097','aaaaaaaa-0000-0000-0000-000000000097',
+          'bbbbbbbb-0000-0000-0000-000000000097','CLECIA','5511940131413')
+  on conflict (id) do nothing;
+update familias set responsavel_id = 'cccccccc-0000-0000-0000-000000000097'
+ where id = 'bbbbbbbb-0000-0000-0000-000000000097';
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo, valor_lavagem)
+  values ('ffffffff-0000-0000-0000-000000000097','aaaaaaaa-0000-0000-0000-000000000097',
+          'eeeeeeee-0000-0000-0000-000000000097','bbbbbbbb-0000-0000-0000-000000000097',
+          'Alcantara','A-1', 0) on conflict (id) do nothing;
+
+-- 1 · O RESPONSAVEL APARECE PELO NOME, e nao como "exatamente um"
+select ci6('o responsavel aparece pelo nome',
+  (select detalhe from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'responsavel financeiro'), 'CLECIA');
+
+-- 2 · NAO DECIDIR E PENDENCIA
+select ci6('familia sem regime definido fica PENDENTE',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'contrato ou avulso'), 'pendente');
+
+select ci6b('e o item e obrigatorio',
+  (select obrigatorio from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'contrato ou avulso'),
+  'o item que trava o piloto ficou marcado como opcional');
+
+-- 3 · O OK E RECUSADO ENQUANTO FALTA OBRIGATORIO
+select ci6b('nao da para dar ok com pendencia obrigatoria',
+  (select not ok from sureya_conferir_familia('bbbbbbbb-0000-0000-0000-000000000097', true)),
+  'a familia foi carimbada como conferida com item obrigatorio faltando');
+
+select ci6b('e o carimbo nao foi gravado',
+  (select conferida_em is null from familias where id = 'bbbbbbbb-0000-0000-0000-000000000097'),
+  'gravou conferida_em mesmo recusando');
+
+-- 4 · AVULSO E UMA DECISAO VALIDA — vale tanto quanto contrato
+update familias set regime = 'avulso' where id = 'bbbbbbbb-0000-0000-0000-000000000097';
+
+select ci6('avulso conta como decidido',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'contrato ou avulso'), 'ok');
+
+-- 5 · AVULSO NAO PRECISA DE PLANO, mas PRECISA DE VALOR
+--
+-- Era "nao se aplica" quando nao havia contrato. Mas avulso cobra POR LAVAGEM:
+-- sem valor, a limpeza acontece e o lancamento sai zerado. E o jeito mais
+-- silencioso de trabalhar de graca.
+select ci6('avulso nao precisa de plano',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'plano com as datas preenchidas'), 'ok');
+
+select ci6('mas avulso SEM VALOR e pendencia',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'valor da limpeza'), 'pendente');
+
+-- 6 · COM TUDO RESOLVIDO, O OK PASSA
+update tumulos set valor_lavagem = 40 where id = 'ffffffff-0000-0000-0000-000000000097';
+
+select ci6('sem pendencia obrigatoria, o ok passa',
+  (select ok::text from sureya_conferir_familia('bbbbbbbb-0000-0000-0000-000000000097', true)), 'true');
+
+select ci6b('e o carimbo ficou gravado',
+  (select conferida_em is not null from familias where id = 'bbbbbbbb-0000-0000-0000-000000000097'),
+  'o ok passou mas nao gravou nada');
+
+-- 7 · O CONSENTIMENTO E AVISO, NAO TRAVA
+--
+-- Antes tudo que nao fosse 'ok' pesava igual, e um consentimento nao
+-- registrado segurava a familia do mesmo jeito que um telefone faltando.
+select ci6('consentimento nao registrado e AVISO',
+  (select situacao from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'consentimento registrado'), 'atencao');
+
+select ci6b('e nao e obrigatorio',
+  (select not obrigatorio from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
+    where item = 'consentimento registrado'),
+  'o consentimento voltou a travar o piloto');
+
+-- 8 · DESFAZER O OK E SEMPRE PERMITIDO
+select ci6('da para tirar o ok',
+  (select ok::text from sureya_conferir_familia('bbbbbbbb-0000-0000-0000-000000000097', false)), 'true');

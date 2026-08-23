@@ -5,35 +5,65 @@ import Link from "next/link";
 import { Cartao, Botao, Selo } from "../pecas";
 
 /**
- * A DUPLA CONFERÊNCIA DO CADASTRO — Build 7, etapa 1.
+ * A DUPLA CONFERÊNCIA DO CADASTRO.
  *
  * Metade da conferência é comparar com o caderno, e essa metade é humana. A
  * outra metade — falta telefone? falta quadra? o plano está ativo sem data? —
  * o banco responde melhor, e sem cansar na décima família.
  *
- * Esta tela é a segunda metade. Ela existe para que a atenção de quem confere
- * sobre inteira para o **saldo de abertura**, que é a única coisa aqui que
- * nenhuma consulta consegue verificar: só o caderno sabe se o número está certo.
+ * O QUE MUDOU DEPOIS DE USAR A TELA DE VERDADE
+ * ---------------------------------------------------------------------------
+ * 1. OS BLOCOS VÊM PREENCHIDOS. Cada família era um clique para expandir e só
+ *    então uma ida ao servidor: trinta famílias eram sessenta cliques antes de
+ *    ler a primeira linha. Agora o checklist já vem, e o trabalho é ler e dar
+ *    o ok — que é o que a conferência é.
+ *
+ * 2. O TÍTULO DIZ DE QUEM É. Era "ALCANTARA · 1 jazigo · 1 pessoa · sem
+ *    contrato": nome e contagem. Faltava a coisa mais útil para quem vai
+ *    ligar — o nome de quem atende. Agora é "ALCANTARA — CLECIA", e as
+ *    contagens descem para a segunda linha.
+ *
+ * 3. PENDENTE E ATENÇÃO SÃO COISAS DIFERENTES. Antes tudo que não fosse "ok"
+ *    tinha o mesmo peso, e um consentimento não registrado pesava igual a um
+ *    telefone faltando. Agora o que é obrigatório e falta é **pendente**
+ *    (trava o piloto); o resto é **atenção** (avisa e deixa passar).
+ *
+ * 4. O "ABRIR" ABRE. O link ia para `/painel/clientes?familiaId=…`, um
+ *    parâmetro que aquela tela não lê — caía na lista inteira e a família se
+ *    perdia no meio de trezentas. Agora vai para a ficha da família, que tem
+ *    exatamente o que a conferência cobra, e volta para cá.
  */
 
-interface Item { item: string; situacao: string; detalhe: string; onde: string }
+interface Item {
+  item: string; situacao: string; detalhe: string; onde: string;
+  obrigatorio: boolean; acao: string;
+}
 interface Fam {
-  familia_id: string; familia: string; jazigos: number; pessoas: number;
-  contratado: boolean; pendencias: number; o_que_falta: string | null;
+  familia_id: string; familia: string; responsavel: string | null; telefone: string | null;
+  regime: string; contratado: boolean; conferida_em: string | null;
+  jazigos: number; pessoas: number; pendencias: number; avisos: number;
+  o_que_falta: string | null;
 }
 
 function tomDaSituacao(s: string): "bom" | "atencao" | "neutro" {
   if (s === "ok") return "bom";
-  if (s === "CORRIGIR") return "atencao";
+  if (s === "pendente") return "atencao";
   return "neutro";   // "CONFERIR NO CADERNO", "nao se aplica", "atencao"
 }
+
+const ROTULO_REGIME: Record<string, string> = {
+  contrato: "contrato",
+  avulso: "avulso",
+  nao_definido: "sem regime definido",
+};
 
 export default function Conferencia() {
   const [dados, setDados] = useState<any>(null);
   const [erro, setErro] = useState("");
-  const [aberta, setAberta] = useState<string | null>(null);
   const [itens, setItens] = useState<Record<string, Item[]>>({});
+  const [fechadas, setFechadas] = useState<Set<string>>(new Set());
   const [soPendentes, setSoPendentes] = useState(false);
+  const [ocupado, setOcupado] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -41,6 +71,9 @@ export default function Conferencia() {
       const r = await fetch("/api/conferencia").then((x) => x.json());
       if (!r.ok) throw new Error(r.erro || "falhou");
       setDados(r);
+      // Os blocos já vêm preenchidos do servidor. O que passar do teto continua
+      // abrindo sob demanda, e a tela não mente sobre isso.
+      setItens(r.itens || {});
     } catch (e: any) {
       setErro(e?.message || "não deu para carregar");
     }
@@ -48,12 +81,28 @@ export default function Conferencia() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  async function abrir(f: Fam) {
-    if (aberta === f.familia_id) { setAberta(null); return; }
-    setAberta(f.familia_id);
+  async function alternar(f: Fam) {
+    setFechadas((s) => {
+      const n = new Set(s);
+      if (n.has(f.familia_id)) n.delete(f.familia_id); else n.add(f.familia_id);
+      return n;
+    });
     if (itens[f.familia_id]) return;
     const r = await fetch(`/api/conferencia?familiaId=${f.familia_id}`).then((x) => x.json());
     if (r.ok) setItens((x) => ({ ...x, [f.familia_id]: r.itens }));
+  }
+
+  /** DAR O OK — recusado pelo banco enquanto houver pendência obrigatória. */
+  async function darOk(f: Fam, ok: boolean) {
+    setOcupado(f.familia_id);
+    try {
+      const r = await fetch("/api/conferencia", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId: f.familia_id, ok }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+      await carregar();
+    } finally { setOcupado(null); }
   }
 
   if (erro) {
@@ -77,94 +126,167 @@ export default function Conferencia() {
         se a mais simples já dá problema, o problema é do sistema, não do cadastro.
       </p>
 
-      <div className="mb-4 grid grid-cols-3 gap-3 rounded-xl2 bg-brand p-4 text-sobre">
-        <div>
-          <p className="text-[26px] font-semibold leading-tight">{dados.resumo.total}</p>
-          <p className="text-[12px] opacity-75">famílias</p>
-        </div>
-        <div>
-          <p className="text-[26px] font-semibold leading-tight">{dados.resumo.prontas}</p>
-          <p className="text-[12px] opacity-75">sem pendência</p>
-        </div>
-        <div>
-          <p className="text-[26px] font-semibold leading-tight">{dados.resumo.prontasContratadas}</p>
-          <p className="text-[12px] opacity-75">prontas e contratadas</p>
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl2 bg-brand p-4 text-sobre sm:grid-cols-4">
+        {[
+          [dados.resumo.total, "famílias"],
+          [dados.resumo.prontas, "sem pendência"],
+          [dados.resumo.conferidas, "com o seu ok"],
+          [dados.resumo.prontasContratadas, "prontas e com contrato"],
+        ].map(([n, rot], i) => (
+          <div key={i}>
+            <p className="text-[26px] font-semibold leading-tight">{n as any}</p>
+            <p className="text-[12px] opacity-75">{rot as any}</p>
+          </div>
+        ))}
       </div>
 
-      {/* O NÚMERO DO MEIO ENGANA SOZINHO. Uma família sem contrato pode estar
-          "sem pendência" e mesmo assim não servir para o piloto: ela não gera
-          competência. O terceiro número é o que conta para escolher a amostra. */}
-      {dados.resumo.prontasContratadas < 5 && (
+      {/* O QUE NINGUÉM DECIDIU AINDA.
+          "Sem contrato" e "avulso" não são a mesma coisa: a primeira é uma
+          lacuna, a segunda é uma decisão. Enquanto forem confundidas, a família
+          indecisa aparece verde. */}
+      {dados.resumo.semRegime > 0 && (
         <Cartao>
           <p className="text-[15px] text-ink">
-            <b>Só {dados.resumo.prontasContratadas} família(s) pronta(s) e contratada(s).</b>{" "}
-            O piloto pede 5.
+            <b>{dados.resumo.semRegime} família(s) sem regime definido.</b>{" "}
+            Ninguém disse ainda se é contrato ou avulso.
           </p>
           <p className="mt-1 text-[14px] text-ink-soft">
-            Família sem contrato não gera competência — as limpezas dela entram como
-            avulso, que é outro fluxo. Para chegar a 5: resolva as pendências das
-            contratadas, ou feche contrato com famílias que já têm jazigo ligado.
+            Não é detalhe de cadastro: são fluxos de cobrança diferentes, e a
+            lavagem não espera a decisão. Abra a ficha e escolha uma das duas.
           </p>
         </Cartao>
       )}
 
-      <div className="mb-3">
+      {dados.resumo.prontasContratadas < 5 && (
+        <Cartao>
+          <p className="text-[15px] text-ink">
+            <b>Só {dados.resumo.prontasContratadas} família(s) pronta(s) e com contrato.</b>{" "}
+            O piloto pede 5.
+          </p>
+          <p className="mt-1 text-[14px] text-ink-soft">
+            Família avulsa não gera competência — as limpezas dela entram uma a uma,
+            que é outro fluxo. Para chegar a 5: resolva as pendências das que já têm
+            contrato, ou feche contrato com famílias que já têm jazigo ligado.
+          </p>
+        </Cartao>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Botao tom={soPendentes ? "principal" : "secundario"}
                onClick={() => setSoPendentes((v) => !v)}>
           {soPendentes ? "Mostrando só as pendentes" : "Ver só as pendentes"}
         </Botao>
+        <Botao tom="secundario"
+               onClick={() => setFechadas(fechadas.size ? new Set() : new Set(lista.map((f) => f.familia_id)))}>
+          {fechadas.size ? "Abrir todas" : "Fechar todas"}
+        </Botao>
+        {dados.preenchidas < familias.length && (
+          <span className="text-[13px] text-ink-soft">
+            as {dados.preenchidas} primeiras já vêm conferidas; as demais abrem ao clicar
+          </span>
+        )}
       </div>
 
-      {lista.map((f) => (
-        <Cartao key={f.familia_id}>
-          <button onClick={() => abrir(f)}
-                  className="flex w-full items-center justify-between gap-3 text-left">
-            <span className="min-w-0">
-              <span className="text-[15px] font-medium text-ink">{f.familia}</span>
-              <span className="ml-2 text-[13px] text-ink-soft">
-                {f.jazigos} jazigo{f.jazigos === 1 ? "" : "s"} · {f.pessoas} pessoa{f.pessoas === 1 ? "" : "s"}
-                {f.contratado ? " · contratada" : " · sem contrato"}
+      {lista.map((f) => {
+        const aberta = !fechadas.has(f.familia_id);
+        const pend = Number(f.pendencias);
+        return (
+          <Cartao key={f.familia_id}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <button onClick={() => alternar(f)} className="min-w-0 flex-1 text-left">
+                {/* O TÍTULO: família — quem responde. */}
+                <span className="text-[16px] font-medium text-ink">
+                  {f.familia}
+                  {f.responsavel ? <span className="text-ink-soft"> — {f.responsavel}</span>
+                                 : <span className="text-aviso"> — sem responsável</span>}
+                </span>
+                <span className="block text-[13px] text-ink-soft">
+                  {f.jazigos} jazigo{f.jazigos === 1 ? "" : "s"} · {f.pessoas} pessoa{f.pessoas === 1 ? "" : "s"}
+                  {" · "}{ROTULO_REGIME[f.regime] || f.regime}
+                  {f.telefone ? ` · ${f.telefone}` : ""}
+                </span>
+              </button>
+              <span className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                {f.conferida_em && <Selo tom="bom">✓ conferida</Selo>}
+                <Selo tom={pend === 0 ? "bom" : "atencao"}>
+                  {pend === 0 ? "sem pendência" : `${pend} a corrigir`}
+                </Selo>
+                {Number(f.avisos) > 0 && (
+                  <Selo tom="neutro">{f.avisos} aviso{Number(f.avisos) === 1 ? "" : "s"}</Selo>
+                )}
               </span>
-            </span>
-            <Selo tom={Number(f.pendencias) === 0 ? "bom" : "atencao"}>
-              {Number(f.pendencias) === 0 ? "sem pendência" : `${f.pendencias} a corrigir`}
-            </Selo>
-          </button>
-
-          {aberta === f.familia_id && (
-            <div className="mt-3 border-t border-line pt-3">
-              {!itens[f.familia_id] && (
-                <p className="text-[14px] text-ink-soft">Conferindo…</p>
-              )}
-              {(itens[f.familia_id] || []).map((i) => (
-                <div key={i.item}
-                     className="flex flex-wrap items-start justify-between gap-2 border-b border-line py-2 last:border-0">
-                  <span className="min-w-0">
-                    <span className="text-[14px] text-ink">{i.item}</span>
-                    <span className="block text-[13px] text-ink-soft">{i.detalhe}</span>
-                  </span>
-                  <span className="flex flex-shrink-0 items-center gap-2">
-                    <Selo tom={tomDaSituacao(i.situacao)}>{i.situacao}</Selo>
-                    {i.situacao === "CORRIGIR" && (
-                      <Link href={i.onde} className="text-[13px] underline text-ink-soft">abrir</Link>
-                    )}
-                  </span>
-                </div>
-              ))}
-
-              {/* A ÚNICA LINHA DESTA TELA QUE A MÁQUINA NÃO RESOLVE. */}
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
-                <b>O saldo de abertura é o número mais perigoso do piloto.</b> É
-                digitado à mão e é o único que ninguém consegue conferir depois
-                olhando o sistema — só o caderno sabe. Confira com duas pessoas,
-                separadamente. Corrigir é seguro: a correção substitui a anterior
-                em vez de somar.
-              </p>
             </div>
-          )}
-        </Cartao>
-      ))}
+
+            {aberta && (
+              <div className="mt-3 border-t border-line pt-3">
+                {!itens[f.familia_id] && (
+                  <p className="text-[14px] text-ink-soft">Conferindo…</p>
+                )}
+                {(itens[f.familia_id] || []).map((i) => (
+                  <div key={i.item}
+                       className="flex flex-wrap items-start justify-between gap-2 border-b border-line py-2 last:border-0">
+                    <span className="min-w-0">
+                      <span className="text-[14px] text-ink">
+                        {i.item}
+                        {i.obrigatorio && (
+                          <span className="ml-1 text-[12px] text-ink-soft">(obrigatório)</span>
+                        )}
+                      </span>
+                      <span className="block text-[13px] text-ink-soft">{i.detalhe}</span>
+                      {/* O QUE FAZER, em palavras de quem vai fazer. Só quando
+                          há o que fazer: repetir a instrução no que já está ok
+                          é ruído em toda linha. */}
+                      {i.situacao === "pendente" && i.acao && (
+                        <span className="block text-[13px] text-aviso">{i.acao}</span>
+                      )}
+                    </span>
+                    <span className="flex flex-shrink-0 items-center gap-2">
+                      <Selo tom={tomDaSituacao(i.situacao)}>{i.situacao}</Selo>
+                      {i.situacao === "pendente" && (
+                        <Link href={i.onde} className="text-[13px] underline text-ink-soft">
+                          abrir
+                        </Link>
+                      )}
+                    </span>
+                  </div>
+                ))}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link href={`/painel/conferencia/${f.familia_id}`}>
+                    <Botao tom="secundario">Abrir a ficha da família</Botao>
+                  </Link>
+                  {f.conferida_em ? (
+                    <>
+                      <span className="text-[13px] text-ink-soft">
+                        conferida em {new Date(f.conferida_em).toLocaleDateString("pt-BR")}
+                      </span>
+                      <button className="text-[13px] underline text-ink-soft"
+                              disabled={ocupado === f.familia_id}
+                              onClick={() => darOk(f, false)}>
+                        tirar o ok
+                      </button>
+                    </>
+                  ) : (
+                    <Botao tom="principal" disabled={ocupado === f.familia_id || pend > 0}
+                           onClick={() => darOk(f, true)}>
+                      {pend > 0 ? `Faltam ${pend} obrigatório(s)` : "Dar o ok nesta família"}
+                    </Botao>
+                  )}
+                </div>
+
+                {/* A ÚNICA LINHA DESTA TELA QUE A MÁQUINA NÃO RESOLVE. */}
+                <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
+                  <b>O saldo de abertura é o número mais perigoso do piloto.</b> É
+                  digitado à mão e é o único que ninguém consegue conferir depois
+                  olhando o sistema — só o caderno sabe. Confira com duas pessoas,
+                  separadamente. Corrigir é seguro: a correção substitui a anterior
+                  em vez de somar.
+                </p>
+              </div>
+            )}
+          </Cartao>
+        );
+      })}
     </>
   );
 }

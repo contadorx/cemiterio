@@ -711,3 +711,100 @@ mensagens foram lidas, em vez de pedir fé.
 **Dois botões, dois usos.** *Sugerir resposta* é um clique, para o caso comum —
 responder o que a família acabou de perguntar. *Me ajuda a escrever* continua
 para quando ela já sabe o que quer dizer e quer três jeitos de dizer.
+
+---
+
+## D-18 · A conferência separa o que trava do que avisa
+
+Da ficha da família **ALCANTARA**, em produção:
+
+```
+contrato        sem contrato — as limpezas serao cobradas como avulso   atencao
+plano com datas nenhum plano ativo                                      nao se aplica
+```
+
+**"Sem contrato" e "avulso" não são a mesma coisa.** A primeira é uma lacuna; a
+segunda é uma decisão. As duas moravam no mesmo `contratado = false`, e por isso
+a família que ninguém decidiu ainda aparecia verde, como se estivesse resolvida.
+
+`familias.regime` passa a ter três estados: **contrato**, **avulso** e
+**não definido** — e não definido é **pendência**. Quem já tem contrato foi
+migrado; o resto ficou não definido de propósito. Marcar todo mundo como avulso
+seria inventar uma decisão que ninguém tomou, e é justamente essa decisão que a
+conferência existe para cobrar.
+
+**Cada item declara se é obrigatório.** Antes tudo que não fosse `ok` tinha o
+mesmo peso, e um consentimento não registrado — que é um aviso — segurava a
+família do mesmo jeito que um telefone faltando. Agora:
+
+| trava o piloto (pendente) | só avisa (atenção) |
+|---|---|
+| responsável financeiro | plano com as datas |
+| telefone de quem responde | saldo de abertura |
+| jazigo cadastrado | consentimento registrado |
+| jazigo com quadra e identificação | |
+| contrato ou avulso | |
+| valor da limpeza | |
+
+**O valor da limpeza mudou de lado.** Era "não se aplica" quando não havia
+contrato. Mas **avulso cobra por lavagem**: sem valor, a limpeza acontece e o
+lançamento sai zerado. É o jeito mais silencioso de trabalhar de graça.
+
+**O título diz de quem é.** Era `ALCANTARA · 1 jazigo · 1 pessoa · sem contrato`
+— nome e contagem. Agora é **`ALCANTARA — CLECIA`**, com as contagens na segunda
+linha, onde contagem deve ficar. Quem vai ligar precisa do nome de quem atende.
+
+**Os blocos vêm preenchidos.** Cada família era um clique para expandir e só
+então uma ida ao servidor: trinta famílias eram sessenta cliques antes de ler a
+primeira linha. O servidor manda os checklists das 60 primeiras junto com a
+lista; o que passa do teto continua abrindo sob demanda, e a tela diz isso.
+
+**O ok é um fato com data e autor**, e é **recusado pelo banco** enquanto houver
+pendência obrigatória: dar ok no que está incompleto é pior que não conferir,
+porque fica registrado que foi conferido. Desfazer é sempre permitido — quem
+conferiu pode ter percebido que errou.
+
+---
+
+## D-19 · Excluir uma pessoa não pode levar os jazigos junto
+
+`DELETE /api/clientes/[id]` fazia, no meio da limpeza:
+
+```ts
+await db.from("tumulos").delete().eq("cliente_id", params.id);
+```
+
+Isso nasceu quando o jazigo pertencia a uma **pessoa**. Desde a D-10/0091 o
+jazigo pertence à **família**, e `tumulos.cliente_id` é só o contato derivado
+dela. Medido em 23/08: **245 túmulos com `cliente_id` preenchido**.
+
+Excluir o responsável apagaria os jazigos da família junto — o cadastro do
+campo, o GPS, a foto da lápide, a ordem na rua — sem erro e sem aviso. Hoje cada
+família tem uma pessoa só, então nunca aconteceu; **bastava cadastrar o segundo
+contato para virar perda de dado real**, que é exatamente o que esta leva
+habilita.
+
+O jazigo agora é **solto** da pessoa e continua com a família.
+
+### Editar e remover pessoas
+
+`PATCH` e `DELETE` em `/api/familias/[id]/contatos`, com três recusas:
+
+- **O responsável não sai assim.** Passe a responsabilidade primeiro (ou deixe a
+  família sem responsável, que é estado legítimo desde a 0091) — tem de ser uma
+  escolha, não efeito colateral.
+- **Telefone repetido é recusado.** Duas fichas com o mesmo número fazem a
+  resposta do WhatsApp cair na errada.
+- **Pessoa com lançamento no nome não é apagada: é solta da família.** O extrato
+  continua inteiro e a pessoa some da ficha, que é o que se queria.
+
+### A ficha da família
+
+O "abrir" da conferência ia para `/painel/clientes?familiaId=…` — **um parâmetro
+que aquela tela não lê**. Caía na lista inteira e a família se perdia no meio de
+trezentas. Na prática o link não abria nada.
+
+`/painel/conferencia/[id]` é a bancada de conserto: tem exatamente o que a
+conferência cobra — pessoas, quem responde, regime, consentimento, jazigos com o
+que falta — e nada além. O caminho de volta está em cima **e** embaixo: quem
+corrige três coisas não vai rolar até o topo para voltar.

@@ -227,8 +227,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0096  +6  sureya_recebe_lembrete, sureya_data_no_ano,
 #             sureya_gerar_eventos_memoria, sureya_semear_textos_memoria,
 #             sureya_texto_memoria, sureya_lembretes_do_dia
-# Saldo: +37.
-FUNCOES_DELTA=${FUNCOES_DELTA:-37}
+#   0097  +1  sureya_conferir_familia — o ok da conferencia vira um fato com
+#             data e autor. sureya_conferencia_cadastro nao entra: ela cai e
+#             nasce de novo (o retorno ganhou colunas), mas ja existia.
+# Saldo: +38.
+FUNCOES_DELTA=${FUNCOES_DELTA:-38}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

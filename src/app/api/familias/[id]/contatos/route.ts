@@ -27,14 +27,23 @@ export async function GET(
   const org = await orgAtual(auth.db);
   if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
 
-  const [{ data: fam }, { data: contatos }, { data: hist }] = await Promise.all([
-    auth.db.from("familias").select("id,nome,responsavel_id").eq("id", params.id).maybeSingle(),
+  const [{ data: fam }, { data: contatos }, { data: hist }, { data: jaz }] = await Promise.all([
+    auth.db.from("familias")
+      .select("id,nome,responsavel_id,regime,contratado,conferida_em")
+      .eq("id", params.id).maybeSingle(),
     auth.db.from("clientes")
-      .select("id,nome,telefone,responsavel_financeiro,recebe_fotos,created_at")
+      .select("id,nome,telefone,responsavel_financeiro,recebe_fotos,created_at," +
+              "parentesco,tratamento,observacoes,consentimento_em")
       .eq("familia_id", params.id).order("created_at"),
     auth.db.from("familia_responsavel_log")
       .select("id,cliente_id,desde,motivo")
       .eq("familia_id", params.id).order("desde", { ascending: false }).limit(20),
+    // Os jazigos vão junto porque a conferência cobra três coisas sobre eles
+    // (existir, ter quadra e identificação, ter valor) e a pessoa que está
+    // corrigindo precisa ver o que falta sem trocar de tela.
+    auth.db.from("tumulos")
+      .select("id,identificacao,codigo,valor_lavagem,quadra_id,quadras(codigo),ruas(nome)")
+      .eq("familia_id", params.id).order("codigo"),
   ]);
 
   if (!fam) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
@@ -45,10 +54,27 @@ export async function GET(
 
   return NextResponse.json({
     ok: true,
-    familia: { id: (fam as any).id, nome: (fam as any).nome, responsavelId: (fam as any).responsavel_id },
+    familia: {
+      id: (fam as any).id, nome: (fam as any).nome,
+      responsavelId: (fam as any).responsavel_id,
+      regime: (fam as any).regime || "nao_definido",
+      contratado: !!(fam as any).contratado,
+      conferidaEm: (fam as any).conferida_em || null,
+    },
     contatos: (contatos || []).map((c: any) => ({
       id: c.id, nome: c.nome, telefone: c.telefone,
       paga: !!c.responsavel_financeiro, recebeFotos: !!c.recebe_fotos,
+      parentesco: c.parentesco || null,
+      tratamento: c.tratamento || null,
+      observacoes: c.observacoes || null,
+      // A conferência pergunta por isto, e é aqui que se conserta.
+      consentimentoEm: c.consentimento_em || null,
+    })),
+    jazigos: ((jaz as any[]) || []).map((t: any) => ({
+      id: t.id, identificacao: t.identificacao, codigo: t.codigo || null,
+      quadra: t.quadras?.codigo || null, rua: t.ruas?.nome || null,
+      valor: t.valor_lavagem ?? null,
+      completo: !!t.quadra_id && !!String(t.identificacao || "").trim(),
     })),
     // `cliente_id` nulo numa linha do histórico quer dizer "a família ficou SEM
     // contato". É um estado legítimo e a tela precisa mostrá-lo por extenso, e
@@ -127,4 +153,172 @@ export async function POST(
   }
 
   return NextResponse.json({ ok: false, erro: "acao_invalida" }, { status: 400 });
+}
+
+/**
+ * EDITAR UMA PESSOA — PATCH { contatoId, nome?, telefone?, parentesco?, tratamento?,
+ *                             observacoes?, consentimento? }
+ *
+ * Só os campos de IDENTIDADE da pessoa. Quem responde pelo dinheiro NÃO se
+ * troca por aqui: isso é `sureya_definir_responsavel`, porque três coisas têm
+ * de mudar juntas (o ponteiro da família, o booleano dos contatos e os jazigos)
+ * ou nenhuma.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+
+  const b = await req.json().catch(() => ({}));
+  const contatoId = String(b?.contatoId || "").trim();
+  if (!contatoId) {
+    return NextResponse.json({ ok: false, erro: "sem_contato" }, { status: 400 });
+  }
+
+  // A pessoa tem de ser DESTA família. Sem esta conferência, um id de outra
+  // família passaria pela RLS (a organização é a mesma) e seria editado daqui.
+  const { data: atual } = await auth.db
+    .from("clientes").select("id,nome,familia_id,telefone")
+    .eq("id", contatoId).maybeSingle();
+  if (!atual || (atual as any).familia_id !== params.id) {
+    return NextResponse.json(
+      { ok: false, erro: "nao_e_desta_familia",
+        mensagem: "Esta pessoa não está nesta família." },
+      { status: 404 },
+    );
+  }
+
+  const campos: Record<string, any> = {};
+  if (typeof b?.nome === "string" && b.nome.trim()) campos.nome = b.nome.trim();
+  if (typeof b?.parentesco === "string") campos.parentesco = b.parentesco.trim() || null;
+  if (typeof b?.tratamento === "string") campos.tratamento = b.tratamento.trim() || null;
+  if (typeof b?.observacoes === "string") campos.observacoes = b.observacoes.trim() || null;
+
+  // O CONSENTIMENTO é uma data, não um texto: marcar registra AGORA, desmarcar
+  // apaga. É o que a conferência cobra, e é onde se conserta.
+  if (b?.consentimento === true) campos.consentimento_em = new Date().toISOString();
+  if (b?.consentimento === false) campos.consentimento_em = null;
+
+  if (typeof b?.telefone === "string") {
+    const t = b.telefone.trim();
+    if (!t) {
+      return NextResponse.json(
+        { ok: false, erro: "telefone_vazio",
+          mensagem: "O telefone não pode ficar em branco. Se a pessoa não tem telefone, remova-a da família." },
+        { status: 400 },
+      );
+    }
+    const norm = normalizarTelefone(t);
+    if (!norm) {
+      return NextResponse.json(
+        { ok: false, erro: "telefone_invalido",
+          mensagem: "Telefone inválido. Use DDD + número, como 11 94013-1413." },
+        { status: 400 },
+      );
+    }
+    campos.telefone = norm;
+  }
+
+  if (!Object.keys(campos).length) {
+    return NextResponse.json({ ok: false, erro: "nada_para_mudar" }, { status: 400 });
+  }
+
+  const { error } = await auth.db.from("clientes").update(campos).eq("id", contatoId);
+  if (error) {
+    // Telefone é único por organização: duas pessoas com o mesmo número
+    // fariam a resposta do WhatsApp cair na ficha errada.
+    if (String(error.message).includes("duplicate") || String(error.code) === "23505") {
+      return NextResponse.json(
+        { ok: false, erro: "telefone_repetido",
+          mensagem: "Já existe outra pessoa com este telefone. Duas fichas com o mesmo número fazem a resposta cair na errada." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * TIRAR UMA PESSOA DA FAMÍLIA — DELETE ?contatoId=...
+ *
+ * ⚠ O QUE ISTO NÃO FAZ, e por quê
+ *
+ * NÃO chama `DELETE /api/clientes/[id]`. Aquela rota apaga a pessoa E os
+ * jazigos dela (`tumulos.delete().eq("cliente_id", …)`). Isso nasceu quando
+ * o jazigo pertencia a uma PESSOA; desde a 0091 ele pertence à FAMÍLIA, e
+ * `tumulos.cliente_id` é só o contato derivado. Medido em 23/08: 245 túmulos
+ * com `cliente_id` preenchido — apagar o responsável levaria os jazigos da
+ * família junto, calado.
+ *
+ * Aqui a pessoa sai da família e o resto fica onde está.
+ *
+ * O RESPONSÁVEL NÃO SAI ASSIM. Enquanto ele for o responsável, tirá-lo
+ * deixaria a família sem quem responde pelo dinheiro sem ninguém decidir isso
+ * — e "família sem contato" é estado legítimo (0091), mas tem de ser uma
+ * escolha, não um efeito colateral.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+
+  const contatoId = (req.nextUrl.searchParams.get("contatoId") || "").trim();
+  if (!contatoId) {
+    return NextResponse.json({ ok: false, erro: "sem_contato" }, { status: 400 });
+  }
+
+  const { data: fam } = await auth.db
+    .from("familias").select("id,responsavel_id").eq("id", params.id).maybeSingle();
+  const { data: pessoa } = await auth.db
+    .from("clientes").select("id,nome,familia_id").eq("id", contatoId).maybeSingle();
+
+  if (!pessoa || (pessoa as any).familia_id !== params.id) {
+    return NextResponse.json(
+      { ok: false, erro: "nao_e_desta_familia" }, { status: 404 });
+  }
+
+  if ((fam as any)?.responsavel_id === contatoId) {
+    return NextResponse.json(
+      { ok: false, erro: "e_o_responsavel",
+        mensagem: `${(pessoa as any).nome} responde pelo dinheiro desta família. ` +
+                  `Passe a responsabilidade para outra pessoa (ou deixe a família sem responsável) antes de removê-la.` },
+      { status: 409 },
+    );
+  }
+
+  // HISTÓRICO FINANCEIRO NÃO SE APAGA. A conta é da família (0073/0091), mas
+  // um lançamento pode apontar para a pessoa — e apagá-la deixaria o extrato
+  // com um débito de ninguém.
+  const { count } = await auth.db
+    .from("conta_corrente").select("id", { count: "exact", head: true })
+    .eq("cliente_id", contatoId);
+  const { count: cMov } = await auth.db
+    .from("movimentos").select("id", { count: "exact", head: true })
+    .eq("cliente_id", contatoId);
+
+  if ((count || 0) + (cMov || 0) > 0) {
+    // Solta da família em vez de apagar: o extrato continua inteiro e a pessoa
+    // some da ficha, que é o que se queria.
+    const { error } = await auth.db
+      .from("clientes").update({ familia_id: null, responsavel_financeiro: false })
+      .eq("id", contatoId);
+    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    return NextResponse.json({
+      ok: true, soltou: true,
+      mensagem: `${(pessoa as any).nome} saiu da família. Como há lançamentos no nome dela, ` +
+                `a ficha foi mantida para o extrato continuar inteiro.`,
+    });
+  }
+
+  const { error } = await auth.db.from("clientes").delete().eq("id", contatoId);
+  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  return NextResponse.json({
+    ok: true, apagou: true,
+    mensagem: `${(pessoa as any).nome} foi removida da família.`,
+  });
 }

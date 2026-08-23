@@ -148,7 +148,23 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   await db.from("conversas").delete().eq("cliente_id", params.id);
   await db.from("servicos").delete().eq("cliente_id", params.id);
   await db.from("planos").delete().eq("cliente_id", params.id);
-  await db.from("tumulos").delete().eq("cliente_id", params.id);
+
+  // ⚠ O JAZIGO NÃO É DA PESSOA — E APAGÁ-LO AQUI ERA UMA BOMBA
+  //
+  // Havia um `tumulos.delete().eq("cliente_id", params.id)` nesta lista. Ele
+  // nasceu quando o jazigo pertencia a uma PESSOA. Desde a 0091 o jazigo
+  // pertence à FAMÍLIA, e `tumulos.cliente_id` é só o contato derivado dela.
+  //
+  // Medido em produção em 23/08: 245 túmulos com `cliente_id` preenchido.
+  // Excluir o responsável apagaria os jazigos da família junto — o cadastro
+  // do campo, o GPS, a foto da lápide, a ordem na rua —, sem erro e sem aviso.
+  // Hoje cada família tem uma pessoa só, então isso nunca aconteceu; bastava
+  // cadastrar o segundo contato para virar perda de dado real.
+  //
+  // Agora o jazigo é SOLTO da pessoa e continua com a família. Se a família
+  // inteira estiver sendo removida, quem cuida disso é a rota da família.
+  await db.from("tumulos").update({ cliente_id: null }).eq("cliente_id", params.id);
+
   const { error } = await db.from("clientes").delete().eq("id", params.id);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
