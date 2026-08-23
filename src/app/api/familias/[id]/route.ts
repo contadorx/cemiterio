@@ -164,6 +164,24 @@ export async function POST(
   if (auth.erro) return auth.erro;
 
   const b = await req.json().catch(() => ({}));
+
+  // LANÇAR AS COBRANÇAS VENCIDAS DESTA FAMÍLIA, agora.
+  //
+  // O motor já existia e só rodava no cron das 6h. Quem configurava a cobrança
+  // hoje descobria amanhã se tinha acertado — e enquanto isso a ficha dizia
+  // "Em dia" para uma família com dois meses em aberto (o caso Cordeiro,
+  // 23/08: próxima cobrança 01/07, zero lançamentos, R$ 60 a lançar).
+  //
+  // É um COMANDO: ninguém cria dívida abrindo uma tela.
+  if (b?.acao === "cobrar") {
+    const { data, error } = await auth.db.rpc("sureya_cobrar_competencias", {
+      p_ate: null, p_org: null, p_familia: params.id,
+    });
+    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+    const r = (Array.isArray(data) ? data[0] : data) || {};
+    return NextResponse.json({ ok: true, cobrado: r });
+  }
+
   if (b?.acao !== "fundir") {
     return NextResponse.json({ ok: false, erro: "acao_invalida" }, { status: 400 });
   }

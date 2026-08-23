@@ -70,7 +70,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const chaveFam = familiaId || "00000000-0000-0000-0000-000000000000";
 
   const [{ data: tumulos }, { data: mov }, { data: msgs },
-         { data: familia }, { data: pessoas }, { data: checklist }] = await Promise.all([
+         { data: familia }, { data: pessoas }, { data: checklist },
+         { data: aLancar }] = await Promise.all([
     db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,proxima_cobranca,inicio_agendamento,meses_entre_cobrancas,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
     db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem,competencia,canal,conferido_em,servico_id")
       .eq("familia_id", chaveFam)
@@ -86,6 +87,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       .eq("familia_id", chaveFam).order("created_at"),
     familiaId
       ? db.rpc("sureya_conferencia_cadastro", { p_familia: familiaId })
+      : Promise.resolve({ data: [] } as any),
+    // O QUE FALTA LANÇAR. Uma prévia que NÃO cobra: abrir uma ficha nunca pode
+    // criar dívida. Sem ela, "Em dia" continuaria sendo dito para quem tem
+    // dois meses a lançar — saldo zero é "ainda não cobrado", não "quitado".
+    familiaId
+      ? db.rpc("sureya_cobrancas_a_lancar", { p_familia: familiaId, p_ate: null })
       : Promise.resolve({ data: [] } as any),
   ]);
 
@@ -139,6 +146,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     // existir AQUI, que é onde se corrige. Ir até a conferência para dar um ok
     // no que se acabou de arrumar é uma viagem que ninguém faz.
     conferencia: (checklist as any[]) || [],
+    // { competencias, valor, desde } — o que o botao "Lancar cobrancas" faria.
+    cobrancasALancar: (Array.isArray(aLancar) ? aLancar[0] : aLancar) || null,
     tumulos: tumulos || [],
     planos: planos || [],
     saldo: Math.round(saldo * 100) / 100,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cronAutorizado } from "@/lib/cron-auth";
 import { avisosSaldoBaixo, cobrancaGentil } from "@/lib/proativo";
 import { rotinaDeMemoria } from "@/lib/memoria";
-import { cobrarContratos } from "@/lib/cobranca";
+import { cobrarContratos, rodarRegua } from "@/lib/cobranca";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { registrarErro } from "@/lib/monitor";
 import { carimbarRotina } from "@/lib/rotinas";
@@ -54,6 +54,17 @@ export async function GET(req: NextRequest) {
     resultado.cobranca = { erro: true };
   }
 
+  // A RÉGUA DE COBRANÇA (0111). DEPOIS de cobrar: a régua persegue dívida, e a
+  // dívida de hoje pode ter nascido na etapa acima desta mesma rotina.
+  //
+  // Ela ENFILEIRA, não envia — não há caminho dela para o WhatsApp.
+  try {
+    resultado.regua = await rodarRegua();
+  } catch (e) {
+    await registrarErro("cron_diario_regua", e);
+    resultado.regua = { erro: true };
+  }
+
   // AS DATAS DE MEMÓRIA. Etapa própria, com try próprio: uma falha aqui não
   // pode levar a agenda do dia junto — e o inverso também não.
   //
@@ -70,7 +81,8 @@ export async function GET(req: NextRequest) {
   // "ok" so quando NENHUMA etapa falhou: meia rotina nao pode passar por
   // rotina inteira no painel.
   const tudoOk = !resultado.agenda?.erro && !resultado.rascunhos?.erro
-                 && !resultado.memoria?.erro && !resultado.cobranca?.erro;
+                 && !resultado.memoria?.erro && !resultado.cobranca?.erro
+                 && !resultado.regua?.erro;
   await carimbarRotina("diario", tudoOk, resultado,
     tudoOk ? undefined : "uma das etapas falhou — veja erros_log");
 

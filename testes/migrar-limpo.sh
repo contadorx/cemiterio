@@ -132,7 +132,10 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #             precisa ter dono para dar para agrupar em vez de disparar 3x.
 #   0096  +1  eventos_memoria — o calendario, e o registro do que NAO foi
 #             enviado e por que.
-TABELAS_DELTA=${TABELAS_DELTA:-5}
+#   0110  +1  regua_degraus — a regua era tres nomes fixos com os degraus
+#             dentro do TypeScript. Personalizar exigia mexer em codigo, que e
+#             o oposto de "vou ajustando".
+TABELAS_DELTA=${TABELAS_DELTA:-6}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -196,7 +199,9 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0095  +2  falecidos: a da org e a restritiva de DELETE (o campo cadastra,
 #             so admin apaga).
 #   0096  +4  eventos_memoria: a da org e uma restritiva POR COMANDO.
-POLICIES_DELTA=${POLICIES_DELTA:-63}
+#   0110  +4  regua_degraus: a da org e uma restritiva POR COMANDO (a licao da
+#             0079 — DELETE nunca consulta `with check`).
+POLICIES_DELTA=${POLICIES_DELTA:-67}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -253,8 +258,13 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0108  +2  sureya_fundir_familias e sureya_excluir_familia — 31 nomes
 #             repetidos, 97 familias, NENHUMA vazia. Duplicata pede fusao;
 #             excluir e para o que sobra depois.
-# Saldo: +49.
-FUNCOES_DELTA=${FUNCOES_DELTA:-49}
+#   0109  +1  sureya_cobrancas_a_lancar — a tela precisa avisar "2 competencias
+#             a lancar" ANTES de alguem mandar cobrar. (O cobrador ganhou um
+#             parametro, mas a versao velha foi derrubada: nao soma.)
+#   0111  +1  sureya_regua_do_dia — a regua ENFILEIRA, nunca envia. Nao ha
+#             caminho daqui para o WhatsApp, e e de proposito.
+# Saldo: +51.
+FUNCOES_DELTA=${FUNCOES_DELTA:-51}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -484,6 +494,23 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/etapa_da_familia.sql 2>&
   echo "$saida" | grep -E "ETAPA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Duas telas com contas diferentes sobre os mesmos fatos."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# A REGUA DE COBRANCA
+#
+# O risco aqui tem nome: mandar a mesma cobranca duas vezes, ou mandar para
+# quem ja pagou. A fila nao tem desfazer depois de liberada.
+# ---------------------------------------------------------------------------
+echo "REGUA — cobra quem deve, uma vez, e nunca envia sozinha"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/regua.sql 2>&1); then
+  echo "$saida" | grep -E "REGUA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Cobrar quem pagou, ou cobrar duas vezes, custa a relacao."
   echo "============================================================"
   exit 1
 fi

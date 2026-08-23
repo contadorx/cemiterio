@@ -1520,3 +1520,64 @@ saber ir fundir.
 As zero com lançamento são a boa notícia: fundir hoje não mistura histórico de
 dinheiro de ninguém. É a hora mais barata que vai existir. Ensaiado com um par
 real e desfeito: 365 → 364 famílias, contato e jazigo movidos, zero órfãos.
+
+---
+
+## D-32 · "Em dia" era uma afirmação falsa
+
+**O caso:** a família Cordeiro, cadastrada com cobrança desde julho porque pagou
+em junho. Medido em 23/08: contratado, R$ 30/mês, **próxima cobrança 01/07**,
+**zero lançamentos**, e a ficha dizendo **"Em dia"**.
+
+O cadastro estava certo. O motor estava certo — ensaiado e desfeito, ele
+lançaria 07/2026 R$30 + 08/2026 R$30 = **R$ 60**, exatamente o que o usuário
+esperava. **Não existia caminho para ele rodar quando a pessoa precisa**:
+`sureya_cobrar_competencias` só era chamada pelo cron das 6h. Quem configurava
+a cobrança hoje descobria amanhã se tinha acertado.
+
+E o pior não era a espera: **saldo zero porque nada foi lançado não é o mesmo
+que quitado.** Uma família com dois meses a lançar aparecia igual a uma que
+pagou tudo, e a inadimplência ficava invisível justamente onde se olha.
+
+Duas peças: o cobrador passou a aceitar **uma família** (para o botão agir só
+ali) e nasceu `sureya_cobrancas_a_lancar`, que **responde sem cobrar** — abrir
+uma ficha nunca pode criar dívida. A ficha agora avisa *"2 competências a
+lançar — R$ 60"* com o botão ao lado.
+
+### A régua vive no banco
+
+Era três nomes fixos (suave/padrão/firme) com os degraus **dentro do
+TypeScript**: quantos dias, que texto, em que ordem. Personalizar exigia mexer
+em código — o oposto de *"vou ajustando"*. E ela só sabia perseguir quem **já**
+devia: a cobrança do serviço prévio não existia.
+
+Agora cada degrau é uma linha de `regua_degraus`, com **um eixo só e o zero no
+vencimento**: dias negativos são antes (o aviso), positivos são depois (a
+cobrança). Dois campos separados — "tipo" + "dias" — deixariam criar "aviso
+prévio, 5 dias depois", que não quer dizer nada.
+
+**O vencimento não é a competência.** `competencia` é sempre o dia 1º (o gatilho
+da 0098 carimba assim, e está certo: competência é mês). Mas ninguém vence no
+dia 1º — daí `orgs.dia_vencimento`. Sem ele, o degrau de "3 dias depois" cairia
+no dia 4 de todo mês, chamando de atrasado quem ainda tem uma semana.
+
+**A régua enfileira, nunca envia.** Não há caminho dela para o WhatsApp: ela
+escreve na fila de liberação, que é a porta única desde a 0094. Quatro travas,
+cada uma por um erro concreto: uma por degrau por competência (rodar duas vezes
+não cobra duas vezes), uma por família por dia (três túmulos em atraso não viram
+três mensagens na mesma manhã), só quem ainda deve (quem pagou ontem não recebe
+hoje) e respeito à régua `nao_cobrar`.
+
+### Duplicadas: select na frente, e o esconderijo aberto
+
+O bloco "Ajustes da família" era recolhido, com o argumento de que "coisas de
+fazer uma vez" não podiam competir com o dia a dia. O argumento não sobreviveu
+ao uso: **esconder três botões atrás de um quarto botão não protege ninguém**.
+Aberto.
+
+E a lista de famílias ganhou **caixa de seleção por linha e exclusão em lote** —
+nasceu das 97 duplicadas, com "Família Cemitério" aparecendo ~30 vezes. O lote
+usa a **mesma porta** da ficha, a que recusa quem não está vazia: um lote que
+apagasse à força levaria os 48 jazigos junto. E ele **relata**: quantas saíram
+e, para cada recusada, o motivo — sem isso, "excluí 30 e sumiram 12" seria um
+mistério.

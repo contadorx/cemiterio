@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
+import Regua from "./Regua";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "regua" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   // A ABA VEM DO ENDERECO. Sem isto, o redirecionamento de /painel/whatsapp
   // cairia sempre em "A Casa" — e quem clicou em "Reconectar" na fila teria de
   // procurar a aba, justamente na hora em que o WhatsApp esta fora do ar.
@@ -34,6 +35,8 @@ export default function Config() {
             // entrega as fotos. Quando ele cai, o que se procura e
             // "configuracoes", nao um endereco decorado.
             ["whatsapp", "WhatsApp"],
+            // A régua de cobrança: os degraus vivem no banco desde a 0110.
+            ["regua", "Régua de cobrança"],
             ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
@@ -54,6 +57,7 @@ export default function Config() {
         {aba === "campanhas" && <Campanhas />}
         {aba === "mensagens" && <Mensagens />}
         {aba === "whatsapp" && <ConexaoWhatsapp />}
+        {aba === "regua" && <Regua />}
         {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada"
           && aba !== "mensagens" && aba !== "whatsapp" && <Agregados aba={aba} />}
       </div>

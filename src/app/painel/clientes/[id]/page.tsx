@@ -218,7 +218,8 @@ export default function Ficha() {
       {familiaId && <DadosDaFamilia fam={fam} familiaId={familiaId} aoMudar={carregar} />}
       <Pessoas familiaId={familiaId} atualId={clienteId || ""} />
       <Tumulos tumulos={d.tumulos || []} clienteId={clienteId} aoMudar={carregar} />
-      {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar} />}
+      {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar}
+                                  aLancar={d?.cobrancasALancar} />}
       <Limpezas clienteId={clienteId} tumulos={d.tumulos || []} aoMudar={carregar} />
       {c && <Ajustes clienteId={c.id} nome={c.nome}
                     familiaId={familiaId} familiaNome={fam?.nome || ""} />}
@@ -941,9 +942,35 @@ function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => 
 
 /* ------------------------------------------------------------------ */
 
-function ContaCorrente({ familiaId, clienteId, aoMudar }: {
+function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   familiaId: string | null; clienteId: string | null; aoMudar: () => void;
+  aLancar?: { competencias: number; valor: number; desde: string | null } | null;
 }) {
+  const [cobrando, setCobrando] = useState(false);
+
+  /**
+   * LANÇAR AS COBRANÇAS VENCIDAS DESTA FAMÍLIA.
+   *
+   * O motor já existia e só rodava no cron das 6h. Quem configurava a cobrança
+   * hoje descobria amanhã se tinha acertado — e até lá a ficha dizia "Em dia".
+   * É um COMANDO: ninguém cria dívida abrindo uma tela.
+   */
+  async function cobrarAgora() {
+    if (!familiaId || !aLancar?.competencias) return;
+    if (!confirm(
+      `Lançar ${aLancar.competencias} ${aLancar.competencias === 1 ? "competência" : "competências"} `
+      + `no valor de R$ ${Number(aLancar.valor).toFixed(2).replace(".", ",")}?\n\n`
+      + `Elas entram no conta corrente como dívida da família. Nada é enviado a ninguém.`)) return;
+    setCobrando(true);
+    try {
+      const r = await fetch(`/api/familias/${familiaId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "cobrar" }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.mensagem || "Não consegui lançar."); return; }
+      aoMudar();
+    } finally { setCobrando(false); }
+  }
   const [dados, setDados] = useState<any>(null);
   // O comprovante entra AQUI, junto com o pagamento — e não num fluxo à
   // parte. Anexar depois é o tipo de tarefa que ninguém volta para fazer.
@@ -1043,6 +1070,30 @@ function ContaCorrente({ familiaId, clienteId, aoMudar }: {
         </span>
       )}
     >
+      {/* "EM DIA" ERA UMA AFIRMAÇÃO FALSA.
+          Saldo zero porque nada foi lançado não é o mesmo que quitado. Uma
+          família com dois meses a lançar aparecia igual a uma que pagou tudo,
+          e a inadimplência ficava invisível justamente onde se olha. */}
+      {!!aLancar?.competencias && (
+        <div className="mb-3 rounded-xl2 border border-aviso/40 bg-aviso/10 p-3">
+          <p className="text-[15px] font-semibold text-aviso">
+            {aLancar.competencias} {aLancar.competencias === 1 ? "competência" : "competências"} a lançar
+            {" — "}R$ {Number(aLancar.valor).toFixed(2).replace(".", ",")}
+          </p>
+          <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
+            A cobrança está configurada desde{" "}
+            <b>{aLancar.desde ? String(aLancar.desde).slice(0, 7).split("-").reverse().join("/") : "—"}</b>{" "}
+            e estas competências ainda não entraram no extrato. Enquanto não entrarem, o saldo
+            fica zerado e a família parece em dia.
+          </p>
+          <div className="mt-2">
+            <Botao tom="principal" onClick={cobrarAgora} disabled={cobrando}>
+              {cobrando ? "Lançando…" : "Lançar as cobranças vencidas"}
+            </Botao>
+          </div>
+        </div>
+      )}
+
       <div className="mb-3 flex flex-wrap gap-2">
         <Botao tom="principal" onClick={() => { setAbrindo("pagamento"); setErro(""); }}>
           <Plus size={16} /> Pagamento
@@ -2062,14 +2113,17 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
 /* ------------------------------------------------------------------ */
 
 /**
- * AJUSTES — recolhido por padrão.
+ * AJUSTES — ABERTO.
  *
- * Coisas de fazer uma vez: exportar dados e excluir. Ficavam abertas
- * competindo com o que se usa todo dia.
+ * Era recolhido, com o argumento de que "coisas de fazer uma vez" não podiam
+ * competir com o dia a dia. O argumento não sobreviveu ao uso: o bloco tem só
+ * três botões, e esconder três botões atrás de um quarto botão não protege
+ * ninguém — só faz procurar. Quem chegou ao fim da ficha já passou por tudo o
+ * que se usa todo dia.
  */
 function Ajustes({ clienteId, nome, familiaId, familiaNome }:
   { clienteId: string; nome: string; familiaId: string | null; familiaNome: string }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(true);
   const [ocupado, setOcupado] = useState(false);
 
   async function excluir() {

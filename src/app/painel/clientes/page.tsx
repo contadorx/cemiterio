@@ -109,6 +109,56 @@ function VisaoFamilias() {
                                regua: "", venceEm: "", ordem: "nome", teste: false, etapa: "" });
   const [quadras, setQuadras] = useState<any[]>([]);
   const [abrindo, setAbrindo] = useState(false);
+  /** As famílias marcadas para a ação em lote. Guarda o id da FAMÍLIA. */
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [excluindo, setExcluindo] = useState(false);
+
+  /**
+   * EXCLUIR AS MARCADAS.
+   *
+   * Nasceu das 97 duplicadas: "Família Cemitério" sozinha aparece ~30 vezes.
+   * Abrir 30 fichas para apagar 30 cascas é o trabalho que o lote tira.
+   *
+   * Usa a MESMA porta da ficha — a que recusa quem não está vazia e diz o que
+   * está preso. Um lote que apagasse à força levaria jazigos junto, e é
+   * exatamente o desenho que já mordeu esta casa uma vez.
+   *
+   * O relatório do fim é o ponto: diz quantas saíram e, para cada recusada, o
+   * motivo. Sem ele, "excluí 30 e sumiram 12" seria um mistério.
+   */
+  async function excluirMarcadas() {
+    const alvos = [...marcadas];
+    if (!alvos.length) return;
+    if (!confirm(
+      `Excluir ${alvos.length} ${alvos.length === 1 ? "família" : "famílias"}?\n\n`
+      + `Só saem as que estiverem VAZIAS — sem contato, sem jazigo e sem lançamento. `
+      + `As demais continuam onde estão, e eu digo o motivo de cada uma.`)) return;
+
+    setExcluindo(true);
+    const recusadas: string[] = [];
+    let saíram = 0;
+    try {
+      for (const id of alvos) {
+        const r = await fetch(`/api/familias/${id}`, { method: "DELETE" })
+          .then((x) => x.json()).catch(() => null);
+        if (r?.ok) saíram++;
+        else {
+          const nome = (d?.clientes || []).find((c: any) => c.familia_id === id)?.familia || id.slice(0, 8);
+          recusadas.push(`${nome}: ${r?.mensagem || "não deu"}`);
+        }
+      }
+    } finally { setExcluindo(false); }
+
+    setMarcadas(new Set());
+    await carregar();
+    alert(
+      `${saíram} ${saíram === 1 ? "família excluída" : "famílias excluídas"}.`
+      + (recusadas.length
+          ? `\n\nNão saíram (${recusadas.length}):\n` + recusadas.slice(0, 10).join("\n")
+            + (recusadas.length > 10 ? `\n…e mais ${recusadas.length - 10}.` : "")
+            + `\n\nPara duplicadas com jazigo ou contato, abra a ficha e use "Fundir com outra família".`
+          : ""));
+  }
 
   const carregar = useCallback(async () => {
     const p = new URLSearchParams();
@@ -246,10 +296,50 @@ function VisaoFamilias() {
           <div style={painel.card}><p style={{ color: cor.cinza, margin: 0 }}>Nenhuma família com esses filtros.</p></div>
         )}
 
+        {/* A BARRA DE LOTE. Só aparece com alguém marcado: uma barra vazia
+            permanente é ruído em cima da lista que se usa todo dia. */}
+        {marcadas.size > 0 && (
+          <div style={{ ...painel.card, display: "flex", flexWrap: "wrap", gap: 10,
+                        alignItems: "center", position: "sticky", top: 8, zIndex: 5 }}>
+            <b style={{ color: cor.navy }}>
+              {marcadas.size} {marcadas.size === 1 ? "família marcada" : "famílias marcadas"}
+            </b>
+            <button style={painel.botaoMiniSec} onClick={() => setMarcadas(new Set())}>
+              Desmarcar
+            </button>
+            <span style={{ flex: 1 }} />
+            <button style={{ ...painel.botaoMini, background: "rgb(var(--zm-perigo))" }}
+                    disabled={excluindo} onClick={excluirMarcadas}>
+              {excluindo ? "Excluindo…" : `Excluir ${marcadas.size}`}
+            </button>
+          </div>
+        )}
+
         {d && d.clientes.map((c: any) => (
           <Link key={c.id} href={`/painel/clientes/${c.id}`} style={{ textDecoration: "none" }}>
             <div style={{ ...painel.card, borderLeft: c.atrasado ? "4px solid #dc2626" : `1px solid ${cor.linha}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                {/* O SELECT NA FRENTE.
+                    `preventDefault` porque a linha inteira é um link: sem ele,
+                    marcar a caixa abriria a ficha e a marcação se perderia. */}
+                {c.familia_id && (
+                  <input
+                    type="checkbox"
+                    checked={marcadas.has(c.familia_id)}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onChange={() => {}}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); e.stopPropagation();
+                      setMarcadas((m) => {
+                        const n = new Set(m);
+                        if (n.has(c.familia_id)) n.delete(c.familia_id); else n.add(c.familia_id);
+                        return n;
+                      });
+                    }}
+                    style={{ width: 18, height: 18, marginTop: 3, flexShrink: 0, cursor: "pointer" }}
+                    title="Marcar para a ação em lote"
+                  />
+                )}
                 <div style={{ flex: 1, minWidth: 200 }}>
                   {/* FAMÍLIA E RESPONSÁVEL, antes de abrir a ficha.
                       A lista mostrava só o nome da PESSOA — e a família
