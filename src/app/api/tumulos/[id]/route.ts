@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [{ data: t }, { data: urg }, { data: servs }] = await Promise.all([
     db.from("tumulos")
       .select("id,identificacao,numero,falecido_nome,rua,rua_id,ordem_na_rua,observacoes,"
-            + "contratado,periodicidade,valor_lavagem,valor_mensal,lat,lng,gps_precisao,"
+            + "contratado,periodicidade,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,lat,lng,gps_precisao,"
             + "foto_referencia_url,foto_enquadramento_url,ultima_lavagem_informada,"
             + "cliente_id,familia_id,quadras(codigo),familias(nome,contratado,inicio_cobranca),"
             + "clientes(nome,telefone)")
@@ -190,6 +190,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Zero não é "de graça": é "não combinei". Guardar 0 faria a conferência
     // dar o item como resolvido e a lavagem sair sem cobrança.
     patch[campo] = v > 0 ? Math.round(v * 100) / 100 : null;
+  }
+
+  // AS OUTRAS OPÇÕES DO CONTRATO, que agora moram no jazigo.
+  //
+  // O painel tinha DOIS cartões — "Contrato" (da família) e "Túmulo" — com o
+  // mesmo assunto repartido entre eles: o valor num, o ritmo no outro. Com N
+  // jazigos por família, o cartão da família precisava dizer "um só, mesmo com
+  // vários túmulos", que é a confissão de que o grão estava errado.
+  //
+  // As colunas já existiam aqui desde antes (são o histórico de quando o plano
+  // morava no túmulo); o que faltava era o PATCH aceitá-las de volta.
+  if (body.valor_base !== undefined) patch.valor_base = body.valor_base || null;
+  if (body.inicio_cobranca !== undefined) {
+    // Sempre o dia 1: competência é mês, não dia. Guardar "15/03" faria a
+    // comparação com "2026-03-01" falhar em silêncio.
+    const v = String(body.inicio_cobranca || "");
+    patch.inicio_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
   }
 
   if (body.periodicidade !== undefined) {

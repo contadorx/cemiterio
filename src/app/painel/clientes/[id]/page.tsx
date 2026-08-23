@@ -62,6 +62,44 @@ const FREQUENCIAS = [
   ["anual", "uma vez por ano"],
 ];
 
+/** O mesmo, indexado — a tela mostra o rótulo e grava o código. */
+const FREQ_ROTULO: Record<string, string> = Object.fromEntries(FREQUENCIAS);
+
+/**
+ * O CÓDIGO INTERNO NÃO VAI PARA A TELA.
+ *
+ * Apareceu "nada_para_mudar" em letras miúdas embaixo do botão de trocar quem
+ * acerta a conta — um nome de variável mostrado a quem está conferindo
+ * cadastro. É o padrão `r.mensagem || r.erro`, em que o segundo termo é o
+ * código que o servidor usa para si.
+ *
+ * A mensagem do servidor vem primeiro; sem ela, o código é traduzido; e o que
+ * não estiver aqui vira uma frase honesta em vez de um identificador.
+ */
+const ERRO_EM_PORTUGUES: Record<string, string> = {
+  nada_para_mudar: "Nada mudou — não havia o que salvar.",
+  nada_para_atualizar: "Nada mudou — não havia o que salvar.",
+  telefone_repetido: "Já existe outra pessoa com este telefone.",
+  telefone_invalido: "Telefone inválido. Use DDD + número.",
+  telefone_vazio: "O telefone não pode ficar em branco.",
+  nao_e_desta_familia: "Esta pessoa não está nesta família.",
+  e_o_responsavel: "Esta pessoa é o titular. Troque o titular antes de removê-la.",
+  familia_nao_encontrada: "Não achei esta família.",
+  nome_vazio: "A família precisa de um nome.",
+  valor_invalido: "Informe um valor válido.",
+};
+
+function traduzirErro(r: any, padrao = "Não consegui salvar. Tente de novo."): string {
+  if (r?.mensagem) return String(r.mensagem);
+  const cod = String(r?.erro || "");
+  if (ERRO_EM_PORTUGUES[cod]) return ERRO_EM_PORTUGUES[cod];
+  // Sem tradução: melhor uma frase que admite não saber do que um
+  // identificador com underline no meio da ficha. Cada tela passa a sua,
+  // porque "não consegui salvar" mente quando o que falhou foi registrar
+  // uma limpeza ou ligar um jazigo.
+  return padrao;
+}
+
 export default function Ficha() {
   const params = useParams();
   const id = String(params?.id || "");
@@ -170,9 +208,14 @@ export default function Ficha() {
       {familiaId && <BarraConferencia familiaId={familiaId} fam={fam}
                                       pendentes={pendentes} aoMudar={carregar} />}
 
+      {/* UM LUGAR SÓ PARA CADA COISA.
+          Havia "Dados do contato" (uma pessoa) E "Contatos da família" (todas)
+          — dois cartões para o mesmo assunto, e no primeiro não dava para
+          dizer quem acerta a conta. Ficou o segundo.
+          E havia "Contrato" (da família) E "Túmulo": o valor num, o ritmo no
+          outro. O que é do jazigo desceu para o jazigo; o que é da família
+          (fotos, quando ela paga, como o extrato soma) subiu para cá. */}
       {familiaId && <DadosDaFamilia fam={fam} familiaId={familiaId} aoMudar={carregar} />}
-      {c && <Identificacao c={c} aoMudar={carregar} />}
-      <Contrato familiaId={familiaId} aoMudar={carregar} />
       <Pessoas familiaId={familiaId} atualId={clienteId || ""} />
       <Tumulos tumulos={d.tumulos || []} clienteId={clienteId} aoMudar={carregar} />
       {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar} />}
@@ -213,16 +256,26 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
   fam: any; familiaId: string; aoMudar: () => void;
 }) {
   const [abrindo, setAbrindo] = useState(false);
-  const [nome, setNome] = useState(fam?.nome || "");
+  // O QUE É DA FAMÍLIA, e só isso. O valor combinado e o início da cobrança
+  // desceram para o jazigo (0100): com N túmulos, cada um tem o seu.
+  // Aqui fica o que é dela mesma — o nome, se recebe foto, quando paga e
+  // como o extrato soma.
+  const [f, setF] = useState({
+    nome: fam?.nome || "",
+    enviar_fotos: fam?.enviar_fotos === null || fam?.enviar_fotos === undefined
+      ? "geral" : (fam.enviar_fotos ? "sim" : "nao"),
+    freq_pagamento: fam?.freq_pagamento || "",
+    modo_cobranca: fam?.modo_cobranca || "consumo",
+  });
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
-    if (!nome.trim()) { alert("A família precisa de um nome."); return; }
+    if (!f.nome.trim()) { alert("A família precisa de um nome."); return; }
     setSalvando(true);
     try {
       const r = await fetch(`/api/familias/${familiaId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome }),
+        body: JSON.stringify(f),
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
       setAbrindo(false);
@@ -234,18 +287,53 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
     <Cartao
       titulo="Dados da família"
       acao={
-        <Botao onClick={() => { setNome(fam?.nome || ""); setAbrindo((x) => !x); }}>
+        <Botao onClick={() => setAbrindo((x) => !x)}>
           <Pencil size={16} /> Editar
         </Botao>
       }
     >
       {!abrindo ? (
-        <p className="text-[15px] text-ink">{fam?.nome || "sem nome"}</p>
+        <div className="text-[14px] text-ink-soft">
+          <p className="text-[15px] text-ink">{fam?.nome || "sem nome"}</p>
+          <p>
+            {fam?.enviar_fotos === null || fam?.enviar_fotos === undefined
+              ? "fotos: segue a chave da casa"
+              : fam.enviar_fotos ? "fotos: sempre enviar" : "fotos: nunca enviar"}
+            {fam?.freq_pagamento ? ` · paga ${FREQ_ROTULO[fam.freq_pagamento] || fam.freq_pagamento}` : ""}
+            {fam?.modo_cobranca === "competencia"
+              ? " · extrato por competência" : " · extrato por consumo"}
+          </p>
+        </div>
       ) : (
         <>
           <Campo rotulo="Nome da família" dica="é por ele que ela aparece nas listas">
-            <Entrada value={nome} onChange={(e: any) => setNome(e.target.value)} />
+            <Entrada value={f.nome} onChange={(e: any) => setF({ ...f, nome: e.target.value })} />
           </Campo>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Campo rotulo="Fotos do serviço para esta família"
+                   dica="a escolha aqui vale mais que a chave geral em Config">
+              <Selecao value={f.enviar_fotos}
+                       onChange={(e: any) => setF({ ...f, enviar_fotos: e.target.value })}>
+                <option value="geral">segue a chave geral da casa</option>
+                <option value="sim">sempre enviar</option>
+                <option value="nao">nunca enviar</option>
+              </Selecao>
+            </Campo>
+            <Campo rotulo="A família paga" dica="de quanto em quanto tempo ela acerta">
+              <Selecao value={f.freq_pagamento}
+                       onChange={(e: any) => setF({ ...f, freq_pagamento: e.target.value })}>
+                <option value="">escolha</option>
+                {Object.entries(FREQ_ROTULO).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+              </Selecao>
+            </Campo>
+            <Campo rotulo="No extrato" dica="como o saldo é calculado">
+              <Selecao value={f.modo_cobranca}
+                       onChange={(e: any) => setF({ ...f, modo_cobranca: e.target.value })}>
+                <option value="consumo">cada limpeza desconta do que foi pago</option>
+                <option value="competencia">o mês inteiro entra de uma vez</option>
+              </Selecao>
+            </Campo>
+          </div>
           <div className="mt-3 flex gap-2">
             <Botao tom="principal" onClick={salvar} disabled={salvando}>
               {salvando ? "Salvando…" : "Salvar"}
@@ -416,6 +504,8 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
     valor_mensal: t.valor_mensal ?? "",
     // O preço de uma ida, para quem é avulso: aí não há mês para dividir.
     valor_lavagem: t.valor_lavagem ?? "",
+    valor_base: t.valor_base ?? "mes",
+    inicio_cobranca: t.inicio_cobranca ?? "",
   });
   const [salvando, setSalvando] = useState(false);
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
@@ -552,6 +642,23 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               <Entrada value={f.valor_lavagem} inputMode="decimal" placeholder="40,00"
                        onChange={(e: any) => setF({ ...f, valor_lavagem: e.target.value })} />
             </Campo>
+            {/* O RESTO DO CONTRATO DESCE PARA CÁ.
+                Havia um cartão "Contrato", da família, com o valor combinado e
+                a régua — e ele precisava avisar "um só, mesmo com vários
+                túmulos", que é a confissão de que o grão estava errado. Com N
+                jazigos por família (24 têm, uma tem três), cada um pode ter o
+                seu preço, o seu início e a sua base. */}
+            <Campo rotulo="Esse valor é" dica="por mês, ou o valor de cada cobrança">
+              <Selecao value={f.valor_base}
+                       onChange={(e: any) => setF({ ...f, valor_base: e.target.value })}>
+                <option value="mes">por mês</option>
+                <option value="cobranca">o valor de cada cobrança</option>
+              </Selecao>
+            </Campo>
+            <Campo rotulo="Cobrar a partir de" dica="o mês em que o serviço começou">
+              <Entrada type="month" value={String(f.inicio_cobranca || "").slice(0, 7)}
+                       onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })} />
+            </Campo>
             <Campo rotulo="Endereço, foto e falecido">
               <a
                 href={`/painel/jazigos?rua=${encodeURIComponent(t.ruas?.nome || "")}`}
@@ -562,6 +669,12 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
             </Campo>
           </div>
 
+          {/* O QUE ESTA CAIXA FAZ, e não quem lava.
+              Dizia "A Nina limpa este túmulo" — o nome de uma pessoa numa
+              caixa que decide se o jazigo entra na ESTEIRA de geração da
+              agenda. Quem lava é decidido na agenda, a cada data, e pode ser
+              ninguém até alguém começar (D-11).
+              O próprio selo da linha já dizia a verdade: "não entra na rota". */}
           <label className="mt-3 flex items-center gap-2 text-[14px] text-ink">
             <input
               type="checkbox"
@@ -569,7 +682,7 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               onChange={(e: any) => setF({ ...f, contratado: e.target.checked })}
               className="h-4 w-4"
             />
-            A Nina limpa este túmulo
+            Este túmulo entra na rota (a agenda gera limpezas para ele)
           </label>
 
           {aviso && <p className="mt-2 text-[13px] text-perigo">{aviso}</p>}
@@ -635,213 +748,6 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
   );
 }
 
-/**
- * O CONTRATO DA FAMÍLIA.
- *
- * A Sureya combina UM valor com a família, mesmo que ela tenha dois túmulos.
- * Por isso valor, frequência de pagamento e início moram aqui — e não no
- * túmulo, onde geravam duas cobranças para quem tem duas pedras.
- *
- * O que fica no túmulo é a periodicidade da limpeza, porque essa sim pode ser
- * diferente em cada um.
- */
-function Contrato({ familiaId, aoMudar }: { familiaId: string | null; aoMudar: () => void }) {
-  const [d, setD] = useState<any>(null);
-  const [abrindo, setAbrindo] = useState(false);
-  const [f, setF] = useState<any>(null);
-  const [salvando, setSalvando] = useState(false);
-  const [aviso, setAviso] = useState("");
-
-  const carregar = useCallback(() => {
-    if (!familiaId) return;
-    fetch(`/api/familias/${familiaId}`).then((x) => x.json())
-      .then((r) => {
-        if (!r?.ok) return;
-        setD(r.familia);
-        setF({
-          valor_mensal: r.familia.valor_mensal ?? "",
-          valor_base: r.familia.valor_base ?? "mes",
-          modo_cobranca: r.familia.modo_cobranca ?? "consumo",
-          freq_pagamento: r.familia.freq_pagamento ?? "",
-          inicio_cobranca: (r.familia.inicio_cobranca ?? "").slice(0, 7),
-          contratado: !!r.familia.contratado,
-          // TRÊS estados, não dois: "" = segue a chave geral da casa.
-          // Guardar `false` no lugar de nulo faria a família parar de receber
-          // foto no dia em que alguém religasse a geral.
-          enviar_fotos: r.familia.enviar_fotos === null || r.familia.enviar_fotos === undefined
-            ? "geral" : (r.familia.enviar_fotos ? "sim" : "nao"),
-        });
-      }).catch(() => {});
-  }, [familiaId]);
-
-  useEffect(() => { carregar(); }, [carregar]);
-
-  if (!familiaId || !f) return null;
-
-  async function salvar() {
-    if (f.contratado && (!f.valor_mensal || !f.freq_pagamento || !f.inicio_cobranca)) {
-      // Contrato pela metade não gera cobrança nenhuma, e ninguém descobre por
-      // quê. Melhor barrar aqui.
-      setAviso("Preencha valor, quando cobrar e a partir de quando.");
-      return;
-    }
-    setAviso(""); setSalvando(true);
-    try {
-      await fetch(`/api/familias/${familiaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
-      });
-      setAbrindo(false); carregar(); aoMudar();
-    } finally { setSalvando(false); }
-  }
-
-  const FREQ: Record<string, string> = {
-    mensal: "todo mês", trimestral: "a cada três meses",
-    semestral: "a cada seis meses", anual: "uma vez por ano",
-  };
-  const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
-
-  return (
-    <Cartao
-      titulo="Contrato"
-      acao={
-        <Botao onClick={() => setAbrindo((x) => !x)}>
-          <Pencil size={16} /> {abrindo ? "Fechar" : "Editar"}
-        </Botao>
-      }
-    >
-      {!abrindo ? (
-        <>
-        {/* A EXCEÇÃO DE FOTO APARECE SEMPRE, com ou sem plano.
-            Uma família marcada como "nunca enviar" e que não mostra nada aqui é
-            uma armadilha: a Sureya conclui a limpeza, nenhuma mensagem aparece
-            na fila, e não há tela em que se descubra por quê. */}
-        {d?.enviar_fotos === false && (
-          <p className="mb-2"><Selo tom="atencao">esta família NÃO recebe fotos</Selo></p>
-        )}
-        {d?.enviar_fotos === true && (
-          <p className="mb-2"><Selo tom="neutro">recebe fotos mesmo com a chave geral desligada</Selo></p>
-        )}
-        {!d?.contratado ? (
-          <p className="text-[14px] text-ink-soft">
-            Sem plano — as limpezas entram como avulso na conta corrente.
-          </p>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Selo tom="neutro">
-              {dinheiro(Number(d.valor_mensal || 0))}
-              {(d.valor_base ?? "mes") === "mes" ? " por mês" : " por cobrança"}
-            </Selo>
-            <Selo tom="neutro">paga {FREQ[d.freq_pagamento] ?? "—"}</Selo>
-            {d.inicio_cobranca && (
-              <Selo tom="neutro">
-                desde {MES[Number(d.inicio_cobranca.slice(5, 7)) - 1]}/{d.inicio_cobranca.slice(2, 4)}
-              </Selo>
-            )}
-            {/* Sem ritmo em nenhum túmulo não há como dividir o valor, e a
-                limpeza entraria no extrato valendo zero. Melhor dizer o que
-                falta que mostrar um número errado. */}
-            {d.modo_cobranca === "consumo" && <FecharMes familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
-            {d.modo_cobranca === "consumo"
-              ? (d.valor_por_limpeza > 0
-                  ? <Selo tom="neutro">cada limpeza vale {dinheiro(d.valor_por_limpeza)}</Selo>
-                  : <Selo tom="atencao">falta dizer o ritmo da limpeza no túmulo</Selo>)
-              : <PorNaConta familiaId={familiaId} aoMudar={() => { carregar(); aoMudar(); }} />}
-          </div>
-        )}
-        </>
-      ) : (
-        <>
-          <label className="mb-3 flex items-center gap-2 text-[14px] text-ink">
-            <input type="checkbox" checked={f.contratado} className="h-4 w-4"
-                   onChange={(e) => setF({ ...f, contratado: e.target.checked })} />
-            Esta família tem plano
-          </label>
-
-          {/* A CHAVE DE ENVIO DE FOTOS DESTA FAMÍLIA (migration 0085).
-              Fica fora do bloco do plano de propósito: família sem plano também
-              recebe limpeza avulsa, e também pode não querer receber foto.
-              O terceiro estado ("segue a casa") é o padrão e não é o mesmo que
-              "não" — ele acompanha a chave geral em Config › Mensagens. */}
-          <Campo rotulo="Fotos do serviço para esta família"
-                 dica="a escolha aqui vale mais que a chave geral em Config">
-            <Selecao value={f.enviar_fotos}
-                     onChange={(e: any) => setF({ ...f, enviar_fotos: e.target.value })}>
-              <option value="geral">segue a chave geral da casa</option>
-              <option value="sim">sempre enviar</option>
-              <option value="nao">nunca enviar</option>
-            </Selecao>
-          </Campo>
-
-          {f.contratado && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Campo rotulo="Valor combinado" dica="um só, mesmo com vários túmulos">
-                <Entrada inputMode="decimal" value={f.valor_mensal}
-                         onChange={(e: any) => setF({ ...f, valor_mensal: e.target.value })}
-                         placeholder="100,00" />
-              </Campo>
-              {/* Nem todo combinado é dito por mês. "R$ 600 por semestre"
-                  existe, e obrigar a Sureya a dividir de cabeça é pedir erro —
-                  ainda mais quando a divisão não é exata. */}
-              <Campo rotulo="Esse valor é">
-                <Selecao value={f.valor_base}
-                         onChange={(e: any) => setF({ ...f, valor_base: e.target.value })}>
-                  <option value="mes">por mês</option>
-                  <option value="cobranca">o valor de cada cobrança</option>
-                </Selecao>
-              </Campo>
-              <Campo rotulo="A família paga">
-                <Selecao value={f.freq_pagamento}
-                         onChange={(e: any) => setF({ ...f, freq_pagamento: e.target.value })}>
-                  <option value="">escolha</option>
-                  {Object.entries(FREQ).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-                </Selecao>
-              </Campo>
-              <Campo rotulo="Cobrar a partir de" dica="o mês em que o serviço começou">
-                <Entrada type="month" value={f.inicio_cobranca}
-                         onChange={(e: any) => setF({ ...f, inicio_cobranca: e.target.value })} />
-              </Campo>
-              {/* COMO O EXTRATO CONTA.
-                  Os dois modos não convivem: somados, cobrariam duas vezes o
-                  mesmo serviço. */}
-              <Campo rotulo="No extrato" dica="como o saldo é calculado">
-                <Selecao value={f.modo_cobranca}
-                         onChange={(e: any) => setF({ ...f, modo_cobranca: e.target.value })}>
-                  <option value="consumo">cada limpeza desconta do que foi pago</option>
-                  <option value="competencia">o mês inteiro entra de uma vez</option>
-                </Selecao>
-              </Campo>
-            </div>
-          )}
-
-          {/* O RESULTADO, escrito antes de salvar: é a única forma de perceber
-              na hora que se combinou uma coisa e o sistema entendeu outra. */}
-          {f.contratado && f.valor_mensal && f.freq_pagamento && (
-            <p className="mt-3 rounded-lg bg-brand-light px-3 py-2 text-[14px] text-ink">
-              A família recebe <b>{dinheiro(valorDaCobranca(f))}</b>{" "}
-              {FREQ[f.freq_pagamento] ?? ""}.
-              {f.modo_cobranca === "consumo" && (
-                <>
-                  {" "}No extrato, cada limpeza vai descontando desse valor
-                  {d?.valor_por_limpeza > 0 && <> — hoje <b>{dinheiro(d.valor_por_limpeza)}</b> por limpeza</>}.
-                </>
-              )}
-            </p>
-          )}
-
-          {aviso && <p className="mt-2 text-[13px] text-perigo">{aviso}</p>}
-          <div className="mt-3 flex gap-2">
-            <Botao tom="principal" onClick={salvar} disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar"}
-            </Botao>
-            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
-          </div>
-        </>
-      )}
-    </Cartao>
-  );
-}
 
 /**
  * FECHAR O MÊS — o ajuste de quando faltou limpeza.
@@ -1306,7 +1212,7 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
       }).then((x) => x.json()).catch(() => null);
 
       if (!r?.ok) {
-        setErro(r?.mensagem || r?.erro || "Não consegui registrar a limpeza.");
+        setErro(traduzirErro(r, "Não consegui registrar a limpeza."));
         return;
       }
       setFeito(r);
@@ -1482,94 +1388,6 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
 
 /* ------------------------------------------------------------------ */
 
-/**
- * EDITAR A FAMÍLIA — nome, WhatsApp e observações.
- *
- * Sumiu na primeira versão da ficha nova, e era a coisa mais básica que se
- * faz aqui: corrigir um telefone digitado errado. Cortar excesso não pode
- * levar função junto.
- */
-function Identificacao({ c, aoMudar }: { c: any; aoMudar: () => void }) {
-  const [abrindo, setAbrindo] = useState(false);
-  const [f, setF] = useState({
-    nome: c.nome ?? "",
-    telefone: c.telefone ?? "",
-    observacoes: c.observacoes ?? "",
-  });
-  const [salvando, setSalvando] = useState(false);
-
-  async function salvar() {
-    setSalvando(true);
-    try {
-      // A RESPOSTA É LIDA. Antes o `await fetch` ia sozinho: dando erro, a tela
-      // fechava o editor, recarregava e mostrava o valor ANTIGO — a pessoa via
-      // "não aconteceu nada" e não tinha como saber por quê. Falha muda numa
-      // tela de edição é o mesmo que a edição não existir.
-      const r = await fetch(`/api/clientes/${c.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
-      }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) {
-        alert(r?.mensagem || r?.erro || "Não consegui salvar. Tente de novo.");
-        return;
-      }
-      setAbrindo(false);
-      aoMudar();
-    } finally { setSalvando(false); }
-  }
-
-  return (
-    // ⚠ ESTE CARTÃO EDITA A PESSOA, e dizia "Dados da família".
-    //
-    // O nome, o WhatsApp e as observações que ele mostra são de `clientes` —
-    // do CONTATO. Quem abria "Dados da família" para corrigir "Família Andre"
-    // acabava renomeando a pessoa, que é a confusão de sempre com outro rótulo.
-    // O nome da família tem cartão próprio, logo acima.
-    <Cartao
-      titulo="Dados do contato"
-      acao={
-        <Botao onClick={() => setAbrindo((x) => !x)}>
-          <Pencil size={16} /> Editar
-        </Botao>
-      }
-    >
-      {!abrindo ? (
-        <div className="text-[14px] text-ink-muted">
-          <p className="text-[15px] text-ink">{c.nome}</p>
-          <p>{c.telefone || "sem WhatsApp"}</p>
-          {c.observacoes && <p className="mt-1 text-[13px]">{c.observacoes}</p>}
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Campo rotulo="Nome">
-              <Entrada value={f.nome} onChange={(e: any) => setF({ ...f, nome: e.target.value })} />
-            </Campo>
-            <Campo rotulo="WhatsApp">
-              <Entrada value={f.telefone} inputMode="tel"
-                       onChange={(e: any) => setF({ ...f, telefone: e.target.value })}
-                       placeholder="11 99999-9999" />
-            </Campo>
-          </div>
-          <div className="mt-3">
-            <Campo rotulo="Observações" dica="o que ajuda a atender bem esta família">
-              <Entrada value={f.observacoes}
-                       onChange={(e: any) => setF({ ...f, observacoes: e.target.value })}
-                       placeholder="opcional" />
-            </Campo>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Botao tom="principal" onClick={salvar} disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar"}
-            </Botao>
-            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
-          </div>
-        </>
-      )}
-    </Cartao>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 
@@ -1639,10 +1457,45 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(corpo),
       }).then((x) => x.json());
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return false; }
+      // O CÓDIGO INTERNO NÃO VAI PARA A TELA. Aparecia "nada_para_mudar" em
+      // letras miúdas embaixo do botão — um nome de variável mostrado a quem
+      // está conferindo cadastro. A mensagem vem primeiro; o código só se não
+      // houver mensagem, e mesmo assim traduzido.
+      if (!r?.ok) { setErro(traduzirErro(r)); return false; }
       carregar();
       return true;
     } finally { setOcupado(false); }
+  }
+
+  /**
+   * Liga ou desliga "esta pessoa acerta a conta".
+   *
+   * Não mexe no TITULAR: são duas perguntas diferentes — "quem responde"
+   * (um só, com histórico) e "quem pode pagar" (quantos forem). A exceção é
+   * a família sem titular nenhum: aí o primeiro marcado assume, porque uma
+   * família com quem paga e sem para quem cobrar é o pior dos dois mundos.
+   *
+   * QUEM DIZ NÃO É O BANCO, NÃO ESTA FUNÇÃO.
+   *
+   * Havia aqui uma recusa própria: desmarcar o titular era proibido pela tela.
+   * Ela era mais dura que a regra da casa — o titular pode deixar de ser quem
+   * paga desde que outro pague, e era justamente isso que o usuário pediu ao
+   * permitir vários contatos financeiros.
+   *
+   * O limite verdadeiro é um só, e mora no gatilho da 0102: não dá para tirar
+   * o ÚLTIMO. Deixar a recusa num lugar só evita o pior dos casos — a tela
+   * proibir o que o banco permite, e ninguém entender por quê.
+   */
+  async function marcarPagador(p: any, ligar: boolean) {
+    setMexendo(p.id); setErro("");
+    try {
+      const r = await fetch(`/api/familias/${familiaId}/contatos`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contatoId: p.id, acertaConta: ligar }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setErro(traduzirErro(r)); return; }
+      carregar();
+    } finally { setMexendo(null); }
   }
 
   /** Corrige os dados de uma pessoa da família. */
@@ -1653,7 +1506,7 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contatoId: id, ...ed }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      if (!r?.ok) { setErro(traduzirErro(r)); return; }
       setEditando(null); setEd({});
       carregar();
     } finally { setMexendo(null); }
@@ -1675,7 +1528,7 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
       const r = await fetch(`/api/familias/${familiaId}/contatos?contatoId=${p.id}`, {
         method: "DELETE",
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui remover."); return; }
+      if (!r?.ok) { setErro(traduzirErro(r)); return; }
       if (r.mensagem) alert(r.mensagem);
       carregar();
     } finally { setMexendo(null); }
@@ -1778,8 +1631,21 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
                 </p>
               </div>
               <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
-                {p.paga && <Selo tom="bom">acerta a conta</Selo>}
+                {/* PODE HAVER VÁRIOS. O casal que divide, a filha que assume
+                    quando o pai viaja. `responsavel_financeiro` sempre foi um
+                    booleano por pessoa — o que impedia vários era a tela.
+                    O TITULAR continua sendo um: é quem recebe a cobrança e
+                    quem tem histórico com data (0091). */}
+                {p.id === dados?.familia?.responsavelId && <Selo tom="bom">titular</Selo>}
+                {p.paga && p.id !== dados?.familia?.responsavelId && (
+                  <Selo tom="bom">acerta a conta</Selo>
+                )}
                 {p.recebeFotos && <Selo tom="neutro">recebe fotos</Selo>}
+                <button className="text-[13px] text-ink-soft underline decoration-dotted hover:text-brand"
+                        disabled={mexendo === p.id}
+                        onClick={() => marcarPagador(p, !p.paga)}>
+                  {p.paga ? "não acerta mais" : "também acerta a conta"}
+                </button>
                 <button className="text-[13px] text-ink-soft underline decoration-dotted hover:text-brand"
                         onClick={() => { setEditando(p.id); setEd({}); }}>
                   editar
@@ -1919,7 +1785,7 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(corpo),
       }).then((x) => x.json());
-      if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui ligar."); return; }
+      if (!r?.ok) { setErro(traduzirErro(r, "Não consegui ligar.")); return; }
       // Falha parcial ainda é sucesso parcial: mostra o que não deu, mas segue
       // com o que entrou — esconder isso faria a Sureya ligar de novo o que já
       // estava ligado.

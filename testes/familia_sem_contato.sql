@@ -147,11 +147,29 @@ select ci8('a familia passou para a Marta',
   (select responsavel_id::text from familias where id='bbbbbbbb-0000-0000-0000-000000000081'),
   'cccccccc-0000-0000-0000-000000000082');
 
--- O INDICE UNICO E' `(familia_id) where responsavel_financeiro`. Se a funcao
--- marcasse antes de limpar, esta troca estouraria com chave duplicada.
-select ci8('so um responsavel marcado na familia',
-  (select count(*)::text from clientes
-    where familia_id='bbbbbbbb-0000-0000-0000-000000000081' and responsavel_financeiro), '1');
+-- MUDOU NA 0102. Ate aqui havia um indice UNICO
+-- `(familia_id) where responsavel_financeiro`, e este teste cobrava o efeito
+-- dele: depois da troca, UM marcado. A funcao limpava a familia inteira antes
+-- de marcar o novo — nao por escolha, mas porque o indice recusaria os dois.
+--
+-- A 0102 separou as duas perguntas. `familias.responsavel_id` (QUEM RESPONDE)
+-- continua sendo um; `responsavel_financeiro` (QUEM PODE ACERTAR A CONTA)
+-- passou a aceitar varios, porque na vida real o filho paga um mes e a filha
+-- paga o outro. Entao o que se cobra aqui inverteu de proposito: a Marta
+-- ENTRA na lista, e o Nagae NAO e apagado dela.
+select ci8('o titular continua sendo UM',
+  (select count(*)::text from familias
+    where id='bbbbbbbb-0000-0000-0000-000000000081' and responsavel_id is not null), '1');
+
+select ci8b('a Marta passou a acertar a conta',
+  (select responsavel_financeiro from clientes
+    where id='cccccccc-0000-0000-0000-000000000082'),
+  'quem responde pela familia tem de estar entre quem pode pagar');
+
+select ci8b('e o primeiro NAO foi apagado da lista',
+  (select responsavel_financeiro from clientes
+    where id='cccccccc-0000-0000-0000-000000000081'),
+  'trocar o titular apagou o cadastro de quem ja acertava a conta');
 
 select ci8('e o jazigo seguiu junto',
   (select cliente_id::text from tumulos where id='ffffffff-0000-0000-0000-000000000081'),

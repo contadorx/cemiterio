@@ -150,7 +150,9 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             arquivos leem, igual ao nome do falecido principal.
 #   0098  +1  trg_cc_competencia — a competencia estava NULA em 100% dos
 #             lancamentos; sem ela nao ha relatorio por competencia.
-GATILHOS_DELTA=${GATILHOS_DELTA:-6}
+#   0102  +1  trg_guarda_quem_acerta_a_conta — recusa tirar a marca do ULTIMO
+#             que acerta a conta de uma familia que ainda tem gente.
+GATILHOS_DELTA=${GATILHOS_DELTA:-7}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -236,8 +238,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #             sureya_conferir_evento — o ok por lancamento.
 #   0100  +2  sureya_lavagens_no_mes e sureya_valor_da_lavagem — o combinado
 #             e MENSAL e cada lavagem desconta a fracao do mes.
-# Saldo: +42.
-FUNCOES_DELTA=${FUNCOES_DELTA:-42}
+#   0102  +1  sureya_guarda_quem_acerta_a_conta — o teto de UM pagador caiu,
+#             entao o PISO de um passa a precisar de guarda propria. Antes ele
+#             vinha de graca do indice unico: com um so, desmarcar era trocar.
+# Saldo: +43.
+FUNCOES_DELTA=${FUNCOES_DELTA:-43}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -449,6 +454,25 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/agenda.sql 2>&1); then
   echo "$saida" | grep -E "AGENDA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "O aviso da agenda vai voltar a ficar na tela para sempre."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# QUEM ACERTA A CONTA PODE SER MAIS DE UM
+#
+# A tela oferecia "tambem acerta a conta" e o banco recusava o segundo clique:
+# um indice UNICO parcial prendia a familia a um pagador so. O teste cobra que
+# o teto caiu, que o PISO ficou (nunca zero) e que trocar o titular — outra
+# pergunta — nao apaga mais quem paga.
+# ---------------------------------------------------------------------------
+echo "PAGADORES — mais de um pode acertar a conta, nunca nenhum"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/quem_acerta_a_conta.sql 2>&1); then
+  echo "$saida" | grep -E "PAGADORES FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Ou a familia volta a ter um pagador so, ou pode ficar sem nenhum."
   echo "============================================================"
   exit 1
 fi

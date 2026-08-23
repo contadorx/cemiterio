@@ -1112,3 +1112,55 @@ casa. O endereço continua de pé, redirecionando.
 E a **lista de famílias** passou a mostrar `(Família - X)` com `(Responsável -
 Y)` embaixo. Ela se chama "Famílias" e mostrava o nome da **pessoa** — procurar
 "Alcantara" não achava nada quando o contato se chama "Clecia".
+
+---
+
+## D-26 · "Quem responde" e "quem paga" são duas perguntas
+
+A ficha oferecia o botão **"também acerta a conta"**, a rota aceitava, e o
+segundo clique morria no banco:
+
+```sql
+CREATE UNIQUE INDEX idx_familia_um_responsavel
+  ON clientes (familia_id) WHERE responsavel_financeiro = true;
+```
+
+Um índice **único** parcial. O limite estava uma camada abaixo da tela, e voltava
+como violação de chave — um erro que não fala do que a Sureya tentou fazer.
+
+O índice não era um descuido: ele é de quando havia **uma** pergunta só. Hoje são
+duas, e este é o ponto da decisão:
+
+| | quem é | quantos |
+|---|---|---|
+| `familias.responsavel_id` | **quem responde** — o titular, aparece no cabeçalho, recebe a cobrança, tem histórico com data (D-13) | **um** |
+| `clientes.responsavel_financeiro` | **quem pode acertar a conta** — o filho que paga um mês, a filha que paga o outro | **vários** |
+
+A 0102 tirou o teto e **manteve o piso**: uma família com gente nunca fica sem
+ninguém que acerte a conta — é a condição que `sureya_alertas` e
+`sureya_familias_sem_responsavel` verificam, e sem ela a cobrança não sabe com
+quem falar. Antes o piso vinha de graça: com um só, desmarcar era **trocar**,
+nunca esvaziar. Agora precisa de guarda própria (`trg_guarda_quem_acerta_a_conta`),
+e ela **recusa** em vez de escolher um substituto — adivinhar quem paga é
+exatamente a pergunta que a Sureya está respondendo.
+
+### O estrago que saiu junto
+
+`sureya_definir_responsavel_interno` **apagava a marca de todos** antes de marcar
+o novo titular. Não por escolha: o índice único recusaria os dois entre as
+escritas. Sem ele, essa limpeza vira perda de cadastro — marcar três filhos,
+trocar o titular por outro motivo, e os três perdem a marca sem ninguém pedir.
+Agora o titular **entra** na lista; ninguém sai dela.
+
+### A tela não repõe o limite
+
+Havia na ficha uma recusa própria — desmarcar o titular era proibido pela tela.
+Ela era **mais dura que a regra da casa**. Saiu. O limite verdadeiro é um só e
+mora no gatilho; a rota apenas traduz a recusa para o português. Tela que proíbe
+o que o banco permite é o pior dos casos: ninguém entende por quê.
+
+**Medido antes de mexer** (produção, 23/08): 365 famílias, 341 marcados, **zero**
+famílias com mais de um marcado, zero titulares sem a marca, zero famílias com
+gente e sem pagador. Dado limpo — não havia o que consertar, só o que liberar.
+E o motivo de o teto nunca ter aparecido: **nenhuma família tinha mais de um
+contato**. O limite só apareceria no dia em que a Sureya cadastrasse o segundo.

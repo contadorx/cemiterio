@@ -221,11 +221,50 @@ export async function PATCH(
     campos.telefone = norm;
   }
 
+  // QUEM ACERTA A CONTA — e podem ser VÁRIOS.
+  //
+  // A família pode ter mais de uma pessoa que paga: o casal que divide, a filha
+  // que assume quando o pai viaja.
+  //
+  // O que impedia vários NÃO era a tela — era o banco. Havia um índice ÚNICO
+  // parcial `(familia_id) where responsavel_financeiro`, e o segundo clique
+  // voltava como violação de chave, um erro que não fala do que a Sureya
+  // tentou fazer. A 0102 derrubou o teto e manteve o PISO: uma família com
+  // gente nunca fica sem ninguém que acerte a conta.
+  //
+  // `familias.responsavel_id` continua sendo UM: é o TITULAR, o que aparece no
+  // cabeçalho, o que recebe a cobrança e o que tem histórico com data (0091).
+  // São duas perguntas diferentes: "quem responde" e "quem pode pagar".
+  if (typeof b?.acertaConta === "boolean") {
+    campos.responsavel_financeiro = b.acertaConta;
+  }
+
   if (!Object.keys(campos).length) {
-    return NextResponse.json({ ok: false, erro: "nada_para_mudar" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, erro: "nada_para_mudar",
+        mensagem: "Nada mudou — não havia o que salvar." },
+      { status: 400 });
   }
 
   const { error } = await auth.db.from("clientes").update(campos).eq("id", contatoId);
+
+  // SEM TITULAR, O PRIMEIRO MARCADO ASSUME.
+  //
+  // Marcar alguém como "acerta a conta" numa família que não tem titular e
+  // deixá-la sem titular seria dar a ela uma pessoa que paga e ninguém para
+  // quem cobrar — o pior dos dois mundos. A troca passa por
+  // `sureya_definir_responsavel` (0091), que mexe no ponteiro, no espelho e
+  // nos jazigos de uma vez.
+  if (!error && campos.responsavel_financeiro === true) {
+    const { data: fam } = await auth.db
+      .from("familias").select("responsavel_id").eq("id", params.id).maybeSingle();
+    if (!(fam as any)?.responsavel_id) {
+      await auth.db.rpc("sureya_definir_responsavel", {
+        p_familia: params.id, p_cliente: contatoId,
+        p_motivo: "primeiro contato financeiro marcado na ficha",
+      }).then(() => {}, () => {});
+    }
+  }
   if (error) {
     // Telefone é único por organização: duas pessoas com o mesmo número
     // fariam a resposta do WhatsApp cair na ficha errada.
@@ -233,6 +272,18 @@ export async function PATCH(
       return NextResponse.json(
         { ok: false, erro: "telefone_repetido",
           mensagem: "Já existe outra pessoa com este telefone. Duas fichas com o mesmo número fazem a resposta cair na errada." },
+        { status: 409 },
+      );
+    }
+    // O PISO DA 0102: tirar a marca do ÚLTIMO que acerta a conta.
+    //
+    // Quem recusa é o gatilho `trg_guarda_quem_acerta_a_conta`, e não a tela:
+    // a regra vale para qualquer caminho que escreva na tabela. Aqui ela só
+    // vira uma frase que diz o que fazer — o código cru não ajuda ninguém.
+    if (String(error.message).includes("familia_ficaria_sem_quem_acerta_a_conta")) {
+      return NextResponse.json(
+        { ok: false, erro: "familia_ficaria_sem_quem_acerta_a_conta",
+          mensagem: "Esta é a única pessoa que acerta a conta da família. Marque outra antes de tirar esta — sem ninguém marcado, a cobrança não sabe com quem falar." },
         { status: 409 },
       );
     }

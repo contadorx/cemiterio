@@ -71,7 +71,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const [{ data: tumulos }, { data: mov }, { data: msgs },
          { data: familia }, { data: pessoas }, { data: checklist }] = await Promise.all([
-    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
+    db.from("tumulos").select("id,identificacao,numero,falecido_nome,qr_token,rua,rua_id,codigo,ordem_na_rua,periodicidade,contratado,quadra_id,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,lat,lng,gps_precisao,gps_amostras,foto_referencia_url,familia_id,cliente_id,ruas(nome),quadras(codigo)").eq("familia_id", chaveFam),
     db.from("conta_corrente").select("id,tipo,valor,status_conc,data,descricao,origem,competencia,canal,conferido_em,servico_id")
       .eq("familia_id", chaveFam)
       .order("data", { ascending: false }),
