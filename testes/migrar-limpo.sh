@@ -128,7 +128,11 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0085  +1  modelos_mensagem — os textos da casa viram um CONJUNTO. A frase
 #             de reserva escrita dentro da funcao chegou na tela em producao.
 #   0091  +1  familia_responsavel_log — "muda ano apos ano" e um fato com data
-TABELAS_DELTA=${TABELAS_DELTA:-3}
+#   0095  +1  falecidos — um tumulo guarda varias pessoas, e cada data
+#             precisa ter dono para dar para agrupar em vez de disparar 3x.
+#   0096  +1  eventos_memoria — o calendario, e o registro do que NAO foi
+#             enviado e por que.
+TABELAS_DELTA=${TABELAS_DELTA:-5}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -142,7 +146,9 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             esquema depois.
 # Soma zero. Enquanto a 0074 nao subir, producao tera 2 gatilhos a MAIS que o
 # repositorio — e este numero volta a fechar quando ela subir.
-GATILHOS_DELTA=${GATILHOS_DELTA:-4}
+#   0095  +1  trg_falecido_espelha — mantem tumulos.falecido_nome, que 21
+#             arquivos leem, igual ao nome do falecido principal.
+GATILHOS_DELTA=${GATILHOS_DELTA:-5}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -183,7 +189,10 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0091  +4   familia_responsavel_log, mesmo desenho
 #              (insert, update, delete) — de novo a licao da 0079
 # Ajuste no mesmo commit em que criar ou remover policy.
-POLICIES_DELTA=${POLICIES_DELTA:-57}
+#   0095  +2  falecidos: a da org e a restritiva de DELETE (o campo cadastra,
+#             so admin apaga).
+#   0096  +4  eventos_memoria: a da org e uma restritiva POR COMANDO.
+POLICIES_DELTA=${POLICIES_DELTA:-63}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -214,7 +223,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-57}
 # Saldo: +30. As demais migrations desta
 # leva (0057, 0060, 0062) so SUBSTITUEM corpo de funcao que ja estava la —
 # por isso nao entram na conta. Ajuste no mesmo commit em que criar funcao.
-FUNCOES_DELTA=${FUNCOES_DELTA:-30}
+#   0095  +1  sureya_espelhar_falecido_principal
+#   0096  +6  sureya_recebe_lembrete, sureya_data_no_ano,
+#             sureya_gerar_eventos_memoria, sureya_semear_textos_memoria,
+#             sureya_texto_memoria, sureya_lembretes_do_dia
+# Saldo: +37.
+FUNCOES_DELTA=${FUNCOES_DELTA:-37}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

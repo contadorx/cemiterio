@@ -26,7 +26,21 @@ const DESLIGADAS = [
   // Agente de IA — robô conversando com idoso quebra o que faz o cliente ficar
   "/painel/agente",
   "/painel/atendimento",
-  "/painel/conversas",
+  // ATENÇÃO: "/painel/conversas" NÃO entra mais nesta lista.
+  //
+  // Ela estava aqui desde que o CRM foi desligado, e o endereço passou a ser
+  // a tela de CONVERSAS — liberação, conversas de WhatsApp e contatos do site,
+  // que é para onde o menu aponta agora. Com a linha de pé, o middleware
+  // devolvia 404 antes de a página existir: a tela subiu funcionando e o
+  // usuário via "HTTP ERROR 404".
+  //
+  // Foi uma tela nova aterrissando num endereço com placa de "desligado". A
+  // lição fica: esta lista casa por `startsWith`, então ela desliga o endereço
+  // e TUDO abaixo dele — inclusive uma tela que ainda vai nascer ali.
+  //
+  // O que continua desligado é o CRM em si: /painel/leads, /painel/agente e
+  // /painel/atendimento. A aba de conversas usa o módulo antigo por dentro,
+  // mas sem leads, sem rascunho automático e sem robô.
   // ATENÇÃO: /painel/whatsapp NÃO entra nesta lista.
   // Ela foi desligada junto com o agente de IA, mas é a única tela onde se
   // reconecta a instância da Evolution — e a Evolution voltou a ser essencial:
