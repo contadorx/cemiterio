@@ -250,8 +250,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0106  +1  sureya_etapas_das_familias — a lista dizia "falta contrato" numa
 #             familia conferida e completa: ela perguntava a FAMILIA o valor e
 #             o inicio, que a D-24 moveu para o TUMULO. Uma definicao so.
-# Saldo: +47.
-FUNCOES_DELTA=${FUNCOES_DELTA:-47}
+#   0108  +2  sureya_fundir_familias e sureya_excluir_familia — 31 nomes
+#             repetidos, 97 familias, NENHUMA vazia. Duplicata pede fusao;
+#             excluir e para o que sobra depois.
+# Saldo: +49.
+FUNCOES_DELTA=${FUNCOES_DELTA:-49}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")

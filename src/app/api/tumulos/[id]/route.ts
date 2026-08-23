@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     db.from("tumulos")
       .select("id,identificacao,numero,falecido_nome,rua,rua_id,ordem_na_rua,observacoes,"
             + "contratado,periodicidade,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,"
-            + "proxima_cobranca,inicio_agendamento,lat,lng,gps_precisao,"
+            + "proxima_cobranca,inicio_agendamento,meses_entre_cobrancas,lat,lng,gps_precisao,"
             + "foto_referencia_url,foto_enquadramento_url,ultima_lavagem_informada,"
             + "cliente_id,familia_id,quadras(codigo),familias(nome,contratado,inicio_cobranca),"
             + "clientes(nome,telefone)")
@@ -223,6 +223,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.proxima_cobranca !== undefined) {
     const v = String(body.proxima_cobranca || "");
     patch.proxima_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
+  }
+
+  // DE QUANTOS EM QUANTOS MESES SE COBRA (0107).
+  //
+  // Era um enum na família — mensal, trimestral, semestral, anual — e a
+  // primeira família real que combinou QUATRO meses não coube no vocabulário.
+  // Virou número, e no túmulo, junto do resto do contrato (D-24).
+  //
+  // Nulo é "segue o combinado da família", não "uma vez por mês".
+  if (body.meses_entre_cobrancas !== undefined) {
+    const v = body.meses_entre_cobrancas;
+    if (v === null || v === "") {
+      patch.meses_entre_cobrancas = null;
+    } else {
+      const n = Math.round(Number(v));
+      if (!Number.isFinite(n) || n < 1 || n > 24) {
+        return NextResponse.json(
+          { ok: false, erro: "meses_invalidos",
+            mensagem: "A cobrança se repete de 1 a 24 meses. Deixe em branco para seguir o combinado da família." },
+          { status: 400 });
+      }
+      patch.meses_entre_cobrancas = n;
+    }
   }
 
   // Esta NÃO cai no dia 1: a rota começa num dia, não num mês.

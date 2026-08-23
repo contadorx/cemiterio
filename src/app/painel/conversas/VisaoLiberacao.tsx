@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Trash2, AlertTriangle, Undo2, Shuffle, CheckSquare, Square, StopCircle } from "lucide-react";
+import { Send, Trash2, AlertTriangle, Undo2, Shuffle, CheckSquare, Square, StopCircle, XCircle } from "lucide-react";
 import { Cartao, Botao, Selo } from "../pecas";
 import { BellOff, Bell } from "lucide-react";
 import { diasDesde, faz } from "@/lib/datas";
@@ -38,6 +38,52 @@ const TIPOS: [string, string][] = [
   ["agradecimento", "Agradecimentos"],
 ];
 
+/**
+ * OS GRUPOS DE LIBERAÇÃO.
+ *
+ * O filtro por tipo é uma lista de sete botões, e sete escolhas não são uma
+ * organização — são um menu. O que a Sureya faz de verdade são quatro
+ * conversas de naturezas diferentes, e cada uma se decide num momento e num
+ * tom próprios:
+ *
+ *   Fotos dos serviços   o carinho — sai depois da limpeza
+ *   Cobrança             a rotina do dinheiro — competência a vencer
+ *   Inadimplente         quem JÁ deve — outro tom, outra urgência
+ *   Ações                oferta e data comemorativa — é venda e memória
+ *   Demais               lembrete e agradecimento
+ *
+ * "Inadimplente" NÃO é um tipo de mensagem: é um corte por SALDO dentro das
+ * cobranças. Sem ele, a cobrança de rotina e a de quem deve há três meses
+ * chegavam na mesma lista e saíam com o mesmo clique.
+ */
+type Grupo = {
+  id: string;
+  rotulo: string;
+  descricao: string;
+  /** Decide se um item pertence ao grupo. Recebe o item inteiro, não só o tipo. */
+  pega: (i: Item) => boolean;
+};
+
+const GRUPOS: Grupo[] = [
+  { id: "", rotulo: "Tudo", descricao: "tudo o que está esperando decisão",
+    pega: () => true },
+  { id: "fotos", rotulo: "Fotos dos serviços",
+    descricao: "a foto da limpeza, para a família ver o cuidado",
+    pega: (i) => i.tipo === "foto" },
+  { id: "cobranca", rotulo: "Cobrança",
+    descricao: "a cobrança de rotina — a família ainda não está devendo",
+    pega: (i) => i.tipo === "cobranca" && !(Number(i.saldoDevedor) > 0.005) },
+  { id: "inadimplente", rotulo: "Inadimplente",
+    descricao: "cobrança de quem JÁ tem saldo em aberto — leia antes de liberar",
+    pega: (i) => i.tipo === "cobranca" && Number(i.saldoDevedor) > 0.005 },
+  { id: "acoes", rotulo: "Ações",
+    descricao: "oferta de serviço e datas comemorativas",
+    pega: (i) => i.tipo === "servico" || i.tipo === "comemorativa" },
+  { id: "demais", rotulo: "Demais",
+    descricao: "lembretes e agradecimentos",
+    pega: (i) => i.tipo === "lembrete" || i.tipo === "agradecimento" },
+];
+
 /** Os tipos que a família pode silenciar. A foto tem chave própria (0085). */
 const SILENCIAVEIS = ["cobranca", "lembrete", "agradecimento", "comemorativa", "servico"];
 
@@ -58,6 +104,8 @@ interface Item {
    * `mesmoTipoDia` responde a segunda pergunta: a última DESTE tipo.
    */
   ultimaAcao: { tipo: string; dia: string; mesmoTipoDia: string | null } | null;
+  /** Quanto a família deve. Positivo = em aberto. É o corte de "Inadimplente". */
+  saldoDevedor?: number;
   /** Tipos que esta família pediu para não receber. */
   silenciados: string[];
   familiaId: string | null;
@@ -93,7 +141,11 @@ export default function VisaoLiberacao() {
   const pararLote = useRef(false);
   const [carregando, setCarregando] = useState(true);
   /** O tipo escolhido. Vazio = tudo. Filtra no BANCO, não na tela. */
-  const [tipo, setTipo] = useState("");
+  /** O GRUPO escolhido. Vazio = tudo. Filtrado na TELA, não no banco: o corte
+      "Inadimplente" depende do saldo da família, que não é um tipo. */
+  const [grupo, setGrupo] = useState("");
+  /** A chave mestra da casa. Desligada = nada sai sozinho, só pela tela. */
+  const [disparosAutomaticos, setDisparosAutomaticos] = useState(true);
   const [porTipo, setPorTipo] = useState<Record<string, number>>({});
   const [silenciando, setSilenciando] = useState<string | null>(null);
   const [editando, setEditando] = useState<Record<string, string>>({});
@@ -148,19 +200,26 @@ export default function VisaoLiberacao() {
     setEditando((x) => ({ ...x, [item.id]: proximo }));
   }
 
+  // CARREGA TUDO, e agrupa na tela.
+  //
+  // O filtro por tipo era feito no BANCO. Não serve mais: "Inadimplente" é um
+  // corte por SALDO dentro das cobranças, e o banco não sabe disso pela coluna
+  // `tipo`. Carregar tudo também deixa a contagem de cada grupo correta sem
+  // uma segunda consulta — e a fila de liberação é curta por natureza: se um
+  // dia deixar de ser, o problema é a fila, não a consulta.
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const q = tipo ? `?tipo=${encodeURIComponent(tipo)}` : "";
-      const r = await fetch(`/api/fila${q}`).then((x) => x.json());
+      const r = await fetch("/api/fila").then((x) => x.json());
       if (r.ok) {
         setItens(r.itens);
         setWhatsapp(r.whatsapp || "");
         setDiasEntreFotos(Number(r.diasEntreFotos) || 0);
+        setDisparosAutomaticos(!!r.disparosAutomaticos);
         setPorTipo(r.porTipo || {});
       }
     } finally { setCarregando(false); }
-  }, [tipo]);
+  }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -251,7 +310,16 @@ export default function VisaoLiberacao() {
     });
   }
 
-  const enviaveis = itens.filter(podeEnviar);
+  /** Os itens de um grupo. O corte usa o item inteiro, não só o tipo. */
+  function itensDoGrupo(g: Grupo) {
+    return itens.filter(g.pega);
+  }
+
+  const grupoAtual = GRUPOS.find((g) => g.id === grupo) || GRUPOS[0];
+  /** O que a tela mostra: o grupo escolhido. */
+  const visiveis = itensDoGrupo(grupoAtual);
+
+  const enviaveis = visiveis.filter(podeEnviar);
   /** Sem aviso de foto recente — as que ela provavelmente quer mandar. */
   const semAviso = enviaveis.filter((i) => {
     if (i.tipo !== "foto" || diasEntreFotos <= 0) return true;
@@ -260,8 +328,38 @@ export default function VisaoLiberacao() {
   });
   const comAviso = enviaveis.length - semAviso.length;
 
+  /**
+   * DESCARTAR AS MARCADAS.
+   *
+   * Uma pergunta só, com o número e os nomes — e não trinta confirmações
+   * seguidas, que é como se aprende a clicar em "ok" sem ler.
+   *
+   * NÃO é irreversível: cada uma volta pelo "desfazer" do topo, o mesmo
+   * caminho do descarte individual (0093). O que se perde num engano é o
+   * tempo de restaurar, não a mensagem.
+   */
+  async function descartarLote() {
+    const alvos = visiveis.filter((i) => marcadas.has(i.id));
+    if (!alvos.length) return;
+
+    const quem = alvos.slice(0, 3).map((a) => a.para || a.familia || "sem nome").join(", ");
+    const resto = alvos.length > 3 ? ` e mais ${alvos.length - 3}` : "";
+    if (!confirm(
+      `Não enviar ${alvos.length} ${alvos.length === 1 ? "mensagem" : "mensagens"}?\n\n` +
+      `${quem}${resto}.\n\nElas saem da fila. Dá para desfazer em seguida.`)) return;
+
+    for (const item of alvos) {
+      await fetch("/api/fila", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, acao: "descartar" }),
+      }).catch(() => null);
+    }
+    setMarcadas(new Set());
+    await carregar();
+  }
+
   async function enviarLote() {
-    const alvos = itens.filter((i) => marcadas.has(i.id) && podeEnviar(i));
+    const alvos = visiveis.filter((i) => marcadas.has(i.id) && podeEnviar(i));
     if (!alvos.length) return;
 
     const quem = alvos.slice(0, 3).map((a) => a.para || a.familia || "sem nome").join(", ");
@@ -328,8 +426,8 @@ export default function VisaoLiberacao() {
   return (
     <>
       <p className="mb-3 text-[14px] text-ink-soft">
-        {itens.length} {itens.length === 1 ? "mensagem" : "mensagens"}
-        {tipo ? " neste tipo" : ""} · nada é enviado sem você aprovar
+        {visiveis.length} {visiveis.length === 1 ? "mensagem" : "mensagens"}
+        {grupo ? " neste grupo" : ""} · nada é enviado sem você aprovar
       </p>
 
       {/* ------------------------------------------------ FILTRO POR TIPO
@@ -340,25 +438,46 @@ export default function VisaoLiberacao() {
           Os números são contados SEM o filtro — senão sumiriam assim que uma
           aba fosse escolhida, que é justamente quando servem para dizer o que
           está esperando do outro lado. */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        {TIPOS.map(([v, rot]) => {
-          const n = v ? (porTipo[v] || 0)
-                      : Object.values(porTipo).reduce((a, b) => a + b, 0);
-          if (v && !n && tipo !== v) return null;   // tipo sem nada não vira botão
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        {GRUPOS.map((g) => {
+          const n = g.id ? itensDoGrupo(g).length : itens.length;
+          if (g.id && !n && grupo !== g.id) return null;  // grupo vazio não vira botão
           return (
             <button
-              key={v || "tudo"}
-              onClick={() => setTipo(v)}
+              key={g.id || "tudo"}
+              onClick={() => { setGrupo(g.id); setMarcadas(new Set()); }}
+              title={g.descricao}
               className={`rounded-full border px-3 py-1.5 text-[13px] ${
-                tipo === v
+                grupo === g.id
                   ? "border-brand bg-brand text-white"
                   : "border-line bg-card text-ink hover:border-brand"}`}
             >
-              {rot}{n ? ` (${n})` : ""}
+              {g.rotulo}{n ? ` (${n})` : ""}
             </button>
           );
         })}
       </div>
+
+      {/* NADA SAI SOZINHO — e a tela precisa dizer isso.
+          Com a chave mestra desligada, a IA não responde por conta própria, a
+          fila de envios não drena e a foto da conclusão não parte sozinha. O
+          botão "Enviar" desta tela continua funcionando: ele não passa pela
+          chave. Sem esta faixa, a Sureya não teria como saber em qual dos dois
+          mundos está — e "não chegou" viraria um chamado. */}
+      {!disparosAutomaticos && (
+        <div className="mb-4 rounded-xl2 border border-line bg-surface p-3 text-[13.5px] leading-relaxed text-ink-soft">
+          <b className="text-ink">Nenhuma mensagem sai sozinha.</b> Enquanto o app não se
+          provar na operação, tudo passa por esta tela: você lê, escolhe e manda. O que
+          o sistema gera fica aqui esperando — nada vai para a família sem um comando seu.
+        </div>
+      )}
+
+      {/* O QUE ESTE GRUPO É. Sem a frase, "Inadimplente" e "Cobrança" parecem
+          dois nomes para a mesma coisa — e a diferença entre eles é o tom da
+          conversa que a Sureya vai ter. */}
+      <p className="mb-4 text-[13px] leading-relaxed text-ink-soft">
+        {(GRUPOS.find((g) => g.id === grupo) || GRUPOS[0]).descricao}
+      </p>
 
       {/* ------------------------------------------------------- o lote */}
       {lote && (
@@ -420,6 +539,16 @@ export default function VisaoLiberacao() {
           <Botao tom="principal" disabled={!marcadas.size} onClick={enviarLote}>
             <Send size={16} /> Enviar {marcadas.size || ""} {marcadas.size === 1 ? "marcada" : "marcadas"}
           </Botao>
+
+          {/* DESCARTAR EM LOTE.
+              Descartar existia uma a uma, e revisar trinta comemorativas que
+              não fazem sentido este ano custava trinta confirmações — o
+              trabalho que o lote deveria estar tirando.
+              Continua com COMANDO e CONFIRMAÇÃO: a pergunta diz quantas e
+              para quem, e o desfazer fica no topo depois. */}
+          <Botao tom="perigo" disabled={!marcadas.size} onClick={descartarLote}>
+            <XCircle size={16} /> Não enviar {marcadas.size || ""}
+          </Botao>
         </div>
       )}
 
@@ -460,7 +589,7 @@ export default function VisaoLiberacao() {
         </Cartao>
       )}
 
-      {itens.map((item) => (
+      {visiveis.map((item) => (
         <Cartao key={item.id}>
           {/* QUEM, PARA QUEM, ONDE E QUANDO — entrega 1 do Build 6.
               Antes o cartão mostrava `para || familia`, que colapsa os dois: com

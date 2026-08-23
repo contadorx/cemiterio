@@ -141,3 +141,86 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * FUNDIR OU EXCLUIR A FAMÍLIA.
+ *
+ * As duas ações vivem juntas porque uma sem a outra é armadilha: fundir sem
+ * excluir deixa cascas na lista; excluir sem fundir convida a apagar o que tem
+ * jazigo pendurado.
+ *
+ * Medido em 23/08: 31 nomes repetidos, 97 famílias, e NENHUMA vazia — 97 com
+ * contato, 48 com jazigo. Um "excluir" que respeita o dado recusaria todas.
+ * Duplicata pede FUSÃO; a exclusão é para o que sobra depois.
+ *
+ * POST { acao: "fundir", destino }  — move tudo e apaga a origem
+ * DELETE                            — só se a família estiver realmente vazia
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+
+  const b = await req.json().catch(() => ({}));
+  if (b?.acao !== "fundir") {
+    return NextResponse.json({ ok: false, erro: "acao_invalida" }, { status: 400 });
+  }
+  const destino = String(b?.destino || "").trim();
+  if (!destino) {
+    return NextResponse.json(
+      { ok: false, erro: "sem_destino", mensagem: "Escolha a família que fica." },
+      { status: 400 });
+  }
+
+  const { data, error } = await auth.db.rpc("sureya_fundir_familias", {
+    p_origem: params.id, p_destino: destino,
+    p_motivo: String(b?.motivo || "") || null,
+  });
+
+  if (error) {
+    const m = String(error.message || "");
+    if (m.includes("origem_igual_ao_destino")) {
+      return NextResponse.json(
+        { ok: false, erro: "origem_igual_ao_destino",
+          mensagem: "Escolha uma família diferente para receber." },
+        { status: 400 });
+    }
+    if (m.includes("familia_nao_encontrada") || m.includes("organizacoes_diferentes")) {
+      return NextResponse.json(
+        { ok: false, erro: "familia_nao_encontrada",
+          mensagem: "Não achei uma das duas famílias." },
+        { status: 404 });
+    }
+    return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  }
+
+  const r = (Array.isArray(data) ? data[0] : data) || {};
+  return NextResponse.json({ ok: true, movido: r });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const auth = await exigirAdmin();
+  if (auth.erro) return auth.erro;
+
+  const { error } = await auth.db.rpc("sureya_excluir_familia", { p_familia: params.id });
+
+  if (error) {
+    // A função recusa DIZENDO o que segura. Sem repassar o detalhe, a pessoa
+    // tenta de novo pelo mesmo caminho em vez de ir fundir.
+    if (String(error.message || "").includes("familia_nao_esta_vazia")) {
+      const detalhe = String((error as any).details || "").trim();
+      return NextResponse.json(
+        { ok: false, erro: "familia_nao_esta_vazia",
+          mensagem: `Esta família ainda tem ${detalhe || "coisas ligadas a ela"}. `
+                  + `Se for duplicada, use "Fundir com outra" — assim nada se perde.` },
+        { status: 409 });
+    }
+    return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}

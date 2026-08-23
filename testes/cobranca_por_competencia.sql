@@ -180,3 +180,75 @@ on conflict do nothing;
 select ci15('jazigo sem contrato nao gera cobranca',
   (select lancados = 0 from sureya_cobrar_competencias(current_date, 'aaaaaaaa-0000-0000-0000-000000000015')),
   'avulso virou mensalidade sem ninguem combinar');
+
+-- ---------------------------------------------------------------------------
+-- 7 · A CADA N MESES — o caso que o enum nao previa (0107)
+-- ---------------------------------------------------------------------------
+-- "me pagou 4 meses em agosto, precisava colocar as lavagens imediatas e a
+--  proxima cobranca em dezembro e a cada 4 meses, porem nao tinha o periodo."
+--
+-- Nao tinha porque `sureya_freq_pagamento` e um enum fechado: mensal,
+-- trimestral, semestral, anual. Quatro meses nao cabia. Agora o TUMULO diz de
+-- quantos em quantos meses e cobrado, e a familia so define o padrao.
+insert into familias (id, org_id, nome, freq_pagamento, contratado)
+values ('ff000000-0000-0000-0000-000000000155','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Quatro Meses','mensal', true)
+on conflict do nothing;
+
+-- Pagou 4 meses em agosto: a proxima cobranca e dezembro, e o ritmo e 4 meses.
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, meses_entre_cobrancas,
+                     proxima_cobranca, inicio_agendamento)
+values ('11100000-0000-0000-0000-000000000156','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000155','CI-COB-4M',
+        true, 50, 4, '2026-12-01', current_date)
+on conflict do nothing;
+
+-- Em novembro ainda nao vence: quem pagou ate novembro nao pode ser cobrado.
+-- A conta e POR TUMULO, e nao pelo `lancados` da chamada: a org do teste tem
+-- outras familias vencendo no mesmo dia, e olhar o total mediria o arquivo
+-- inteiro em vez deste caso.
+select sureya_cobrar_competencias('2026-11-30'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('em novembro a familia que pagou adiantado NAO e cobrada',
+  not exists (select 1 from conta_corrente
+               where tumulo_id='11100000-0000-0000-0000-000000000156'
+                 and origem='competencia'),
+  'cobrou um mes que a familia ja tinha pago adiantado');
+
+-- Em dezembro vence, e o valor e de QUATRO meses.
+select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('em dezembro ela e cobrada, e por quatro meses',
+  (select count(*) = 1 and sum(valor) = 200 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000156' and origem='competencia'),
+  'R$50/mes a cada 4 meses tinha de dar UMA cobranca de R$200');
+
+select ci15('e a proxima cobranca pula para abril',
+  (select proxima_cobranca = '2027-04-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000156'),
+  'a data nao andou os quatro meses — o proximo ciclo sairia errado');
+
+select ci15('o lancamento diz que sao quatro meses',
+  (select descricao like '%(4 meses)%' from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000156' and origem='competencia' limit 1),
+  'quem le o extrato precisa saber que aquele valor cobre quatro meses');
+
+-- E as lavagens comecam JA, sem esperar a cobranca: sao duas datas separadas.
+select ci15('as lavagens comecam hoje, e nao em dezembro',
+  (select inicio_agendamento <= current_date from tumulos
+    where id='11100000-0000-0000-0000-000000000156'),
+  'a rota ficou presa a data da cobranca — eram os dois campos que a 0104 separou');
+
+-- O TUMULO MANDA. A familia diz "mensal" e o tumulo diz 4: vale o tumulo.
+select ci15('o ritmo do tumulo vence o padrao da familia',
+  (select sureya_meses_da_cobranca('mensal') = 1
+      and (select meses_entre_cobrancas from tumulos
+            where id='11100000-0000-0000-0000-000000000156') = 4),
+  'se a familia mandasse, a cobranca sairia todo mes contra o combinado');
+
+-- E sem nada no tumulo, o padrao da familia continua valendo.
+select ci15('sem ritmo proprio, o tumulo segue a familia',
+  (select meses_entre_cobrancas is null from tumulos
+    where id='11100000-0000-0000-0000-000000000151'),
+  'nulo tem de significar "segue a familia", nao "uma vez por mes"');

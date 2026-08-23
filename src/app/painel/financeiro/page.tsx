@@ -8,7 +8,6 @@ import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
 import Mes from "./Mes";
-import PainelDoMes from "./PainelDoMes";
 import Remuneracao from "./Remuneracao";
 import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
@@ -25,7 +24,7 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "painel" | "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
+type AbaFin = "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
   // "O mês" é a primeira e a padrão: é a pergunta que se faz primeiro, e era a
@@ -41,19 +40,25 @@ const ABAS_FIN: [AbaFin, string][] = [
   // separada no menu — duas portas para dinheiro, e ninguém sabia qual abrir.
   //
   // As abas removidas continuam no arquivo; voltam tirando o comentário.
-  // "Painel do mês" vem primeiro (0105): é a leitura, e leitura vem antes de
-  // ação. Quem abre o financeiro quer saber como o mês está antes de decidir
-  // fechar. Ele responde numa tela o que exigia cruzar cinco abas — receita,
-  // recebido, em aberto, aging, entrega e carteira.
-  ["painel", "Painel do mês"],
+  // O PAINEL DO MÊS SAIU DAQUI e virou a tela "O mês" do menu.
+  //
+  // Ele entrou como aba primeiro, e ficou errado: o menu já tinha "O mês" como
+  // primeira entrada, e era lá que se procurava. Três portas para a mesma
+  // pergunta — o defeito que este projeto mais repete.
+  //
+  // O Financeiro ficou com o que é AÇÃO: fechar, conferir, resultado por
+  // jazigo. A leitura mora no menu.
   ["fechar", "Fechar o mês"],
   ["mes", "O mês"],
   ["conferir", "Conferir entradas"],
   ["jazigos", "Resultado por jazigo"],
 ];
 
+/** A aba que abre sem `?aba=` — e o único endereço sem parâmetro. */
+const ABA_PADRAO: AbaFin = "fechar";
+
 export default function Financeiro() {
-  const [aba, setAba] = useState<AbaFin>("painel");
+  const [aba, setAba] = useState<AbaFin>(ABA_PADRAO);
 
   // a aba escolhida entra no endereco: da para mandar o link certo e o F5 nao
   // devolve a pessoa para a primeira aba. Lido no window dentro do useEffect e
@@ -65,7 +70,11 @@ export default function Financeiro() {
 
   function trocar(v: AbaFin) {
     setAba(v);
-    const url = v === "fechar" ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
+    // O ENDEREÇO LIMPO É O DA ABA PADRÃO, e a padrão mudou para "painel" na
+    // 0105. Enquanto isto dizia "fechar", clicar em "Fechar o mês" gravava
+    // `/painel/financeiro` — que ao recarregar abria o Painel do mês. O link
+    // compartilhado levava a pessoa para outra tela, e o F5 também.
+    const url = v === ABA_PADRAO ? "/painel/financeiro" : `/painel/financeiro?aba=${v}`;
     window.history.replaceState(null, "", url);
   }
 
@@ -83,7 +92,6 @@ export default function Financeiro() {
           ))}
         </div>
 
-        {aba === "painel" && <PainelDoMes />}
         {aba === "fechar" && <PainelFechamento />}
         {aba === "mes" && <Mes />}
         {aba === "gestao" && <Gestao />}

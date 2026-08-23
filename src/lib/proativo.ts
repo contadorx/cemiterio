@@ -137,9 +137,9 @@ export async function cobrancaGentil(): Promise<number> {
   const db = supabaseAdmin();
   const org = env.orgId();
 
-  const { data: clientes } = await db
+  const { data: candidatos } = await db
     .from("clientes")
-    .select("id,nome,tratamento,cobranca_em,cobranca_nivel,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,anonimizado_em")
+    .select("id,nome,familia_id,tratamento,cobranca_em,cobranca_nivel,regua_cobranca,dias_entre_cobrancas,max_lembretes,orientacao_cobranca,anonimizado_em")
     .eq("org_id", org)
     .eq("envio_automatico", true)                    // familia em revisao fica de fora
     // UMA COBRANCA POR FAMILIA, PARA QUEM RESPONDE POR ELA.
@@ -153,6 +153,39 @@ export async function cobrancaGentil(): Promise<number> {
     // familia do LINEU, o publico "em aberto" passou a devolver as duas.
     .eq("responsavel_financeiro", true)
     .is("anonimizado_em", null);
+
+  // ⚠ O FILTRO ACIMA DEIXOU DE BASTAR NA 0102.
+  //
+  // Ate ela, um indice UNICO garantia UM `responsavel_financeiro` por familia,
+  // e filtrar por ele ja devolvia uma pessoa por casa. A 0102 derrubou esse
+  // teto de proposito — "permita um ou mais contatos financeiros" — e com ele
+  // caiu a garantia da qual esta funcao dependia sem dizer.
+  //
+  // Medido em 23/08: 341 pagadores, ZERO familias com mais de um. O defeito
+  // nao aparece hoje; ele aparece no dia em que a Sureya marcar o segundo
+  // filho como quem acerta a conta, e a familia receber duas cobrancas pela
+  // mesma divida. Arma carregada, nao recurso funcionando.
+  //
+  // A cobranca vai para o TITULAR (`familias.responsavel_id`), que e quem
+  // responde pela casa; se a familia nao tiver titular, vai para o primeiro
+  // pagador — melhor um do que nenhum, e nunca dois.
+  const familiaIds = [...new Set(((candidatos || []) as any[])
+    .map((c) => c.familia_id).filter(Boolean))];
+  const { data: fams } = familiaIds.length
+    ? await db.from("familias").select("id,responsavel_id").in("id", familiaIds)
+    : { data: [] as any[] };
+  const titularDa = new Map<string, string | null>(
+    ((fams || []) as any[]).map((f) => [f.id, f.responsavel_id]));
+
+  const umPorFamilia = new Map<string, any>();
+  for (const c of (candidatos || []) as any[]) {
+    // Sem familia a pessoa e ela mesma: cobrar por `id` nao duplica ninguem.
+    const chave = c.familia_id || `solto:${c.id}`;
+    const jaEscolhido = umPorFamilia.get(chave);
+    const ehTitular = c.familia_id && titularDa.get(c.familia_id) === c.id;
+    if (!jaEscolhido || ehTitular) umPorFamilia.set(chave, c);
+  }
+  const clientes = [...umPorFamilia.values()];
 
   let n = 0;
   for (const c of clientes || []) {

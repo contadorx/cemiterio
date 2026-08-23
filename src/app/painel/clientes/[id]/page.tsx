@@ -220,7 +220,8 @@ export default function Ficha() {
       <Tumulos tumulos={d.tumulos || []} clienteId={clienteId} aoMudar={carregar} />
       {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar} />}
       <Limpezas clienteId={clienteId} tumulos={d.tumulos || []} aoMudar={carregar} />
-      {c && <Ajustes clienteId={c.id} nome={c.nome} />}
+      {c && <Ajustes clienteId={c.id} nome={c.nome}
+                    familiaId={familiaId} familiaNome={fam?.nome || ""} />}
     </>
   );
 }
@@ -537,6 +538,8 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
     // juntos, e enquanto foram um campo só, mexer numa mexia na outra.
     proxima_cobranca: t.proxima_cobranca ?? "",
     inicio_agendamento: t.inicio_agendamento ?? "",
+    // Vazio = segue o combinado da família (0107).
+    meses_entre_cobrancas: t.meses_entre_cobrancas ?? "",
   });
   const [salvando, setSalvando] = useState(false);
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
@@ -705,6 +708,21 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               <Entrada type="date" value={String(f.inicio_agendamento || "").slice(0, 10)}
                        onChange={(e: any) => setF({ ...f, inicio_agendamento: e.target.value })} />
             </Campo>
+
+            {/* DE QUANTOS EM QUANTOS MESES SE COBRA.
+                Era um enum na família (mensal/trimestral/semestral/anual) e a
+                primeira família que combinou QUATRO meses não coube. Agora é
+                um número, e fica no túmulo junto do resto do contrato. */}
+            <Campo rotulo="Cobrar a cada"
+                   dica="em meses · vazio segue o combinado da família">
+              <Selecao value={String(f.meses_entre_cobrancas ?? "")}
+                       onChange={(e: any) => setF({ ...f, meses_entre_cobrancas: e.target.value })}>
+                <option value="">segue a família</option>
+                {[1, 2, 3, 4, 5, 6, 9, 12, 18, 24].map((n) => (
+                  <option key={n} value={n}>{n === 1 ? "todo mês" : `${n} meses`}</option>
+                ))}
+              </Selecao>
+            </Campo>
             <Campo rotulo="Endereço, foto e falecido">
               <a
                 href={`/painel/jazigos?rua=${encodeURIComponent(t.ruas?.nome || "")}`}
@@ -716,10 +734,13 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
           </div>
 
           <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
-            A cobrança é do <b>contrato</b>, não das limpezas: entra o valor combinado
-            do período, na periodicidade de pagamento da família. As limpezas são a{" "}
-            <b>entrega</b> e não mexem no saldo — uma adiada não baixa o mês, uma
-            anotada em atraso não vira dívida retroativa.
+            A cobrança é do <b>contrato</b>, não das limpezas: no vencimento entra o
+            valor mensal <b>multiplicado pelos meses do período</b>. Quem pagou quatro
+            meses adiantados põe a próxima cobrança no mês certo e <b>cobrar a cada 4
+            meses</b> — as limpezas começam antes disso, pelo <b>início dos
+            agendamentos</b>. As limpezas são a <b>entrega</b> e não mexem no saldo:
+            uma adiada não baixa o mês, uma anotada em atraso não vira dívida
+            retroativa.
           </p>
 
           {/* O QUE ESTA CAIXA FAZ, e não quem lava.
@@ -2046,7 +2067,8 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
  * Coisas de fazer uma vez: exportar dados e excluir. Ficavam abertas
  * competindo com o que se usa todo dia.
  */
-function Ajustes({ clienteId, nome }: { clienteId: string; nome: string }) {
+function Ajustes({ clienteId, nome, familiaId, familiaNome }:
+  { clienteId: string; nome: string; familiaId: string | null; familiaNome: string }) {
   const [aberto, setAberto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
@@ -2078,8 +2100,118 @@ function Ajustes({ clienteId, nome }: { clienteId: string; nome: string }) {
           <Botao tom="perigo" onClick={excluir} disabled={ocupado}>
             <Trash2 size={16} /> Excluir ficha
           </Botao>
+
+          {familiaId && <FundirOuExcluir familiaId={familiaId} familiaNome={familiaNome} />}
         </Cartao>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * FUNDIR OU EXCLUIR A FAMÍLIA.
+ *
+ * Medido em 23/08: 31 nomes repetidos, 97 famílias — "Família Cemitério"
+ * sozinha aparece ~30 vezes, resto de importação. E NENHUMA delas está vazia:
+ * 97 têm contato, 48 têm jazigo.
+ *
+ * Por isso as duas ações andam juntas. "Excluir" sozinho seria inútil (recusa
+ * as 97) ou destrutivo (levaria 48 jazigos junto — o mesmo desenho que já
+ * mordeu esta casa quando apagar uma pessoa apagava os jazigos dela).
+ *
+ * O que duplicata pede é FUSÃO: tudo vai para a família que fica, e a outra
+ * some. A exclusão serve para o cadastro criado por engano, que existe — e o
+ * banco recusa dizendo o que está preso, para a pessoa saber ir fundir.
+ */
+function FundirOuExcluir({ familiaId, familiaNome }:
+  { familiaId: string; familiaNome: string }) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [achadas, setAchadas] = useState<any[]>([]);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function procurar(q: string) {
+    setBusca(q);
+    if (q.trim().length < 2) { setAchadas([]); return; }
+    const r = await fetch(`/api/clientes?busca=${encodeURIComponent(q)}`)
+      .then((x) => x.json()).catch(() => null);
+    // Uma linha por família, e nunca ela mesma: fundir consigo é o erro que a
+    // função recusa, mas oferecer a opção já é confuso.
+    const vistas = new Map<string, any>();
+    for (const c of (r?.clientes || [])) {
+      if (!c.familia_id || c.familia_id === familiaId) continue;
+      if (!vistas.has(c.familia_id)) {
+        vistas.set(c.familia_id, { id: c.familia_id, nome: c.familia || c.nome });
+      }
+    }
+    setAchadas([...vistas.values()].slice(0, 8));
+  }
+
+  async function fundir(destino: any) {
+    if (!confirm(
+      `Fundir "${familiaNome}" em "${destino.nome}"?\n\n` +
+      `Os contatos, os jazigos e o histórico passam para "${destino.nome}", ` +
+      `e "${familiaNome}" some da lista.\n\nIsto não tem desfazer.`)) return;
+    setOcupado(true); setErro("");
+    const r = await fetch(`/api/familias/${familiaId}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "fundir", destino: destino.id }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (!r?.ok) { setErro(r?.mensagem || "Não consegui fundir."); return; }
+    const m = r.movido || {};
+    alert(`Pronto. Foram para "${destino.nome}": ${m.contatos || 0} contato(s), `
+        + `${m.tumulos || 0} jazigo(s), ${m.lancamentos || 0} lançamento(s).`);
+    window.location.href = `/painel/clientes/${destino.id}`;
+  }
+
+  async function excluirFamilia() {
+    if (!confirm(`Excluir a família "${familiaNome}"?\n\nSó dá certo se ela estiver vazia.`)) return;
+    setOcupado(true); setErro("");
+    const r = await fetch(`/api/familias/${familiaId}`, { method: "DELETE" })
+      .then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+    if (!r?.ok) { setErro(r?.mensagem || "Não consegui excluir."); return; }
+    window.location.href = "/painel/clientes";
+  }
+
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="mb-2 text-[13px] leading-relaxed text-ink-soft">
+        <b>Família duplicada?</b> Funda — tudo passa para a que fica e nada se perde.
+        Excluir só funciona com a família vazia.
+      </p>
+
+      {!abrindo ? (
+        <div className="flex flex-wrap gap-2">
+          <Botao onClick={() => setAbrindo(true)}>Fundir com outra família</Botao>
+          <Botao tom="perigo" onClick={excluirFamilia} disabled={ocupado}>
+            Excluir família
+          </Botao>
+        </div>
+      ) : (
+        <div>
+          <input className="zm-input" autoFocus placeholder="Nome da família que FICA"
+                 value={busca} onChange={(e) => procurar(e.target.value)} />
+          {achadas.map((f) => (
+            <button key={f.id} onClick={() => fundir(f)} disabled={ocupado}
+                    className="mt-1 block w-full rounded-lg border border-line px-3 py-2 text-left text-[14px] hover:border-brand">
+              {f.nome}
+            </button>
+          ))}
+          {busca.trim().length >= 2 && !achadas.length && (
+            <p className="mt-2 text-[13px] text-ink-soft">Nenhuma outra família com esse nome.</p>
+          )}
+          <Botao className="mt-2" onClick={() => { setAbrindo(false); setBusca(""); setAchadas([]); }}>
+            Cancelar
+          </Botao>
+        </div>
+      )}
+
+      {erro && <p className="mt-2 text-[14px] text-perigo">{erro}</p>}
     </div>
   );
 }

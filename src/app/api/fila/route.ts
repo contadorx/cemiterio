@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
       ? db.from("sureya_ultima_foto_jazigo").select("tumulo_id,ultima_em,total")
           .eq("org_id", org).in("tumulo_id", tumuloIds)
       : Promise.resolve({ data: [] } as any),
-    db.from("orgs").select("dias_entre_fotos").eq("id", org).maybeSingle(),
+    db.from("orgs").select("dias_entre_fotos,disparos_ativos").eq("id", org).maybeSingle(),
     // A ÚLTIMA AÇÃO — de qualquer tipo, não só foto (0094).
     //
     // A pergunta que ela faz antes de liberar não é só "já mandei foto?": é
@@ -111,6 +111,21 @@ export async function GET(req: NextRequest) {
           .eq("org_id", org).in("familia_id", familiaIds)
       : Promise.resolve({ data: [] } as any),
   ]);
+
+  // O SALDO DA FAMÍLIA — para separar "cobrança" de "INADIMPLENTE".
+  //
+  // Os dois não são a mesma fila e não se decidem do mesmo jeito. A cobrança
+  // de rotina vai para quem tem uma competência a vencer; a de inadimplência
+  // vai para quem já deve, e essa conversa tem outro tom, outro texto e outra
+  // urgência. Sem o saldo aqui, a tela não conseguia distinguir e a Sureya
+  // liberava as duas com o mesmo clique.
+  const { data: saldos } = familiaIds.length
+    ? await db.from("saldo_familia").select("familia_id,saldo")
+        .eq("org_id", org).in("familia_id", familiaIds)
+    : { data: [] as any[] };
+  const saldoDaFamilia = new Map<string, number>(
+    ((saldos || []) as any[]).map((r) => [r.familia_id, Number(r.saldo) || 0]),
+  );
 
   const porFamilia = new Map<string, any>(((ultFam || []) as any[]).map((r) => [r.familia_id, r]));
   const porJazigo  = new Map<string, any>(((ultJaz || []) as any[]).map((r) => [r.tumulo_id, r]));
@@ -179,6 +194,8 @@ export async function GET(req: NextRequest) {
     // `null` aqui significa NUNCA recebeu — que é diferente de "recebeu hoje" e
     // é justamente o caso em que ela manda sem pensar. A tela precisa dizer as
     // duas coisas com palavras diferentes.
+    // Positivo = a família DEVE. É o corte do grupo "Inadimplente".
+    saldoDevedor: Math.max(0, saldoDaFamilia.get(f.familia_id) ?? 0),
     ultimaFotoFamiliaEm: porFamilia.get(f.familia_id)?.ultima_em ?? null,
     ultimaFotoFamiliaTotal: Number(porFamilia.get(f.familia_id)?.total) || 0,
     // O grão do jazigo responde a segunda pergunta, que só existe para família
@@ -217,7 +234,14 @@ export async function GET(req: NextRequest) {
     whatsapp = "erro";
   }
 
-  return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos, porTipo, tipo: tipoFiltro || null });
+  // A CHAVE MESTRA vai para a tela. Enquanto ela estiver desligada, NADA sai
+  // sozinho — nem a resposta da IA, nem a fila de envios, nem a foto da
+  // conclusão. O envio pela tela continua funcionando: ele não passa por aqui.
+  // Quem lê a fila precisa saber em qual dos dois mundos está.
+  const disparosAutomaticos = !!(cfg as any)?.disparos_ativos;
+
+  return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos, porTipo,
+                             disparosAutomaticos, tipo: tipoFiltro || null });
 }
 
 export async function POST(req: NextRequest) {

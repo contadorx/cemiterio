@@ -1442,3 +1442,81 @@ deve ser tomada por quem sabe o combinado.
 *"Iniciar controle"* é um rótulo de estado. *"Completar valor, ritmo e próxima
 cobrança no jazigo"* é uma tarefa. E quem já tem o ok da conferência ganhou o
 selo **conferida** — era a contradição que apareceu na tela.
+
+---
+
+## D-31 · A cobrança a cada N meses, e o que mais saiu desta rodada
+
+**O caso:** uma família pagou **4 meses em agosto**; as limpezas começam já, a
+próxima cobrança é dezembro, e daí a cada 4 meses. Não deu — `sureya_freq_pagamento`
+é um enum fechado (mensal/trimestral/semestral/anual) e **quatro meses não está
+lá**. O vocabulário foi escrito adivinhando, e a primeira família real que
+combinou outra coisa não coube.
+
+Virou **número**, não mais um valor no enum: acrescentar `quadrimestral`
+resolveria esta e adiaria o problema até alguém combinar cinco. E foi para o
+**túmulo**, junto do resto do contrato (D-24) — era a última peça que ainda
+morava na família, e por isso não aparecia na caixa onde se foi procurá-la.
+Nulo = segue o combinado da família.
+
+Verificado em produção e desfeito: nada até 30/11, **uma cobrança de R$ 200 em
+dezembro** rotulada "(4 meses)", próxima em abril/2027.
+
+### O painel estava no lugar errado — erro meu
+
+O painel do mês nasceu como aba do Financeiro. O menu já tinha **"O mês"** como
+primeira entrada, e era ali que se procurava: ficaram **três portas** para a
+mesma pergunta. Subiu para `/painel`, acima da lista de trabalho — ler primeiro,
+agir depois. O Financeiro ficou com o que é ação.
+
+Junto saiu um defeito que eu mesmo criei: ao tornar o painel a aba padrão,
+"Fechar o mês" continuou gravando o endereço limpo, que passou a abrir outra
+aba. Link compartilhado e F5 levavam a pessoa para a tela errada.
+
+### Os grupos da liberação são a base da régua
+
+Fotos dos serviços · Cobrança · **Inadimplente** · Ações · Demais.
+**"Inadimplente" não é um tipo de mensagem** — é um corte por *saldo* dentro das
+cobranças. Sem ele, a cobrança de rotina e a de quem deve há três meses chegavam
+na mesma lista e saíam com o mesmo clique, com o mesmo tom.
+
+E entrou o **descartar em lote**: descartar existia uma a uma, e revisar trinta
+comemorativas custava trinta confirmações — que é como se aprende a clicar "ok"
+sem ler. Continua com confirmação única, nomeando quantas e para quem.
+
+**Uma regressão da 0102 apareceu aqui:** `cobrancaGentil` seleciona
+`responsavel_financeiro = true` e dependia — sem dizer — do índice único que a
+0102 derrubou de propósito. Com dois pagadores, a família receberia **duas
+cobranças pela mesma dívida**. Hoje há 341 pagadores e zero famílias com mais de
+um: arma carregada, não recurso quebrado. Agora é uma por família, para o titular.
+
+### Nada sai sozinho
+
+*"nenhuma mensagem deve ir automática até o app se provar na operação."*
+
+Os três caminhos automáticos — a resposta da IA, a fila de envios e a foto da
+conclusão — passam por `orgs.disparos_ativos`. O envio pela tela **não passa**:
+usa o WhatsApp direto. Então a chave foi **desligada** em produção: nada
+automático, manual continua inteiro. A tela de liberação passou a dizer isso —
+sem a faixa, "não chegou" viraria chamado.
+
+Medido antes: chave ligada, **zero** clientes em modo automático (a IA nunca
+enviou sozinha), e **1 item pendente** na fila de envios que o cron do minuto
+despacharia.
+
+### Duplicadas pedem fusão, não exclusão
+
+31 nomes repetidos, **97 famílias** — "Família Cemitério" sozinha aparece ~30
+vezes, resto de importação. E o que mudou a solução: **nenhuma está vazia** — 97
+têm contato, 48 têm jazigo, **zero têm lançamento**.
+
+Um "excluir" que respeita o dado recusaria as 97; um que não respeita levaria 48
+jazigos junto — o desenho que já mordeu esta casa quando apagar uma pessoa
+apagava os jazigos dela. Então entraram as **duas**: `sureya_fundir_familias`
+move tudo para a que fica, e `sureya_excluir_familia` só apaga o que está
+realmente vazio, **recusando com o motivo escrito** ("2 jazigos") para a pessoa
+saber ir fundir.
+
+As zero com lançamento são a boa notícia: fundir hoje não mistura histórico de
+dinheiro de ninguém. É a hora mais barata que vai existir. Ensaiado com um par
+real e desfeito: 365 → 364 famílias, contato e jazigo movidos, zero órfãos.

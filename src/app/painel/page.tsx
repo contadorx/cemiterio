@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Cartao, Selo, dinheiro } from "./pecas";
+import PainelDoMes from "./financeiro/PainelDoMes";
 
 /**
  * O MÊS — a tela inicial.
@@ -13,6 +14,22 @@ import { Cartao, Selo, dinheiro } from "./pecas";
  * O que havia aqui antes: capacidade do dia, rascunhos da IA, leads novos do
  * site e indicadores de gestão — números de um sistema que saiu de escopo, e
  * nenhum deles dizia se o mês estava fechando.
+ *
+ * A TELA TEM DUAS METADES, e a ordem entre elas é a decisão.
+ *
+ *   em cima   O PAINEL DO MÊS (0105) — como o mês está: receita, recebido,
+ *             em aberto com aging, entrega, custos, carteira.
+ *   embaixo   A LISTA DE TRABALHO — quem falta limpar e quem falta pagar,
+ *             família por família, para clicar e resolver.
+ *
+ * O painel nasceu como aba do Financeiro e foi um erro meu: o menu já tinha
+ * "O mês" como primeira entrada, e era ali que se procurava. Ficaram três
+ * portas para a mesma pergunta — o defeito que este projeto mais repete. O
+ * painel subiu para cá, e o Financeiro ficou com o que é AÇÃO (fechar,
+ * conferir, resultado por jazigo).
+ *
+ * Ler primeiro, agir depois: os números dizem se o mês vai fechar, a lista diz
+ * em quem tocar para que feche.
  */
 
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho",
@@ -103,6 +120,16 @@ export default function Painel() {
           </p>
         </Link>
       )}
+
+      {/* ================= O PAINEL DO MÊS =================
+          Mesmo componente do Financeiro — não uma segunda versão. Duas telas
+          com contas diferentes sobre os mesmos fatos é o defeito que já mordeu
+          a agenda (0092), o painel (0105) e a lista de famílias (0106). */}
+      <PainelDoMes />
+
+      <h2 className="mb-3 mt-6 text-[15px] font-bold tracking-[0.2px] text-ink">
+        Quem falta limpar e quem falta pagar
+      </h2>
 
       {/* Três números e nada mais no topo: o que falta fazer, o que falta
           entrar, e quanto isso soma.
