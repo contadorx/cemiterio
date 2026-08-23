@@ -244,8 +244,14 @@ POLICIES_DELTA=${POLICIES_DELTA:-63}
 #   0104  +2  sureya_meses_da_cobranca e sureya_cobrar_competencias — a divida
 #             passa a ser do CONTRATO, lancada por competencia. Antes quem
 #             gerava dinheiro era a lavagem, e nada alimentava a competencia.
-# Saldo: +45.
-FUNCOES_DELTA=${FUNCOES_DELTA:-45}
+#   0105  +1  sureya_painel_do_mes — todo numero do painel sai de UMA funcao.
+#             Cada cartao com a sua consulta e como a agenda quebrou: contador
+#             e movedor com definicoes diferentes, e o aviso que nunca zerava.
+#   0106  +1  sureya_etapas_das_familias — a lista dizia "falta contrato" numa
+#             familia conferida e completa: ela perguntava a FAMILIA o valor e
+#             o inicio, que a D-24 moveu para o TUMULO. Uma definicao so.
+# Saldo: +47.
+FUNCOES_DELTA=${FUNCOES_DELTA:-47}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -457,6 +463,42 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/agenda.sql 2>&1); then
   echo "$saida" | grep -E "AGENDA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "O aviso da agenda vai voltar a ficar na tela para sempre."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# A LISTA E A FICHA DIZEM A MESMA COISA
+#
+# A ficha dizia "conferida, nada faltando" e a lista, no mesmo minuto, dizia
+# "iniciar controle · sem plano". A lista perguntava a FAMILIA o valor e o
+# inicio, que a D-24 moveu para o TUMULO.
+# ---------------------------------------------------------------------------
+echo "ETAPA — a lista nao contradiz a ficha"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/etapa_da_familia.sql 2>&1); then
+  echo "$saida" | grep -E "ETAPA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Duas telas com contas diferentes sobre os mesmos fatos."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O PAINEL DO MES
+#
+# O risco aqui nao e um numero errado: e DOIS numeros que discordam. O aging
+# tem de somar o em aberto, a lista de devedores tem de somar o mesmo, e a
+# quebra das lavagens tem de fechar com o total.
+# ---------------------------------------------------------------------------
+echo "PAINEL — os numeros do mes batem entre si"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/painel_do_mes.sql 2>&1); then
+  echo "$saida" | grep -E "PAINEL FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Um painel que discorda de si mesmo ensina a nao confiar na tela."
   echo "============================================================"
   exit 1
 fi

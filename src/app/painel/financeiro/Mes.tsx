@@ -12,7 +12,11 @@ import { mesOperacao } from "@/lib/vencimento";
  *   1. quanto entrou (e quanto sobrou)
  *   2. quem pagou
  *   3. quem não pagou — e como estava NO FIM DAQUELE MÊS, não hoje
- *   4. o que ficou para trás (limpeza feita e não cobrada é dinheiro no chão)
+ *   4. o que ficou para trás (limpeza sem a foto do depois)
+ *
+ * O item 4 já foi "limpeza feita e não cobrada". Na 0104 a cobrança passou a
+ * ser do contrato, e nenhuma limpeza gera débito — o alarme acusaria todas.
+ * O risco inverteu e virou "cobrado e não entregue", no Painel do mês.
  *   5. o que reajustar
  *
  * Antes isto exigia ~9 telas e 15+ cliques, e o mês era informado quatro vezes
@@ -146,35 +150,13 @@ export default function Mes() {
           )}
 
           {/* ================= 2. O QUE FICOU PARA TRÁS ================= */}
-          {(d.pendencias.semCobranca.length > 0
-            || d.pendencias.semFoto.length > 0
+          {/* `semCobranca` saiu na 0104: a limpeza deixou de gerar cobranca,
+              entao o alarme acusaria todas as limpezas para sempre. */}
+          {(d.pendencias.semFoto.length > 0
             || d.pendencias.comprovantesAConferir > 0
             || (d.pendencias.entradasSemDono || 0) > 0) && (
             <div style={{ ...painel.card, border: "2px solid #f59e0b", background: "rgb(var(--zm-aviso) / 0.08)" }}>
               <b style={{ color: "rgb(var(--zm-aviso))", fontSize: 18 }}>O que ficou para trás</b>
-
-              {d.pendencias.semCobranca.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <b style={{ color: "rgb(var(--zm-perigo))" }}>
-                    {d.pendencias.semCobranca.length} limpeza(s) feita(s) e NÃO cobrada(s)
-                  </b>
-                  <p style={{ margin: "4px 0 6px", color: "rgb(var(--zm-aviso))", fontSize: 14, lineHeight: 1.5 }}>
-                    O serviço saiu e nada entrou na conta da família. É dinheiro no chão — e era o
-                    tipo de coisa que só aparecia meses depois, se alguém cruzasse as duas tabelas.
-                  </p>
-                  <ul style={lista}>
-                    {d.pendencias.semCobranca.slice(0, 8).map((s: any) => (
-                      <li key={s.id}>
-                        {dataBR(s.data)} · {s.familia}
-                        {s.valor != null ? ` · ${money(s.valor)}` : " · sem valor definido"}
-                      </li>
-                    ))}
-                    {d.pendencias.semCobranca.length > 8 && (
-                      <li>e mais {d.pendencias.semCobranca.length - 8}…</li>
-                    )}
-                  </ul>
-                </div>
-              )}
 
               {d.pendencias.semFoto.length > 0 && (
                 <div style={{ marginTop: 10 }}>

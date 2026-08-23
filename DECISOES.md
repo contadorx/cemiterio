@@ -1304,3 +1304,141 @@ chave do serviço.
 270 túmulos, **5 contratados**, **2 com valor** — e os dois vencem em 01/09.
 Ensaiado em produção e desfeito: em 01/09 o cobrador lança R$ 25 (Alcantara) e
 R$ 30 (Bruniera), e a segunda rodada lança zero.
+
+---
+
+## D-29 · O painel do mês, e o risco que inverteu
+
+Uma tela para as cinco perguntas que se faz ao abrir o mês: **quanto fechou**,
+**quem não pagou e há quanto tempo**, **a casa entregou o que cobrou**, **quanto
+custou**, **do que o negócio vive**.
+
+### Um número, uma conta
+
+Todo valor sai de `sureya_painel_do_mes` — uma função. Cada cartão com a sua
+própria consulta é como o aviso da agenda ficou meses sem zerar: o contador e o
+movedor usavam definições diferentes de "fora do lugar" (0092). Um painel cujos
+números **discordam entre si** é pior que nenhum painel — ele ensina a não
+confiar na tela inteira. Por isso o teste cobra as somas cruzadas: o aging tem
+de somar o em aberto, a lista de devedores tem de dar o mesmo total, e a quebra
+das lavagens tem de fechar com as executadas.
+
+### Receita e recebido não batem, e é assim mesmo
+
+**Receita** é por **competência** — o mês a que a cobrança se refere. **Recebido**
+é por **data** — o dia em que o dinheiro entrou. Um pagamento de julho que caiu
+em agosto aparece no recebido de agosto e na competência de julho. A tela diz
+isso onde os dois números aparecem, senão a diferença vira suspeita de defeito.
+
+A idade da dívida conta da **competência em aberto mais antiga**, não do último
+lançamento: quem deve desde março e pagou parte em agosto continua sendo uma
+dívida de março.
+
+### O risco inverteu
+
+Enquanto a limpeza gerava a cobrança (até a D-28), o risco era **lavagem sem
+cobrança** — serviço entregue e não faturado. `Mes.tsx` tinha esse alarme, e ele
+estava certo.
+
+Agora o contrato cobra sozinho, nenhuma limpeza gera débito, e aquele alarme
+acusaria **todas as limpezas, para sempre**. Um aviso que nunca zera é pior que
+aviso nenhum: ensina a ignorar a tela. Ele saiu.
+
+O risco não sumiu — virou o contrário, e é mais grave: **cobrado e não
+entregue**. A casa debita o mês e pode não ter ido ao jazigo. Isso não existia
+antes, ninguém avisa, e por isso é cartão de primeira linha no painel.
+
+### Vazio não é zero
+
+Medido em 23/08: `lancamentos` tem **zero linhas**. As onze categorias de
+despesa existem desde sempre — *Materiais*, *Pagamento da ajudante*, Transporte,
+Impostos — e nenhuma recebeu lançamento. `conta_equipe`, `compras_material`,
+`remuneracao_regras` e `materiais` também estão vazias.
+
+Mostrar "R$ 0,00 de material" seria apresentar **ausência de registro como
+medição**, e a margem sairia inflada com cara de fato. Onde não há registro, a
+tela diz que não há, explica o que isso significa e mostra o caminho — e o
+cartão de resultado muda de nome: enquanto ninguém lançar despesa, ele se chama
+*"Receita (sem custos lançados)"*, não *"Resultado do mês"*.
+
+É a mesma regra da D-27: a função devolve a **contagem** de lançamentos junto do
+total, justamente para a tela conseguir distinguir os dois casos.
+
+### O que mais deu para medir
+
+- **Contrato por mês** — o que entra se ninguém sair. Nenhuma tela mostrava.
+- **Prontos para cobrar** — contratado **não é** cobrável: falta valor ou falta
+  data. É o que explica um mês menor sem nada estar quebrado (hoje: 2 de 5).
+- **Campo × anotada** — só `iniciado_em` prova que alguém esteve no jazigo.
+  Separadas, dá para confiar na primeira; somadas, em nenhuma.
+- Ticket médio, jazigos sem família, famílias com contrato.
+
+---
+
+## D-30 · A lista contradizia a ficha
+
+O usuário abriu a família **BRUNIERA**. A ficha dizia *"conferida em 23/08 ·
+nada obrigatório faltando"*, contrato, R$ 30/mês, toda semana, cobrar a partir
+de 09/2026, início dos agendamentos 31/08. A lista, no mesmo minuto, dizia
+**"iniciar controle · sem plano · Sem data de lavagem · Sem data de cobrança"**,
+e a contava em *Falta contrato (1)*.
+
+Nada estava quebrado nos dados. As duas telas faziam **contas diferentes sobre
+os mesmos fatos** — o terceiro defeito com esta forma em quatro semanas (0092 na
+agenda, 0105 no painel, este na lista).
+
+### A conta olhava para campos que a decisão esvaziou
+
+```
+contratoOk = fam.contratado && fam.valor_mensal > 0
+             && fam.freq_pagamento && fam.inicio_cobranca
+             && algum tumulo.contratado com periodicidade
+```
+
+Três das quatro condições perguntam à **família**. A D-24 moveu o contrato para
+o **túmulo** e a 0100/0104 completaram. Medido na BRUNIERA:
+
+| na família | | no túmulo | |
+|---|---|---|---|
+| `valor_mensal` | null | `valor_mensal` | 30,00 |
+| `freq_pagamento` | null | `periodicidade` | semanal |
+| `inicio_cobranca` | null | `proxima_cobranca` | 2026-09-01 |
+
+E o *"sem plano · sem data"* vinha da tabela `planos`, que tem **zero linhas**
+para as famílias novas. A definição virou `sureya_etapas_das_familias` — uma só,
+no banco, respeitando o **regime** (avulso não tem mensalidade para faltar).
+
+### O filtro filtrava outra coisa
+
+Dois defeitos somados, ambos invisíveis:
+
+1. **A busca não achava família.** `c.nome` é o nome do *contato*; o nome da
+   família só era anexado **depois** do filtro. Procurar "BRUNIERA" não achava a
+   família BRUNIERA — só "adriana" funcionava. A tela se chama *Famílias*.
+2. **O seletor de periodicidade nunca casava.** Ele manda o enum (`mensal`) e a
+   lista guardava o texto humanizado (*"uma vez por mês"*). Agora o valor cru
+   serve ao filtro e o rótulo serve à tela. Faltavam também `semanal` e
+   `quinzenal` nas opções — os dois ritmos mais usados.
+
+Os filtros também rodavam **antes** do enriquecimento, então mordiam o dado
+velho. Passaram para depois.
+
+### O que a correção revelou — e não foi consertado sozinho
+
+Três famílias têm `regime='contrato'` e o valor mensal **na família, nulo no
+túmulo**: **Andre R$ 100 · Anninha R$ 20 · Perrela R$ 15**. A 0100 moveu o
+conceito e não migrou o dado. Como `sureya_cobrar_competencias` (0104) lê o
+túmulo, elas **nunca seriam cobradas** — e a lista antiga chamava a Andre de
+*"operacional"*, escondendo isso por completo.
+
+Não foram remendadas de ofício. Copiar `familias.valor_mensal` para o túmulo é
+uma decisão de dinheiro, e a Perrela tem **dois** túmulos — copiar dobraria o
+contrato. A lista passou a acusar as três com o próximo passo escrito
+("completar valor, ritmo e próxima cobrança no jazigo"), que é onde a decisão
+deve ser tomada por quem sabe o combinado.
+
+### O selo passou a dizer a tarefa
+
+*"Iniciar controle"* é um rótulo de estado. *"Completar valor, ritmo e próxima
+cobrança no jazigo"* é uma tarefa. E quem já tem o ok da conferência ganhou o
+selo **conferida** — era a contradição que apareceu na tela.

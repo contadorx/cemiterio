@@ -212,17 +212,20 @@ export async function GET(req: NextRequest) {
   // =====================================================================
   // 4. O QUE FICOU PARA TRÁS — a parte que evita prejuízo
   // =====================================================================
-  const comDebito = new Set(
-    (movsAte || []).filter((m: any) => m.tipo === "debito" && m.servico_id).map((m: any) => m.servico_id),
-  );
-  const semCobranca = executados
-    .filter((s: any) => s.cliente_id && !comDebito.has(s.id))
-    .map((s: any) => ({
-      id: s.id,
-      data: s.data_executada,
-      familia: (nomeDe.get(s.cliente_id) as any)?.nome || "—",
-      valor: s.valor != null ? r2(s.valor) : null,
-    }));
+  // "LIMPEZA FEITA E NÃO COBRADA" DEIXOU DE EXISTIR NA 0104.
+  //
+  // Este alarme comparava cada limpeza executada com um débito de mesmo
+  // `servico_id`. Fazia sentido enquanto a limpeza gerava a cobrança: um
+  // serviço sem débito era dinheiro no chão.
+  //
+  // Agora quem cobra é o CONTRATO, por competência, e nenhuma limpeza gera
+  // débito. Mantido, este alarme acusaria TODAS as limpezas, para sempre — um
+  // aviso que nunca zera é pior que aviso nenhum: ensina a ignorar a tela
+  // inteira (foi o que aconteceu com o da agenda até a 0092).
+  //
+  // O risco não sumiu, INVERTEU: agora é cobrar sem ter ido. Quem mede isso é
+  // `sureya_painel_do_mes` (0105), no cartão "Cobrado e não entregue".
+  const semCobranca: any[] = [];
 
   const semFoto = executados
     .filter((s: any) => !s.foto_depois_url)

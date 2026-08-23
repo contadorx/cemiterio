@@ -8,6 +8,7 @@ import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
 import Mes from "./Mes";
+import PainelDoMes from "./PainelDoMes";
 import Remuneracao from "./Remuneracao";
 import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 
@@ -24,7 +25,7 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
+type AbaFin = "painel" | "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
   // "O mês" é a primeira e a padrão: é a pergunta que se faz primeiro, e era a
@@ -40,6 +41,11 @@ const ABAS_FIN: [AbaFin, string][] = [
   // separada no menu — duas portas para dinheiro, e ninguém sabia qual abrir.
   //
   // As abas removidas continuam no arquivo; voltam tirando o comentário.
+  // "Painel do mês" vem primeiro (0105): é a leitura, e leitura vem antes de
+  // ação. Quem abre o financeiro quer saber como o mês está antes de decidir
+  // fechar. Ele responde numa tela o que exigia cruzar cinco abas — receita,
+  // recebido, em aberto, aging, entrega e carteira.
+  ["painel", "Painel do mês"],
   ["fechar", "Fechar o mês"],
   ["mes", "O mês"],
   ["conferir", "Conferir entradas"],
@@ -47,7 +53,7 @@ const ABAS_FIN: [AbaFin, string][] = [
 ];
 
 export default function Financeiro() {
-  const [aba, setAba] = useState<AbaFin>("fechar");
+  const [aba, setAba] = useState<AbaFin>("painel");
 
   // a aba escolhida entra no endereco: da para mandar o link certo e o F5 nao
   // devolve a pessoa para a primeira aba. Lido no window dentro do useEffect e
@@ -77,6 +83,7 @@ export default function Financeiro() {
           ))}
         </div>
 
+        {aba === "painel" && <PainelDoMes />}
         {aba === "fechar" && <PainelFechamento />}
         {aba === "mes" && <Mes />}
         {aba === "gestao" && <Gestao />}

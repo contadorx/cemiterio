@@ -44,14 +44,29 @@ export async function GET(req: NextRequest) {
   // desatualiza no dia em que alguém mexe por outro caminho.
   const familiaIds = [...new Set((clientes || []).map((c: any) => c.familia_id).filter(Boolean))];
 
-  const [{ data: tumsFam }, { data: famsInfo }, { data: servs }] = await Promise.all([
+  const [{ data: tumsFam }, { data: famsInfo }, { data: servs }, { data: etapasBanco }] =
+    await Promise.all([
     db.from("tumulos").select("familia_id,periodicidade,contratado")
       .in("familia_id", familiaIds.length ? familiaIds : ["-"]),
     db.from("familias").select("id,nome,responsavel_id,contratado,valor_mensal,freq_pagamento,inicio_cobranca")
       .in("id", familiaIds.length ? familiaIds : ["-"]),
     db.from("servicos").select("cliente_id").not("data_executada", "is", null)
       .in("cliente_id", ids.length ? ids : ["-"]),
+    // A ETAPA VEM DO BANCO (0106), e não mais de uma conta feita aqui.
+    //
+    // A conta daqui perguntava à FAMÍLIA o valor, a frequência e o início da
+    // cobrança. A D-24 moveu tudo isso para o TÚMULO, e a 0100/0104
+    // completaram — então três das quatro condições liam campos que a decisão
+    // esvaziou. Resultado visto pelo usuário: a ficha da BRUNIERA dizia
+    // "conferida, nada obrigatório faltando" e a lista, no mesmo minuto,
+    // dizia "iniciar controle · sem plano · sem data de lavagem".
+    //
+    // Enquanto a regra viver dentro de uma tela, a próxima tela escreve a sua.
+    db.rpc("sureya_etapas_das_familias", { p_org: null }),
   ]);
+
+  const etapaDaFamilia = new Map<string, any>();
+  for (const e of (etapasBanco || []) as any[]) etapaDaFamilia.set(e.familia_id, e);
 
   const tumulosPorFamilia = new Map<string, any[]>();
   for (const t of (tumsFam || []) as any[]) {
@@ -108,25 +123,60 @@ export async function GET(req: NextRequest) {
     x.aConferir = s.aConferir;
   }
 
-  let lista = [...porCliente.values()].map((c) => ({
-    ...c,
-    saldo: Math.round(c.saldo * 100) / 100,
-    mensal: Math.round(c.mensal * 100) / 100,
-    cadencias: [...new Set(c.cadencias)],
-    quadras: [...new Set(c.jazigos.map((j: any) => j.quadra).filter(Boolean))],
-    ruas: [...new Set(c.jazigos.map((j: any) => j.rua).filter(Boolean))],
-    atrasado: c.saldo < -0.005,
-    faltaData: c.temPlanoAtivo && (!c.proximaLavagem || !c.proximaCobranca),
-    conferido: c.conferido,
-  }));
+  // A ETAPA E AS DATAS ENTRAM AQUI, ANTES DOS FILTROS.
+  //
+  // Elas entravam DEPOIS, e por isso os filtros mordiam o dado velho: filtrar
+  // por "quinzenal" ou por "falta data" consultava `planos` (vazia para as
+  // famílias novas) enquanto a tela mostrava o ritmo do túmulo. Era o
+  // "não filtra" que o usuário viu — a lista filtrava, só que outra coisa.
+  let lista = [...porCliente.values()].map((c) => {
+    const e = etapaDaFamilia.get(c.familia_id);
+    // DUAS COISAS QUE ERAM UMA. `cadencias` guardava o texto humanizado
+    // ("uma vez por mês") e o seletor da tela manda o enum ("mensal") — então
+    // `cadencias.includes("mensal")` NUNCA casava. Era o segundo motivo do
+    // "não filtra": a lista filtrava, e nunca achava nada.
+    //
+    // Agora o valor cru serve ao filtro e o rótulo serve à tela.
+    const cadencias: string[] = e?.cadencias?.length ? e.cadencias : [];
+    const proximaLavagem = e?.proxima_lavagem ?? c.proximaLavagem;
+    const proximaCobranca = e?.proxima_cobranca ?? c.proximaCobranca;
+    return {
+      ...c,
+      saldo: Math.round(c.saldo * 100) / 100,
+      mensal: Math.round(Number(e?.mensal ?? c.mensal) * 100) / 100,
+      cadencias,
+      cadenciasRotulo: cadencias.length
+        ? cadencias.map((x: string) => descreverFrequencia(x, 1))
+        : [...new Set(c.cadencias)],
+      proximaLavagem,
+      proximaCobranca,
+      quadras: [...new Set(c.jazigos.map((j: any) => j.quadra).filter(Boolean))],
+      ruas: [...new Set(c.jazigos.map((j: any) => j.rua).filter(Boolean))],
+      atrasado: c.saldo < -0.005,
+      // Só faz sentido cobrar data de quem TEM contrato: quem ainda não
+      // combinou nada não está com data faltando, está sem contrato — e é
+      // outra etapa, com outro próximo passo.
+      faltaData: !!e?.contrato_ok && (!proximaLavagem || !proximaCobranca),
+      conferido: c.conferido,
+    };
+  });
 
   // ------------------------------- filtros
   const busca = (q.get("busca") || "").trim().toLowerCase();
   if (busca) {
-    lista = lista.filter((c) =>
-      String(c.nome).toLowerCase().includes(busca) ||
-      String(c.telefone).includes(busca) ||
-      c.jazigos.some((j: any) => String(j.id).toLowerCase().includes(busca)));
+    // A TELA SE CHAMA "FAMÍLIAS" E A BUSCA NÃO ACHAVA FAMÍLIA.
+    //
+    // `c.nome` é o nome do CONTATO. O nome da família só era anexado depois
+    // deste filtro, lá embaixo — então procurar "BRUNIERA" não achava a
+    // família BRUNIERA, e só "adriana" (o contato) funcionava. Quem procura
+    // pelo nome da família é o caso comum: é o nome que está na lápide.
+    lista = lista.filter((c) => {
+      const fam = infoFamilia.get(c.familia_id);
+      return String(c.nome).toLowerCase().includes(busca)
+        || String(fam?.nome || "").toLowerCase().includes(busca)
+        || String(c.telefone).includes(busca)
+        || c.jazigos.some((j: any) => String(j.id).toLowerCase().includes(busca));
+    });
   }
   const quadra = q.get("quadra") || "";
   if (quadra) lista = lista.filter((c) => c.quadras.includes(quadra));
@@ -181,18 +231,20 @@ export async function GET(req: NextRequest) {
     const meus = tumulosPorFamilia.get(c.familia_id) || [];
     const fam = infoFamilia.get(c.familia_id);
     const servicos = servicosPorCliente.get(c.id) || 0;
+    const e = etapaDaFamilia.get(c.familia_id);
 
-    const contratoOk = !!fam?.contratado && Number(fam?.valor_mensal) > 0
-      && !!fam?.freq_pagamento && !!fam?.inicio_cobranca
-      && meus.some((t: any) => t.contratado && t.periodicidade);
-
-    const etapa = !meus.length ? "sem_tumulo"
-      : !contratoOk ? "sem_contrato"
-      : servicos > 0 ? "operacional"
-      : "pronta";
+    // Sem família não há etapa a calcular: a linha é um contato solto.
+    const etapa = e?.etapa || (meus.length ? "sem_contrato" : "sem_tumulo");
 
     return {
       ...c, etapa, qtdTumulos: meus.length, qtdServicos: servicos,
+      // O QUE FALTA, em português e vindo da mesma conta da etapa. "Falta
+      // contrato" é um rótulo de estado; "completar valor, ritmo e próxima
+      // cobrança no jazigo" é uma tarefa.
+      falta: e?.falta || null,
+      contratoOk: !!e?.contrato_ok,
+      conferidaEm: e?.conferida_em || null,
+
       // O NOME DA FAMÍLIA vai na linha. A lista se chama "Famílias" e mostrava
       // o nome da PESSOA — e como a família costuma se chamar de um jeito e o
       // contato de outro (a Família Andre tem uma pessoa chamada "Nagae"), não

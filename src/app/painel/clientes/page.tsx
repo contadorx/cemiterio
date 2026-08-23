@@ -189,7 +189,10 @@ function VisaoFamilias() {
             <select style={{ ...painel.input, width: "auto" }} value={f.cadencia}
                     onChange={(e) => setF({ ...f, cadencia: e.target.value })}>
               <option value="">Toda periodicidade</option>
-              {["mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
+              {/* Faltavam "semanal" e "quinzenal", que existem no enum desde
+                  sempre e são os ritmos mais usados no cemitério — filtrar por
+                  eles era impossível. */}
+              {["semanal","quinzenal","mensal","bimestral","trimestral","semestral","anual","avulso"].map((c) =>
                 <option key={c} value={c}>{c}</option>)}
             </select>
             <select style={{ ...painel.input, width: "auto" }} value={f.venceEm}
@@ -266,23 +269,39 @@ function VisaoFamilias() {
                   {/* A ETAPA, ao lado do nome. Ela diz qual é o PRÓXIMO passo
                       daquela família — e não só um rótulo de estado. Quem abre
                       a lista para trabalhar precisa saber onde continuar. */}
+                  {/* O SELO DIZ A TAREFA, e vem da mesma conta da ficha (0106).
+                      "iniciar controle" aparecia numa família conferida, com
+                      contrato completo — porque esta lista fazia a própria
+                      conta, olhando campos que a D-24 esvaziou. Agora o texto
+                      vem de `falta`, que é o próximo passo em português. */}
                   {c.etapa && c.etapa !== "operacional" && (
                     <span style={{
                       marginLeft: 8, borderRadius: 999, padding: "2px 9px", fontSize: 12,
                       fontWeight: 600, whiteSpace: "nowrap",
-                      background: "rgb(var(--zm-aviso) / 0.12)",
-                      color: "rgb(var(--zm-aviso))",
+                      background: c.etapa === "pronta"
+                        ? "rgb(var(--zm-teal) / 0.12)" : "rgb(var(--zm-aviso) / 0.12)",
+                      color: c.etapa === "pronta" ? cor.teal : "rgb(var(--zm-aviso))",
                     }}>
-                      {c.etapa === "sem_tumulo" ? "ligar o túmulo"
-                        : c.etapa === "sem_contrato" ? "iniciar controle"
-                        : "falta a 1ª limpeza"}
+                      {c.etapa === "pronta" ? "aguardando a 1ª limpeza"
+                        : c.falta || (c.etapa === "sem_tumulo" ? "ligar o túmulo" : "completar o contrato")}
+                    </span>
+                  )}
+                  {/* Quem já recebeu o ok da conferência não pode parecer
+                      pendente: era a contradição que o usuário viu na tela. */}
+                  {c.conferidaEm && (
+                    <span style={{
+                      marginLeft: 6, borderRadius: 999, padding: "2px 9px", fontSize: 12,
+                      fontWeight: 600, whiteSpace: "nowrap",
+                      background: "rgb(var(--zm-teal) / 0.12)", color: cor.teal,
+                    }}>
+                      conferida
                     </span>
                   )}
                   <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
                     {(c.jazigos || []).map((j: any) => `${j.id}${j.quadra ? ` (${j.quadra}${j.rua ? " · " + j.rua : ""})` : ""}`).join(" + ") || "sem jazigo"}
                   </div>
                   <div style={{ fontSize: 15, color: cor.cinza, marginTop: 3 }}>
-                    {(c.cadencias || []).join(", ") || "sem plano"}
+                    {(c.cadenciasRotulo || []).join(", ") || "sem ritmo definido"}
                     {c.mensal > 0 && ` · ${money(c.mensal)}/mês`}
                     {c.modo === "automatico" && " · IA automática"}
                     {!c.ativo_ia && " · IA desligada"}
