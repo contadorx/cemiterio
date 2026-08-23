@@ -109,9 +109,23 @@ values ('11100000-0000-0000-0000-000000000153','aaaaaaaa-0000-0000-0000-00000000
         true, 30, date_trunc('month', current_date)::date)
 on conflict do nothing;
 
-select ci15('trimestral cobra tres meses de uma vez',
-  (select valor_total = 90 from sureya_cobrar_competencias(current_date, 'aaaaaaaa-0000-0000-0000-000000000015')),
-  'R$30/mes em trimestral tinha de dar R$90');
+-- MUDOU NA 0112. Ate aqui o ciclo virava UMA linha com o valor cheio, e a
+-- receita de tres meses caia num mes so no painel. Agora vira UMA LINHA POR
+-- MES do periodo, todas vencendo na mesma data.
+select ci15('trimestral vira TRES linhas de R$30, e nao uma de R$90',
+  (select lancados = 3 and valor_total = 90
+     from sureya_cobrar_competencias(current_date, 'aaaaaaaa-0000-0000-0000-000000000015')),
+  'o total esta certo mas a receita continua empilhada num mes so');
+
+select ci15('e as tres caem em competencias diferentes',
+  (select count(distinct competencia) = 3 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000153' and origem='competencia'),
+  'tres meses de servico na mesma competencia distorcem o painel');
+
+select ci15('mas VENCEM todas no mesmo dia',
+  (select count(distinct data) = 1 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000153' and origem='competencia'),
+  'a familia paga uma vez; se cada linha vencer num dia, a regua cobra tres vezes');
 
 select ci15('e a proxima cobranca anda TRES meses',
   (select proxima_cobranca = (date_trunc('month', current_date) + interval '3 months')::date
@@ -138,6 +152,7 @@ on conflict do nothing;
 select ci15('tres meses parados viram QUATRO cobrancas',
   (select lancados = 4 from sureya_cobrar_competencias(current_date, 'aaaaaaaa-0000-0000-0000-000000000015')),
   'os meses atrasados nao foram cobrados um a um');
+-- (mensal: um ciclo = um mes = uma linha, entao a 0112 nao muda nada aqui)
 
 select ci15('e cada uma na sua competencia, nao todas em hoje',
   (select count(distinct competencia) = 4 from conta_corrente
@@ -220,19 +235,19 @@ select ci15('em novembro a familia que pagou adiantado NAO e cobrada',
 select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
 
 select ci15('em dezembro ela e cobrada, e por quatro meses',
-  (select count(*) = 1 and sum(valor) = 200 from conta_corrente
+  (select count(*) = 4 and sum(valor) = 200 from conta_corrente
     where tumulo_id='11100000-0000-0000-0000-000000000156' and origem='competencia'),
-  'R$50/mes a cada 4 meses tinha de dar UMA cobranca de R$200');
+  'R$50/mes a cada 4 meses tinha de dar QUATRO linhas somando R$200 (0112)');
 
 select ci15('e a proxima cobranca pula para abril',
   (select proxima_cobranca = '2027-04-01'::date from tumulos
     where id='11100000-0000-0000-0000-000000000156'),
   'a data nao andou os quatro meses — o proximo ciclo sairia errado');
 
-select ci15('o lancamento diz que sao quatro meses',
-  (select descricao like '%(4 meses)%' from conta_corrente
-    where tumulo_id='11100000-0000-0000-0000-000000000156' and origem='competencia' limit 1),
-  'quem le o extrato precisa saber que aquele valor cobre quatro meses');
+select ci15('e cada linha diz de que periodo ela faz parte',
+  (select bool_and(descricao like '%parte de%vence em%') from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000156' and origem='competencia'),
+  'quem le o extrato precisa saber que aquelas quatro linhas sao um pagamento so');
 
 -- E as lavagens comecam JA, sem esperar a cobranca: sao duas datas separadas.
 select ci15('as lavagens comecam hoje, e nao em dezembro',
@@ -252,3 +267,74 @@ select ci15('sem ritmo proprio, o tumulo segue a familia',
   (select meses_entre_cobrancas is null from tumulos
     where id='11100000-0000-0000-0000-000000000151'),
   'nulo tem de significar "segue a familia", nao "uma vez por mes"');
+
+-- ---------------------------------------------------------------------------
+-- 8 · PAGA DEPOIS DO SERVICO — o caso Anninha (0112)
+-- ---------------------------------------------------------------------------
+-- "ela pagou em junho no fim do periodo e agora ela paga em dezembro, mas apos
+--  servico."
+--
+-- O cobrador assumia PRE-PAGO sem dizer: cobra em P e anda N meses, logo o
+-- periodo seria P..P+N-1. No pos-pago o periodo TERMINA na cobranca: P-N+1..P.
+-- As duas leituras dao o mesmo ritmo e MESES DIFERENTES — e nada no cadastro
+-- dizia qual era.
+insert into familias (id, org_id, nome, freq_pagamento, contratado)
+values ('ff000000-0000-0000-0000-000000000156','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Pos Pago','semestral', true)
+on conflict do nothing;
+
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, proxima_cobranca, cobranca_no_fim)
+values ('11100000-0000-0000-0000-000000000157','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000156','CI-COB-POS',
+        true, 40, '2026-12-01', true)
+on conflict do nothing;
+
+select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('pos-pago: seis linhas de R$40, somando R$240',
+  (select count(*) = 6 and sum(valor) = 240 from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'),
+  'o semestre pago no fim tinha de virar seis competencias de R$40');
+
+select ci15('e elas sao JULHO a DEZEMBRO, nao dezembro a maio',
+  (select min(competencia) = '2026-07-01'::date and max(competencia) = '2026-12-01'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'),
+  'quem paga depois do servico esta pagando os meses que JA passaram');
+
+select ci15('todas vencendo em dezembro',
+  (select bool_and(data = '2026-12-01'::date) from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000157' and origem='competencia'),
+  'ela paga uma vez, em dezembro — o vencimento e um so');
+
+select ci15('e a proxima cobranca vai para junho',
+  (select proxima_cobranca = '2027-06-01'::date from tumulos
+    where id='11100000-0000-0000-0000-000000000157'),
+  'o proximo semestre (jan a jun) e cobrado em junho');
+
+-- E o PRE-PAGO do mesmo tamanho pega os meses PARA A FRENTE.
+insert into familias (id, org_id, nome, freq_pagamento, contratado)
+values ('ff000000-0000-0000-0000-000000000157','aaaaaaaa-0000-0000-0000-000000000015',
+        'Familia Pre Pago','semestral', true)
+on conflict do nothing;
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
+                     contratado, valor_mensal, proxima_cobranca, cobranca_no_fim)
+values ('11100000-0000-0000-0000-000000000158','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000157','CI-COB-PRE',
+        true, 40, '2026-12-01', false)
+on conflict do nothing;
+
+select sureya_cobrar_competencias('2026-12-01'::date, 'aaaaaaaa-0000-0000-0000-000000000015');
+
+select ci15('pre-pago: o periodo comeca na cobranca',
+  (select min(competencia) = '2026-12-01'::date and max(competencia) = '2027-05-01'::date
+     from conta_corrente
+    where tumulo_id='11100000-0000-0000-0000-000000000158' and origem='competencia'),
+  'quem paga adiantado esta pagando os meses que ainda VAO acontecer');
+
+-- A PREVIA PROMETE O QUE O BOTAO ENTREGA.
+select ci15('a previa conta as linhas, nao os ciclos',
+  (select competencias = 6 from sureya_cobrancas_a_lancar(
+     'ff000000-0000-0000-0000-000000000157'::uuid, '2027-06-01'::date)),
+  'a tela diria "1 competencia" e o botao lancaria 6');

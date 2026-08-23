@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     db.from("tumulos")
       .select("id,identificacao,numero,falecido_nome,rua,rua_id,ordem_na_rua,observacoes,"
             + "contratado,periodicidade,valor_lavagem,valor_mensal,valor_base,inicio_cobranca,"
-            + "proxima_cobranca,inicio_agendamento,meses_entre_cobrancas,lat,lng,gps_precisao,"
+            + "proxima_cobranca,inicio_agendamento,meses_entre_cobrancas,cobranca_no_fim,lat,lng,gps_precisao,"
             + "foto_referencia_url,foto_enquadramento_url,ultima_lavagem_informada,"
             + "cliente_id,familia_id,quadras(codigo),familias(nome,contratado,inicio_cobranca),"
             + "clientes(nome,telefone)")
@@ -247,6 +247,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch.meses_entre_cobrancas = n;
     }
   }
+
+  // PAGA ANTES OU DEPOIS DO SERVIÇO (0112).
+  //
+  // O sistema assumia pré-pago sem dizer. As duas leituras dão o MESMO ritmo e
+  // meses diferentes: cobrando em dezembro a cada 6 meses, o pré-pago cobre
+  // dez–mai e o pós-pago cobre jul–dez. Funcionava por coincidência.
+  if (body.cobranca_no_fim !== undefined) patch.cobranca_no_fim = !!body.cobranca_no_fim;
 
   // Esta NÃO cai no dia 1: a rota começa num dia, não num mês.
   if (body.inicio_agendamento !== undefined) {

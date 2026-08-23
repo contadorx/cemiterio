@@ -30,6 +30,8 @@ interface Conversa {
   arquivada: boolean;
   atualizada: string;
   rascunhoPendente: boolean;
+  /** O que a IA preparou e por que não mandou. Nulo = não há sugestão. */
+  sugestao: { texto: string; motivo: string | null } | null;
   ultima: { texto: string; autor: string } | null;
 }
 
@@ -341,7 +343,7 @@ export default function VisaoConversas() {
                     : c.assunto ? ASSUNTOS[c.assunto] || c.assunto : "sem assunto"}
                   {" · "}
                   {new Date(c.atualizada).toLocaleDateString("pt-BR")}
-                  {c.rascunhoPendente && <span style={{ color: "#d97706" }}> · rascunho a aprovar</span>}
+                  {c.rascunhoPendente && <span style={{ color: "#d97706" }}> · a IA sugeriu uma resposta</span>}
                   {c.escalada && <span style={{ color: "#dc2626" }}> · escalada</span>}
                   {c.resolvida && !c.arquivada && <span style={{ color: cor.teal }}> · resolvida</span>}
                 </div>
@@ -350,6 +352,30 @@ export default function VisaoConversas() {
                     <b>{c.ultima.autor === "cliente" ? "Cliente" : "Nós"}:</b>{" "}
                     {c.ultima.texto.slice(0, 110)}{c.ultima.texto.length > 110 ? "…" : ""}
                   </p>
+                )}
+
+                {/* A SUGESTÃO DA IA, NO CONTEXTO DA CONVERSA.
+                    Ela morava numa aba própria — uma lista de rascunhos soltos,
+                    sem a pergunta que os originou. Era a segunda porta que a
+                    0094 fechou para as mensagens e deixou aberta para a IA, e
+                    foi assim que 162 rascunhos se acumularam sem ninguém ver.
+
+                    Aqui ela aparece embaixo da última mensagem, que é o único
+                    lugar onde dá para julgar se a resposta serve. E o MOTIVO
+                    junto: "a IA ficou em dúvida" e "disparos desligados" pedem
+                    decisões diferentes. */}
+                {c.sugestao && (
+                  <div style={{ marginTop: 8, paddingLeft: 10,
+                                borderLeft: "3px solid #d97706" }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#92400e" }}>
+                      A IA sugeriu
+                      {c.sugestao.motivo ? ` — segurou porque: ${c.sugestao.motivo}` : ""}
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: 14, color: cor.cinza, lineHeight: 1.45 }}>
+                      {c.sugestao.texto.slice(0, 160)}
+                      {c.sugestao.texto.length > 160 ? "…" : ""}
+                    </p>
+                  </div>
                 )}
               </div>
 

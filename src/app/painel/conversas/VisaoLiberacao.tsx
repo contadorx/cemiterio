@@ -439,9 +439,18 @@ export default function VisaoLiberacao() {
           aba fosse escolhida, que é justamente quando servem para dizer o que
           está esperando do outro lado. */}
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        {/* OS CINCO GRUPOS APARECEM SEMPRE, inclusive vazios.
+            Herdei do filtro por tipo antigo um `return null` para o que estava
+            zerado — e ali fazia sentido, porque os tipos são muitos e vão e
+            vêm. Aqui é uma TAXONOMIA FIXA: com a fila vazia (o caso de hoje,
+            medido em 23/08: zero mensagens), some tudo menos "Tudo", e quem
+            abre a tela conclui que os grupos não existem. Era exatamente o que
+            estava sendo relatado.
+
+            Um grupo com (0) informa: "não há cobrança de inadimplente hoje" é
+            uma resposta, e some não é. */}
         {GRUPOS.map((g) => {
           const n = g.id ? itensDoGrupo(g).length : itens.length;
-          if (g.id && !n && grupo !== g.id) return null;  // grupo vazio não vira botão
           return (
             <button
               key={g.id || "tudo"}
@@ -452,7 +461,7 @@ export default function VisaoLiberacao() {
                   ? "border-brand bg-brand text-white"
                   : "border-line bg-card text-ink hover:border-brand"}`}
             >
-              {g.rotulo}{n ? ` (${n})` : ""}
+              {g.rotulo} ({n})
             </button>
           );
         })}
@@ -469,6 +478,20 @@ export default function VisaoLiberacao() {
           <b className="text-ink">Nenhuma mensagem sai sozinha.</b> Enquanto o app não se
           provar na operação, tudo passa por esta tela: você lê, escolhe e manda. O que
           o sistema gera fica aqui esperando — nada vai para a família sem um comando seu.
+        </div>
+      )}
+
+      {/* FILA VAZIA NÃO É DEFEITO — mas parece um, se a tela só ficar branca.
+          Hoje ela está: nada foi gerado ainda, e os disparos automáticos estão
+          desligados de propósito. Dizer isso evita o chamado. */}
+      {itens.length === 0 && (
+        <div className="mb-4 rounded-xl2 border border-line bg-card p-4">
+          <p className="text-[15px] font-semibold text-ink">Nada esperando liberação.</p>
+          <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
+            As mensagens chegam aqui sozinhas: a <b>foto</b> quando uma limpeza é
+            concluída, a <b>cobrança</b> pelos degraus da régua, as <b>datas de
+            memória</b> pelo calendário. Nenhuma delas sai sem você mandar.
+          </p>
         </div>
       )}
 

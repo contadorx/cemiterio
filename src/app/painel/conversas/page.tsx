@@ -5,7 +5,6 @@ import { PainelNav, painel } from "../ui";
 import VisaoLiberacao from "./VisaoLiberacao";
 import VisaoConversas from "./VisaoConversas";
 import VisaoSite from "./VisaoSite";
-import VisaoRascunhos from "./VisaoRascunhos";
 
 /**
  * CONVERSAS — tudo que é falar com a família, numa tela só.
@@ -38,13 +37,28 @@ import VisaoRascunhos from "./VisaoRascunhos";
  * F5. Leitura no window dentro do useEffect, NÃO com useSearchParams — que no
  * Next 14 exigiria um <Suspense> em volta da página inteira só por isso.
  */
-type Aba = "liberacao" | "conversas" | "site" | "antiga";
+/**
+ * A "FILA ANTIGA" SAIU DAS ABAS.
+ *
+ * Ela era uma lista de rascunhos da IA soltos — texto sem a pergunta que o
+ * originou. Nasceu como remendo para expor 164 mensagens que o sistema tinha
+ * preparado numa segunda fila sem tela, e cumpriu o papel: hoje as 162 estão
+ * todas decididas e a lista está vazia.
+ *
+ * Mantê-la seria manter a SEGUNDA PORTA aberta — a mesma que a 0094 fechou
+ * para as mensagens e deixou aberta para a IA. Foi por ela que os rascunhos se
+ * acumularam sem ninguém ver.
+ *
+ * Agora a sugestão da IA aparece DENTRO da conversa, embaixo da última
+ * mensagem, com o motivo pelo qual não foi enviada. É o único lugar onde dá
+ * para julgar se a resposta serve.
+ */
+type Aba = "liberacao" | "conversas" | "site";
 
 const ABAS: [Aba, string][] = [
   ["liberacao", "Liberação"],
   ["conversas", "Conversas"],
   ["site", "Contatos do site"],
-  ["antiga", "Fila antiga"],
 ];
 
 export default function Conversas() {
@@ -84,7 +98,7 @@ export default function Conversas() {
   }
 
   const contagem = (v: Aba) =>
-    v === "liberacao" ? nLiberacao : v === "site" ? nSite : v === "antiga" ? nAntiga : null;
+    v === "liberacao" ? nLiberacao : v === "site" ? nSite : null;
 
   return (
     <div style={painel.wrap}>
@@ -94,10 +108,6 @@ export default function Conversas() {
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {ABAS.map(([v, rot]) => {
-            // A FILA ANTIGA SOME QUANDO ZERAR. Ela existe para o passivo ser
-            // pago, não para virar mais um lugar permanente de olhar: uma aba
-            // vazia para sempre é o começo da próxima fila esquecida.
-            if (v === "antiga" && nAntiga === 0) return null;
             const ativa = aba === v;
             const n = contagem(v);
             return (
@@ -119,13 +129,16 @@ export default function Conversas() {
             Esconder o número na aba 4 repetiria o erro que criou o problema:
             quem abre esta tela tem de saber, na primeira linha, que existem
             mensagens preparadas há semanas que nunca foram vistas. */}
+        {/* O PASSIVO CONTINUA ANUNCIADO, mas agora aponta para onde se decide.
+            A lista solta saiu; o que sobrou de rascunho da IA aparece dentro da
+            conversa que o originou. */}
         {aba === "liberacao" && !!nAntiga && (
           <div className="mb-4 rounded-xl2 border border-aviso/30 bg-aviso/10 p-3 text-[14px] text-aviso">
-            <b>{nAntiga} mensagens na fila antiga.</b> São as que o sistema preparou
-            antes desta tela existir e ficaram numa segunda fila, sem tela — a maior
-            parte cobranças geradas dia após dia. Elas <b>não</b> foram enviadas.{" "}
-            <button className="underline" onClick={() => trocar("antiga")}>
-              ver e decidir
+            <b>A IA preparou {nAntiga} {nAntiga === 1 ? "resposta" : "respostas"} esperando você.</b>{" "}
+            Nenhuma foi enviada. Elas aparecem <b>dentro da conversa</b> de cada família,
+            com o motivo pelo qual a IA segurou.{" "}
+            <button className="underline" onClick={() => trocar("conversas")}>
+              ver as conversas
             </button>
           </div>
         )}
@@ -133,7 +146,6 @@ export default function Conversas() {
         {aba === "liberacao" && <VisaoLiberacao />}
         {aba === "conversas" && <VisaoConversas />}
         {aba === "site" && <VisaoSite />}
-        {aba === "antiga" && <VisaoRascunhos onMudou={contar} />}
       </div>
     </div>
   );

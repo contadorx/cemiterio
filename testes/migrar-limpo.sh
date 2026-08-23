@@ -261,6 +261,8 @@ POLICIES_DELTA=${POLICIES_DELTA:-67}
 #   0109  +1  sureya_cobrancas_a_lancar — a tela precisa avisar "2 competencias
 #             a lancar" ANTES de alguem mandar cobrar. (O cobrador ganhou um
 #             parametro, mas a versao velha foi derrubada: nao soma.)
+#   0112  +0  o cobrador e a previa foram REESCRITOS (uma competencia por mes
+#             do periodo, e pre/pos-pago), sem funcao nova.
 #   0111  +1  sureya_regua_do_dia — a regua ENFILEIRA, nunca envia. Nao ha
 #             caminho daqui para o WhatsApp, e e de proposito.
 # Saldo: +51.

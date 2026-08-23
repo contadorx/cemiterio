@@ -1581,3 +1581,102 @@ usa a **mesma porta** da ficha, a que recusa quem não está vazia: um lote que
 apagasse à força levaria os 48 jazigos junto. E ele **relata**: quantas saíram
 e, para cada recusada, o motivo — sem isso, "excluí 30 e sumiram 12" seria um
 mistério.
+
+---
+
+## D-33 · Uma competência por mês do período, e o pós-pago
+
+**O caso Anninha:** paga a cada seis meses, **depois do serviço** — pagou em
+junho pelo semestre que terminou, e paga em dezembro pelo próximo.
+
+O ritmo estava certo: R$ 240 em dezembro, próxima em junho/2027. Duas coisas
+não estavam.
+
+### A competência empilhava seis meses num mês
+
+Os R$ 240 entravam como **uma linha** de competência 12/2026 — mas cobrem
+julho a dezembro. No Painel do mês, julho a novembro apareciam com R$ 0 dessa
+família e dezembro com R$ 240. A regra do painel é *"receita da competência = o
+mês a que a cobrança se refere"*, e ela se referia a seis.
+
+Agora o ciclo vira **N lançamentos**, um por mês, no valor mensal, **todos com o
+mesmo vencimento**. A receita fica no mês em que o serviço foi prestado, a
+inadimplência aparece mês a mês, e o extrato diz de que mês é cada real. Para
+contrato mensal (N = 1) nada muda.
+
+O vencimento único é o que mantém a régua coerente: a família paga **uma vez**;
+se cada linha vencesse no seu mês, a régua cobraria seis vezes.
+
+### O sistema assumia pré-pago sem dizer
+
+O cobrador cobrava em P e andava N meses — logo o período seria P..P+N-1. Quem
+paga depois do serviço tem período P-N+1..P. **As duas leituras dão o mesmo
+ritmo e meses diferentes**, e nada no cadastro dizia qual era: cobrando em
+dezembro a cada 6 meses, o pré-pago cobre dez–mai e o pós-pago cobre jul–dez.
+Funcionava por coincidência de a próxima data cair certa.
+
+Virou `tumulos.cobranca_no_fim`. Verificado em produção e desfeito: a Anninha
+agora produz **07 a 12/2026, R$ 40 cada, todas vencendo em 01/12**.
+
+### O R$ 240 de "situação inicial" — e por que foi apagado, não estornado
+
+Era lixo de digitação, e coincidia com o valor do contrato semestral — some com
+ele quando vier. **Apagado, não estornado:** `idx_cc_uma_abertura` é único por
+família, então um estorno deixaria o débito de pé e ela nunca mais poderia
+registrar uma situação inicial correta. Lançamento que nunca representou nada
+se apaga; o que representou, se estorna.
+
+### Os grupos da liberação sumiam quando vazios
+
+Herdei do filtro por tipo antigo um `return null` para o grupo zerado. Ali fazia
+sentido — os tipos são muitos e vão e vêm. Aqui é uma **taxonomia fixa de
+cinco**: com a fila vazia (o caso de hoje, medido: zero mensagens), sumia tudo
+menos "Tudo", e quem abria concluía que os grupos não existiam. Era exatamente
+o que estava sendo relatado.
+
+Os cinco aparecem sempre, com **(0)** quando vazios — *"não há cobrança de
+inadimplente hoje"* é uma resposta; sumir não é. E a fila vazia passou a
+explicar-se, em vez de ficar branca.
+
+E o menu ganhou a **bolinha** com quantas esperam liberação: como nada sai
+sozinho, a fila só anda quando alguém abre a tela — sem um número visível,
+"abrir Conversas para ver" vira um hábito que se perde, e a foto da limpeza
+espera dias.
+
+---
+
+## D-34 · A segunda porta da IA
+
+A "Fila antiga" era uma aba com os rascunhos da IA em **lista solta** — texto
+sem a pergunta que o originou. Ela nasceu como remendo para expor 164 mensagens
+que o sistema havia preparado numa segunda fila sem tela nenhuma, e cumpriu o
+papel: medido em 23/08, **as 162 estão todas decididas** (aprovadas ou
+descartadas) e a lista está vazia.
+
+Mantê-la seria manter aberta a **segunda porta** — a mesma que a 0094 fechou
+para as mensagens e deixou aberta para a IA. Foi por ela que os rascunhos se
+acumularam sem ninguém ver: uma lista de textos soltos não dá para julgar,
+porque julgar uma resposta exige a pergunta.
+
+**A sugestão passou a morar dentro da conversa**, embaixo da última mensagem,
+com duas coisas que a lista não tinha:
+
+- **o texto** que a IA escreveu, não só o aviso de que existe algo
+- **o motivo pelo qual ela segurou** — *"a IA ficou em dúvida"*, *"disparos
+  automáticos desligados"*, *"contato em modo copiloto"* pedem decisões
+  diferentes, e sem o motivo todas parecem a mesma
+
+O aviso do passivo continua na primeira aba, mas agora aponta para onde se
+decide, não para uma lista paralela.
+
+### O que já estava certo, e vale registrar
+
+Nada dispara sozinho, e não por acidente: `atendimento.ts` só envia quando
+`disparos_ativos` **e** o contato está em modo automático **e** a IA está
+confiante. Medido: **zero** contatos em modo automático e a chave mestra
+desligada — a IA nunca enviou nada por conta própria (`enviou_direto` = 0).
+
+Restam **1 mídia pendente** em `fila_envios` (de 22/08) e **1 foto descartada**
+em `fila_liberacao`. A mídia fica onde está enquanto a chave estiver desligada;
+ela sai sozinha no dia em que a casa religar, e é o comportamento esperado —
+está anotado aqui para que não vire surpresa.

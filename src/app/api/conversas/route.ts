@@ -111,13 +111,30 @@ export async function GET(req: NextRequest) {
   }
 
   const comRascunho = new Set<string>();
+  const sugestaoDe = new Map<string, { texto: string; motivo: string | null }>();
   if (ids.length) {
+    // A SUGESTÃO VEM JUNTO, não só o fato de existir.
+    //
+    // "rascunho a aprovar" diz que há algo; não diz o quê nem por que a IA não
+    // mandou. Sem isso, decidir exige abrir uma a uma — e era essa fricção que
+    // fazia a fila antiga crescer sem ninguém olhar.
     const { data: rasc } = await db
       .from("interacoes_ia")
-      .select("conversa_id")
+      .select("conversa_id,rascunho,motivo_retencao,created_at")
       .in("conversa_id", ids)
-      .is("acao_humana", null);
-    for (const r of rasc || []) comRascunho.add((r as any).conversa_id);
+      .is("acao_humana", null)
+      .order("created_at", { ascending: false });
+    for (const r of rasc || []) {
+      const cid = (r as any).conversa_id;
+      comRascunho.add(cid);
+      // O mais recente ganha: a IA pode ter preparado mais de um.
+      if (!sugestaoDe.has(cid)) {
+        sugestaoDe.set(cid, {
+          texto: String((r as any).rascunho || ""),
+          motivo: (r as any).motivo_retencao || null,
+        });
+      }
+    }
   }
 
   // quem espera há mais tempo aparece antes
@@ -157,6 +174,8 @@ export async function GET(req: NextRequest) {
     estado: estadoDa(c),
     esperandoHa: esperaDe(c),
     rascunhoPendente: comRascunho.has(c.id),
+    // { texto, motivo } — o que a IA escreveu e por que segurou.
+    sugestao: sugestaoDe.get(c.id) || null,
     ultima: ultima.get(c.id) || null,
     foto: c.clientes?.foto_url || null,
     // estado: de quem é a bola?

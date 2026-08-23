@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { CalendarDays, ClipboardCheck, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
@@ -61,6 +62,30 @@ const AJUSTES = [
 export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
   const caminho = usePathname();
 
+  /**
+   * A BOLINHA DE CONVERSAS — quantas mensagens esperam liberação.
+   *
+   * Nada sai sozinho (os disparos automáticos estão desligados), então a fila
+   * só anda quando alguém abre a tela. Sem um número no menu, "abrir Conversas
+   * para ver se tem algo" vira um hábito que se perde — e a foto da limpeza
+   * fica esperando dias.
+   *
+   * Silencioso de propósito: se a contagem não responder, o menu aparece
+   * inteiro sem a bolinha. Um menu que não carrega por causa de um contador
+   * seria pior que contador nenhum.
+   */
+  const [pendentes, setPendentes] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/fila")
+      .then((r) => r.json())
+      .then((r) => { if (vivo && r?.ok) setPendentes((r.itens || []).length); })
+      .catch(() => {});
+    return () => { vivo = false; };
+    // Recarrega ao trocar de tela: liberar uma mensagem e ver o número cair é
+    // o que faz a bolinha ser confiável.
+  }, [caminho]);
+
   // "/painel" só está ativo na raiz: sem isto ele acenderia junto com todas as
   // telas filhas, e a Sureya veria dois itens marcados ao mesmo tempo.
   const ativo = (href: string) =>
@@ -95,6 +120,15 @@ export default function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
           />
           <Icone size={17} strokeWidth={2} />
           {label}
+          {href === "/painel/conversas" && pendentes > 0 && (
+            <span
+              className="ml-auto min-w-[20px] rounded-full bg-ouro px-1.5 py-0.5 text-center
+                         text-[11px] font-bold leading-none text-rail"
+              title={`${pendentes} ${pendentes === 1 ? "mensagem espera" : "mensagens esperam"} liberação`}
+            >
+              {pendentes > 99 ? "99+" : pendentes}
+            </span>
+          )}
         </Link>
       ))}
     </div>

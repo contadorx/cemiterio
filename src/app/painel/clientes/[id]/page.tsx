@@ -541,6 +541,8 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
     inicio_agendamento: t.inicio_agendamento ?? "",
     // Vazio = segue o combinado da família (0107).
     meses_entre_cobrancas: t.meses_entre_cobrancas ?? "",
+    // Pré ou pós-pago. O sistema assumia pré sem dizer (0112).
+    cobranca_no_fim: !!t.cobranca_no_fim,
   });
   const [salvando, setSalvando] = useState(false);
   const local = [t.quadras?.codigo, t.ruas?.nome].filter(Boolean).join(" · ");
@@ -714,6 +716,17 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
                 Era um enum na família (mensal/trimestral/semestral/anual) e a
                 primeira família que combinou QUATRO meses não coube. Agora é
                 um número, e fica no túmulo junto do resto do contrato. */}
+            {/* PRÉ OU PÓS-PAGO. As duas leituras dão o mesmo ritmo e meses
+                diferentes: cobrando em dezembro a cada 6 meses, o adiantado
+                cobre dez–mai e o pós-pago cobre jul–dez. */}
+            <Campo rotulo="Quando se paga"
+                   dica="muda quais meses a cobrança cobre">
+              <Selecao value={f.cobranca_no_fim ? "fim" : "inicio"}
+                       onChange={(e: any) => setF({ ...f, cobranca_no_fim: e.target.value === "fim" })}>
+                <option value="inicio">no início do período (adiantado)</option>
+                <option value="fim">no fim do período (após o serviço)</option>
+              </Selecao>
+            </Campo>
             <Campo rotulo="Cobrar a cada"
                    dica="em meses · vazio segue o combinado da família">
               <Selecao value={String(f.meses_entre_cobrancas ?? "")}
@@ -739,7 +752,10 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
             valor mensal <b>multiplicado pelos meses do período</b>. Quem pagou quatro
             meses adiantados põe a próxima cobrança no mês certo e <b>cobrar a cada 4
             meses</b> — as limpezas começam antes disso, pelo <b>início dos
-            agendamentos</b>. As limpezas são a <b>entrega</b> e não mexem no saldo:
+            agendamentos</b>. Cada mês do período vira <b>uma linha</b> no extrato, todas
+            vencendo na mesma data: assim a receita fica no mês em que o serviço foi
+            prestado, e não empilhada no mês do pagamento. As limpezas são a
+            <b>entrega</b> e não mexem no saldo:
             uma adiada não baixa o mês, uma anotada em atraso não vira dívida
             retroativa.
           </p>

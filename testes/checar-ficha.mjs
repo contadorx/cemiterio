@@ -1,11 +1,14 @@
 // Prova que a ficha LIGA cada edicao a uma rota que aceita o campo.
 // Compilar nao prova isso: o cartao "Dados da familia" compilava e editava a
 // pessoa, e as rotas PATCH/DELETE de contato compilavam sem tela nenhuma.
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 const ficha = readFileSync("src/app/painel/clientes/[id]/page.tsx", "utf8");
 const rotaFam = readFileSync("src/app/api/familias/[id]/route.ts", "utf8");
 const rotaCont = readFileSync("src/app/api/familias/[id]/contatos/route.ts", "utf8");
 const rotaCli = readFileSync("src/app/api/clientes/[id]/route.ts", "utf8");
+const rotaConv = readFileSync("src/app/api/conversas/route.ts", "utf8");
+const telaConv = readFileSync("src/app/painel/conversas/VisaoConversas.tsx", "utf8");
+const telaConvIndex = readFileSync("src/app/painel/conversas/page.tsx", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -82,5 +85,30 @@ ok("o cartao da familia e RENDERIZADO", /<DadosDaFamilia fam=/.test(ficha));
 ok("os jazigos vem por FAMILIA", /from\("tumulos"\)[\s\S]{0,400}\.eq\("familia_id", chaveFam\)/.test(rotaCli));
 ok("e nao ha mais busca de tumulos por cliente_id na ficha",
    !/from\("tumulos"\)[\s\S]{0,400}\.eq\("cliente_id", id\)/.test(rotaCli));
+
+
+
+// ---------------------------------------------------------------------------
+// A SEGUNDA PORTA DA IA FICA FECHADA
+//
+// Os rascunhos da IA tinham LISTA PROPRIA — uma aba "Fila antiga" com textos
+// soltos, sem a pergunta que os originou. Foi por ela que 162 rascunhos se
+// acumularam sem ninguem ver. A 0094 fechou a segunda porta das mensagens e
+// deixou esta aberta.
+//
+// A sugestao agora mora DENTRO da conversa. Se alguem recriar a lista solta, o
+// problema volta inteiro — e volta silencioso, que e o pior jeito.
+ok("a lista solta de rascunhos da IA nao existe mais",
+   !existsSync("src/app/painel/conversas/VisaoRascunhos.tsx")
+   && !/VisaoRascunhos/.test(telaConvIndex));
+
+ok("e a aba 'Fila antiga' saiu das abas",
+   !/\["antiga"/.test(telaConvIndex));
+
+ok("a conversa CARREGA a sugestao da IA, nao so o aviso de que existe",
+   /motivo_retencao/.test(rotaConv) && /sugestao: sugestaoDe\.get/.test(rotaConv));
+
+ok("e a tela MOSTRA o texto e o motivo",
+   /c\.sugestao/.test(telaConv) && /segurou porque/.test(telaConv));
 
 process.exit(falhas ? 1 : 0);
