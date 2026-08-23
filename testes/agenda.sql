@@ -206,3 +206,93 @@ select set_config('request.jwt.claim.sub','f0f0f0f0-0000-0000-0000-000000000009'
 select ci9('a agenda desta organizacao continua intacta',
   (select count(*)::text from servicos
     where org_id = 'aaaaaaaa-0000-0000-0000-000000000009' and data_prevista = current_date - 7), '5');
+
+-- ============================================================================
+-- 6 · A ULTIMA LAVAGEM DO JAZIGO (0093)
+--
+-- E o jazigo que ficava orfao depois de salvo: SEIS em producao em 23/08, todos
+-- na Quadra 4, entre eles o "Americo damo" ligado a familia DAMO 2. A causa era
+-- o codigo perguntar `cliente_id is null` para saber se o jazigo tinha familia
+-- — e `cliente_id` e o CONTATO, nulo justamente nas familias que ainda nao tem
+-- com quem falar.
+-- ============================================================================
+select set_config('request.jwt.claim.sub','f0f0f0f0-0000-0000-0000-000000000009', false);
+
+-- Uma familia SEM contato nenhum, e um jazigo dela. E exatamente o caso DAMO 2.
+insert into familias (id, org_id, nome, modo_cobranca)
+  values ('bbbbbbbb-0000-0000-0000-000000000092','aaaaaaaa-0000-0000-0000-000000000009',
+          'DAMO 2','consumo') on conflict (id) do nothing;
+insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo, valor_lavagem)
+  values ('ffffffff-0000-0000-0000-000000000093','aaaaaaaa-0000-0000-0000-000000000009',
+          'eeeeeeee-0000-0000-0000-000000000009','bbbbbbbb-0000-0000-0000-000000000092',
+          'Americo damo','Q4-T6-010', 40) on conflict (id) do nothing;
+
+select ci9b('o jazigo tem familia e NAO tem contato — o caso DAMO 2',
+  (select familia_id is not null and cliente_id is null from tumulos
+    where id = 'ffffffff-0000-0000-0000-000000000093'),
+  'o cenario nao montou: sem ele o teste abaixo nao prova nada');
+
+-- ESTE e o teste do defeito. A pergunta velha (`cliente_id is null`) traria
+-- este jazigo; a certa nao traz.
+select ci9('a pergunta velha (por contato) acusaria o jazigo como orfao',
+  (select count(*)::text from tumulos
+    where id = 'ffffffff-0000-0000-0000-000000000093' and cliente_id is null), '1');
+
+select ci9('a view NAO o traz como sem familia — era isso que nao saia da tela',
+  (select count(*)::text from sureya_jazigos_sem_familia
+    where id = 'ffffffff-0000-0000-0000-000000000093'), '0');
+
+-- ---------------------------------------------------------------------------
+-- A ultima lavagem: a mais recente, e nao a primeira que aparecer
+-- ---------------------------------------------------------------------------
+insert into servicos (id, org_id, tumulo_id, status, data_prevista, data_executada,
+                      iniciado_em, foto_depois_url, valor)
+values
+  ('99999999-0000-0000-0000-000000000091','aaaaaaaa-0000-0000-0000-000000000009',
+   'ffffffff-0000-0000-0000-000000000093','executado', current_date - 30,
+   now() - interval '30 days', null, null, 40),
+  ('99999999-0000-0000-0000-000000000092','aaaaaaaa-0000-0000-0000-000000000009',
+   'ffffffff-0000-0000-0000-000000000093','executado', current_date - 10,
+   now() - interval '10 days', now() - interval '10 days', 'https://exemplo/d.jpg', 40);
+
+select ci9('a ultima lavagem e uma so por jazigo',
+  (select count(*)::text from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000093'), '1');
+
+select ci9b('e e a MAIS RECENTE',
+  (select servico_id = '99999999-0000-0000-0000-000000000092'
+     from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000093'),
+  'pegou a lavagem antiga em vez da recente');
+
+select ci9b('a que passou pelo botao Comecar aparece como de campo',
+  (select no_campo from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000093'),
+  'a lavagem tem iniciado_em e nao foi marcada como de campo');
+
+-- ---------------------------------------------------------------------------
+-- ESTORNO NAO CONTA
+--
+-- Uma lavagem estornada foi anulada e o valor voltou como credito. Continuar
+-- dizendo que o jazigo foi lavado naquele dia e afirmar o que a propria casa ja
+-- disse que nao aconteceu — e faria a agenda pular uma lavagem devida.
+-- ---------------------------------------------------------------------------
+update servicos set estornado_em = now(), motivo_estorno = 'lancada no jazigo errado'
+ where id = '99999999-0000-0000-0000-000000000092';
+
+select ci9b('estornada deixa de ser a ultima, e a anterior assume',
+  (select servico_id = '99999999-0000-0000-0000-000000000091'
+     from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000093'),
+  'a lavagem estornada continua contando como a ultima');
+
+select ci9b('a anotada pelo painel NAO se apresenta como de campo',
+  (select no_campo = false from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000093'),
+  'lavagem sem iniciado_em apareceu como registrada no campo');
+
+-- Jazigo nunca lavado simplesmente nao aparece — a tela diz "sem lavagem
+-- registrada" em vez de inventar uma data.
+select ci9('jazigo nunca lavado nao aparece na view',
+  (select count(*)::text from sureya_ultima_lavagem_jazigo
+    where tumulo_id = 'ffffffff-0000-0000-0000-000000000091'), '0');

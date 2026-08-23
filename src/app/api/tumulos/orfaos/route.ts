@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/tumulos/orfaos — a fila do "vincular em lote".
  *
- * O que a equipe captura no campo entra SEM família (cliente_id null). O
+ * O que a equipe captura no campo entra SEM família (familia_id null — e NÃO
+ * cliente_id, que desde a 0091 é só o contato derivado da família). O
  * /api/tumulos já devolvia esses órfãos, mas só id/identificação/rua/quadra —
  * sem foto e sem GPS não dá para reconhecer o jazigo na mesa, e reconhecer é
  * justamente o trabalho de quem vincula. Aqui vem tudo o que a captura gravou.

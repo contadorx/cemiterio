@@ -59,6 +59,26 @@ export async function GET(req: NextRequest) {
 
   const diaDe = (iso: string) => new Date(iso + "T12:00:00Z").getTime();
 
+  // ---------------------------------------------------------------------
+  // QUANDO ESTE JAZIGO FOI LAVADO PELA ÚLTIMA VEZ (0093)
+  //
+  // É a pergunta que decide se uma lavagem marcada ainda faz sentido. Sem
+  // ela, a agenda diz "lavar o Perrela na terça" e não diz que o Perrela foi
+  // lavado na sexta — e quem monta o dia não tem como pular nada com
+  // segurança.
+  //
+  // A view já desconta as estornadas e já diz se a lavagem passou pelo botão
+  // "Começar" do aplicativo de campo.
+  // ---------------------------------------------------------------------
+  const idsJazigo = [...new Set((data || []).map((s: any) => s.tumulo_id).filter(Boolean))];
+  const { data: lavagens } = idsJazigo.length
+    ? await db
+        .from("sureya_ultima_lavagem_jazigo")
+        .select("tumulo_id,dia,executora,no_campo")
+        .in("tumulo_id", idsJazigo)
+    : { data: [] as any[] };
+  const ultimaDe = new Map(((lavagens as any[]) || []).map((l) => [l.tumulo_id, l]));
+
   const porDia: Record<string, any[]> = {};
   for (const s of data || []) {
     const d = (s as any).data_prevista;
@@ -86,6 +106,18 @@ export async function GET(req: NextRequest) {
       atrasoDias: plano && plano < d
         ? Math.round((diaDe(d) - diaDe(plano)) / 86_400_000)
         : 0,
+      // A última lavagem DESTE jazigo — nula quando nunca foi lavado.
+      ultimaLavagem: (() => {
+        const u = ultimaDe.get((s as any).tumulo_id);
+        if (!u) return null;
+        return {
+          dia: u.dia,
+          executora: u.executora || null,
+          noCampo: !!u.no_campo,
+          // dias entre a última lavagem e o dia em que esta está marcada
+          diasAte: Math.round((diaDe(d) - diaDe(u.dia)) / 86_400_000),
+        };
+      })(),
       estornadoEm: (s as any).estornado_em || null,
       motivoEstorno: (s as any).motivo_estorno || null,
       // marcado à mão: o alocador automático não mexe nele (0041)

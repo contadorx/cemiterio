@@ -527,3 +527,71 @@ o resto atrás de "mais".
 **O estorno foi ligado.** A rota `/api/servico/[id]/estornar` existia e **nenhuma
 tela a chamava** — a função estava escrita na página, completa, e nunca foi
 ligada a um botão. Uma lavagem registrada por engano só se desfazia no banco.
+
+---
+
+## D-15 · O jazigo salvo que continuava órfão — e a última lavagem
+
+**O que você viu:** salvava a família no jazigo, ele continuava aparecendo como
+sem família. DAMO 2 era o exemplo.
+
+**O que estava no banco.** O jazigo *Américo damo* (Q4-T6-010) estava
+corretamente ligado à família **DAMO 2**. O `familia_id` estava lá. **O salvamento
+sempre funcionou — a pergunta é que estava errada.**
+
+Três telas perguntavam `cliente_id is null` para saber se o jazigo tinha família.
+Desde a **D-10 / 0091**, `cliente_id` é o **contato**, derivado da família — e ele
+é nulo justamente nas famílias que ainda não têm com quem falar, que são a razão
+de a 0091 existir. O jazigo ficava preso na lista de órfãos para sempre.
+
+Eram **6 jazigos** nesse estado em 23/08, todos na Quadra 4:
+
+| jazigo | família |
+|---|---|
+| Generoso (Q4-R10-003) | GENEROSO MARGARIDA |
+| Indefinido-RRua 10 (Q4-R10-007) | MARIA CATADORA |
+| Bueno camargo (Q4-R11-004) | BUENO CAMARGO |
+| Harles (Q4-R13-001) | BRANCO MAGRICELA |
+| figueiredo (Q4-R13-002) | FIGUEIREDO |
+| Américo damo (Q4-T6-010) | **DAMO 2** |
+
+**Nenhum dado precisou ser corrigido.** Os seis somem da lista assim que o
+código subir. Os três lugares: a lista de "vincular jazigo do campo"
+(`/api/tumulos`), o filtro **Sem família** da tela de jazigos (`/api/jazigos`) e o
+mapa (`/api/localizacao`), que dizia "sem família vinculada" olhando o nome do
+contato.
+
+A view `sureya_jazigos_sem_familia`, criada na 0091, já fazia a pergunta certa e
+**não era usada por ninguém**. Passa a ser: a definição de "sem família" existe
+uma vez só.
+
+### A última lavagem
+
+Não havia resposta em tela nenhuma para "quando este jazigo foi lavado pela
+última vez?". `tumulos.ultima_lavagem_informada` é **outra coisa**: é o que a
+família disse no cadastro, não o que a equipe fez — e por isso ficou em outro
+campo, dizendo que foi ela quem informou.
+
+**Uma view, não um campo** (`sureya_ultima_lavagem_jazigo`, 0093). Um campo em
+`tumulos` teria de ser mantido em toda conclusão, todo estorno e toda mudança de
+data — três lugares para esquecer, e um número errado na tela é pior do que
+número nenhum.
+
+**Estorno não conta.** Uma lavagem estornada foi anulada e o valor voltou como
+crédito para a família. Continuar dizendo que o jazigo foi lavado naquele dia é
+afirmar o que a própria casa já disse que não aconteceu — e faria a agenda pular
+uma lavagem devida.
+
+**"Registrada no campo" é um fato, não um enfeite.** Não existe coluna de origem,
+mas existe `iniciado_em`, que só é carimbado pelo botão **Começar** do aplicativo
+de campo (0068). Lavagem anotada pelo painel nasce executada, sem início. As duas
+valem; só uma delas tem hora, foto e quem fez, e a tela diz qual é qual.
+
+**O dia é o de São Paulo.** `data_executada` é `timestamptz`: uma lavagem
+concluída às 21h30 de Brasília é 00h30 do dia seguinte em UTC, e a tela mostraria
+a lavagem de ontem com a data de hoje — o mesmo erro que já custou a lista vazia
+do aplicativo de campo.
+
+Na agenda, a linha se acende quando a última lavagem está a **7 dias ou menos**
+da que está marcada. Não é erro — pode ser um pedido da família —, é a pergunta
+que alguém precisa fazer antes de a equipe andar até lá.

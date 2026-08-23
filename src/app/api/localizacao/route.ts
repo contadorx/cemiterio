@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
   const { data: tums, error } = await db
     .from("tumulos")
     .select(
-      "id,identificacao,numero,rua,lat,lng,gps_precisao,cliente_id," +
-      "quadras(codigo,ordem,cemiterios(nome)),clientes(nome)," +
+      "id,identificacao,numero,rua,lat,lng,gps_precisao,cliente_id,familia_id," +
+      "quadras(codigo,ordem,cemiterios(nome)),clientes(nome),familias(nome)," +
       "planos(proxima_cobranca,proximo_servico,valor_mensal,valor_vigente,cadencia,ativo)",
     )
     .order("identificacao", { ascending: true })
@@ -80,6 +80,12 @@ export async function GET(req: NextRequest) {
       cemiterio: t.quadras?.cemiterios?.nome || "sem cemitério",
       cliente: t.clientes?.nome || null,
       clienteId: t.cliente_id || null,
+      // A FAMÍLIA é o vínculo desde a 0091; o contato é derivado dela e pode
+      // não existir. O mapa dizia "sem família vinculada" olhando o CONTATO —
+      // então todo jazigo de família sem telefone aparecia como órfão, por
+      // mais vezes que fosse salvo. Mesmo defeito da lista de órfãos.
+      familia: t.familias?.nome || null,
+      familiaId: t.familia_id || null,
       lat: t.lat ?? null,
       lng: t.lng ?? null,
       precisao: t.gps_precisao ?? null,
@@ -95,7 +101,9 @@ export async function GET(req: NextRequest) {
   });
 
   if (!incluirTeste) {
-    jazigos = jazigos.filter((j) => !String(j.cliente || "").startsWith("[TESTE]"));
+    jazigos = jazigos.filter(
+      (j) => !String(j.familia || j.cliente || "").startsWith("[TESTE]"),
+    );
   }
 
   return NextResponse.json({

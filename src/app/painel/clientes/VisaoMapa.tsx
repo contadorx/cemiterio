@@ -37,6 +37,8 @@ type Jazigo = {
   id: string; identificacao: string; rua: string | null; numero: string | null;
   quadra: string; quadraOrdem: number; cemiterio: string;
   cliente: string | null; clienteId: string | null;
+  /** O vínculo de verdade desde a 0091; `cliente` é o contato derivado dela. */
+  familia?: string | null; familiaId?: string | null;
   lat: number | null; lng: number | null; precisao: number | null;
   status: string; proximaCobranca: string | null; proximoServico: string | null;
   valorMensal: number | null; cadencia: string | null; temPlano: boolean;
@@ -933,7 +935,12 @@ function Detalhe({ j, onFechar, onMudou }: { j: Jazigo; onFechar: () => void; on
           <strong style={{ color: cor.navy, fontSize: 17 }}>{j.identificacao || "sem identificação"}</strong>
           <div style={{ color: cor.cinza, fontSize: 14 }}>{local || "sem local"}</div>
           <div style={{ marginTop: 6, fontSize: 15 }}>
-            {j.cliente ? <b>{j.cliente}</b> : <span style={{ color: "rgb(var(--zm-aviso))" }}>sem família vinculada</span>}
+            {/* Quem decide se há família é `familiaId`, não o nome do
+                contato: família sem contato é estado legítimo (0091), e
+                olhar o contato marcava como órfão um jazigo já vinculado. */}
+            {j.familiaId || j.clienteId
+              ? <b>{j.familia || j.cliente}</b>
+              : <span style={{ color: "rgb(var(--zm-aviso))" }}>sem família vinculada</span>}
           </div>
         </div>
         <button style={painel.botaoMiniSec} onClick={onFechar}>fechar</button>

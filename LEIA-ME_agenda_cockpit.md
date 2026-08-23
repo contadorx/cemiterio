@@ -119,10 +119,59 @@ foi ligada a um botão. Uma lavagem registrada por engano só se desfazia no ban
 
 ---
 
+## 6b. O jazigo salvo que continuava órfão (DAMO 2)
+
+**Nada de errado com o seu cadastro.** O jazigo *Américo damo* (Q4-T6-010) está
+ligado à família **DAMO 2** no banco desde que você salvou. O que estava errado
+era a **pergunta**: três telas checavam `cliente_id is null` para saber se o
+jazigo tinha família, e desde a 0091 `cliente_id` é o **contato** — nulo
+justamente nas famílias que ainda não têm com quem falar.
+
+São **6 jazigos** nesse estado, todos na Quadra 4:
+
+| jazigo | família |
+|---|---|
+| Generoso (Q4-R10-003) | GENEROSO MARGARIDA |
+| Indefinido-RRua 10 (Q4-R10-007) | MARIA CATADORA |
+| Bueno camargo (Q4-R11-004) | BUENO CAMARGO |
+| Harles (Q4-R13-001) | BRANCO MAGRICELA |
+| figueiredo (Q4-R13-002) | FIGUEIREDO |
+| Américo damo (Q4-T6-010) | **DAMO 2** |
+
+**Não precisa refazer nada.** Os seis somem da lista assim que o código subir.
+
+Corrigido em três lugares: a lista "vincular jazigo do campo", o filtro **Sem
+família** da tela de jazigos, e o mapa — que dizia "sem família vinculada"
+olhando o nome do contato.
+
+---
+
+## 6c. Última lavagem registrada no campo
+
+No **card do jazigo** e em **cada linha da agenda**:
+
+```
+Última lavagem 22/08/2026 · há 1 dia · registrada no campo · Campo Teste · ver a foto
+```
+
+- **"registrada no campo"** quando passou pelo botão *Começar* do aplicativo —
+  tem hora, foto e quem fez. **"anotada pelo painel"** quando foi registrada
+  depois. As duas valem; só uma tem prova, e a tela diz qual é qual.
+- **Lavagem estornada não conta** como a última: ela foi anulada e o valor voltou
+  como crédito. A anterior assume.
+- Jazigo nunca lavado por nós mostra o que **a família informou** no cadastro,
+  dizendo que foi ela quem informou.
+- Na agenda, a linha **se acende** quando a última lavagem está a 7 dias ou menos
+  da que está marcada — não é erro, é a pergunta a fazer antes de a equipe andar
+  até lá.
+
+---
+
 ## 7. O que subir
 
-**No Supabase (já aplicado):**
+**No Supabase (os dois já aplicados):**
 `migrations/0092_a_agenda_fora_do_lugar_tem_uma_definicao.sql`
+`migrations/0093_a_ultima_lavagem_do_jazigo.sql`
 
 **No código:**
 
@@ -133,7 +182,12 @@ foi ligada a um botão. Uma lavagem registrada por engano só se desfazia no ban
 | `src/app/api/agenda/reorganizar/route.ts` | pergunta ao banco em vez de decidir sozinha |
 | `src/app/painel/agenda/page.tsx` | a tela inteira |
 | `src/app/painel/contatos/page.tsx` | **sem os marcadores de conflito** que quebraram o build |
-| `testes/agenda.sql` | 16 provas novas |
+| `src/app/api/jazigos/route.ts` | filtro "sem família" pela família; última lavagem |
+| `src/app/api/tumulos/route.ts` | lista de órfãos pela view; família no cartão de duplicata |
+| `src/app/api/localizacao/route.ts` | o mapa passa a conhecer a família |
+| `src/app/painel/jazigos/page.tsx` | última lavagem no card |
+| `src/app/painel/clientes/VisaoMapa.tsx` | "sem família" pela família |
+| `testes/agenda.sql` | 25 provas novas |
 | `testes/simular.ts` | 5 provas novas |
 
 ---

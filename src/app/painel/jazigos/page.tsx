@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import BuscaSelect from "../BuscaSelect";
+import { diasDesde, faz } from "@/lib/datas";
 
 /**
  * /painel/jazigos — a tela de correção em lote.
@@ -46,6 +47,20 @@ interface Jazigo {
   fotoLonge: string | null;
   criadoEm: string;
   alteradoEm: string | null;
+  /**
+   * A ÚLTIMA LAVAGEM DE VERDADE (0093) — a executada mais recente, já sem as
+   * estornadas. Nula quando o jazigo nunca foi lavado por nós.
+   */
+  ultimaLavagem: {
+    dia: string;
+    executora: string | null;
+    /** passou pelo botão "Começar" do aplicativo de campo */
+    noCampo: boolean;
+    foto: string | null;
+    minutos: number | null;
+  } | null;
+  /** O que a FAMÍLIA informou no cadastro. Outra coisa, e por isso outro campo. */
+  lavagemInformada: string | null;
   suspeito: boolean;
   motivos: string[];
 }
@@ -364,6 +379,48 @@ function Cartao({
                 chega em ninguém. */}
             {j.familiaId && !j.clienteId && (
               <span style={{ color: AMBAR, fontSize: 13 }}>· sem contato</span>
+            )}
+          </div>
+
+          {/* ------------------------------------------- ÚLTIMA LAVAGEM
+              A pergunta que não tinha resposta em tela nenhuma. Fica logo
+              abaixo do nome porque é o que se quer saber antes de decidir
+              qualquer coisa sobre o jazigo.
+
+              Diz DE ONDE veio: uma lavagem que passou pelo campo tem hora,
+              foto e quem fez; uma anotada depois pelo painel é a palavra de
+              alguém. As duas valem, mas não são a mesma prova.
+
+              Sem nenhuma lavagem nossa, mostra o que a família informou no
+              cadastro — que é a única referência que existe no primeiro ciclo
+              — e diz que foi ela quem informou. */}
+          <div style={{ fontSize: 14, marginTop: 4 }}>
+            {j.ultimaLavagem ? (
+              <span style={{ color: cor.cinza }}>
+                Última lavagem{" "}
+                <b style={{ color: cor.navy }}>
+                  {new Date(j.ultimaLavagem.dia + "T12:00:00").toLocaleDateString("pt-BR")}
+                </b>
+                {(() => {
+                  const d = diasDesde(j.ultimaLavagem!.dia + "T12:00:00");
+                  return d === null ? null : ` · ${faz(d)}`;
+                })()}
+                {j.ultimaLavagem.noCampo
+                  ? <> · <span style={{ color: cor.teal }}>registrada no campo</span></>
+                  : <> · anotada pelo painel</>}
+                {j.ultimaLavagem.executora ? ` · ${j.ultimaLavagem.executora}` : ""}
+                {j.ultimaLavagem.foto && (
+                  <> · <a href={j.ultimaLavagem.foto} target="_blank" rel="noreferrer"
+                          style={{ color: cor.teal }}>ver a foto</a></>
+                )}
+              </span>
+            ) : j.lavagemInformada ? (
+              <span style={{ color: cor.cinza }}>
+                Nunca lavado por nós — a família informou{" "}
+                <b>{new Date(j.lavagemInformada + "T12:00:00").toLocaleDateString("pt-BR")}</b>
+              </span>
+            ) : (
+              <span style={{ color: cor.cinza }}>Sem lavagem registrada</span>
             )}
           </div>
 

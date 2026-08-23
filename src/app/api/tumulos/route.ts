@@ -31,25 +31,51 @@ export async function GET() {
   }));
 
   // jazigos ainda SEM família (ex.: capturados no campo) — para vincular no cadastro
+  //
+  // ⚠ O DEFEITO QUE ESTAVA AQUI, e como ele aparecia
+  //
+  // A pergunta era `.is("cliente_id", null)`. Desde a 0091 `cliente_id` é o
+  // CONTATO, derivado da família — e ele é nulo justamente nas famílias que
+  // ainda não têm com quem falar, que são a razão de a 0091 existir.
+  //
+  // Resultado: um jazigo vinculado a uma família SEM contato continuava nesta
+  // lista para sempre. Salvava, recarregava, continuava lá. Medido em produção
+  // em 23/08: SEIS jazigos nesse estado, todos na Quadra 4 — entre eles o
+  // "Américo damo" (Q4-T6-010), ligado à família DAMO 2. O cadastro estava
+  // certo; a pergunta é que estava errada.
+  //
+  // Agora vem da view `sureya_jazigos_sem_familia` (0091), que já fazia a
+  // pergunta certa e não era usada por ninguém. A definição de "sem família"
+  // passa a existir uma vez só.
+  //
   // A FOTO VAI JUNTO.
   //
   // São dezenas de jazigos capturados no campo, quase todos sem nome na pedra.
   // Distinguir "Quadra 1 · Rua 2" de outro "Quadra 1 · Rua 2" por texto é
-  // impossível — a foto é o que a Sureya realmente reconhece.
+  // impossível — a foto é o que a Sureya realmente reconhece. A view não a
+  // carrega, então ela vem numa segunda busca, pelos ids.
   const { data: orfaos } = await db
-    .from("tumulos")
-    .select("id,identificacao,codigo,rua,falecido_nome,foto_referencia_url,ruas(nome),quadras(codigo)")
-    .is("cliente_id", null)
+    .from("sureya_jazigos_sem_familia")
+    .select("id,identificacao,codigo,rua,quadra,falecido_nome")
     .order("codigo")
     .limit(500);
-  const semDono = (orfaos || []).map((t: any) => ({
+
+  const idsOrfaos = ((orfaos as any[]) || []).map((t) => t.id);
+  const { data: fotos } = idsOrfaos.length
+    ? await db.from("tumulos").select("id,foto_referencia_url").in("id", idsOrfaos)
+    : { data: [] as any[] };
+  const fotoDe = new Map(
+    ((fotos as any[]) || []).map((t) => [t.id, t.foto_referencia_url || null]),
+  );
+
+  const semDono = ((orfaos as any[]) || []).map((t: any) => ({
     id: t.id,
     identificacao: t.identificacao,
     codigo: t.codigo || null,
-    rua: t.ruas?.nome || t.rua || null,
-    quadra: t.quadras?.codigo || null,
+    rua: t.rua || null,
+    quadra: t.quadra || null,
     falecido: t.falecido_nome || null,
-    foto: t.foto_referencia_url || null,
+    foto: fotoDe.get(t.id) || null,
   }));
 
   return NextResponse.json({ ok: true, cemiterios, semDono });
@@ -205,7 +231,7 @@ export async function POST(req: NextRequest) {
   if (existente && !b?.confirmarExistente && !b?.forcarNovo) {
     const { data: ficha } = await db
       .from("tumulos")
-      .select("id,identificacao,falecido_nome,observacoes,foto_referencia_url,foto_enquadramento_url,lat,created_at,clientes(nome)")
+      .select("id,identificacao,falecido_nome,observacoes,foto_referencia_url,foto_enquadramento_url,lat,created_at,familias(nome),clientes(nome)")
       .eq("id", existente.id)
       .maybeSingle();
     const f = (ficha || existente) as any;
@@ -221,7 +247,10 @@ export async function POST(req: NextRequest) {
         fotoLapide: f.foto_referencia_url || null,
         fotoLonge: f.foto_enquadramento_url || null,
         temGps: f.lat != null,
-        familia: f.clientes?.nome || null,
+        // A FAMÍLIA, não o contato. O contato fica de reserva para o cadastro
+        // antigo que ainda não tem família — mas quem está olhando a lápide
+        // decide por "de quem é este jazigo", e isso é a família.
+        familia: f.familias?.nome || f.clientes?.nome || null,
         criadoEm: f.created_at || null,
       },
       // numero livre para o caso de ser outro tumulo

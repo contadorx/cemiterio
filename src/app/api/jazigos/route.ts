@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 const BASE =
   "id,identificacao,quadra_id,cliente_id,familia_id,falecido_nome,observacoes,lat,lng,foto_referencia_url,created_at,updated_at";
 // colunas que nasceram depois (0013/0017/0026) — se faltarem, a tela funciona sem
-const EXTRAS = ",rua,numero,gps_precisao,gps_amostras,gps_atualizado_em,foto_enquadramento_url";
+const EXTRAS = ",rua,numero,gps_precisao,gps_amostras,gps_atualizado_em,foto_enquadramento_url,ultima_lavagem_informada";
 
 export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
@@ -66,6 +66,29 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
   const linhas = (data as any[]) || [];
+
+  // ---------------------------------------------------------------------
+  // A ÚLTIMA LAVAGEM DE CADA JAZIGO (0093)
+  //
+  // "Quando este jazigo foi lavado pela última vez?" não tinha resposta em
+  // tela nenhuma. `tumulos.ultima_lavagem_informada` é outra coisa: é o que a
+  // FAMÍLIA disse no cadastro, não o que a equipe fez.
+  //
+  // Vem da view, que já desconta as estornadas — uma lavagem anulada não pode
+  // continuar contando como a última — e já diz se passou pelo botão
+  // "Começar" do aplicativo de campo.
+  //
+  // Uma busca só, pelos ids da página: por jazigo seriam 800 idas ao banco
+  // para montar uma lista.
+  // ---------------------------------------------------------------------
+  const ids = linhas.map((t) => t.id);
+  const { data: lavagens } = ids.length
+    ? await db
+        .from("sureya_ultima_lavagem_jazigo")
+        .select("tumulo_id,dia,executora,no_campo,foto_depois_url,duracao_minutos")
+        .in("tumulo_id", ids)
+    : { data: [] as any[] };
+  const ultimaDe = new Map(((lavagens as any[]) || []).map((l) => [l.tumulo_id, l]));
 
   // Quantas vezes cada identificação aparece — número repetido é o gatilho da
   // fusão. A chave inclui o CEMITÉRIO (0044): contar sobre a lista inteira
@@ -134,6 +157,21 @@ export async function GET(req: NextRequest) {
       fotoLonge: t.foto_enquadramento_url || null,
       criadoEm: t.created_at,
       alteradoEm: t.updated_at,
+      // a última lavagem DE VERDADE — nula quando o jazigo nunca foi lavado
+      ultimaLavagem: (() => {
+        const u = ultimaDe.get(t.id);
+        if (!u) return null;
+        return {
+          dia: u.dia,
+          executora: u.executora || null,
+          noCampo: !!u.no_campo,
+          foto: u.foto_depois_url || null,
+          minutos: u.duracao_minutos ?? null,
+        };
+      })(),
+      // o que a FAMÍLIA informou no cadastro — outra coisa, e por isso outro
+      // campo: serve para o primeiro ciclo, quando ainda não lavamos nenhuma vez
+      lavagemInformada: t.ultima_lavagem_informada ?? null,
       suspeito: motivos.length > 0,
       motivos,
     };
@@ -141,7 +179,13 @@ export async function GET(req: NextRequest) {
 
   const filtrados = jazigos.filter((j) => {
     if (filtro === "suspeitos" && !j.suspeito) return false;
-    if (filtro === "semdono" && j.clienteId) return false;
+    // "SEM DONO" É SEM FAMÍLIA, e não sem contato.
+    //
+    // Era `j.clienteId`. Desde a 0091 o contato é derivado da família e é nulo
+    // nas famílias que ainda não têm com quem falar — então um jazigo já
+    // vinculado continuava caindo neste filtro por mais vezes que fosse salvo.
+    // Seis jazigos assim em produção em 23/08, todos na Quadra 4.
+    if (filtro === "semdono" && j.familiaId) return false;
     if (filtro === "semfoto" && (j.fotoLapide || j.fotoLonge)) return false;
     if (filtro === "semgps" && j.lat !== null) return false;
     if (!busca) return true;

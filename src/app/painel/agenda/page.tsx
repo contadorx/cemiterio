@@ -47,6 +47,18 @@ interface Item {
   executoraId?: string | null;
   estornadoEm?: string | null;
   motivoEstorno?: string | null;
+  /**
+   * A ÚLTIMA LAVAGEM DESTE JAZIGO (0093) — a executada mais recente, já sem as
+   * estornadas. É o que decide se a lavagem marcada ainda faz sentido.
+   */
+  ultimaLavagem: {
+    dia: string;
+    executora: string | null;
+    /** passou pelo botão "Começar" do aplicativo de campo */
+    noCampo: boolean;
+    /** dias entre a última lavagem e o dia em que esta está marcada */
+    diasAte: number;
+  } | null;
 }
 
 interface Saude {
@@ -799,6 +811,36 @@ export default function AgendaPage() {
                         {s.valor ? ` · ${dinheiro(Number(s.valor))}` : ""}
                         {" · "}
                         <span style={{ color: statusCor[s.status] || cor.cinza }}>{s.status}</span>
+                      </div>
+
+                      {/* ------------------------------------ ÚLTIMA LAVAGEM
+                          Sem esta linha a agenda diz "lavar o Perrela na
+                          terça" e não diz que o Perrela foi lavado na sexta —
+                          e quem monta o dia não tem como pular nada com
+                          segurança.
+
+                          `diasAte` é a distância entre a última lavagem e o
+                          dia marcado. Quando ela é curta, a linha se acende:
+                          não é erro (pode ser um pedido da família), é a
+                          pergunta que alguém precisa fazer antes de a equipe
+                          andar até lá. */}
+                      <div style={{ fontSize: 14, marginTop: 2,
+                                    color: s.ultimaLavagem && s.ultimaLavagem.diasAte <= 7
+                                      ? "rgb(var(--zm-aviso))" : cor.cinza }}>
+                        {s.ultimaLavagem ? (
+                          <>
+                            Última lavagem{" "}
+                            {new Date(s.ultimaLavagem.dia + "T12:00:00").toLocaleDateString("pt-BR")}
+                            {" · "}
+                            {s.ultimaLavagem.diasAte === 0
+                              ? "no mesmo dia"
+                              : `${s.ultimaLavagem.diasAte} dia(s) antes desta`}
+                            {s.ultimaLavagem.noCampo ? " · registrada no campo" : " · anotada pelo painel"}
+                            {s.ultimaLavagem.executora ? ` · ${s.ultimaLavagem.executora}` : ""}
+                          </>
+                        ) : (
+                          "Primeira lavagem deste jazigo"
+                        )}
                       </div>
 
                       {s.estornadoEm && (
