@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     .select(
       "id,tipo,status,texto,fotos,criado_em,servico_id,familia_id,tumulo_id," +
         "tentativas,ultimo_erro,ultimo_erro_em,erro_tipo,fotos_enviadas," +
+        "adiada_para,adiada_em,motivo_adiamento," +
         "familias(nome,silenciar),clientes(nome,telefone)," +
         "tumulos(codigo,identificacao,ruas(nome),quadras(codigo))," +
         "servicos(foto_antes_url,foto_depois_url,data_executada)"
@@ -55,6 +56,21 @@ export async function GET(req: NextRequest) {
     .eq("org_id", org)
     .eq("status", "aguardando");
   if (tipoFiltro) consulta = consulta.eq("tipo", tipoFiltro);
+
+  // O QUE FOI ADIADO SOME ATÉ O DIA (0124).
+  //
+  // A família combinou uma data; deixar a mensagem na lista até lá obrigaria a
+  // Sureya a lembrar de cabeça, todo dia, que aquela linha já foi acertada — e
+  // a fila existe justamente para ela não ter de lembrar de nada.
+  //
+  // `?adiadas=1` mostra só as guardadas, para ela conferir os combinados sem
+  // ter de confiar na memória. É o mesmo dado, com a lente invertida.
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (req.nextUrl.searchParams.get("adiadas") === "1") {
+    consulta = consulta.gt("adiada_para", hoje);
+  } else {
+    consulta = consulta.or(`adiada_para.is.null,adiada_para.lte.${hoje}`);
+  }
 
   const { data, error } = await consulta
     .order("criado_em", { ascending: true })
@@ -66,7 +82,18 @@ export async function GET(req: NextRequest) {
   // números das abas sumiriam assim que uma aba fosse escolhida.
   const { data: todosTipos } = await db
     .from("fila_liberacao").select("tipo")
-    .eq("org_id", org).eq("status", "aguardando").limit(2000);
+    .eq("org_id", org).eq("status", "aguardando")
+    // A ABA NÃO PODE PROMETER O QUE A LISTA NÃO MOSTRA. Contar as adiadas aqui
+    // daria "Cobrança (7)" com a lista vazia — o número e a tela discordando
+    // sobre os mesmos fatos, que é o defeito de forma de sempre.
+    .or(`adiada_para.is.null,adiada_para.lte.${hoje}`)
+    .limit(2000);
+
+  // Quantas estão guardadas, para a tela poder dizer "3 combinadas para depois"
+  // em vez de simplesmente não mostrá-las.
+  const { count: nAdiadas } = await db
+    .from("fila_liberacao").select("id", { count: "exact", head: true })
+    .eq("org_id", org).eq("status", "aguardando").gt("adiada_para", hoje);
   const porTipo: Record<string, number> = {};
   for (const r of ((todosTipos as any[]) || [])) {
     porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1;
@@ -170,6 +197,8 @@ export async function GET(req: NextRequest) {
     texto: f.texto,
     fotos,
     criadoEm: f.criado_em,
+    adiadaPara: f.adiada_para || null,
+    motivoAdiamento: f.motivo_adiamento || null,
     // QUANDO A LIMPEZA FOI FEITA — não quando a mensagem entrou na fila. É o
     // que a família vai perguntar, e é o que o roadmap pede ("data/hora").
     executadoEm: f.servicos?.data_executada ?? null,
@@ -245,7 +274,21 @@ export async function GET(req: NextRequest) {
   const disparosAutomaticos = !!(cfg as any)?.disparos_ativos;
 
   return NextResponse.json({ ok: true, itens, whatsapp, diasEntreFotos, porTipo,
-                             disparosAutomaticos, tipo: tipoFiltro || null });
+                             disparosAutomaticos, tipo: tipoFiltro || null,
+                             adiadas: Number(nAdiadas) || 0,
+                             vendoAdiadas: req.nextUrl.searchParams.get("adiadas") === "1" });
+}
+
+/** O erro do banco em português de gente — a Sureya não lê nome de função. */
+function mensagemDoAdiar(bruto: string): string {
+  const t = String(bruto || "");
+  if (t.includes("depois de hoje")) return "Escolha uma data futura.";
+  if (t.includes("nao e adiar, e desistir")) {
+    return "Mais de um ano é muito. Se é para não cobrar mais, mude a régua da família para \"não cobrar\".";
+  }
+  if (t.includes("nao esta mais aguardando")) return "Esta mensagem já saiu da fila.";
+  if (t.includes("mensagem_nao_encontrada")) return "Mensagem não encontrada.";
+  return "Não consegui adiar.";
 }
 
 export async function POST(req: NextRequest) {
@@ -256,8 +299,29 @@ export async function POST(req: NextRequest) {
   // O `id` e conferido ANTES de qualquer acao. Sem isto, `restaurar` sem id
   // viraria um update com `.eq("id", undefined)` — que o PostgREST nao rejeita
   // do jeito que se espera, e o resultado seria uma consulta sem filtro de id.
-  if (!id || !["enviar", "descartar", "restaurar"].includes(acao)) {
+  if (!id || !["enviar", "descartar", "restaurar", "adiar"].includes(acao)) {
     return NextResponse.json({ ok: false, erro: "Ação inválida." }, { status: 400 });
+  }
+
+  // ADIAR (0124) — a família combinou uma data.
+  //
+  // `ate` nulo desadia: a mensagem volta para a lista hoje. O caminho de volta
+  // de quem adiou por engano precisa existir, senão o botão vira armadilha.
+  if (acao === "adiar") {
+    const corpo = await req.clone().json().catch(() => ({} as any));
+    const { data, error } = await db.rpc("sureya_adiar_mensagem", {
+      p_id: id,
+      p_ate: corpo?.ate || null,
+      p_motivo: corpo?.motivo || null,
+      p_org: org,
+    });
+    if (error) {
+      return NextResponse.json(
+        { ok: false, erro: error.message, mensagem: mensagemDoAdiar(error.message) },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ ok: true, ...(data as any) });
   }
 
   // DESFAZER O DESCARTE.

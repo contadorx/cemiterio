@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Send, Trash2, AlertTriangle, Undo2, Shuffle, CheckSquare, Square, StopCircle, XCircle } from "lucide-react";
 import { Cartao, Botao, Selo } from "../pecas";
-import { BellOff, Bell } from "lucide-react";
+import { BellOff, Bell, CalendarClock } from "lucide-react";
 import { diasDesde, faz } from "@/lib/datas";
 
 /**
@@ -109,6 +109,10 @@ interface Item {
   /** Tipos que esta família pediu para não receber. */
   silenciados: string[];
   familiaId: string | null;
+  /** A data combinada com a família. Enquanto for futura, a mensagem some
+   *  da lista — e, se for cobrança, a régua não cria outra (0124). */
+  adiadaPara?: string | null;
+  motivoAdiamento?: string | null;
 }
 
 /** "2026-08-14T09:30:00Z" -> "14/08 às 09:30". Sem depender de locale do device. */
@@ -147,6 +151,9 @@ export default function VisaoLiberacao() {
   /** A chave mestra da casa. Desligada = nada sai sozinho, só pela tela. */
   const [disparosAutomaticos, setDisparosAutomaticos] = useState(true);
   const [porTipo, setPorTipo] = useState<Record<string, number>>({});
+  /** Quantas estão guardadas para depois, e se a lista está mostrando ELAS. */
+  const [adiadas, setAdiadas] = useState(0);
+  const [verAdiadas, setVerAdiadas] = useState(false);
   const [silenciando, setSilenciando] = useState<string | null>(null);
   const [editando, setEditando] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -210,16 +217,17 @@ export default function VisaoLiberacao() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const r = await fetch("/api/fila").then((x) => x.json());
+      const r = await fetch(`/api/fila${verAdiadas ? "?adiadas=1" : ""}`).then((x) => x.json());
       if (r.ok) {
         setItens(r.itens);
         setWhatsapp(r.whatsapp || "");
         setDiasEntreFotos(Number(r.diasEntreFotos) || 0);
         setDisparosAutomaticos(!!r.disparosAutomaticos);
         setPorTipo(r.porTipo || {});
+        setAdiadas(Number(r.adiadas) || 0);
       }
     } finally { setCarregando(false); }
-  }, []);
+  }, [verAdiadas]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -259,6 +267,57 @@ export default function VisaoLiberacao() {
       alert(r.mensagem);
       await carregar();
     } finally { setSilenciando(null); }
+  }
+
+  /**
+   * ADIAR — a família combinou uma data (0124).
+   *
+   * "Pode ser dia 15?" não tinha o que fazer nesta tela. As duas saídas eram
+   * ruins: descartar (e a régua criava outra amanhã, cobrando dois dias depois
+   * de a Sureya ter dito "combinado") ou deixar na fila (e ela ter de lembrar
+   * de cabeça, todo dia, que aquela já estava acertada).
+   *
+   * Adiar uma COBRANÇA segura a família inteira até a data. O silêncio é a
+   * promessa.
+   */
+  async function adiar(item: Item) {
+    const hoje = new Date();
+    const sugestao = new Date(hoje.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+    const ate = prompt(
+      `Adiar para quando?\n\n`
+      + (item.tipo === "cobranca"
+          ? "Até essa data, nenhuma outra cobrança sai para esta família.\n\n"
+          : "")
+      + "Data no formato AAAA-MM-DD:",
+      sugestao,
+    );
+    if (ate === null) return;                       // cancelou
+    const limpo = ate.trim();
+    if (!limpo) return;
+    const motivo = prompt("Combinado o quê? (opcional — fica anotado na mensagem)", "") || null;
+
+    setOcupado(item.id);
+    try {
+      const r = await fetch("/api/fila", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, acao: "adiar", ate: limpo, motivo }),
+      }).then((x) => x.json());
+      if (!r.ok) { alert(r.mensagem || r.erro || "Não consegui adiar."); return; }
+      await carregar();
+    } finally { setOcupado(null); }
+  }
+
+  /** Desadiar — o caminho de volta de quem adiou por engano. */
+  async function desadiar(item: Item) {
+    setOcupado(item.id);
+    try {
+      const r = await fetch("/api/fila", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, acao: "adiar", ate: null }),
+      }).then((x) => x.json());
+      if (!r.ok) { alert(r.mensagem || r.erro || "Não consegui trazer de volta."); return; }
+      await carregar();
+    } finally { setOcupado(null); }
   }
 
   async function decidir(item: Item, acao: "enviar" | "descartar" | "restaurar") {
@@ -449,6 +508,24 @@ export default function VisaoLiberacao() {
 
             Um grupo com (0) informa: "não há cobrança de inadimplente hoje" é
             uma resposta, e some não é. */}
+        {/* AS GUARDADAS PARA DEPOIS (0124).
+            Elas não aparecem na lista até o dia combinado — mas precisam ser
+            ALCANÇÁVEIS, senão "adiar" viraria "sumir", e a Sureya teria de
+            confiar na memória para saber o que combinou com quem. */}
+        {(adiadas > 0 || verAdiadas) && (
+          <button
+            onClick={() => { setVerAdiadas(!verAdiadas); setMarcadas(new Set()); }}
+            title="mensagens com data combinada com a família"
+            className={`rounded-full border px-3 py-1.5 text-[13px] ${
+              verAdiadas
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-card text-ink-soft hover:bg-surface"}`}
+          >
+            <CalendarClock size={13} className="mr-1 inline align-[-2px]" />
+            {verAdiadas ? "voltar para a fila" : `guardadas para depois (${adiadas})`}
+          </button>
+        )}
+
         {GRUPOS.map((g) => {
           const n = g.id ? itensDoGrupo(g).length : itens.length;
           return (
@@ -793,6 +870,23 @@ export default function VisaoLiberacao() {
             </button>
           </div>
 
+          {/* A PROMESSA, ESCRITA. Sem esta linha, "adiada" seria um estado
+              invisível que a Sureya teria de deduzir da ausência da mensagem
+              na lista — e adivinhar já custou caro nesta casa. */}
+          {item.adiadaPara && (
+            <p className="mt-3 rounded-xl2 border border-line bg-surface px-3 py-2 text-[13.5px] text-ink-soft">
+              <CalendarClock size={14} className="mr-1 inline align-[-2px]" />
+              Guardada até{" "}
+              <b className="text-ink">
+                {String(item.adiadaPara).slice(0, 10).split("-").reverse().join("/")}
+              </b>
+              {item.motivoAdiamento && <> — {item.motivoAdiamento}</>}
+              {item.tipo === "cobranca" && (
+                <> · até lá, nenhuma outra cobrança sai para esta família.</>
+              )}
+            </p>
+          )}
+
           <div className="mt-3 flex gap-2">
             <Botao tom="principal" disabled={ocupado === item.id || !item.telefone}
                    onClick={() => decidir(item, "enviar")}>
@@ -807,6 +901,18 @@ export default function VisaoLiberacao() {
                    onClick={() => pedirDescarte(item)}>
               <Trash2 size={16} /> Não enviar
             </Botao>
+
+            {/* ADIAR fica ao lado de enviar, e não escondido: é a resposta
+                para a frase mais comum que a família manda de volta. */}
+            {item.adiadaPara ? (
+              <Botao disabled={ocupado === item.id} onClick={() => desadiar(item)}>
+                <CalendarClock size={16} /> Trazer de volta
+              </Botao>
+            ) : (
+              <Botao disabled={ocupado === item.id} onClick={() => adiar(item)}>
+                <CalendarClock size={16} /> Adiar
+              </Botao>
+            )}
 
             {/* NÃO ENVIAR MAIS DISSO — a decisão, e não a mensagem de hoje.
                 Só para os tipos que têm silêncio: a foto tem chave própria,

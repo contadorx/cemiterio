@@ -281,6 +281,8 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
 #   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
 #             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
+#   0124  +2  sureya_cobranca_adiada e sureya_adiar_mensagem. A regua foi
+#             recriada (a lista de retorno ganhou `adiados`), nao acrescentada.
 #   0123  +1  sureya_registrar_pagamento — o pagamento com desconto, juros,
 #             multa e outros nasce inteiro ou nao nasce. O painel foi remendado
 #             por substituicao de texto, sem funcao nova.
@@ -294,7 +296,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #             sureya_limpar_eventos_webhook — as tres respondem a mesma
 #             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
-FUNCOES_DELTA=${FUNCOES_DELTA:-67}
+FUNCOES_DELTA=${FUNCOES_DELTA:-69}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -625,6 +627,23 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/pagamento_composto.sql 2
   echo "$saida" | grep -E "PAGAMENTO FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Conta de familia errada e a confianca que nao volta."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# ADIAR A COBRANCA
+#
+# O risco aqui nao e um numero errado: e uma promessa quebrada. Ela disse
+# "combinado, dia 15" e uma segunda cobranca sai no dia 12.
+# ---------------------------------------------------------------------------
+echo "ADIAR — a data combinada segura a regua ate la"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/adiar_cobranca.sql 2>&1); then
+  echo "$saida" | grep -E "ADIAR FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Cobrar depois de combinar uma data e a confianca que nao volta."
   echo "============================================================"
   exit 1
 fi

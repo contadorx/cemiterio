@@ -201,9 +201,26 @@ export async function cobrancaGentil(): Promise<number> {
   const clientes = [...umPorFamilia.values()];
 
   let n = 0;
+  let adiadas = 0;
   for (const c of clientes || []) {
     const regua = (c as any).regua_cobranca || "padrao";
     if (regua === "nao_cobrar") continue;               // respeita a régua da família
+
+    // A COBRANÇA QUE FOI ADIADA (0124).
+    //
+    // A família disse "pode ser dia 15?" e a Sureya adiou a mensagem na fila.
+    // Até lá o silêncio É a promessa — uma segunda cobrança saindo antes da
+    // data combinada desfaz na hora a confiança que a primeira construiu.
+    //
+    // A pergunta é a MESMA que a régua faz, feita pela mesma função. Duas
+    // contas sobre o mesmo fato é o defeito que este projeto mais repete, e
+    // aqui daria "a régua respeitou e a rotina cobrou mesmo assim".
+    if ((c as any).familia_id) {
+      const { data: ate } = await db.rpc("sureya_cobranca_adiada", {
+        p_familia: (c as any).familia_id, p_org: org,
+      });
+      if (ate) { adiadas++; continue; }
+    }
 
     // "contra_foto": só cobra o que já foi entregue. Cobrar antes da foto é
     // quebrar o combinado — a foto é a prova do serviço.
@@ -269,6 +286,13 @@ export async function cobrancaGentil(): Promise<number> {
         .eq("id", (c as any).id);
       n++;
     }
+  }
+  // O QUE FOI SEGURADO PRECISA APARECER. Sem isto, "a rotina não criou
+  // cobrança nenhuma" tem duas causas indistinguíveis: ninguém devia, ou
+  // estava tudo adiado. Silêncio que não se explica já custou dezenove dias
+  // de WhatsApp nesta casa (0121).
+  if (adiadas > 0) {
+    console.log(`[cobranca] ${adiadas} família(s) com cobrança adiada — nada enfileirado para elas`);
   }
   return n;
 }

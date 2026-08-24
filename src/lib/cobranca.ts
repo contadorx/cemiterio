@@ -52,6 +52,8 @@ export interface ResumoRegua {
   sem_saldo: number; por_limite_diario: number;
   /** Devia ser cobrado e não tem número no cadastro (0116). */
   sem_telefone: number;
+  /** A família combinou uma data e a mensagem está guardada até lá (0124). */
+  adiados: number;
 }
 
 /**
@@ -87,5 +89,6 @@ export async function rodarRegua(): Promise<ResumoRegua> {
     por_limite_diario: Number((l as any).limitados) || 0,
     // Cadastro sem número: quem devia ser cobrado e não tem como (0116).
     sem_telefone: Number((l as any).sem_telefone) || 0,
+    adiados: Number((l as any).adiados) || 0,
   };
 }
