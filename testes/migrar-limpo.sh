@@ -675,6 +675,24 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
+# A PORTA DO ANONIMO
+#
+# Nao confere uma lista de funcoes: confere uma REGRA contra todas as que
+# existirem no dia. O defeito de 24/08 nao foi alguem abrir a porta — foi
+# ninguem fechar: o Supabase concede EXECUTE a anon por padrao em `public`.
+# ---------------------------------------------------------------------------
+echo "ANONIMO — security definer nao passa pela RLS; o grant e o cadeado"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/porta_do_anonimo.sql 2>&1); then
+  echo "$saida" | grep -E "ANONIMO FALHOU|ERROR|^    sureya" | sed 's/^/  /'
+  echo
+  echo "A chave anonima e publica. Funcao aberta a ela e funcao aberta a todos."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
 # DE ONDE VEIO A LAVAGEM
 #
 # O risco nao e a coluna faltar: e a regra voltar a ser deduzida por ausencia.
