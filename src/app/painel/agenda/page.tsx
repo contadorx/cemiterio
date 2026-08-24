@@ -38,6 +38,15 @@ interface Item {
   falecido: string | null;
   contato: string | null;
   valor: number | null;
+  /**
+   * DE ONDE VEIO ESTA LAVAGEM (0128): "contrato", "pedido" ou "nao_definido".
+   * Na agenda convivem as duas coisas, e a decisão não é a mesma nas duas:
+   * adiar uma de contrato encurta o intervalo até a próxima; adiar um pedido é
+   * furar uma data combinada com a família.
+   */
+  origem?: string | null;
+  /** a data que a família pediu — só existe em `pedido` */
+  dataPedida?: string | null;
   dataPlano: string | null;
   /** dias entre a data teórica do plano e o dia em que a lavagem caiu */
   atrasoDias: number;
@@ -126,7 +135,8 @@ export default function AgendaPage() {
   // aqui são os que se pede em voz alta: "cadê a lavagem dos Perrela",
   // "o que está atrasado" e "o que ainda está sem ninguém".
   const [busca, setBusca] = useState("");
-  const [recorte, setRecorte] = useState<"tudo" | "atrasadas" | "aberto" | "pessoa">("tudo");
+  const [recorte, setRecorte] =
+    useState<"tudo" | "atrasadas" | "aberto" | "pessoa" | "pedidos">("tudo");
 
   /**
    * QUEM LIMPA — marcado em lote, e sempre opcional.
@@ -144,8 +154,6 @@ export default function AgendaPage() {
   const [atribuindo, setAtribuindo] = useState(false);
 
   const [mesAlvo, setMesAlvo] = useState(mesOperacao());
-  const [incluirAvulsos, setIncluirAvulsos] = useState(false);
-  const [dataAvulsos, setDataAvulsos] = useState("");
   const [saude, setSaude] = useState<Saude | null>(null);
   /** Quanto o roteiro envelheceu desde a última distribuição completa (0125). */
   const [idade, setIdade] = useState<{
@@ -191,6 +199,10 @@ export default function AgendaPage() {
       if (recorte === "atrasadas" && s.atrasoDias <= 0) return false;
       if (recorte === "aberto" && s.executoraId) return false;
       if (recorte === "pessoa" && !s.executoraId) return false;
+      // AVULSO NA AGENDA É `pedido` (0128), como em todo o resto do sistema.
+      // Antes o recorte não existia porque não havia como fazê-lo: toda
+      // lavagem de contrato respondia "sim" à pergunta "é avulso?".
+      if (recorte === "pedidos" && s.origem !== "pedido") return false;
       if (!t) return true;
       return [s.familia, s.jazigo, s.rua, s.quadra, s.falecido, s.contato]
         .some((x) => (x || "").toLowerCase().includes(t));
@@ -321,7 +333,7 @@ export default function AgendaPage() {
     setGerando(true); setDiag(null);
     const r = await fetch("/api/agenda/mes", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mes: mesAlvo, incluirAvulsos, dataAvulsos: dataAvulsos || undefined }),
+      body: JSON.stringify({ mes: mesAlvo }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
     if (r?.ok) { setDiag(r); carregar(); }
@@ -615,7 +627,8 @@ export default function AgendaPage() {
               style={{ ...painel.input, width: 260 }}
             />
             {([["tudo", "tudo"], ["atrasadas", "atrasadas"],
-               ["aberto", "sem pessoa"], ["pessoa", "com pessoa"]] as const).map(([v, rot]) => (
+               ["aberto", "sem pessoa"], ["pessoa", "com pessoa"],
+               ["pedidos", "só pedidos"]] as const).map(([v, rot]) => (
               <button key={v} style={chip(recorte === v)} onClick={() => setRecorte(v)}>
                 {rot}
               </button>
@@ -704,22 +717,18 @@ export default function AgendaPage() {
             </button>
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14,
-                          marginTop: 12, color: cor.navy }}>
-            <input type="checkbox" checked={incluirAvulsos}
-                   onChange={(e) => setIncluirAvulsos(e.target.checked)} />
-            Incluir os avulsos neste mês (Finados, Dia das Mães…)
-          </label>
-          {incluirAvulsos && (
-            <div style={{ marginTop: 8 }}>
-              <label style={painel.rotulo}>Data da lavagem dos avulsos</label>
-              <input type="date" style={{ ...painel.input, width: 160 }} value={dataAvulsos}
-                     onChange={(e) => setDataAvulsos(e.target.value)} />
-              <p style={{ color: cor.cinza, fontSize: 14, margin: "6px 0 0" }}>
-                Para o Finados, ponha 30/10 — assim tudo fica pronto antes do dia 2.
-              </p>
-            </div>
-          )}
+          {/* A CAIXA "INCLUIR OS AVULSOS NESTE MÊS" SAIU (0128).
+              Ela criava, de uma vez, uma lavagem para todo mundo — e chamava
+              isso de avulso. Era a única máquina do sistema que fabricava
+              avulso sem ninguém pedir, justamente o contrário da regra: avulso
+              é o que a família solicita.
+
+              Também usava uma QUARTA definição de avulso (plano com cadência
+              não recorrente) e, com um único plano vivo e mensal, não fazia
+              nada havia meses.
+
+              O Finados continua atendido, e melhor: cada família que pede ganha
+              o seu pedido, com a data dela e o preço dela. */}
 
           {diag && (
             <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
@@ -730,7 +739,6 @@ export default function AgendaPage() {
               </strong>
               <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
                 {diag.planosAtivos != null && `${diag.planosAtivos} planos ativos · `}
-                {diag.avulsosIncluidos > 0 && `${diag.avulsosIncluidos} avulso(s) · `}
                 {diag.jaExistiam > 0 && `${diag.jaExistiam} já existiam · `}
                 {diag.foraDoHorizonte > 0 && `${diag.foraDoHorizonte} fora do período · `}
                 {diag.agendados} distribuída(s) em {diag.dias} dia(s)
@@ -945,6 +953,24 @@ export default function AgendaPage() {
                                          background: "#ecfdf5", border: "1px solid #99f6e4",
                                          borderRadius: 999, padding: "2px 8px" }}>
                             📌 data sua
+                          </span>
+                        )}
+                        {/* PEDIDO, NÃO CONTRATO (0128).
+                            A agenda mistura as duas de propósito — é uma rota
+                            só, e a Nina lava as duas do mesmo jeito. Mas a
+                            decisão de escritório NÃO é a mesma: adiar uma
+                            lavagem de contrato encurta o intervalo até a
+                            próxima; adiar um pedido é furar uma data que
+                            alguém combinou com a família. Sem o selo, as duas
+                            são a mesma linha na tela. */}
+                        {s.origem === "pedido" && (
+                          <span title={s.dataPedida
+                                  ? `Pedido pela família para ${new Date(s.dataPedida + "T12:00:00").toLocaleDateString("pt-BR")}`
+                                  : "Lavagem pedida pela família, fora do contrato"}
+                                style={{ fontSize: 13, fontWeight: 700, color: "#7c3aed",
+                                         background: "#f5f3ff", border: "1px solid #ddd6fe",
+                                         borderRadius: 999, padding: "2px 8px" }}>
+                            🙋 pedido
                           </span>
                         )}
                         {/* O ATRASO. Sai de data_plano contra o dia em que a

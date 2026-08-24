@@ -391,4 +391,32 @@ ok("e a tela de Inicio nao chama de avulsa a familia sem jazigo",
 ok("o vazio da tela de Avulsos e explicado, nao deixado no ar",
    /vazio aqui é uma boa notícia/.test(telaAvulsos));
 
+// --- e na AGENDA tambem (0128) ------------------------------------------
+// A agenda mistura contrato e pedido de proposito: e uma rota so, e a Nina
+// lava as duas do mesmo jeito. O que NAO pode e as duas serem a mesma linha na
+// tela — adiar uma de contrato encurta o intervalo; adiar um pedido fura uma
+// data combinada com a familia.
+const rotaSemana = readFileSync("src/app/api/agenda/semana/route.ts", "utf8");
+
+ok("a agenda traz a origem de cada lavagem",
+   /tumulo_id,origem,data_desejada/.test(rotaSemana) &&
+   /origem: \(\(s as any\)\.origem \|\| "nao_definido"\)/.test(rotaSemana));
+
+ok("a linha da agenda mostra quando foi PEDIDA",
+   /s\.origem === "pedido"/.test(telaAgenda) && /🙋 pedido/.test(telaAgenda));
+
+ok("e da para ver so os pedidos",
+   /recorte === "pedidos" && s\.origem !== "pedido"/.test(telaAgenda) &&
+   /\["pedidos", "só pedidos"\]/.test(telaAgenda));
+
+// A CAIXA QUE FABRICAVA AVULSO. Criava, de uma vez, uma lavagem para todo
+// mundo — a unica maquina do sistema que produzia avulso sem ninguem pedir.
+ok("nao existe mais caixa de 'incluir os avulsos deste mes'",
+   !/incluirAvulsos/.test(telaAgenda) &&
+   !/Incluir os avulsos neste mês/.test(telaAgenda));
+
+ok("e nem o gerador do mes sabe fabricar avulso",
+   !/incluirAvulsos/.test(libAgenda) && !/avulsosIncluidos/.test(libAgenda) &&
+   /if \(!DIAS_CICLO\[p\.cadencia\]\) continue;/.test(libAgenda));
+
 process.exit(falhas ? 1 : 0);

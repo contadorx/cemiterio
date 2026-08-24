@@ -101,3 +101,49 @@ restaurar do LEIA-ME da 0127 continua valendo (ela vai no sentido contrário).
 **zero jazigos**. Não é defeito do código — é cadastro: contrato sem jazigo não
 gera lavagem nem competência. Com a regra nova ela aparece como "sem jazigo",
 que é a verdade. Vale uma olhada quando você passar por ela.
+
+---
+
+# Na agenda também
+
+*"agenda também, somente os avulso solicitados"*
+
+A agenda continua misturando as duas — é uma rota só, e a Nina lava contrato e
+pedido do mesmo jeito. O que não podia é as duas serem **a mesma linha na
+tela**: adiar uma lavagem de contrato encurta o intervalo até a próxima; adiar
+um pedido é furar uma data que alguém combinou com a família. Decisões
+diferentes precisam de linhas diferentes.
+
+- cada linha pedida ganha o selo **🙋 pedido**, com a data pedida no tooltip;
+- e há o recorte **só pedidos**, ao lado de "atrasadas" e "sem pessoa".
+
+## A caixa que fabricava avulso saiu
+
+Havia na agenda um **"Incluir os avulsos neste mês (Finados, Dia das Mães…)"**
+que criava, de uma vez, uma lavagem para todo mundo — e chamava isso de avulso.
+
+Era a **única máquina do sistema que produzia avulso sem ninguém pedir**, o
+oposto exato da regra. E usava uma *quarta* definição de avulso: plano com
+cadência não recorrente. Com um único plano vivo, e mensal, ela não fazia nada
+havia meses — falhava em silêncio, que é como esse tipo de coisa se esconde.
+
+O Finados continua atendido, e melhor: **cada família que pede ganha o seu
+pedido**, com a data dela e o preço dela.
+
+## O que eu NÃO mexi, e você precisa saber
+
+O botão **"Gerar o mês"** ainda lê a tabela `planos` — o mundo de antes da
+0100. Medido:
+
+```
+1 plano vivo · jazigo Perrela · cadência mensal · R$ 15,00
+o MESMO jazigo tem contrato no túmulo: quinzenal, R$ 60,00/mês
+```
+
+São **dois geradores sobre o mesmo jazigo**. Apertar "Gerar o mês" hoje cria
+uma lavagem mensal de R$ 15,00 por cima das quinzenais do contrato — que, pela
+0104, nascem sem valor nenhum, porque o dinheiro vem da competência.
+
+Não é o rótulo do avulso, então não entrou nesta fatia. Mas é o mesmo defeito
+de forma: dois caminhos para o mesmo ato, que começam iguais e terminam
+discordando. Aposentar `planos` é uma fatia curta — me diga e eu faço.

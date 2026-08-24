@@ -1000,14 +1000,17 @@ export async function refazerRoteiro(
 // ============================================================================
 // CALENDÁRIO DE UM MÊS ESPECÍFICO
 // Gera o que os planos devem NAQUELE mês, sem tocar no que já existe.
-// Também permite incluir os AVULSOS que só contratam para uma data — o caso do
-// Finados, em que a família paga apenas por aquela ida.
+//
+// NÃO GERA AVULSO (0128). Havia aqui um ramo que criava, de uma vez, uma
+// lavagem para todo plano de cadência não recorrente — o caso do Finados. Era
+// a única máquina do sistema que fabricava avulso sem ninguém pedir, e a regra
+// é a oposta: avulso é o que a família solicita. Cada família que pede ganha o
+// seu pedido, com a data e o preço dela.
 // ============================================================================
 export interface CalendarioMes {
   mes: string;
   criados: number;
   jaExistiam: number;
-  avulsosIncluidos: number;
   planosNoMes: number;
   agendados: number;
   dias: number;
@@ -1015,7 +1018,7 @@ export interface CalendarioMes {
 
 export async function gerarCalendarioMes(
   mes: string,                       // "2026-11"
-  opcoes?: { incluirAvulsos?: boolean; dataAvulsos?: string; distribuir?: boolean }
+  opcoes?: { distribuir?: boolean }
 ): Promise<CalendarioMes> {
   const db = supabaseAdmin();
   const org = env.orgId();
@@ -1033,33 +1036,15 @@ export async function gerarCalendarioMes(
   let criados = 0;
   let jaExistiam = 0;
   let planosNoMes = 0;
-  let avulsosIncluidos = 0;
 
   for (const p of (planos || []) as any[]) {
-    const ehAvulso = !DIAS_CICLO[p.cadencia];
-
-    // avulso só entra se pedirem explicitamente (ex.: campanha de Finados)
-    if (ehAvulso) {
-      if (!opcoes?.incluirAvulsos) continue;
-      const data = opcoes?.dataAvulsos || fim;
-      if (data < ini || data > fim) continue;
-
-      const comColunaA = await temDataPlano(db);
-      const existentesA = await servicosDoPlano(db, org, p.id, comColunaA);
-      if (jaTemServico(existentesA, data, 0, ["pendente", "agendado", "executado"])) {
-        jaExistiam++; continue;
-      }
-
-      const linhaA: any = {
-        org_id: org, tumulo_id: p.tumulo_id, plano_id: p.id, cliente_id: p.cliente_id,
-        data_prevista: data, status: "pendente", valor: p.valor_vigente, prioridade: 5,
-      };
-      if (comColunaA) linhaA.data_plano = data;
-
-      const { error } = await db.from("servicos").insert(linhaA);
-      if (!error) { criados++; avulsosIncluidos++; } else jaExistiam++;
-      continue;
-    }
+    // PLANO SEM CICLO NÃO GERA NADA AQUI (0128).
+    //
+    // Cadência "avulso" ou "por_data" quer dizer que a família contrata uma ida
+    // por vez. Isso é PEDIDO, e pedido tem dono, data e preço próprios — nasce
+    // pela ficha da família ou pelo aviso da conversa, uma linha de cada vez.
+    // Criar em lote, para todo mundo, era fabricar avulso sem ninguém pedir.
+    if (!DIAS_CICLO[p.cadencia]) continue;
 
     // recorrentes: percorre o ciclo até cobrir o mês pedido
     const cicloDias = DIAS_CICLO[p.cadencia];
@@ -1108,5 +1093,5 @@ export async function gerarCalendarioMes(
     ? { agendados: 0, dias: 0 }
     : await alocarAgenda();
 
-  return { mes, criados, jaExistiam, avulsosIncluidos, planosNoMes, ...aloc };
+  return { mes, criados, jaExistiam, planosNoMes, ...aloc };
 }

@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     .from("servicos")
     .select(
       "id,data_prevista,data_plano,ordem_dia,status,valor,estornado_em,motivo_estorno," +
-      "fixado_em,executora_id,tumulo_id," +
+      "fixado_em,executora_id,tumulo_id,origem,data_desejada," +
       "tumulos(identificacao,falecido_nome,quadras(codigo),ruas(nome),familias(nome))," +
       "clientes(nome)",
     )
@@ -141,6 +141,13 @@ export async function GET(req: NextRequest) {
       // parou de nomear. A tela precisa do id para poder marcar em lote.
       executoraId: (s as any).executora_id || null,
       valor: (s as any).valor,
+      // DE ONDE VEIO ESTA LINHA (0128). Na agenda convivem as duas coisas: a
+      // lavagem que o contrato devia e a que alguém pediu. Só que na tela elas
+      // eram idênticas — e a decisão de pular ou remarcar não é a mesma nas
+      // duas. Adiar uma lavagem de contrato encurta o intervalo; adiar um
+      // pedido é furar uma data combinada com a família.
+      origem: ((s as any).origem || "nao_definido") as string,
+      dataPedida: (s as any).data_desejada || null,
       dataPlano: plano,
       // dias entre a data teórica do plano e o dia em que a lavagem caiu
       atrasoDias: plano && plano < d
