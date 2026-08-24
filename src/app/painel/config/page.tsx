@@ -6,8 +6,14 @@ import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
 import Extras from "./Extras";
 
+type Aba =
+  | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
+  | "regua" | "extras"
+  | "whatsapp" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes"
+  | "privacidade" | "auditoria" | "erros";
+
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "regua" | "extras" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<Aba>("casa");
   // A ABA VEM DO ENDERECO. Sem isto, o redirecionamento de /painel/whatsapp
   // cairia sempre em "A Casa" — e quem clicou em "Reconectar" na fila teria de
   // procurar a aba, justamente na hora em que o WhatsApp esta fora do ar.
@@ -24,37 +30,7 @@ export default function Config() {
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Configurações</h1>
         <ChaveDisparos />
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          {([
-            ["casa", "A Casa"],
-            ["equipe", "Equipe"],
-            ["cemiterios", "Cemitérios"],
-            ["campo", "Campo"],
-            ["mensagens", "Mensagens"],
-            // O WHATSAPP MORA AQUI AGORA. Estava numa rota solta, fora do
-            // menu — e e a unica tela onde se reconecta a instancia que
-            // entrega as fotos. Quando ele cai, o que se procura e
-            // "configuracoes", nao um endereco decorado.
-            ["whatsapp", "WhatsApp"],
-            // A régua de cobrança: os degraus vivem no banco desde a 0110.
-            ["regua", "Régua de cobrança"],
-            // O CATÁLOGO DE FLORES E EXTRAS (0117). É preço da CASA — vale
-            // para todo mundo e muda quando o fornecedor muda —, por isso mora
-            // aqui e não na ficha de uma família.
-            ["extras", "Flores e extras"],
-            ["jornada", "Dias e horários"],
-            ["campanhas", "Campanhas"],
-            ["avaliacoes", "Avaliações"],
-            ["indicacoes", "Indicações"],
-            ["privacidade", "Privacidade (LGPD)"],
-            ["auditoria", "Auditoria"],
-            ["erros", "Diagnóstico"],
-          ] as const).map(([k, label]) => (
-            <button key={k} style={aba === k ? painel.botao : painel.botaoSec} onClick={() => setAba(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Abas atual={aba} aoTrocar={setAba} />
         {aba === "casa" && <Casa />}
         {aba === "jornada" && <Jornada />}
         {aba === "equipe" && <Equipe />}
@@ -64,10 +40,135 @@ export default function Config() {
         {aba === "whatsapp" && <ConexaoWhatsapp />}
         {aba === "regua" && <Regua />}
         {aba === "extras" && <Extras />}
-        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada"
-          && aba !== "mensagens" && aba !== "whatsapp" && aba !== "extras"
-          && <Agregados aba={aba} />}
+        {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
+            Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
+            LEMBRAR de se excluir daqui, e a Régua de cobrança não lembrou —
+            ficava desenhada duas vezes, a segunda como um resto de outra aba
+            embaixo dela. Uma lista negativa erra em silêncio; a positiva só
+            desenha o que foi escrito nela. */}
+        {AGREGADAS.includes(aba) && <Agregados aba={aba} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * AS ABAS, AGRUPADAS.
+ *
+ * O QUE HAVIA AQUI
+ * Quinze botões numa fileira só, em ordem de chegada — cada tela nova foi
+ * empurrada para o fim da fila. "Régua de cobrança" ficava entre "WhatsApp" e
+ * "Flores e extras"; "Dias e horários" caía depois de "Flores". Não havia
+ * hierarquia nenhuma: quem procurava alguma coisa lia os quinze rótulos.
+ *
+ * Quinze itens é mais do que se lê de relance. A partir de mais ou menos sete,
+ * uma lista deixa de ser vista e passa a ser VARRIDA — e varrer é o que a
+ * Sureya faz no celular, com a mão ocupada, no meio do cemitério.
+ *
+ * O CRITÉRIO DO AGRUPAMENTO
+ * Não é "temas parecidos". É A PERGUNTA QUE SE ESTÁ FAZENDO quando se abre
+ * Configurações. São quatro, e nenhuma se confunde com a outra:
+ *
+ *   A CASA      "como o negócio é montado" — quem trabalha, onde, em que dias
+ *   O DINHEIRO  "quanto custa e como cobro"
+ *   A CONVERSA  "o que sai daqui para a família"
+ *   O SISTEMA   "está tudo funcionando, e eu consigo provar"
+ *
+ * A ORDEM DOS GRUPOS É A ORDEM DE QUEM MEXE MAIS. Preço de flor muda quando o
+ * fornecedor muda; a lista de cemitérios não muda quase nunca. O sistema fica
+ * por último porque é onde se vai quando algo quebrou — e para esse caso existe
+ * o ponto vermelho, que chama em vez de esperar ser procurado.
+ */
+const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
+  { titulo: "A casa", itens: [
+    ["casa", "A Casa"],
+    ["equipe", "Equipe"],
+    ["cemiterios", "Cemitérios"],
+    ["jornada", "Dias e horários"],
+    ["campo", "Campo"],
+  ]},
+  { titulo: "O dinheiro", itens: [
+    // A régua de cobrança: os degraus vivem no banco desde a 0110.
+    ["regua", "Régua de cobrança"],
+    // O CATÁLOGO DE FLORES E EXTRAS (0117). É preço da CASA — vale para todo
+    // mundo e muda quando o fornecedor muda —, por isso mora aqui e não na
+    // ficha de uma família.
+    ["extras", "Flores e extras"],
+  ]},
+  { titulo: "A conversa", itens: [
+    // O WHATSAPP MORA AQUI. Estava numa rota solta, fora do menu — e é a única
+    // tela onde se reconecta a instância que entrega as fotos. Quando ele cai,
+    // o que se procura é "configurações", não um endereço decorado.
+    ["whatsapp", "WhatsApp"],
+    ["mensagens", "Mensagens"],
+    ["campanhas", "Campanhas"],
+    ["avaliacoes", "Avaliações"],
+    ["indicacoes", "Indicações"],
+  ]},
+  { titulo: "O sistema", itens: [
+    ["privacidade", "Privacidade (LGPD)"],
+    ["auditoria", "Auditoria"],
+    ["erros", "Diagnóstico"],
+  ]},
+];
+
+/**
+ * As abas cujo conteúdo mora dentro de `Agregados`, e só elas.
+ *
+ * "cemiterios" NÃO está aqui — tem componente próprio. Na lista negativa
+ * antiga ela passava pelo filtro e caía no fim de `Agregados`, que devolve o
+ * log de erros quando não reconhece a aba. Cemitérios e Régua de cobrança
+ * mostravam, coladas embaixo, a lista de erros do sistema.
+ */
+const AGREGADAS: Aba[] = ["campo", "avaliacoes", "indicacoes", "privacidade", "auditoria", "erros"];
+
+function Abas({ atual, aoTrocar }: { atual: Aba; aoTrocar: (a: Aba) => void }) {
+  // O PONTO VERMELHO. O Diagnóstico é a aba onde se descobre que o WhatsApp
+  // parou — e é a última de todas, num grupo que ninguém abre por vontade
+  // própria. Foram dezenove dias de WhatsApp mudo (04/08 a 22/08) sem que
+  // alguém passasse por aqui. Agora a aba avisa sozinha.
+  const [problemas, setProblemas] = useState(0);
+  const [whatsRuim, setWhatsRuim] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/rotinas")
+      .then((r) => r.json())
+      .then((r) => {
+        if (!r?.ok) return;
+        setProblemas(Number(r.problemas) || 0);
+        const w = r.whatsapp;
+        setWhatsRuim(!!w && (w.silencio || w.nunca_recebeu));
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {GRUPOS.map((g) => (
+        <div key={g.titulo} style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.6,
+                        textTransform: "uppercase", color: cor.cinza, marginBottom: 6 }}>
+            {g.titulo}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(g.itens || []).map(([k, label]) => {
+              const alerta = (k === "erros" && problemas > 0) || (k === "whatsapp" && whatsRuim);
+              return (
+                <button key={k} style={atual === k ? painel.botao : painel.botaoSec}
+                        onClick={() => aoTrocar(k)}>
+                  {label}
+                  {alerta && (
+                    <span title="alguma coisa parou de rodar"
+                          style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999,
+                                   marginLeft: 6, verticalAlign: "middle",
+                                   background: "rgb(var(--zm-perigo))" }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -398,7 +499,14 @@ function Agregados({ aba }: { aba: string }) {
     );
   }
 
-  // erros / diagnóstico
+  // ERROS / DIAGNÓSTICO — e SÓ ele.
+  //
+  // Este `return` era o fim de uma escada de `if`, o que o tornava também a
+  // resposta para toda aba que ninguém tratou. Era assim que Cemitérios e
+  // Régua acabavam com o log de erros pendurado embaixo. Agora quem não é
+  // "erros" sai sem desenhar nada.
+  if (aba !== "erros") return null;
+
   return (
     <>
       <p style={{ color: cor.cinza, fontSize: 14 }}>Últimos erros registrados pelo sistema (para diagnóstico).</p>

@@ -1216,6 +1216,17 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   // O comprovante entra AQUI, junto com o pagamento — e não num fluxo à
   // parte. Anexar depois é o tipo de tarefa que ninguém volta para fazer.
   const [comprovante, setComprovante] = useState<{ b64: string; mt: string } | null>(null);
+  // A LEITURA DO COMPROVANTE, DE VOLTA — e agora pelas duas portas.
+  //
+  // Ler a imagem por IA existia só no caminho do WhatsApp, e esse caminho ficou
+  // fechado dezenove dias (04/08 a 22/08). Aqui, no caminho da mão, a Sureya
+  // digitava valor e data olhando o print. Agora a mesma função lê os dois.
+  //
+  // O que ela lê PREENCHE, não decide: os campos continuam editáveis e ela
+  // confere antes de lançar. Comprovante lido por robô não é dinheiro até uma
+  // pessoa olhar.
+  const [lendo, setLendo] = useState(false);
+  const [leitura, setLeitura] = useState<{ ok: boolean; mensagem: string | null; idTransacao: string | null } | null>(null);
   const camera = useRef<HTMLInputElement | null>(null);
   const [abrindo, setAbrindo] = useState<"pagamento" | "avulso" | "abertura" | null>(null);
   const [valor, setValor] = useState("");
@@ -1254,8 +1265,38 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
     e.target.value = "";
     if (!arquivo) return;
     const leitor = new FileReader();
-    leitor.onload = () => {
-      setComprovante({ b64: String(leitor.result || ""), mt: arquivo.type || "image/jpeg" });
+    leitor.onload = async () => {
+      const b64 = String(leitor.result || "");
+      const mt = arquivo.type || "image/jpeg";
+      setComprovante({ b64, mt });
+      setLeitura(null);
+      setLendo(true);
+      try {
+        const r = await fetch("/api/comprovantes/ler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imagemBase64: b64, mimetype: mt }),
+        }).then((x) => x.json());
+
+        setLeitura({
+          ok: !!r?.leu,
+          mensagem: r?.mensagem || null,
+          idTransacao: r?.idTransacao || null,
+        });
+
+        // SÓ PREENCHE CAMPO VAZIO. Se ela já digitou o valor, a leitura não
+        // apaga o que ela escreveu — quem olhou o papel foi ela.
+        if (r?.leu) {
+          if (r.valor && !String(valor).trim()) {
+            setValor(String(r.valor).replace(".", ","));
+          }
+          if (r.data) setData(String(r.data).slice(0, 10));
+        }
+      } catch {
+        setLeitura({ ok: false, mensagem: "Não consegui ler a imagem agora. Digite o valor e a data à mão.", idTransacao: null });
+      } finally {
+        setLendo(false);
+      }
     };
     leitor.readAsDataURL(arquivo);
   }
@@ -1278,7 +1319,8 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            clienteId, imagemBase64: comprovante.b64, mimetype: comprovante.mt, valor: n, data,
+            clienteId, imagemBase64: comprovante.b64, mimetype: comprovante.mt,
+            valor: n, data, idTransacao: leitura?.idTransacao || null,
           }),
         }).then((x) => x.json());
         if (!up?.ok) { setErro(up?.mensagem || "Não consegui salvar o comprovante."); return; }
@@ -1291,7 +1333,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
         body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao, comprovanteId, data }),
       }).then((x) => x.json());
       if (!r?.ok) { setErro(r?.mensagem || "Não consegui lançar."); return; }
-      setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null);
+      setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null); setLeitura(null);
       setData(new Date().toISOString().slice(0, 10));
       carregar(); aoMudar();
     } finally {
@@ -1380,14 +1422,34 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
               <input ref={camera} type="file" accept="image/*" capture="environment"
                      onChange={escolherComprovante} className="hidden" />
               {comprovante ? (
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={comprovante.b64} alt="" className="h-16 w-16 rounded-lg object-cover" />
-                  <span className="text-[14px] text-positivo">comprovante anexado</span>
-                  <button onClick={() => setComprovante(null)}
-                          className="text-[13px] text-ink-soft underline">
-                    trocar
-                  </button>
+                <div>
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={comprovante.b64} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                    <span className="text-[14px] text-positivo">comprovante anexado</span>
+                    <button onClick={() => { setComprovante(null); setLeitura(null); }}
+                            className="text-[13px] text-ink-soft underline">
+                      trocar
+                    </button>
+                  </div>
+
+                  {/* O QUE A LEITURA DISSE.
+                      Ela PREENCHE os campos acima, nunca decide por eles: o
+                      valor e a data continuam editáveis e é a Sureya quem
+                      confere. Comprovante lido por robô não é dinheiro até uma
+                      pessoa olhar — a mesma regra que o caminho do WhatsApp já
+                      aplicava com o status `a_conferir`. */}
+                  {lendo && (
+                    <p className="mt-2 text-[13px] text-ink-soft">lendo o comprovante…</p>
+                  )}
+                  {!lendo && leitura?.ok && (
+                    <p className="mt-2 text-[13px] text-positivo">
+                      Li o comprovante e preenchi os campos acima — confira antes de lançar.
+                    </p>
+                  )}
+                  {!lendo && leitura && !leitura.ok && leitura.mensagem && (
+                    <p className="mt-2 text-[13px] text-aviso">{leitura.mensagem}</p>
+                  )}
                 </div>
               ) : (
                 <Botao onClick={() => camera.current?.click()}>

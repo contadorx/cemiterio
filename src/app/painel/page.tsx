@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Cartao, Selo, dinheiro } from "./pecas";
 import PainelDoMes from "./financeiro/PainelDoMes";
+import SinaisDeVida from "./SinaisDeVida";
 
 /**
  * O MÊS — a tela inicial.
@@ -92,6 +93,11 @@ export default function Painel() {
           className="rounded-lg border border-line bg-card px-3 py-2 text-[15px] text-ink focus:border-brand focus:outline-none"
         />
       </div>
+
+      {/* SINAIS DE VIDA vem antes de tudo. Uma família esperando resposta é
+          urgente; um cano entupido é a razão pela qual não se sabe quantas
+          estão esperando. */}
+      <SinaisDeVida />
 
       {/* PRECISA DE VOCÊ — quem escreveu pelo site e ainda espera.
           Fica ACIMA dos números do mês porque é a única coisa desta tela com
