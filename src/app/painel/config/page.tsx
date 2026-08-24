@@ -5,7 +5,6 @@ import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
 import Extras from "./Extras";
-<<<<<<< Updated upstream
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -15,11 +14,6 @@ type Aba =
 
 export default function Config() {
   const [aba, setAba] = useState<Aba>("casa");
-=======
-
-export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "regua" | "extras" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
->>>>>>> Stashed changes
   // A ABA VEM DO ENDERECO. Sem isto, o redirecionamento de /painel/whatsapp
   // cairia sempre em "A Casa" — e quem clicou em "Reconectar" na fila teria de
   // procurar a aba, justamente na hora em que o WhatsApp esta fora do ar.
@@ -36,41 +30,7 @@ export default function Config() {
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Configurações</h1>
         <ChaveDisparos />
-<<<<<<< Updated upstream
         <Abas atual={aba} aoTrocar={setAba} />
-=======
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          {([
-            ["casa", "A Casa"],
-            ["equipe", "Equipe"],
-            ["cemiterios", "Cemitérios"],
-            ["campo", "Campo"],
-            ["mensagens", "Mensagens"],
-            // O WHATSAPP MORA AQUI AGORA. Estava numa rota solta, fora do
-            // menu — e e a unica tela onde se reconecta a instancia que
-            // entrega as fotos. Quando ele cai, o que se procura e
-            // "configuracoes", nao um endereco decorado.
-            ["whatsapp", "WhatsApp"],
-            // A régua de cobrança: os degraus vivem no banco desde a 0110.
-            ["regua", "Régua de cobrança"],
-            // O CATÁLOGO DE FLORES E EXTRAS (0117). É preço da CASA — vale
-            // para todo mundo e muda quando o fornecedor muda —, por isso mora
-            // aqui e não na ficha de uma família.
-            ["extras", "Flores e extras"],
-            ["jornada", "Dias e horários"],
-            ["campanhas", "Campanhas"],
-            ["avaliacoes", "Avaliações"],
-            ["indicacoes", "Indicações"],
-            ["privacidade", "Privacidade (LGPD)"],
-            ["auditoria", "Auditoria"],
-            ["erros", "Diagnóstico"],
-          ] as const).map(([k, label]) => (
-            <button key={k} style={aba === k ? painel.botao : painel.botaoSec} onClick={() => setAba(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
->>>>>>> Stashed changes
         {aba === "casa" && <Casa />}
         {aba === "jornada" && <Jornada />}
         {aba === "equipe" && <Equipe />}
@@ -80,7 +40,6 @@ export default function Config() {
         {aba === "whatsapp" && <ConexaoWhatsapp />}
         {aba === "regua" && <Regua />}
         {aba === "extras" && <Extras />}
-<<<<<<< Updated upstream
         {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
             Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
             LEMBRAR de se excluir daqui, e a Régua de cobrança não lembrou —
@@ -88,11 +47,6 @@ export default function Config() {
             embaixo dela. Uma lista negativa erra em silêncio; a positiva só
             desenha o que foi escrito nela. */}
         {AGREGADAS.includes(aba) && <Agregados aba={aba} />}
-=======
-        {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada"
-          && aba !== "mensagens" && aba !== "whatsapp" && aba !== "extras"
-          && <Agregados aba={aba} />}
->>>>>>> Stashed changes
       </div>
     </div>
   );
