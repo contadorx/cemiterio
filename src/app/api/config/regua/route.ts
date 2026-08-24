@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [{ data: degraus }, { data: o }] = await Promise.all([
-    auth.db.from("regua_degraus").select("id,dias,texto,ativo")
+    auth.db.from("regua_degraus").select("id,dias,texto,ativo,repetir_a_cada")
       .eq("org_id", org).eq("regua", regua).order("dias"),
     auth.db.from("orgs").select("dia_vencimento").eq("id", org).maybeSingle(),
   ]);
@@ -125,6 +125,23 @@ export async function PUT(req: NextRequest) {
   // Desligar tira do ar SEM apagar o que foi escrito: ajustar a régua não pode
   // custar reescrever o texto do zero.
   if (b?.ativo !== undefined) patch.ativo = !!b.ativo;
+
+  // DE QUANTO EM QUANTO TEMPO O DEGRAU VOLTA (0130).
+  //
+  // Vazio ou zero = não repete, que é o comportamento de sempre. O piso de 7
+  // dias está no banco (`regua_degraus_repetir_sensato`) e também aqui, para a
+  // recusa virar frase em vez de erro cru do Postgres — quem digita "3"
+  // achando que são meses precisa descobrir na tela, não pela família.
+  if (b?.repetirACada !== undefined) {
+    const v = b.repetirACada === null || b.repetirACada === "" ? null : Math.round(Number(b.repetirACada));
+    if (v !== null && (!Number.isFinite(v) || v < 7 || v > 365)) {
+      return NextResponse.json(
+        { ok: false, erro: "repeticao_invalida",
+          mensagem: "Repetir de quantos em quantos dias? De 7 a 365 — ou deixe vazio para não repetir." },
+        { status: 400 });
+    }
+    patch.repetir_a_cada = v;
+  }
 
   const { error } = await auth.db.from("regua_degraus")
     .update(patch).eq("id", id).eq("org_id", org);

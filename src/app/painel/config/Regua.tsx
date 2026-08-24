@@ -122,6 +122,39 @@ export default function Regua() {
                 {!g.ativo && (
                   <span style={{ fontSize: 12, color: cor.cinza }}>desligado</span>
                 )}
+                {g.repetir_a_cada > 0 && (
+                  <span title={`Depois deste dia, volta a cada ${g.repetir_a_cada} dias sem cobrança`}
+                        style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed",
+                                 background: "#f5f3ff", border: "1px solid #ddd6fe",
+                                 borderRadius: 999, padding: "1px 8px" }}>
+                    ↻ e a cada {g.repetir_a_cada} dias
+                  </span>
+                )}
+              </div>
+
+              {/* O ÚLTIMO DEGRAU NÃO PODE SER O ÚLTIMO RECADO (0130).
+                  A régua casava por dia exato, então quem passava do último
+                  degrau não ouvia mais nada — nunca. Medido em 24/08: 43
+                  débitos de 7 famílias, R$ 1.565,00, o mais velho com 379
+                  dias, no silêncio. É intervalo, não data fixa: conta desde a
+                  última cobrança daquela família, então um dia de rotina
+                  perdido não custa um mês de silêncio. */}
+              <div style={{ display: "flex", gap: 6, alignItems: "center",
+                            marginTop: 6, fontSize: 13.5, color: cor.cinza }}>
+                <span>Depois deste dia, repetir a cada</span>
+                <input
+                  style={{ ...painel.input, margin: 0, width: 74, padding: "4px 8px" }}
+                  inputMode="numeric"
+                  placeholder="—"
+                  defaultValue={g.repetir_a_cada ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    const atual = g.repetir_a_cada ?? "";
+                    if (v === String(atual)) return;
+                    acao("PUT", { id: g.id, repetirACada: v === "" ? null : v });
+                  }}
+                />
+                <span>dias sem cobrança. Vazio = não repete.</span>
               </div>
               <textarea
                 style={{ ...painel.input, minHeight: 78, marginTop: 6 }}

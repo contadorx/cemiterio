@@ -54,6 +54,15 @@ export interface ResumoRegua {
   sem_telefone: number;
   /** A família combinou uma data e a mensagem está guardada até lá (0124). */
   adiados: number;
+  /**
+   * O degrau que repete valia hoje, mas ainda não fez o intervalo desde a
+   * última cobrança daquela família (0130).
+   *
+   * Este contador existe porque o defeito que a 0130 conserta era exatamente
+   * uma cobrança que não saía sem ninguém saber. Repetição que não sai
+   * também precisa aparecer.
+   */
+  repetidos: number;
 }
 
 /**
@@ -85,6 +94,7 @@ export async function rodarRegua(): Promise<ResumoRegua> {
     enfileirados: Number((l as any).enfileirados) || 0,
     ja_existiam: Number((l as any).ja_enfileirados) || 0,
     sem_degrau: Number((l as any).sem_degrau) || 0,
+    repetidos: Number((l as any).repetidos) || 0,
     sem_saldo: Number((l as any).ja_pagos) || 0,
     por_limite_diario: Number((l as any).limitados) || 0,
     // Cadastro sem número: quem devia ser cobrado e não tem como (0116).

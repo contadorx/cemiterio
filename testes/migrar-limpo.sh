@@ -675,6 +675,24 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
+# A REGUA QUE VOLTA A FALAR
+#
+# O defeito consertado na 0130 nao dava erro: a regua parava no dia 31 e
+# ninguem via. O risco de consertar errado tem a mesma cara — passar a falar
+# demais, ou de menos, calado.
+# ---------------------------------------------------------------------------
+echo "REGUA — o ultimo degrau nao pode ser o ultimo recado"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/regua_repete.sql 2>&1); then
+  echo "$saida" | grep -E "REGUA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Cobranca que nao sai e dinheiro parado; cobranca todo dia e perseguicao."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
 # A PORTA DO ANONIMO
 #
 # Nao confere uma lista de funcoes: confere uma REGRA contra todas as que

@@ -207,8 +207,10 @@ inteiro.
 ## 8. A ordem em que eu faria
 
 1. ~~Fechar a porta do anônimo~~ — **feito, 0129, aplicada.**
-2. **A régua não pode emudecer aos 30 dias.** R$ 1.565,00 esperando. É a única
-   coisa aqui que custa dinheiro todo dia.
+2. ~~A régua não pode emudecer aos 30 dias~~ — **feito, 0130, aplicada.** E
+   eram **dois** silêncios, não um: além do degrau, a função só olhava dívidas
+   dentro de ±365 dias, e a mais velha da produção tem 379. Quem achou o
+   segundo foi o teste. Ver `LEIA-ME_a_regua_volta_a_falar.md`.
 3. **Aposentar as duas portas de pagamento mortas** e a tabela `planos` (que
    ainda dobra a geração no jazigo Perrela — está no LEIA-ME de ontem).
 4. **Decidir sobre a memória:** ou preencher as datas dos 62 falecidos e ligar
