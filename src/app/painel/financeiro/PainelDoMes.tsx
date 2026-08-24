@@ -99,8 +99,19 @@ export default function PainelDoMes() {
       {/* ============================================ 1 · O DINHEIRO */}
       <Faixa titulo="O mês fechou quanto" />
       <div style={grade}>
+        {/* O RODAPÉ CONTA O QUE COMPÕE. Juros e multa são receita e não
+            apareciam em lugar nenhum antes da 0123; desconto é receita que ela
+            abriu mão, então SAI do total — e some do rodapé quando é zero, para
+            não encher a tela com quatro zeros todo mês. */}
         <Cartao titulo="Receita da competência" valor={brl(rec.total)} tom="neutro"
-                rodape={`${rec.cobrancas} cobrança(s) de contrato · avulsos ${brl(rec.avulsos)}`} />
+                rodape={[
+                  `${rec.cobrancas} cobrança(s) de contrato`,
+                  Number(rec.avulsos) > 0 ? `avulsos ${brl(rec.avulsos)}` : null,
+                  Number(rec.juros) + Number(rec.multa) > 0
+                    ? `juros e multa ${brl(Number(rec.juros) + Number(rec.multa))}` : null,
+                  Number(rec.outros) > 0 ? `outros ${brl(rec.outros)}` : null,
+                  Number(rec.descontos) > 0 ? `−${brl(rec.descontos)} de desconto` : null,
+                ].filter(Boolean).join(" · ")} />
         <Cartao titulo="Recebido no mês" valor={brl(reb.total)} tom="bom"
                 rodape={`${reb.pagamentos} pagamento(s) · por data de entrada`} />
         <Cartao titulo="Em aberto" valor={brl(ina.em_aberto)}

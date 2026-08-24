@@ -122,6 +122,29 @@ export async function GET(req: NextRequest) {
  * O débito por competência NÃO passa por aqui: ele nasce do fechamento do
  * ciclo (ver /api/financeiro/competencia), não de um clique.
  */
+/**
+ * O ERRO DO BANCO EM PORTUGUÊS DE GENTE.
+ *
+ * `sureya_registrar_pagamento` levanta exceção com o nome da função na frente —
+ * bom para o log, ilegível na tela de quem está lançando um Pix.
+ */
+function mensagemDoErro(bruto: string): string {
+  const t = String(bruto || "");
+  if (t.includes("passam do valor recebido")) {
+    return "Juros, multa e outros somam mais do que o valor recebido. "
+         + "Confira: essas partes saem de dentro do que entrou, não se somam a ele.";
+  }
+  if (t.includes("informe o valor recebido")) {
+    return "Informe o valor recebido — ou um desconto, se você perdoou sem receber nada.";
+  }
+  if (t.includes("nenhuma parte pode ser negativa")) {
+    return "Nenhum dos valores pode ser negativo.";
+  }
+  if (t.includes("familia_nao_encontrada")) return "Família não encontrada.";
+  if (t.includes("somente_admin")) return "Só quem administra pode lançar pagamento.";
+  return "Não consegui lançar.";
+}
+
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
@@ -168,25 +191,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: "familia_nao_encontrada" }, { status: 404 });
   }
 
-  const ehPagamento = acao === "pagamento";
+  // O PAGAMENTO TEM PARTES (0123), e por isso sai por outra porta.
+  //
+  // Desconto, juros, multa e outros viram LINHAS SEPARADAS no razão — cada uma
+  // com seu lado e sua origem, para o relatório saber distinguir "recebi 65" de
+  // "recebi 60 e cobrei 5 de juros". Cinco escritas soltas aqui poderiam falhar
+  // no meio e deixar a família com um crédito que nunca existiu; a função faz
+  // as cinco na mesma transação, ou nenhuma.
+  if (acao === "pagamento") {
+    const parte = (x: any) => {
+      const n = Number(String(x ?? "0").replace(",", "."));
+      return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+    };
+    const { data, error } = await db.rpc("sureya_registrar_pagamento", {
+      p_familia:     familiaId,
+      p_recebido:    Math.abs(Math.round(valor * 100) / 100),
+      p_desconto:    parte(b?.desconto),
+      p_juros:       parte(b?.juros),
+      p_multa:       parte(b?.multa),
+      p_outros:      parte(b?.outros),
+      p_data:        b?.data || new Date().toISOString().slice(0, 10),
+      p_descricao:   String(b?.descricao || "").trim() || null,
+      p_comprovante: b?.comprovanteId || null,
+      p_tumulo:      b?.tumuloId || null,
+    });
+    if (error) {
+      return NextResponse.json(
+        { ok: false, erro: error.message, mensagem: mensagemDoErro(error.message) },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ ok: true, ...(data as any) });
+  }
+
+  // Daqui para baixo só passam ABERTURA e AVULSO: o pagamento saiu acima, pela
+  // função que escreve as partes de uma vez.
   const ehAbertura = acao === "abertura";
 
   // Na abertura, o sinal do número decide o lado do lançamento. O valor
   // gravado é sempre positivo — quem diz "deve" ou "tem a favor" é o `tipo`.
-  const tipo = ehAbertura
-    ? (valor >= 0 ? "debito" : "credito")
-    : (ehPagamento ? "credito" : "debito");
+  const tipo = ehAbertura ? (valor >= 0 ? "debito" : "credito") : "debito";
 
   const rotuloPadrao = ehAbertura
     ? (valor >= 0 ? "Situação inicial · em aberto" : "Situação inicial · crédito a favor")
-    : ehPagamento ? "Pagamento recebido" : "Serviço avulso";
+    : "Serviço avulso";
 
   const { error } = await db.from("conta_corrente").insert({
     org_id: org,
     familia_id: familiaId,
     tumulo_id: b?.tumuloId || null,
     tipo,
-    origem: ehAbertura ? "abertura" : ehPagamento ? "pagamento" : "avulso",
+    origem: ehAbertura ? "abertura" : "avulso",
     competencia: null,          // nenhum destes pertence a um período
     valor: Math.abs(Math.round(valor * 100) / 100),
     descricao: String(b?.descricao || "").trim() || rotuloPadrao,

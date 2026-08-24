@@ -281,6 +281,9 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
 #   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
 #             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
+#   0123  +1  sureya_registrar_pagamento — o pagamento com desconto, juros,
+#             multa e outros nasce inteiro ou nao nasce. O painel foi remendado
+#             por substituicao de texto, sem funcao nova.
 #   0122  +3  sureya_importar_extrato, sureya_classificar_saidas e
 #             sureya_chave_entrada_banco (o gatilho da chave). Mais 1 tabela
 #             (importacoes_extrato), 1 gatilho e 5 policies.
@@ -291,7 +294,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #             sureya_limpar_eventos_webhook — as tres respondem a mesma
 #             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
-FUNCOES_DELTA=${FUNCOES_DELTA:-66}
+FUNCOES_DELTA=${FUNCOES_DELTA:-67}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -605,6 +608,23 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/extrato.sql 2>&1); then
   echo "$saida" | grep -E "EXTRATO FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Credito em dobro e dinheiro que a familia nao mandou."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O PAGAMENTO COMPOSTO
+#
+# O risco aqui e o mais caro: mexer no que a familia deve. Desconto que nao
+# abate, juro que abate ao contrario, ou cinco linhas entrando pela metade.
+# ---------------------------------------------------------------------------
+echo "PAGAMENTO — desconto, juros, multa e outros na mesma escrita"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/pagamento_composto.sql 2>&1); then
+  echo "$saida" | grep -E "PAGAMENTO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Conta de familia errada e a confianca que nao volta."
   echo "============================================================"
   exit 1
 fi

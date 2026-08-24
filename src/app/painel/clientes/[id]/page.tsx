@@ -1231,6 +1231,22 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   const [abrindo, setAbrindo] = useState<"pagamento" | "avulso" | "abertura" | null>(null);
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
+  // AS PARTES DO PAGAMENTO (0123).
+  //
+  // Veio do caso da Josiane: ela pagou R$ 100,00 por R$ 90,00 de competências e
+  // os R$ 10,00 viraram saldo credor. O número ficava certo e a ficha não
+  // contava o que tinha acontecido — daqui a três meses ninguém lembra se foi
+  // arredondamento, gorjeta, uma flor avulsa ou erro de digitação.
+  //
+  // Cada parte vira uma LINHA no razão, com seu próprio lado:
+  //   desconto  crédito — abate a dívida sem dinheiro nenhum
+  //   juros     débito  — cobrança de atraso, que o dinheiro recebido paga
+  //   multa     débito
+  //   outros    débito  — o que entrou e não é mensalidade
+  const [desconto, setDesconto] = useState("");
+  const [juros, setJuros] = useState("");
+  const [multa, setMulta] = useState("");
+  const [outros, setOutros] = useState("");
   // A data nasce hoje porque é o caso comum, mas precisa ser editável: o Pix
   // costuma cair antes de a Sureya sentar para lançar, e sem isso o extrato
   // registra o dia do lançamento em vez do dia do dinheiro.
@@ -1330,10 +1346,14 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
       const r = await fetch("/api/conta-corrente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ familiaId, acao: abrindo, valor: n, descricao, comprovanteId, data }),
+        body: JSON.stringify({
+          familiaId, acao: abrindo, valor: n, descricao, comprovanteId, data,
+          ...(abrindo === "pagamento" ? { desconto, juros, multa, outros } : {}),
+        }),
       }).then((x) => x.json());
       if (!r?.ok) { setErro(r?.mensagem || "Não consegui lançar."); return; }
       setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null); setLeitura(null);
+      setDesconto(""); setJuros(""); setMulta(""); setOutros("");
       setData(new Date().toISOString().slice(0, 10));
       carregar(); aoMudar();
     } finally {
@@ -1397,7 +1417,10 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
             </p>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Campo rotulo="Valor">
+            <Campo
+              rotulo={abrindo === "pagamento" ? "Valor recebido" : "Valor"}
+              dica={abrindo === "pagamento" ? "o que caiu na conta" : undefined}
+            >
               <Entrada inputMode="decimal" value={valor}
                        onChange={(e: any) => setValor(e.target.value)}
                        placeholder={abrindo === "abertura" ? "240 ou -80" : "160,00"} />
@@ -1414,6 +1437,19 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
                        placeholder="opcional" />
             </Campo>
           </div>
+          {/* AS PARTES — só no pagamento.
+              Ficam recolhidas: no dia a dia a Sureya recebe o valor cheio e não
+              quer quatro campos vazios no caminho. Quando precisa, abre. */}
+          {abrindo === "pagamento" && (
+            <PartesDoPagamento
+              recebido={valor}
+              desconto={desconto} setDesconto={setDesconto}
+              juros={juros} setJuros={setJuros}
+              multa={multa} setMulta={setMulta}
+              outros={outros} setOutros={setOutros}
+            />
+          )}
+
           {/* O COMPROVANTE, sem depender do WhatsApp.
               Ela tira foto da tela ou escolhe o print que a família mandou no
               WhatsApp pessoal. Funciona com a instância de pé ou caída. */}
@@ -1464,7 +1500,10 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
             <Botao tom="principal" onClick={lancar} disabled={ocupado}>
               {ocupado ? "Lançando…" : "Lançar"}
             </Botao>
-            <Botao onClick={() => { setAbrindo(null); setComprovante(null); setLeitura(null); }}>Cancelar</Botao>
+            <Botao onClick={() => {
+              setAbrindo(null); setComprovante(null); setLeitura(null);
+              setDesconto(""); setJuros(""); setMulta(""); setOutros("");
+            }}>Cancelar</Botao>
           </div>
         </div>
       )}
@@ -1477,6 +1516,95 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
         <Lancamento key={l.id} l={l} aoMudar={() => { carregar(); aoMudar(); }} />
       ))}
     </Cartao>
+  );
+}
+
+/**
+ * AS PARTES DE UM PAGAMENTO.
+ *
+ * A conta que esta caixa faz é a única coisa que a Sureya precisa entender:
+ *
+ *     o que abate da dívida = recebido + desconto − juros − multa − outros
+ *
+ * Ela vê o número antes de lançar. Se der diferente do que ela esperava, o erro
+ * está aqui e não no razão da família — que é o lugar caro de descobrir.
+ *
+ * POR QUE JUROS E MULTA DIMINUEM
+ * Porque saem de DENTRO do que entrou. A família atrasou, você cobrou R$ 5 de
+ * juros e ela pagou R$ 65: dos 65 que caíram, 5 são juros e 60 abatem a
+ * mensalidade. Somar os juros ao recebido faria a dívida cair 70 — e você
+ * estaria perdoando R$ 10 sem querer.
+ *
+ * O DESCONTO SOMA porque é valor que você abre mão de receber: ela pagou 50,
+ * você perdoou 10, e os 60 de dívida somem inteiros.
+ */
+function PartesDoPagamento({ recebido, desconto, setDesconto, juros, setJuros,
+                             multa, setMulta, outros, setOutros }: any) {
+  const [aberto, setAberto] = useState(false);
+  const n = (x: string) => {
+    const v = Number(String(x || "0").replace(",", "."));
+    return isFinite(v) && v > 0 ? v : 0;
+  };
+  const rec = n(recebido);
+  const abate = Math.round((rec + n(desconto) - n(juros) - n(multa) - n(outros)) * 100) / 100;
+  const partes = n(juros) + n(multa) + n(outros);
+  const tem = n(desconto) + partes > 0;
+  const passou = partes > rec + 0.005;
+
+  if (!aberto && !tem) {
+    return (
+      <button onClick={() => setAberto(true)}
+              className="mt-2 text-[13.5px] text-brand underline underline-offset-2">
+        teve desconto, juros, multa ou outros?
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl2 border border-line bg-surface p-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Campo rotulo="Desconto" dica="você perdoou">
+          <Entrada inputMode="decimal" value={desconto}
+                   onChange={(e: any) => setDesconto(e.target.value)} placeholder="0,00" />
+        </Campo>
+        <Campo rotulo="Juros" dica="atraso">
+          <Entrada inputMode="decimal" value={juros}
+                   onChange={(e: any) => setJuros(e.target.value)} placeholder="0,00" />
+        </Campo>
+        <Campo rotulo="Multa" dica="atraso">
+          <Entrada inputMode="decimal" value={multa}
+                   onChange={(e: any) => setMulta(e.target.value)} placeholder="0,00" />
+        </Campo>
+        <Campo rotulo="Outros" dica="o que não é mensalidade">
+          <Entrada inputMode="decimal" value={outros}
+                   onChange={(e: any) => setOutros(e.target.value)} placeholder="0,00" />
+        </Campo>
+      </div>
+
+      {/* A CONTA, ANTES DE LANÇAR. Sem isto, a Sureya só descobre o efeito
+          depois — olhando o extrato da família, que é tarde. */}
+      <p className={`mt-3 text-[14px] leading-relaxed ${passou ? "text-perigo" : "text-ink-soft"}`}>
+        {passou ? (
+          <>
+            <b>Juros, multa e outros somam mais do que entrou.</b> Essas partes
+            saem de dentro dos {dinheiro(rec)} recebidos — elas não se somam ao valor.
+          </>
+        ) : (
+          <>
+            Isto abate <b className="text-ink">{dinheiro(abate)}</b> da dívida da família
+            {n(desconto) > 0 && <> — {dinheiro(rec)} de dinheiro e {dinheiro(n(desconto))} de desconto</>}
+            {partes > 0 && <>, tirando {dinheiro(partes)} que não é mensalidade</>}.
+          </>
+        )}
+      </p>
+
+      {!tem && (
+        <button onClick={() => setAberto(false)}
+                className="mt-2 text-[13px] text-ink-soft underline">
+          fechar
+        </button>
+      )}
+    </div>
   );
 }
 
