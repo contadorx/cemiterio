@@ -139,7 +139,7 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #             so existia na cabeca do Leandro, e a compra do buque era chute.
 #   0119  +1  pausas_tumulo — parar nao e cancelar. O jeito antigo de parar era
 #             desmarcar `contratado`, que APAGA o combinado.
-TABELAS_DELTA=${TABELAS_DELTA:-9}
+TABELAS_DELTA=${TABELAS_DELTA:-10}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -159,7 +159,7 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             lancamentos; sem ela nao ha relatorio por competencia.
 #   0102  +1  trg_guarda_quem_acerta_a_conta — recusa tirar a marca do ULTIMO
 #             que acerta a conta de uma familia que ainda tem gente.
-GATILHOS_DELTA=${GATILHOS_DELTA:-7}
+GATILHOS_DELTA=${GATILHOS_DELTA:-8}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -208,7 +208,7 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0117  +8  assinaturas_extras e entregas_extras: a da org e uma restritiva
 #              POR COMANDO em cada uma — de novo a licao da 0079.
 #   0119  +4  pausas_tumulo, mesmo desenho.
-POLICIES_DELTA=${POLICIES_DELTA:-79}
+POLICIES_DELTA=${POLICIES_DELTA:-84}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -281,11 +281,17 @@ POLICIES_DELTA=${POLICIES_DELTA:-79}
 #   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
 #   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
 #             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
+#   0122  +3  sureya_importar_extrato, sureya_classificar_saidas e
+#             sureya_chave_entrada_banco (o gatilho da chave). Mais 1 tabela
+#             (importacoes_extrato), 1 gatilho e 5 policies.
+#             `entradas_banco` tinha ZERO linhas desde a 0045: a tabela, a
+#             API, a tela e o palpiteiro existiam, e nada nunca entrou porque
+#             so dava para digitar uma a uma. Em agosto foram 112 Pix.
 #   0121  +3  sureya_saude_whatsapp, sureya_rastro_telefone,
 #             sureya_limpar_eventos_webhook — as tres respondem a mesma
 #             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
-FUNCOES_DELTA=${FUNCOES_DELTA:-63}
+FUNCOES_DELTA=${FUNCOES_DELTA:-66}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -581,6 +587,24 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/rastro_whatsapp.sql 2>&1
   echo "$saida" | grep -E "RASTRO FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Sem rastro, 'a mensagem sumiu' vira deducao — e deducao ja errou aqui."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O EXTRATO
+#
+# O risco aqui tem valor em reais: importar duas vezes e creditar duas vezes,
+# ou o gasto pessoal da Sureya virar despesa do negocio. `entradas_banco` ficou
+# com zero linhas desde a 0045 — agora que entra em lote, entra certo.
+# ---------------------------------------------------------------------------
+echo "EXTRATO — o extrato entra inteiro, sem dobrar e sem misturar o pessoal"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/extrato.sql 2>&1); then
+  echo "$saida" | grep -E "EXTRATO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Credito em dobro e dinheiro que a familia nao mandou."
   echo "============================================================"
   exit 1
 fi

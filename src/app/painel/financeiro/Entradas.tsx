@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
+import ImportarExtrato from "./ImportarExtrato";
 
 /**
  * ENTRADAS DO BANCO
@@ -59,6 +60,12 @@ export default function Entradas() {
         </p>
       </div>
 
+      {/* O EXTRATO INTEIRO VEM ANTES DO LANÇAMENTO A MÃO.
+          A ordem é a decisão: esta tabela ficou com ZERO linhas desde a 0045
+          porque o único caminho era digitar uma a uma, e em agosto entraram
+          112 Pix. O caminho que escala fica em cima; o de exceção, embaixo. */}
+      <ImportarExtrato aoImportar={carregar} />
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12, marginBottom: 14 }}>
         <Cartao titulo="Sem dono" valor={String(d.totais.pendentes)}
@@ -82,7 +89,7 @@ export default function Entradas() {
             só as que faltam identificar
           </label>
           <button style={{ ...painel.botao, marginLeft: "auto" }} onClick={() => setNovo(!novo)}>
-            {novo ? "Fechar" : "+ Lançar entrada do extrato"}
+            {novo ? "Fechar" : "+ Lançar uma entrada à mão"}
           </button>
         </div>
       </div>

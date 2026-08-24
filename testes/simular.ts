@@ -1086,6 +1086,136 @@ async function rodar() {
            "nem todo print traz o E2E; barrar por isso seria trocar crédito em dobro por crédito nenhum");
   }
 
+  // ==========================================================================
+  console.log("\n=== 11. LEITURA DO EXTRATO ===");
+  // O risco aqui e uma linha perdida virar dinheiro que ninguem cobra, ou um
+  // debito lido como credito virar receita que nao existe. Por isso o teste
+  // sempre termina no MESMO juiz: a conferencia do saldo.
+  {
+    const { lerOFX, lerCSV, lerHTML, lerXLSX, conferir, detectarFormato, extrairRemetente } =
+      await import("../src/lib/extrato");
+
+    // --- OFX, o formato do banco
+    const ofx = [
+      "OFXHEADER:100", "<OFX><BANKTRANLIST>",
+      "<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260823100308<TRNAMT>100.00<FITID>1003080",
+      "<NAME>JOSEANE APARECIDA RON<MEMO>PIX RECEBIDO REM: JOSEANE APARECIDA RON 23/08</STMTTRN>",
+      "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260824<TRNAMT>-159.80<FITID>0526731",
+      "<MEMO>COMPRA CARTAO VISA</STMTTRN>", "</BANKTRANLIST></OFX>",
+    ].join("\n");
+    const o = lerOFX(ofx);
+    checar("OFX lê os dois movimentos", o.length === 2, "");
+    checar("OFX: valor negativo vira débito, e o valor fica positivo",
+           o[1].tipo === "debito" && o[1].valor === 159.8,
+           "guardar valor negativo faria toda soma de saída dar o sinal errado");
+    checar("OFX: a data 20260823100308 vira 2026-08-23",
+           o[0].data === "2026-08-23", "o OFX gruda a hora na data");
+    checar("OFX: acha o remetente dentro do MEMO",
+           o[0].remetente === "JOSEANE APARECIDA RON", "");
+    checar("OFX: guarda o FITID, que é a chave contra importar duas vezes",
+           o[0].documento === "1003080", "");
+    checar("OFX não traz saldo por linha, então a conferência diz NÃO SEI",
+           conferir(o).fecha === null,
+           "nulo é ausência de prova; tratar como aprovado seria apresentar vazio como medida");
+
+    // --- tabela com colunas separadas de crédito e débito (o desenho do Bradesco)
+    const html = "<table>"
+      + "<tr><th>Data</th><th>Historico</th><th>Docto.</th><th>Credito (R$)</th><th>Debito (R$)</th><th>Saldo (R$)</th></tr>"
+      + "<tr><td>23/08/2026</td><td>PIX RECEBIDO REM: JOSEANE APARECIDA RON 23/08</td><td>1003080</td><td>100,00</td><td></td><td>6.809,83</td></tr>"
+      + "<tr><td>24/08/2026</td><td>COMPRA CARTAO VISA</td><td>0526731</td><td></td><td>159,80</td><td>6.650,03</td></tr>"
+      + "</table>";
+    const h = lerHTML(html);
+    checar("o '.xls' do banco que é HTML por dentro é lido", h.length === 2, "");
+    checar("coluna vazia é o que diz de que lado o dinheiro andou",
+           h[0].tipo === "credito" && h[1].tipo === "debito", "");
+    checar("1.234,56 é lido como 1234.56", h[0].saldoApos === 6809.83, "");
+    const ch = conferir(h, 6709.83);
+    checar("e a conta fecha", ch.fecha === true, "");
+    checar("deduz o saldo de abertura quando ninguém informa",
+           conferir(h).saldoInicial === 6709.83,
+           "sem abertura, a primeira linha seria a única que a prova não alcança");
+
+    // --- CSV com o lado numa coluna própria e o valor sempre positivo
+    const csv = [
+      "data;tipo;historico;valor;saldo",
+      "23/08/2026;credito;PIX RECEBIDO REM: JOSEANE APARECIDA RON;100,00;6809,83",
+      "24/08/2026;debito;COMPRA CARTAO VISA;159,80;6650,03",
+    ].join("\n");
+    const cv = lerCSV(csv);
+    checar("CSV: a coluna de tipo manda no sinal, não o número",
+           cv.length === 2 && cv[1].tipo === "debito" && cv[1].valor === 159.8,
+           "com valor positivo e lado escrito, confiar no sinal erra em TODAS as linhas");
+    checar("CSV: fareja o ponto-e-vírgula", cv[0].valor === 100, "");
+
+    // --- a prova falha quando falta uma linha
+    const furado = [h[0], { ...h[1], saldoApos: 6600.03 }];
+    const cf = conferir(furado, 6709.83);
+    checar("linha que não bate com o saldo REPROVA a importação", cf.fecha === false, "");
+    checar("e a reprovação diz qual linha e quanto deveria dar",
+           !!cf.problema && cf.problema.includes("linha 2") && cf.problema.includes("6650.03"),
+           "'não fecha' sem o dedo na linha não ajuda ninguém a resolver");
+
+    // --- detecção por conteúdo, não por extensão
+    checar("PDF é reconhecido pelo %PDF",
+           detectarFormato(Buffer.from("%PDF-1.7"), "extrato.pdf") === "pdf", "");
+    checar("o .xls binário de verdade é recusado, não lido errado",
+           detectarFormato(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0, 0, 0, 0]), "e.xls") === "xls_antigo",
+           "ler lixo como se fosse planilha é pior que recusar");
+    checar("HTML com extensão .xls é reconhecido pelo conteúdo",
+           detectarFormato(Buffer.from("<html><table>"), "extrato.xls") === "html",
+           "a extensão mente; o conteúdo não");
+
+    // --- XLSX de verdade: zip + sharedStrings + célula vazia OMITIDA
+    //
+    // É o leitor mais arriscado do conjunto — abre o zip na mão para não trazer
+    // uma dependência de planilha só por causa de um arquivo por mês. O caso
+    // que quebra um parser ingênuo está aqui: o Excel NÃO escreve a célula
+    // vazia, então a coluna vem na referência (r="D2") e não na ordem.
+    {
+      const { deflateRawSync } = await import("node:zlib");
+      const membro = (nome: string, texto: string) => {
+        const n = Buffer.from(nome, "utf8");
+        const dados = deflateRawSync(Buffer.from(texto, "utf8"));
+        const cab = Buffer.alloc(30);
+        cab.writeUInt32LE(0x04034b50, 0);
+        cab.writeUInt16LE(8, 8);                 // deflate
+        cab.writeUInt32LE(dados.length, 18);
+        cab.writeUInt32LE(Buffer.byteLength(texto), 22);
+        cab.writeUInt16LE(n.length, 26);
+        return Buffer.concat([cab, n, dados]);
+      };
+      const textos = ["Data", "Historico", "Credito (R$)", "Debito (R$)", "Saldo (R$)",
+                      "23/08/2026", "PIX RECEBIDO REM: JOSEANE APARECIDA RON 23/08", "100,00", "6.809,83",
+                      "24/08/2026", "COMPRA CARTAO VISA", "159,80", "6.650,03"];
+      const ss = '<sst>' + textos.map((t) => `<si><t>${t.replace(/&/g, "&amp;")}</t></si>`).join("") + "</sst>";
+      const sheet =
+        '<worksheet><sheetData>'
+        + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>'
+        + '<c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c><c r="E1" t="s"><v>4</v></c></row>'
+        // linha 2: coluna D (débito) NÃO existe — é o buraco que desloca tudo
+        + '<row r="2"><c r="A2" t="s"><v>5</v></c><c r="B2" t="s"><v>6</v></c>'
+        + '<c r="C2" t="s"><v>7</v></c><c r="E2" t="s"><v>8</v></c></row>'
+        // linha 3: agora falta a coluna C (crédito)
+        + '<row r="3"><c r="A3" t="s"><v>9</v></c><c r="B3" t="s"><v>10</v></c>'
+        + '<c r="D3" t="s"><v>11</v></c><c r="E3" t="s"><v>12</v></c></row>'
+        + "</sheetData></worksheet>";
+      const zip = Buffer.concat([
+        membro("xl/sharedStrings.xml", ss),
+        membro("xl/worksheets/sheet1.xml", sheet),
+      ]);
+      const x = lerXLSX(zip);
+      checar("XLSX: abre o zip e lê as duas linhas", x.length === 2, "");
+      checar("XLSX: célula vazia omitida não desloca as colunas",
+             x[0].tipo === "credito" && x[0].valor === 100
+             && x[1].tipo === "debito" && x[1].valor === 159.8,
+             "sem ler r=\"D2\", o débito da linha 3 cairia na coluna do crédito");
+      checar("XLSX: e a conta fecha", conferir(x, 6709.83).fecha === true, "");
+    }
+
+    checar("REM: com data no fim não leva a data junto no nome",
+           extrairRemetente("PIX RECEBIDO REM: MARIO KANASHIRO 25/08") === "MARIO KANASHIRO", "");
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {
