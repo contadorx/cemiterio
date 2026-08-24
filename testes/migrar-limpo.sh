@@ -675,6 +675,24 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
+# DE ONDE VEIO A LAVAGEM
+#
+# O risco nao e a coluna faltar: e a regra voltar a ser deduzida por ausencia.
+# Foi assim que 258 de 262 servicos viraram "avulsos" — uma conta certa ate a
+# 0100 que ninguem reviu quando o contrato mudou de casa.
+# ---------------------------------------------------------------------------
+echo "ORIGEM — contrato nao e pedido, e nao saber tem nome proprio"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/origem_do_servico.sql 2>&1); then
+  echo "$saida" | grep -E "ORIGEM FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Avulso deduzido por ausencia foi o defeito. Nao pode voltar."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
 # O PAINEL DO MES
 #
 # O risco aqui nao e um numero errado: e DOIS numeros que discordam. O aging

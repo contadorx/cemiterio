@@ -296,6 +296,11 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
           org_id: org,
           tumulo_id: (p as any).id,
           plano_id: null,          // o plano é o próprio túmulo agora
+          // POR QUE ESTA LAVAGEM EXISTE (0128). O default da coluna já é
+          // "contrato"; está escrito aqui assim mesmo porque foi exatamente um
+          // campo deixado implícito — o `plano_id: null` da linha de cima — que
+          // fez 258 lavagens de contrato serem chamadas de avulsas.
+          origem: "contrato",
           cliente_id: (p as any).cliente_id,
           data_prevista: prox,
           status: "pendente",

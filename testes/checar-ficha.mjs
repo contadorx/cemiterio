@@ -319,4 +319,76 @@ ok("mover o dia NAO arrasta o ciclo de cada jazigo por padrao",
 ok("o destino avisa quando nao e dia de trabalho ou estoura a capacidade",
    /diaDeTrabalho/.test(rotaMover) && /estourou/.test(rotaMover));
 
+// ===========================================================================
+// AVULSO E O QUE ALGUEM PEDIU (0128)
+//
+// Estas guardas nao existem para provar que a coluna `origem` foi usada. Elas
+// existem para impedir a VOLTA da conta antiga. `avulso = !plano_id` esteve
+// certa por 25 migrations e continuou parecendo certa depois de parar de ser:
+// nao quebrou nada, nao deu erro, so passou a responder "sim" para tudo. Em
+// 24/08 eram 258 de 262 servicos chamados de avulsos, os 258 em jazigo
+// contratado. Um defeito que nao grita e um que ninguem procura.
+// ===========================================================================
+const rotaServicos   = readFileSync("src/app/api/servicos/route.ts", "utf8");
+const rotaFinMes     = readFileSync("src/app/api/financeiro/mes/route.ts", "utf8");
+const libRemuneracao = readFileSync("src/lib/remuneracao.ts", "utf8");
+const libAgenda      = readFileSync("src/lib/agenda.ts", "utf8");
+const rotaFeito      = readFileSync("src/app/api/servico/registrar-feito/route.ts", "utf8");
+const rotaMes        = readFileSync("src/app/api/mes/route.ts", "utf8");
+const telaInicio     = readFileSync("src/app/painel/page.tsx", "utf8");
+const telaAvulsos    = readFileSync("src/app/painel/avulsos/page.tsx", "utf8");
+
+ok("a lista de servicos separa avulso por ORIGEM, nao por plano",
+   /\.eq\("origem", "pedido"\)/.test(rotaServicos) &&
+   /avulso: s\.origem === "pedido"/.test(rotaServicos));
+
+ok("e a conta antiga (`plano_id is null` = avulso) sumiu de la",
+   !/is\("plano_id", null\)/.test(rotaServicos) &&
+   !/avulso: !s\.plano_id/.test(rotaServicos));
+
+ok("o relatorio do mes conta avulsa por origem",
+   /s\.origem === "pedido"/.test(rotaFinMes) &&
+   !/!s\.plano_id \|\| s\.planos\?\.cadencia === "avulso"/.test(rotaFinMes));
+
+// ISTO AQUI DECIDE PAGAMENTO. Uma regra com `so_avulso`, ou com valor
+// diferente para avulso, pagaria a Nina pelo balde errado.
+ok("a regra de remuneracao pergunta a origem, nao o plano",
+   /servico\?\.origem === "pedido"/.test(libRemuneracao) &&
+   !/if \(!servico\?\.plano_id\) return true/.test(libRemuneracao));
+
+ok("e as duas leituras dela trazem a coluna origem",
+   (readFileSync("src/app/api/equipe/remuneracao/route.ts", "utf8")
+     .match(/plano_id,origem/g) || []).length === 2);
+
+// O gerador escreve centenas de linhas por rodada. Deixar no default seria
+// repetir o erro que causou tudo isto: um campo importante ficando implicito.
+ok("o gerador de contrato diz, por escrito, que a lavagem e de contrato",
+   /origem: "contrato"/.test(libAgenda));
+
+ok("as duas portas de pedido gravam pedido",
+   /origem: "pedido"/.test(readFileSync("src/app/api/servico/route.ts", "utf8")) &&
+   /origem: "pedido"/.test(readFileSync("src/app/api/pedidos-conversa/route.ts", "utf8")));
+
+// "avulso tem o estado do tumulo, mas o servico somente o solicitado":
+// registrar uma limpeza JA FEITA nao e pedido nenhum — quem responde e o
+// estado do jazigo.
+ok("registrar limpeza ja feita decide pelo ESTADO DO JAZIGO",
+   /origem: ehContratado \? "contrato" : "pedido"/.test(rotaFeito) &&
+   /contratado,valor_mensal/.test(rotaFeito));
+
+// 293 familias recebiam selo "avulso" e nenhuma era avulsa; 122 nem jazigo
+// tem. Cadastro pela metade nao e regime de cobranca.
+ok("o regime da familia tem TRES respostas, e sai dos jazigos",
+   /"sem_jazigo"/.test(rotaMes) && /"contrato"/.test(rotaMes) && /"avulso"/.test(rotaMes) &&
+   // ancorado no inicio da linha: a conta velha aparece CITADA num comentario
+   // logo acima, e uma busca solta acharia a citacao e reprovaria o conserto
+   !/^\s+semPlano: !f\.contratado/m.test(rotaMes));
+
+ok("e a tela de Inicio nao chama de avulsa a familia sem jazigo",
+   /l\.regime === "sem_jazigo"/.test(telaInicio) &&
+   /l\.regime === "avulso"/.test(telaInicio));
+
+ok("o vazio da tela de Avulsos e explicado, nao deixado no ar",
+   /vazio aqui é uma boa notícia/.test(telaAvulsos));
+
 process.exit(falhas ? 1 : 0);

@@ -204,7 +204,9 @@ export async function PUT(req: NextRequest) {
   const base: Record<string, any> = {
     org_id: org,
     tumulo_id: tumuloId,
-    plano_id: null, // avulso
+    plano_id: null,
+    // Veio de um pedido na conversa. É o caso mais literal de `pedido` (0128).
+    origem: "pedido",
     cliente_id: (ped as any).cliente_id,
     data_prevista: dataPrevista,
     status: "pendente",

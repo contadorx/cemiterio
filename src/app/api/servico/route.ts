@@ -97,7 +97,10 @@ export async function POST(req: NextRequest) {
   const base: Record<string, any> = {
     org_id: org,
     tumulo_id: tumuloId,
-    plano_id: null,                 // avulso: não pertence a nenhum plano
+    plano_id: null,
+    // Esta porta SÓ é aberta por alguém pedindo — é a tela de marcar uma
+    // limpeza para um jazigo, com a data que a família quer (0128).
+    origem: "pedido",
     cliente_id: (tum as any).cliente_id,
     data_prevista: data,
     status: jaFeita ? "executado" : "pendente",

@@ -87,9 +87,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: tum } = await db
-    .from("tumulos").select("id,cliente_id,familia_id,identificacao,codigo")
+    .from("tumulos").select("id,cliente_id,familia_id,identificacao,codigo,contratado,valor_mensal")
     .eq("id", tumuloId).eq("org_id", org).maybeSingle();
   if (!tum) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
+
+  const ehContratado =
+    !!(tum as any).contratado && Number((tum as any).valor_mensal || 0) > 0;
 
   // ------------------------------------------------------------ o serviço
   //
@@ -112,7 +115,15 @@ export async function POST(req: NextRequest) {
     const linha: Record<string, any> = {
       org_id: org,
       tumulo_id: tumuloId,
-      plano_id: null,                     // avulso: não pertence a nenhum plano
+      plano_id: null,
+      // DE ONDE VEIO (0128). Aqui ninguém pediu nada: alguém está registrando
+      // uma limpeza que JÁ ACONTECEU. Então quem responde é o ESTADO DO
+      // JAZIGO — jazigo com contrato produz lavagem de contrato lançada com
+      // atraso; jazigo sem contrato só é lavado porque pediram.
+      //
+      // O mesmo corte do cobrador: contratado E valor_mensal > 0. Marcado como
+      // contratado por R$ 0,00 não é contrato.
+      origem: ehContratado ? "contrato" : "pedido",
       cliente_id: (tum as any).cliente_id,
       data_prevista: data,
       data_desejada: data,

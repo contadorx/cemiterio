@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
   const [famRes, tumRes, servRes] = await Promise.all([
     db.from("familias").select("id,nome,contratado").eq("org_id", org).order("nome"),
-    db.from("tumulos").select("id,familia_id,contratado,codigo,ruas(nome),quadras(codigo)").eq("org_id", org),
+    db.from("tumulos").select("id,familia_id,contratado,valor_mensal,codigo,ruas(nome),quadras(codigo)").eq("org_id", org),
     db.from("servicos")
       .select("id,tumulo_id,data_executada,status")
       .eq("org_id", org)
@@ -93,7 +93,9 @@ export async function GET(req: NextRequest) {
 
   const linhas = familias.map((f) => {
     const meus = tumulosPorFamilia.get(f.id) || [];
-    const contratados = meus.filter((t) => t.contratado);
+    // O MESMO CORTE DO COBRADOR: contratado E valor_mensal > 0. Jazigo marcado
+    // como contratado por R$ 0,00 nao gera competencia — nao e contrato.
+    const contratados = meus.filter((t) => t.contratado && Number(t.valor_mensal || 0) > 0);
     const limpos = contratados.filter((t) => (limpezasPorTumulo.get(t.id) || 0) > 0).length;
     // Sinal canônico do sistema: negativo = em aberto. Esta rota usava o
     // inverso (débito positivo), que era uma quarta convenção só dela. Aqui
@@ -108,10 +110,22 @@ export async function GET(req: NextRequest) {
       contratados: contratados.length,
       limpos,
       // "Falta limpar" é sobre o TRABALHO: túmulos que a Nina deve limpar.
-      // "Sem plano" é sobre o CONTRATO, que mora na família — uma família sem
-      // plano tem as limpezas cobradas como avulso.
       limpezaOk: contratados.length > 0 && limpos >= contratados.length,
-      semPlano: !f.contratado,
+      // O REGIME É O ESTADO DOS JAZIGOS (0128), e tem TRÊS respostas.
+      //
+      // Era `semPlano: !f.contratado`, que virava selo "avulso" na tela de
+      // Início. Medido em 24/08: 293 famílias recebiam esse selo e NENHUMA era
+      // avulsa — e 122 delas nem jazigo têm. Cadastro pela metade não é regime
+      // de cobrança; vazio não é zero.
+      //
+      // A tela de Conferência já dizia isto com todas as letras: "Sem contrato
+      // e avulso não são a mesma coisa". Era a única que sabia.
+      regime: meus.length === 0
+        ? ("sem_jazigo" as const)
+        : contratados.length > 0
+          ? ("contrato" as const)
+          : ("avulso" as const),
+      semPlano: contratados.length === 0 && meus.length > 0,
       saldo: s,
       aConferir: conta.aConferir,
       pagamentoOk: s <= 0.005,

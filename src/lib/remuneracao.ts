@@ -96,10 +96,15 @@ export function valorDoServico(regra: Regra, opts: { receita: number; avulso: bo
 }
 
 /** um serviço é avulso quando não nasceu de um plano periódico */
-export function ehAvulso(servico: { plano_id?: string | null; planos?: { cadencia?: string } | any }): boolean {
-  const cad = servico?.planos?.cadencia;
-  if (!servico?.plano_id) return true;
-  return cad === "avulso" || cad === "por_data";
+export function ehAvulso(servico: { origem?: string | null }): boolean {
+  // AVULSO E `origem = 'pedido'` (0128).
+  //
+  // A regra antiga era `!plano_id`, e desde a 0100 ela responde "sim" para toda
+  // lavagem de contrato — o gerador escreve plano_id null de proposito. Isto
+  // aqui decide PAGAMENTO: uma regra com `so_avulso`, ou com valor diferente
+  // para avulso, pagaria a Nina pelo balde errado. Nao custou nada ate hoje
+  // so porque `remuneracao_regras` esta vazia.
+  return servico?.origem === "pedido";
 }
 
 /**

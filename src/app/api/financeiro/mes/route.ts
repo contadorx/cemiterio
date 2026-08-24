@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     db.from("clientes")
       .select("id,nome,telefone,familia_id,responsavel_financeiro,cobranca_nivel,max_lembretes,envio_automatico,regua_cobranca,anonimizado_em"),
     db.from("servicos")
-      .select("id,status,valor,data_executada,cliente_id,plano_id,foto_depois_url,planos(cadencia)")
+      .select("id,status,valor,data_executada,cliente_id,plano_id,origem,foto_depois_url,planos(cadencia)")
       .gte("data_executada", ini)
       .lte("data_executada", `${fim}T23:59:59`),
     db.from("comprovantes").select("id,status").eq("status", "pendente"),
@@ -205,9 +205,10 @@ export async function GET(req: NextRequest) {
   // 3. O TRABALHO DO MÊS
   // =====================================================================
   const executados = (servMes || []).filter((s: any) => s.status === "executado");
-  const avulsos = executados.filter(
-    (s: any) => !s.plano_id || s.planos?.cadencia === "avulso" || s.planos?.cadencia === "por_data",
-  );
+  // AVULSA E A QUE ALGUEM PEDIU (0128), nao a que nao tem plano. A conta
+  // antiga classificava toda lavagem de contrato como avulsa desde a 0100 — e
+  // era esse numero que aparecia no relatorio do mes.
+  const avulsos = executados.filter((s: any) => s.origem === "pedido");
 
   // =====================================================================
   // 4. O QUE FICOU PARA TRÁS — a parte que evita prejuízo

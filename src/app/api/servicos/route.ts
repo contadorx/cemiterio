@@ -18,13 +18,16 @@ export const dynamic = "force-dynamic";
  *                                avulso e de plano, com mês, execução e cobrança
  *   ?tipo=avulso&situacao=abertos → a fila dos avulsos em aberto
  *
+ * "Avulso" aqui e `origem = 'pedido'` (0128): a lavagem que alguem PEDIU.
+ * Nao e "a que nao tem plano" — essa conta passou a valer para tudo na 0100.
+ *
  * "Cobrado" não é campo do serviço: é a existência de um débito em `movimentos`
  * com aquele `servico_id`. É o mesmo lançamento que a conclusão cria — por isso
  * essa lista é a prova do que foi faturado, não uma segunda contabilidade.
  */
 
 const BASE =
-  "id,data_prevista,data_executada,status,valor,plano_id,cliente_id,tumulo_id,prioridade," +
+  "id,data_prevista,data_executada,status,valor,plano_id,origem,cliente_id,tumulo_id,prioridade," +
   "tumulos(identificacao),clientes(nome,telefone),planos(cadencia)";
 const EXTRAS = ",data_desejada,desejada_estourada,observacao";
 
@@ -56,8 +59,14 @@ export async function GET(req: NextRequest) {
   function montar(cols: string) {
     let q = db.from("servicos").select(cols).eq("org_id", org);
     if (clienteId) q = q.eq("cliente_id", clienteId);
-    if (tipo === "avulso") q = q.is("plano_id", null);
-    if (tipo === "plano") q = q.not("plano_id", "is", null);
+    // AVULSO E `origem = 'pedido'` (0128) — nao mais a ausencia de plano.
+    //
+    // Ate a 0100 `plano_id is null` significava avulso. Naquela migration o
+    // contrato mudou de casa e o gerador passou a escrever null em TODA
+    // lavagem de contrato: em 24/08 a conta dava 258 de 262 servicos "avulsos",
+    // os 258 em jazigo contratado. Esta tela mostrava a agenda inteira.
+    if (tipo === "avulso") q = q.eq("origem", "pedido");
+    if (tipo === "plano") q = q.eq("origem", "contrato");
     if (situacao === "abertos") q = q.in("status", ["pendente", "agendado"]);
     if (situacao === "feitos") q = q.eq("status", "executado");
     if (situacao !== "abertos") q = q.neq("status", "cancelado");
@@ -122,7 +131,8 @@ export async function GET(req: NextRequest) {
     const pedida = s.data_desejada ?? null;
     return {
       id: s.id,
-      avulso: !s.plano_id,
+      avulso: s.origem === "pedido",
+      origem: (s.origem || "nao_definido") as string,
       cadencia: s.planos?.cadencia || null,
       clienteId: s.cliente_id,
       cliente: s.clientes?.nome || s.clientes?.telefone || "—",

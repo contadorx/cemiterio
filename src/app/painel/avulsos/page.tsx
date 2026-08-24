@@ -15,6 +15,12 @@ import { PainelNav, painel, cor } from "../ui";
  * Aqui não há filtro de data. É a lista de tudo que foi prometido e ainda não
  * foi feito, com duas datas lado a lado: a que a família pediu e a que a agenda
  * conseguiu. Quando a segunda passa da primeira, a linha fica vermelha.
+ *
+ * O QUE ENTRA AQUI, DESDE A 0128: só `origem = 'pedido'` — a lavagem que
+ * alguém PEDIU. Antes a conta era "serviço sem plano", e desde a 0100 isso
+ * vale para toda lavagem de contrato: em 24/08 esta tela mostrava 257 lavagens
+ * de contrato agendadas como se fossem pedidos em aberto. Ela não era a fila
+ * dos avulsos — era a agenda inteira, com outro nome.
  */
 
 interface Servico {
@@ -125,8 +131,8 @@ export default function AvulsosPage() {
           <div style={painel.card}>
             <p style={{ color: cor.cinza, margin: 0, lineHeight: 1.6 }}>
               {situacao === "abertos"
-                ? "Nenhuma limpeza avulsa em aberto. Elas nascem na ficha da família, no botão 🧽 Nova limpeza avulsa, ou no aviso de pedido que chega pela conversa."
-                : "Nenhuma limpeza avulsa concluída ainda."}
+                ? "Nenhuma limpeza pedida em aberto — e vazio aqui é uma boa notícia, não uma tela quebrada. Só entra o que alguém pediu: pela ficha da família, no botão 🧽 Nova limpeza avulsa, ou pelo aviso de pedido que chega na conversa. As lavagens de contrato ficam na Agenda."
+                : "Nenhuma limpeza pedida concluída ainda."}
             </p>
           </div>
         ) : (

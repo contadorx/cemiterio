@@ -218,7 +218,14 @@ export default function Painel() {
             {/* As duas colunas escritas por extenso: um ✓ e um ✗ sozinhos
                 exigiriam decorar qual é qual. */}
             <div className="flex items-center gap-2">
-              {l.semPlano ? (
+              {/* O REGIME É O ESTADO DOS JAZIGOS, e tem TRÊS respostas (0128).
+                  Aqui só havia duas, e a segunda mentia: "avulso" aparecia em
+                  293 famílias, das quais nenhuma era avulsa — 122 nem jazigo
+                  têm. Família sem jazigo não tem regime nenhum: tem cadastro
+                  pela metade, e é isso que o selo passa a dizer. */}
+              {l.regime === "sem_jazigo" ? (
+                <Selo tom="neutro">sem jazigo</Selo>
+              ) : l.regime === "avulso" ? (
                 <Selo tom="neutro">avulso</Selo>
               ) : l.limpezaOk ? (
                 <Selo tom="bom">limpa</Selo>

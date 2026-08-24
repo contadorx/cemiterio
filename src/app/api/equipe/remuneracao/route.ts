@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   // Agora: colunas certas, e o erro aparece em vez de virar zero.
   const { data: doMes, error: eDoMes } = await db
     .from("servicos")
-    .select("id,executora_id,valor,valor_executora,pago_executora_em,plano_id,data_executada,tumulos(identificacao,quadras(codigo)),planos(cadencia)")
+    .select("id,executora_id,valor,valor_executora,pago_executora_em,plano_id,origem,data_executada,tumulos(identificacao,quadras(codigo)),planos(cadencia)")
     .eq("status", "executado")
     .gte("data_executada", ini)
     .lt("data_executada", prox)
@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
 
     const { data: alvo } = await db
       .from("servicos")
-      .select("id,executora_id,valor,plano_id,planos(cadencia)")
+      .select("id,executora_id,valor,plano_id,origem,planos(cadencia)")
       .eq("status", "executado")
       .is("pago_executora_em", null)
       .not("executora_id", "is", null);
