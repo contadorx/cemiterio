@@ -108,7 +108,6 @@ export default function AgendaPage() {
   const [remarcando, setRemarcando] = useState<string | null>(null);
   const [novaData, setNovaData] = useState("");
   const [replanejar, setReplanejar] = useState(true);
-  const [maisDe, setMaisDe] = useState<string | null>(null);
 
   const [periodo, setPeriodo] = useState({ dias: 14, inicio: "", fim: "" });
   const [gerando, setGerando] = useState(false);
@@ -344,7 +343,6 @@ export default function AgendaPage() {
       alert(r.valorEstornado > 0
         ? `Estornada. ${dinheiro(Number(r.valorEstornado))} devolvidos para a família.`
         : "Estornada. Não havia cobrança lançada.");
-      setMaisDe(null);
       carregar();
     } else alert(r?.erro || "Não consegui estornar.");
   }
@@ -374,7 +372,6 @@ export default function AgendaPage() {
       );
     }
     setRemarcando(null);
-    setMaisDe(null);
     setNovaData("");
     carregar();
   }
@@ -851,12 +848,21 @@ export default function AgendaPage() {
                     </div>
 
                     {/* ------------------------------------------- controles
-                        Eram quatro botões e uma caixa de seleção em toda linha,
-                        com Excluir em vermelho sempre à vista. Numa lista de
-                        vinte, o que se faz todo dia (remarcar) tinha o mesmo
-                        peso do que quase nunca se faz e não se desfaz.
+                        TUDO À VISTA, por pedido dela.
+                        
+                        Antes, só Remarcar aparecia e Pular, Excluir e Soltar
+                        data ficavam atrás de um "mais ⌄". A intenção era tirar
+                        peso visual de uma lista de vinte linhas — mas na
+                        prática cobrava um clique a mais em toda decisão que não
+                        fosse remarcar, e obrigava a lembrar que o resto existia
+                        escondido ali.
 
-                        Fica Remarcar à mostra; o resto entra em "mais". */}
+                        Quem mexe nesta tela é a Sureya, na véspera, com pressa.
+                        Uma ação a um toque vale mais que uma lista enxuta.
+
+                        O que NÃO mudou: Excluir continua vermelho e continua
+                        perguntando antes. Estar à vista não é o mesmo que ser
+                        fácil de fazer sem querer. */}
                     {!executado && (
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         {remarcando === s.id ? (
@@ -888,54 +894,44 @@ export default function AgendaPage() {
                         ) : (
                           <>
                             <button style={painel.botaoMiniSec}
-                                    onClick={() => { setRemarcando(s.id); setMaisDe(null); }}>
+                                    onClick={() => setRemarcando(s.id)}>
                               Remarcar
                             </button>
                             <button style={painel.botaoMiniSec}
-                                    aria-expanded={maisDe === s.id}
-                                    onClick={() => setMaisDe(maisDe === s.id ? null : s.id)}>
-                              mais ⌄
+                                    onClick={() => {
+                                      const motivo = prompt(
+                                        "Pular esta lavagem?\n\n" +
+                                        "A próxima do jazigo já vem no ciclo seguinte.\n" +
+                                        "Motivo (opcional):", "");
+                                      if (motivo !== null) acao(s.id, { acao: "pular", motivo });
+                                    }}>
+                              Pular
                             </button>
-                            {maisDe === s.id && (
-                              <div style={{ display: "flex", gap: 8, alignItems: "center",
-                                            flexWrap: "wrap", padding: "6px 8px",
-                                            background: "rgb(var(--zm-fundo))",
-                                            border: `1px solid ${cor.linha}`, borderRadius: 10 }}>
-                                {s.fixado && (
-                                  <button style={painel.botaoMiniSec}
-                                          title="Devolve esta lavagem para a distribuição automática"
-                                          onClick={() => {
-                                            if (!confirm(
-                                              `Devolver ${s.jazigo} para a agenda automática?\n\n` +
-                                              "A data que você escolheu deixa de ser respeitada: na próxima " +
-                                              "geração ela pode mudar de dia."
-                                            )) return;
-                                            acao(s.id, { acao: "desfixar" });
-                                          }}>
-                                    Soltar data
-                                  </button>
-                                )}
-                                <button style={painel.botaoMiniSec}
-                                        onClick={() => {
-                                          const motivo = prompt(
-                                            "Pular esta lavagem?\n\n" +
-                                            "A próxima do jazigo já vem no ciclo seguinte.\n" +
-                                            "Motivo (opcional):", "");
-                                          if (motivo !== null) acao(s.id, { acao: "pular", motivo });
-                                        }}>
-                                  Pular
-                                </button>
-                                <button style={painel.botaoMiniPerigo}
-                                        onClick={() => {
-                                          if (!confirm(
-                                            `Excluir a lavagem de ${s.jazigo}?\n\n` +
-                                            `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
-                                          excluir(s.id);
-                                        }}>
-                                  Excluir
-                                </button>
-                              </div>
+                            {/* "Soltar data" só existe para lavagem com data fixada à
+                                mão — nas outras, o botão não teria o que soltar. */}
+                            {s.fixado && (
+                              <button style={painel.botaoMiniSec}
+                                      title="Devolve esta lavagem para a distribuição automática"
+                                      onClick={() => {
+                                        if (!confirm(
+                                          `Devolver ${s.jazigo} para a agenda automática?\n\n` +
+                                          "A data que você escolheu deixa de ser respeitada: na próxima " +
+                                          "geração ela pode mudar de dia."
+                                        )) return;
+                                        acao(s.id, { acao: "desfixar" });
+                                      }}>
+                                Soltar data
+                              </button>
                             )}
+                            <button style={painel.botaoMiniPerigo}
+                                    onClick={() => {
+                                      if (!confirm(
+                                        `Excluir a lavagem de ${s.jazigo}?\n\n` +
+                                        `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
+                                      excluir(s.id);
+                                    }}>
+                              Excluir
+                            </button>
                           </>
                         )}
                       </div>
@@ -943,14 +939,10 @@ export default function AgendaPage() {
                     {executado && (
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <Avaliar servicoId={s.id} />
+                        {/* Estornar também sai de trás do "mais ⌄". Continua
+                            vermelho e continua perguntando antes — o que muda é
+                            só o clique a mais para achá-lo. */}
                         {!s.estornadoEm && (
-                          <button style={painel.botaoMiniSec}
-                                  aria-expanded={maisDe === s.id}
-                                  onClick={() => setMaisDe(maisDe === s.id ? null : s.id)}>
-                            mais ⌄
-                          </button>
-                        )}
-                        {maisDe === s.id && !s.estornadoEm && (
                           <button style={painel.botaoMiniPerigo}
                                   onClick={() => estornar(s.id, s.jazigo || "este jazigo")}>
                             Estornar
