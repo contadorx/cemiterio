@@ -229,6 +229,29 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
     };
   }
 
+  // OS JAZIGOS PARADOS A PEDIDO DA FAMÍLIA (0119).
+  //
+  // Uma consulta só, e não uma por jazigo: são 266 jazigos e o gerador roda
+  // todo dia. `pausas_tumulo` com `fim` nulo é a única fonte de "está parado"
+  // — não há booleano espelhado em `tumulos` para desencontrar.
+  //
+  // Falha aqui NÃO vira lista vazia: gerar limpeza para quem pediu para parar
+  // é pior do que não gerar nada, então o erro sobe.
+  const { data: pausas, error: erroPausas } = await db
+    .from("pausas_tumulo")
+    .select("tumulo_id")
+    .eq("org_id", org)
+    .is("fim", null);
+
+  if (erroPausas) {
+    await registrarErro("agenda: nao consegui ler as paradas", erroPausas.message, {});
+    return {
+      criados: 0, planosAtivos: 0, planosNoHorizonte: 0, foraDoHorizonte: 0,
+      jaExistiam: 0, falhas: 1, proximaData: null, horizonteDias,
+    };
+  }
+  const parados = new Set(((pausas as any[]) || []).map((p) => p.tumulo_id));
+
   let criados = 0;
   let jaExistiam = 0;
   let falhasTotais = 0;
@@ -237,6 +260,10 @@ export async function gerarServicosDevidos(horizonteDias = 30): Promise<Diagnost
   let proximaData: string | null = null;
 
   for (const p of planos || []) {
+    // Parado a pedido da família: não se gera limpeza (0119). O combinado
+    // continua inteiro — valor, ritmo, datas —, só não acontece.
+    if (parados.has((p as any).id)) continue;
+
     // A periodicidade JÁ é o intervalo entre limpezas — não há mais "quantas
     // por ciclo" para dividir. "Semanal" é a cada 7 dias, e ponto.
     const passo = DIAS_CICLO[(p as any).periodicidade];

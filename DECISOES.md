@@ -1887,3 +1887,287 @@ De quebra, três dos cinco contadores da régua liam chaves que
 `sureya_regua_do_dia` nunca devolveu (`ja_existiam`, `sem_saldo`,
 `por_limite_diario`): o relatório do cron dizia zero neles desde a 0111 —
 inclusive no que conta cobrança que deixou de sair.
+
+---
+
+## D-39 · Flores no último sábado (0117)
+
+**Pedido:** *"eu coloco flores sábado, então ele contratou flores no último
+sábado do mês… preciso então ter uma esteira para isso, e uma forma de colocar
+e enviar fotos… e principalmente de prever a compra."*
+
+### O que já existia, e o que faltava
+
+O catálogo existe desde a 0045 (`servicos_extras`, 14 itens, com **preço e
+custo** — "Flores frescas" a R$ 35 o buquê que custa R$ 18). O que não existia
+era o meio do caminho: o **combinado que se repete**, a **lista do sábado** e a
+**previsão da compra**.
+
+Sem o combinado, "último sábado do mês" só existe na cabeça do Leandro. Sem a
+lista, o sábado é memória. Sem a previsão, a compra é chute — e num serviço em
+que o custo é um buquê que murcha, chutar para cima é prejuízo miúdo e para
+baixo é a família sem flor no dia em que ela foi ao jazigo.
+
+### Esteira separada, e não uma linha em `servicos`
+
+Decisão do Leandro (rota própria, executada por ele), e é a certa por dentro
+também. `servicos` significa **lavagem** em quinze lugares: o alocador mede
+capacidade por duração de lavagem, o painel conta "executadas / pelo campo /
+anotadas", `sem_entrega` acusa jazigo cobrado sem limpeza, a Nina abre a lista
+dela.
+
+Enfiar flor ali com uma coluna `tipo` obrigaria a filtrar todos esses lugares —
+e o que se esquece de filtrar **não dá erro**: seis buquês somem como seis
+lavagens, e uma flor entregue cala o aviso de que o jazigo foi cobrado sem ser
+limpo. Este banco já foi mordido cinco vezes por duas contas sobre o mesmo
+fato. Há guarda em `checar-ficha.mjs` contra a esteira voltar a escrever em
+`servicos`.
+
+### O ritmo: dia da semana + quais semanas
+
+`{dia_semana: 6, semanas: [-1]}` = todo último sábado. O `-1` conta **de trás**,
+e é o ponto: *"último sábado" não é "quarto sábado"*. Agosto/2026 tem cinco
+sábados — pela contagem da frente a família receberia a flor no dia 22 em vez
+do 29. Em três meses de cada quatro os dois dão a mesma data, então o erro só
+aparece no mês de cinco sábados, e aparece na mão de quem esperava a flor.
+
+Uma implementação só (`sureya_proxima_data_extra`), chamada pelo gerador, pela
+tela e pelo teste. E a frase por extenso vem do servidor: um combinado que só
+existe como `{6, [-1]}` é um combinado que ninguém confere.
+
+### Recorrente e avulso são a mesma coisa com vencimento diferente
+
+Nos dois casos **só se cobra o que foi entregue** — a mesma regra da lavagem
+(0104): entrega prevista não é receita, e o débito nasce no botão do sábado,
+não no gerador. O que muda é só o vencimento:
+
+| | vence |
+|---|---|
+| recorrente | junto com a próxima cobrança do contrato do jazigo — a família recebe **uma** conta |
+| avulso | sozinha, no dia da casa do mês da entrega |
+
+No avulso, se o dia 10 já passou quando a flor foi posta, o vencimento pula
+para o mês seguinte: cobrar com data de ontem faria a família nascer
+inadimplente pelo serviço que acabou de receber. As três leituras da 0114
+valem aqui também — competência é o mês em que a flor foi posta, `data` é
+quando o dinheiro é devido.
+
+### A foto entra na liberação, como todo o resto
+
+*"ele pode ficar também na liberação enquanto não disparamos automático."* A
+foto da entrega entra em `fila_liberacao` com o mesmo desenho da foto da
+lavagem — nasce `aguardando`, e o gatilho da porta (0085) aplica a chave de
+envio de fotos da família. Não há caminho daqui para o WhatsApp.
+
+Sem foto **não é erro** (pode ter chovido), mas a tela diz: *"Registrada sem
+foto — nada foi para a liberação"*. Fingir que enviou seria pior.
+
+### E `pedidos_extras`, que já existia
+
+A 0045 criou também o pedido avulso, com sua própria `sureya_entregar_extra` —
+que continua de pé e com teste. Ela quase servia, e o harness pegou a colisão
+de nome antes de mim. Não foi usada porque é do **cliente** e não da família
+(anterior ao D-01), aponta para `movimentos` (o razão congelado desde a 0074),
+não guarda **custo** — metade da pergunta do Leandro — e não tem data
+**prevista**, sendo que a esteira inteira vive do que ainda não aconteceu.
+
+Nunca foi ligada: uma linha em produção, cancelada, e `Extras.tsx` não é
+importado por ninguém. Uma entrega avulsa agora nasce em `entregas_extras` com
+`assinatura_id` nulo. Retirar a tabela velha ficou em PENDENCIAS: mexer numa
+porta de dinheiro para apagar código morto é troca ruim hoje.
+
+### O que a margem da tela não é
+
+Diferença entre o que a flor custa e o que ela é cobrada. **Não** desconta o
+tempo do Leandro nem o deslocamento — e a tela diz isso, porque chamar aquilo
+de lucro seria vender uma conta que não fecha.
+
+Ensaiado em produção e desfeito: um combinado de último sábado gerou 29/08,
+26/09 e 31/10, e a previsão devolveu custo, preço e margem por data.
+
+---
+
+## D-40 · O portal da família nunca abriu (0118)
+
+**Relato:** *"fui em uma família criar o link da família e ele não funcionou no
+navegador e não aparece também."*
+
+Dois defeitos, e o primeiro é de raiz.
+
+### `anon` nunca teve permissão
+
+A rota `/api/portal` é pública e diz, no próprio comentário, o desenho:
+*"usa a chave anon + RPCs SECURITY DEFINER, que só expõem dados não-sensíveis
+do túmulo pelo token"*. O desenho está certo. Faltava a metade que o faz
+funcionar. Medido em produção:
+
+```
+set role anon; select * from sureya_portal_cabecalho('...');
+→ ERROR: permission denied for function sureya_portal_cabecalho
+```
+
+É a lição da 0067/0079 pelo avesso: lá foi permissão **de mais** no DELETE,
+aqui **de menos** numa função pública. `SECURITY DEFINER` ignora RLS, então o
+`GRANT` é a única guarda que sobra — e foi tratado como detalhe nas duas vezes.
+
+Devolver a permissão é seguro: as três funções de leitura filtram por
+`qr_token` (32 caracteres, `gen_random_bytes(16)` em hexa), exigem 16+ e
+devolvem identificação, falecido, quadra, cemitério e as fotos. Nenhum valor,
+telefone ou saldo. `emitir` e `revogar` continuam fechadas — leem
+`current_org_id()` e são do painel.
+
+### O erro saía pela porta do "não existe"
+
+A rota juntava os dois `error` com o resultado vazio num `if` só e devolvia
+**404 `nao_encontrado`**. Permissão negada e token inexistente saíam iguais: a
+família lia *"este link não existe"* sobre um link que existe, e nada aparecia
+em log nenhum. Agora falha do banco é 500 e vai para `erros_log`; 404 voltou a
+significar o que sempre deveria: este token não é de jazigo nenhum.
+
+### E o link nunca aparecia na tela
+
+Ele existia **apenas** dentro de `navigator.clipboard?.writeText(link)` — que
+é opcional, falha calado fora de HTTPS e não devolve nada. Quem clicasse em
+"Copiar" e colasse podia estar colando outra coisa, sem ter como conferir.
+Agora o endereço aparece escrito, com "abrir para testar" e "gerar outro" (com
+o aviso de que isso invalida o que a família já tem).
+
+De quebra: `sureya_portal_irmaos` casava `cliente_id`, anterior ao D-01. Dos
+266 jazigos, 266 têm família e 239 têm `cliente_id` — 27 nunca veriam os
+irmãos, e dois jazigos da mesma família cadastrados por pessoas diferentes não
+se enxergavam. Passou a casar `familia_id`.
+
+---
+
+## D-41 · Parar e retomar, a pedido da família (0119)
+
+**Pedido:** *"a situação de parada e retomada do serviço em razão de pedidos da
+família, quando ela pede para eu parar o serviço e depois para retomar tempos
+depois."*
+
+Não havia como registrar isso. O que se fazia no lugar era desmarcar
+`contratado` — que **apaga** o combinado em vez de suspendê-lo: some o valor,
+o ritmo, a data. Retomar significava recadastrar de memória, e três meses
+depois ninguém sabia se aquele jazigo tinha parado, sido cancelado, ou perdido
+um clique. **Parar não é cancelar.**
+
+### O relógio congela e anda junto
+
+Decisão do Leandro. Os meses parados não são cobrados **e** a próxima cobrança
+anda para frente na mesma medida — a família não perde o período que
+contratou, ele só acontece mais tarde.
+
+> Magda, pós-pago a cada 2 meses, período set–out cobrado em novembro. Parou em
+> 01/09, voltou em 01/11. Na retomada: período nov–dez, cobrança em janeiro.
+
+A alternativa era pular os meses mantendo o calendário — ela receberia dois
+meses a menos de serviço pelo mesmo ciclo.
+
+Contado sobre o primeiro dia do mês dos dois lados: parar dia 10 e voltar dia
+20 do mesmo mês não empurra nada, porque não houve mês sem serviço.
+
+### A pausa alcança lavagem, cobrança e flores
+
+Não alcança as datas de memória: quem parou a limpeza por dinheiro pode
+continuar querendo a lembrança do aniversário, e essas mensagens não custam
+nada a ela.
+
+Parar também **tira da frente** o que já estava marcado — limpeza agendada e
+entrega de flores prevista. Sem isso a Nina iria ao jazigo que a família pediu
+para não tocar, sem ter como saber pela tela dela, e a previsão de compra
+continuaria contando o buquê. E o gerador de flores passou a pular jazigo
+parado, ou o cron desfaria amanhã, em silêncio, a parada de hoje.
+
+### A âncora do período passou a ser escrita
+
+A 0115 **deduzia** o início do período contando quantas competências já haviam
+sido lançadas. Funcionava porque nenhum mês era pulado. A pausa pula meses, e a
+conta quebra: a âncora volta para um período que já fechou, relançando meses
+antigos ou pulando os novos — **sem erro nenhum na tela**.
+
+Então `tumulos.periodo_inicio` passou a ser gravado, ao lado de
+`proxima_cobranca`, que já andava assim. As duas caminham juntas: uma diz que
+meses o período cobre, a outra diz quando ela paga. O backfill gravou
+exatamente o que a dedução devolvia, e a dedução continua como fallback para
+cadastro que não passou por ele — não é sobra de código, é o único jeito de um
+cadastro antigo continuar dando hoje a resposta que dava ontem.
+
+A ficha passou a gravar a âncora ao salvar o contrato, ou todo jazigo novo
+nasceria sem ela.
+
+### As travas
+
+Duas pausas abertas seriam duas contagens de meses parados (índice único
+parcial). Retomar sem estar parado empurraria a cobrança de graça. E o motivo é
+obrigatório: *parado* sem motivo, meses depois, é a pergunta que a família faz
+e a casa não sabe responder.
+
+---
+
+## D-42 · Auditoria do painel: o que ele media, o que mentia, e o que faltava (0120)
+
+**Pedido:** *"revise todo o painel e audite se os números são os mais adequados
+para o negócio e se são acionáveis, abrem relatórios de gestão. Preciso de
+operacionais com números de lavagens, disparos de mensagem, mensagens enviadas
+sugeridas por ia… Tem que ser a gestão do negócio, serviços extras de flores."*
+
+### O que a auditoria mediu em produção (agosto/2026)
+
+| | |
+|---|---|
+| jazigos contratados | 78 |
+| jazigos **atendidos** no mês | **2** |
+| lavagens executadas | 5 |
+| com foto (a prova que a família recebe) | **1 de 5** |
+| registradas pelo campo | 1 de 5 |
+| cobrados sem limpeza no mês | 11 jazigos, R$ 430 |
+| sugestões da IA | 159 |
+| **usadas** | **2** (1,3%) |
+| custo da IA | R$ 1,13 no mês · 100 mil tokens |
+| mensagens que saíram | 12 |
+| saíram **pela fila de liberação** | **0** |
+| conversas sem resposta | 146 de 157 |
+
+### Os cinco defeitos
+
+**1. "Limpezas executadas: 5" sem denominador.** Cinco de quantas? Sem
+denominador qualquer número parece razoável. O número que dirige o negócio é
+**2 de 78**, e ele não existia. Agora a cobertura vem primeiro, e os jazigos
+parados a pedido da família saem da conta — quem cancelou não é falha da casa.
+
+**2. A foto não era contada.** O painel separava "pelo campo" de "anotadas",
+que é sobre *quem registrou*. Não dizia quantas têm a prova que a **família**
+recebe. Quatro de cinco não tinham. São três coisas diferentes, e agora as três
+são contadas.
+
+**3. Mensagem e IA não existiam no painel.** A casa gastou 159 sugestões para
+aproveitar duas e não havia onde ver isso. O bloco novo separa `pela_fila` do
+total de propósito: a fila é a porta que a casa escolheu, e medir quanto passa
+por ela é medir se a decisão pegou. Passou zero.
+
+**4. Nada abria.** "Cobrado e não entregue: 11 jazigos" não levava aos onze.
+Número que não abre não é gestão, é placar — olhado todo mês e nunca usado.
+Agora nove cartões abrem a lista que os soma, cada linha leva à ficha, e a
+lista sai da **mesma função** que conta o cartão (`sureya_painel_detalhe`).
+Uma consulta própria por bloco faria os dois contarem o mesmo fato de dois
+jeitos, que é o defeito de forma que já custou caro cinco vezes aqui.
+
+**5. A margem mentia — e esta é a única correção que muda um número que já
+estava na tela.** `lancamentos` tem zero linhas desde sempre, então "margem =
+receita − 0" devolvia a receita inteira com cara de lucro. A tela pedia
+desculpa num rodapé pequeno embaixo de um número grande, e número grande com
+ressalva pequena é lido como número grande. Agora o banco devolve **nulo** e a
+tela mostra a receita **dizendo que é receita**.
+
+### E as flores ganharam bloco próprio
+
+Entregas, receita, custo dos buquês e sobra — com a mesma ressalva da tela de
+Flores: não desconta o tempo do Leandro nem o deslocamento.
+
+### De quebra: um teste que dependia do dia em que rodava
+
+`simular.ts` afirmava *"o alocador respeita os dias de trabalho"* e media **todo
+serviço do banco**, inclusive duas lavagens já executadas em `diasAtras(30)`.
+Passou por acaso até 23/08 e quebrou no dia 24, quando `hoje − 30` caiu num
+sábado. Uma lavagem de verdade pode acontecer num sábado — não é falha de
+alocação. Passou a olhar só o que o alocador marcou (`status = 'agendado'`).

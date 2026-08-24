@@ -45,6 +45,9 @@ export default function PainelDoMes() {
   const [mes, setMes] = useState(mesOperacao());
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState("");
+  // O RELATÓRIO ABERTO. Um por vez: dois abertos empilham listas longas e a
+  // pessoa perde de vista qual número gerou qual.
+  const [aberto, setAberto] = useState<string>("");
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -69,6 +72,11 @@ export default function PainelDoMes() {
   // dívida: é o dinheiro reconhecido que ainda vai ser cobrado.
   const fut = d.a_vencer || { valor: 0, familias: 0 };
   const lav = d.lavagens, cus = d.custos, car = d.carteira, res = d.resultado;
+  // OS BLOCOS DA AUDITORIA (0120). Coalesce porque um painel de mês antigo,
+  // servido por cache, ainda pode vir sem eles.
+  const cob = d.cobertura || {}, msg = d.mensagens || {}, ia = d.ia || {}, flo = d.flores || {};
+
+  const abrir = (b: string) => setAberto((x) => (x === b ? "" : b));
 
   // A COBERTURA DA COBRANÇA. Contratado não é o mesmo que cobrável: falta
   // valor combinado e falta a data. É a diferença entre "vendemos" e "vamos
@@ -162,9 +170,40 @@ export default function PainelDoMes() {
 
       {/* ============================================ 3 · A ENTREGA */}
       <Faixa titulo="A casa entregou o que cobrou" />
+
+      {/* A COBERTURA VEM PRIMEIRO, e "5 limpezas" depois.
+          Cinco de quantas? A auditoria de 24/08 mediu 78 jazigos contratados e
+          DOIS atendidos no mês. O painel dizia "5 limpezas executadas" e o
+          número parecia razoável — sem denominador, qualquer número parece. */}
       <div style={grade}>
+        <Cartao titulo="Jazigos atendidos no mês"
+                valor={`${cob.atendidos ?? 0} de ${cob.em_servico ?? 0}`}
+                tom={Number(cob.nao_atendidos) > 0 ? "atencao" : "bom"}
+                destaque
+                rodape={Number(cob.parados) > 0
+                  ? `${cob.parados} parado(s) a pedido da família, fora da conta`
+                  : "sobre os que estão em serviço"} />
+        <Cartao titulo="Sem atendimento" valor={String(cob.nao_atendidos ?? 0)}
+                tom={Number(cob.nao_atendidos) > 0 ? "ruim" : "bom"}
+                abre="nao_atendidos" aoAbrir={abrir} ativo={aberto === "nao_atendidos"}
+                rodape="contratado, em serviço, e ninguém foi lá" />
         <Cartao titulo="Limpezas executadas" valor={String(lav.executadas)} tom="neutro"
-                rodape={`${lav.em_aberto} ainda em aberto no mês`} />
+                abre="lavagens" aoAbrir={abrir} ativo={aberto === "lavagens"}
+                rodape={`${lav.em_aberto} agendada(s) à frente`} />
+        <Cartao titulo="Sem foto" valor={String(lav.sem_foto ?? 0)}
+                tom={Number(lav.sem_foto) > 0 ? "atencao" : "bom"}
+                abre="sem_foto" aoAbrir={abrir} ativo={aberto === "sem_foto"}
+                rodape={`${lav.com_foto ?? 0} com a prova para a família`} />
+      </div>
+
+      <Relatorio bloco="nao_atendidos" aberto={aberto} mes={mes}
+                 titulo="Jazigos sem atendimento no mês" />
+      <Relatorio bloco="lavagens" aberto={aberto} mes={mes}
+                 titulo="As limpezas do mês" />
+      <Relatorio bloco="sem_foto" aberto={aberto} mes={mes}
+                 titulo="Limpezas sem foto" />
+
+      <div style={grade}>
         <Cartao titulo="Registradas no campo" valor={String(lav.pelo_campo)} tom="bom"
                 rodape="alguém apertou “Começar” no jazigo" />
         <Cartao titulo="Anotadas depois" valor={String(lav.anotadas)}
@@ -177,7 +216,8 @@ export default function PainelDoMes() {
       <p style={nota}>
         <b>Campo</b> e <b>anotada</b> não são a mesma coisa. Só a primeira tem prova de
         que alguém esteve no jazigo — é o <i>Começar</i> que carimba a hora. A segunda é
-        memória de quem digitou. Elas separadas é o que permite confiar na primeira.
+        memória de quem digitou. E a <b>foto</b> é uma terceira coisa: é o que a família
+        recebe. Limpeza feita e sem foto é serviço prestado que ninguém viu.
       </p>
 
       {/* O RISCO NOVO. Antes da 0104 a limpeza gerava a cobrança, então o
@@ -193,7 +233,13 @@ export default function PainelDoMes() {
             executada</b>. Desde que a cobrança deixou de depender da limpeza, este é o
             risco da casa — e ele não aparece em lugar nenhum sozinho.
           </p>
-          <p style={{ margin: "8px 0 0", fontSize: 14 }}>
+          <p style={{ margin: "8px 0 0", fontSize: 14, display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <button onClick={() => abrir("sem_entrega")}
+                    style={{ ...painel.botaoMiniSec, background: "transparent",
+                             border: "none", color: "#7c2d12", padding: 0,
+                             textDecoration: "underline", cursor: "pointer" }}>
+              {aberto === "sem_entrega" ? "fechar a lista" : "ver quais são"}
+            </button>
             <Link href="/painel/agenda" style={{ color: cor.navy }}>Ver a agenda →</Link>
           </p>
         </div>
@@ -201,6 +247,118 @@ export default function PainelDoMes() {
         <div style={{ ...painel.card, background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
           <strong style={{ color: "#065f46" }}>Tudo que foi cobrado teve limpeza no mês.</strong>
         </div>
+      )}
+
+      <Relatorio bloco="sem_entrega" aberto={aberto} mes={mes}
+                 titulo="Cobrado e não entregue" />
+
+      {/* ==================================== 3b · O QUE A CASA FALOU */}
+      <Faixa titulo="O que a casa falou com as famílias" />
+      <div style={grade}>
+        <Cartao titulo="Mensagens que saíram" valor={String(msg.saidas ?? 0)} tom="neutro"
+                abre="mensagens" aoAbrir={abrir} ativo={aberto === "mensagens"}
+                rodape={`${msg.entradas ?? 0} chegaram das famílias`} />
+        <Cartao titulo="Pela fila de liberação" valor={String(msg.pela_fila ?? 0)}
+                tom={Number(msg.saidas) > 0 && Number(msg.pela_fila) === 0 ? "atencao" : "neutro"}
+                rodape={`${msg.aguardando ?? 0} esperando o seu comando`} />
+        <Cartao titulo="Conversas sem resposta" valor={String(msg.sem_resposta ?? 0)}
+                tom={Number(msg.sem_resposta) > 0 ? "atencao" : "bom"}
+                abre="sem_resposta" aoAbrir={abrir} ativo={aberto === "sem_resposta"}
+                rodape={`de ${msg.conversas ?? 0} conversas do mês`} />
+        <Cartao titulo="Falhas de envio" valor={String(msg.falharam ?? 0)}
+                tom={Number(msg.falharam) > 0 ? "atencao" : "bom"}
+                rodape={`${msg.na_espera ?? 0} na fila de reenvio`} />
+      </div>
+
+      <Relatorio bloco="mensagens" aberto={aberto} mes={mes}
+                 titulo="Mensagens enviadas no mês" />
+      <Relatorio bloco="sem_resposta" aberto={aberto} mes={mes}
+                 titulo="Conversas sem resposta" />
+
+      {/* A FILA É A PORTA QUE A CASA ESCOLHEU. Medir quanto passa por ela é
+          medir se a decisão pegou — e em agosto/2026 nenhuma das 12 mensagens
+          passou. Isso não é erro de ninguém: é um dado sobre como se trabalha
+          de verdade, e ele estava invisível. */}
+      {Number(msg.saidas) > 0 && Number(msg.pela_fila) === 0 && (
+        <p style={nota}>
+          Todas as {msg.saidas} mensagens do mês saíram <b>fora da fila de liberação</b>
+          {" "}— direto pelo WhatsApp. A fila existe para você ler antes de mandar; se
+          ela não está sendo usada, ou o caminho está longo demais, ou não é onde o
+          trabalho acontece.
+        </p>
+      )}
+
+      {/* ==================================== 3c · A IA */}
+      <Faixa titulo="A IA está ajudando?" />
+      {Number(ia.sugestoes ?? 0) === 0 ? (
+        <div style={{ ...painel.card, background: "#f8fafc" }}>
+          <strong style={{ color: cor.navy }}>Nenhuma sugestão neste mês.</strong>
+          <p style={{ margin: "8px 0 0", fontSize: 14.5, color: cor.cinza }}>
+            Sem sugestões não há aproveitamento a medir — e isso é diferente de 0%.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={grade}>
+            <Cartao titulo="Sugestões" valor={String(ia.sugestoes)} tom="neutro"
+                    rodape={`${ia.chamadas ?? 0} chamada(s) ao modelo`} />
+            <Cartao titulo="Você usou" valor={String(ia.usadas ?? 0)}
+                    tom={Number(ia.aproveitamento) >= 30 ? "bom" : "atencao"}
+                    destaque
+                    rodape={ia.aproveitamento != null
+                      ? `${ia.aproveitamento}% do que ela escreveu`
+                      : undefined} />
+            <Cartao titulo="Descartadas" valor={String(ia.descartadas ?? 0)}
+                    tom={Number(ia.descartadas) > Number(ia.usadas) ? "atencao" : "neutro"}
+                    abre="ia_descartadas" aoAbrir={abrir} ativo={aberto === "ia_descartadas"}
+                    rodape="ler por que ajuda a corrigir o texto" />
+            <Cartao titulo="Custou" valor={brl(ia.custo)} tom="neutro"
+                    rodape={`${Number(ia.tokens || 0).toLocaleString("pt-BR")} tokens`} />
+          </div>
+
+          <Relatorio bloco="ia_descartadas" aberto={aberto} mes={mes}
+                     titulo="Sugestões descartadas" />
+
+          {Number(ia.aproveitamento) < 20 && (
+            <p style={nota}>
+              <b>Aproveitamento de {ia.aproveitamento}%.</b> A casa pagou {brl(ia.custo)}
+              {" "}para escrever {ia.sugestoes} mensagens e usou {ia.usadas}. Isso pode
+              querer dizer três coisas diferentes — o texto não serve, o momento está
+              errado, ou a sugestão nunca deveria ter sido feita. A lista dos descartes
+              é o único jeito de saber qual delas.
+            </p>
+          )}
+        </>
+      )}
+
+      {/* ==================================== 3d · FLORES E EXTRAS */}
+      <Faixa titulo="Flores e serviços extras" />
+      {Number(flo.assinaturas ?? 0) === 0 && Number(flo.entregues ?? 0) === 0
+        && Number(flo.previstas ?? 0) === 0 ? (
+        <div style={{ ...painel.card, background: "#f8fafc" }}>
+          <strong style={{ color: cor.navy }}>Nenhum combinado de flores ainda.</strong>
+          <p style={{ margin: "8px 0 0", fontSize: 14.5, color: cor.cinza }}>
+            O combinado mora no jazigo, na ficha da família. Depois de criado, o sábado
+            e a compra aparecem em <Link href="/painel/flores" style={{ color: cor.navy }}>Flores →</Link>
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={grade}>
+            <Cartao titulo="Entregas feitas" valor={String(flo.entregues ?? 0)} tom="bom"
+                    abre="flores" aoAbrir={abrir} ativo={aberto === "flores"}
+                    rodape={`${flo.previstas ?? 0} ainda previstas no mês`} />
+            <Cartao titulo="Receita das flores" valor={brl(flo.receita)} tom="neutro"
+                    rodape={`${flo.jazigos ?? 0} jazigo(s)`} />
+            <Cartao titulo="Custo dos buquês" valor={brl(flo.custo)} tom="neutro"
+                    rodape={`${flo.assinaturas ?? 0} combinado(s) ativo(s)`} />
+            <Cartao titulo="Sobra" valor={brl(flo.margem)}
+                    tom={Number(flo.margem) > 0 ? "bom" : "neutro"}
+                    rodape="sem o seu tempo nem o deslocamento" />
+          </div>
+          <Relatorio bloco="flores" aberto={aberto} mes={mes}
+                     titulo="Entregas de flores no mês" />
+        </>
       )}
 
       {/* ============================================ 4 · O CUSTO */}
@@ -230,14 +388,20 @@ export default function PainelDoMes() {
         </div>
       )}
 
+      {/* A MARGEM SÓ APARECE SE HOUVER O QUE SUBTRAIR (0120).
+          Antes o cartão mostrava `brl(res.margem)` com a margem valendo a
+          receita inteira, e o rodapé pedia desculpa embaixo. Um número grande
+          com uma ressalva pequena é lido como número grande. Agora o banco
+          devolve nulo e a tela mostra a RECEITA, dizendo que é receita. */}
       <div style={grade}>
-        <Cartao titulo={Number(cus.lancamentos) === 0 ? "Receita (sem custos lançados)" : "Resultado do mês"}
-                valor={brl(res.margem)}
-                tom={Number(cus.lancamentos) === 0 ? "neutro" : (Number(res.margem) >= 0 ? "bom" : "ruim")}
-                destaque
-                rodape={Number(cus.lancamentos) === 0
-                  ? "não é margem: nenhuma despesa foi lançada"
-                  : `${brl(res.receita)} de receita − ${brl(res.custos)} de custos`} />
+        {res.tem_custo ? (
+          <Cartao titulo="Resultado do mês" valor={brl(res.margem)}
+                  tom={Number(res.margem) >= 0 ? "bom" : "ruim"} destaque
+                  rodape={`${brl(res.receita)} de receita − ${brl(res.custos)} de custos`} />
+        ) : (
+          <Cartao titulo="Receita do mês" valor={brl(res.receita)} tom="neutro" destaque
+                  rodape="o resultado não dá para saber: nenhuma despesa foi lançada" />
+        )}
       </div>
 
       {/* ============================================ 5 · A CARTEIRA */}
@@ -296,14 +460,33 @@ const TONS: Record<string, { fundo: string; borda: string; texto: string }> = {
   ruim:    { fundo: "#fef2f2", borda: "#fca5a5", texto: "#7f1d1d" },
 };
 
-function Cartao({ titulo, valor, tom = "neutro", rodape, destaque }: {
+/**
+ * UM CARTÃO. Com `abre`, ele vira botão e a lista aparece embaixo.
+ *
+ * "audite se os números são acionáveis, abrem relatórios de gestão" — não
+ * abriam. O painel dizia "cobrado e não entregue: 11 jazigos" e não levava aos
+ * onze. Para agir era preciso sair da tela e adivinhar quais eram; é assim que
+ * um número vira enfeite, olhado todo mês e nunca usado.
+ */
+function Cartao({ titulo, valor, tom = "neutro", rodape, destaque, abre, aoAbrir, ativo }: {
   titulo: string; valor: string; tom?: string; rodape?: string; destaque?: boolean;
+  abre?: string; aoAbrir?: (b: string) => void; ativo?: boolean;
 }) {
   const t = TONS[tom] || TONS.neutro;
+  const clicavel = !!abre && !!aoAbrir;
   return (
-    <div style={{
-      background: t.fundo, border: `1px solid ${t.borda}`, color: t.texto,
+    <div
+      onClick={clicavel ? () => aoAbrir!(abre!) : undefined}
+      role={clicavel ? "button" : undefined}
+      tabIndex={clicavel ? 0 : undefined}
+      onKeyDown={clicavel ? (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aoAbrir!(abre!); }
+      } : undefined}
+      style={{
+      background: t.fundo, border: `1px solid ${ativo ? t.texto : t.borda}`, color: t.texto,
       borderRadius: 14, padding: 14,
+      cursor: clicavel ? "pointer" : undefined,
+      boxShadow: ativo ? `0 0 0 2px ${t.borda}` : undefined,
     }}>
       <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 600 }}>{titulo}</div>
       <div style={{ fontSize: destaque ? 30 : 24, fontWeight: 800, lineHeight: 1.15,
@@ -314,6 +497,126 @@ function Cartao({ titulo, valor, tom = "neutro", rodape, destaque }: {
         <div style={{ fontSize: 12.5, opacity: 0.8, marginTop: 5, lineHeight: 1.4 }}>
           {rodape}
         </div>
+      )}
+      {/* O CONVITE PRECISA ESTAR ESCRITO. Cartão clicável sem nada dizendo
+          que clica é cartão que ninguém clica. */}
+      {clicavel && (
+        <div style={{ fontSize: 12.5, marginTop: 6, fontWeight: 700,
+                      textDecoration: "underline" }}>
+          {ativo ? "fechar a lista" : "ver a lista"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O RELATÓRIO POR TRÁS DO NÚMERO.
+ *
+ * Carrega só quando abre, e do MESMO lugar que conta o cartão
+ * (`sureya_painel_detalhe`, 0120). Uma consulta própria aqui faria a lista e o
+ * cartão contarem o mesmo fato de dois jeitos — o defeito que já custou caro
+ * cinco vezes neste sistema.
+ *
+ * Cada linha leva à ficha da família, porque é lá que se age.
+ */
+function Relatorio({ bloco, aberto, mes, titulo }: {
+  bloco: string; aberto: string; mes: string; titulo: string;
+}) {
+  const [linhas, setLinhas] = useState<any[] | null>(null);
+  const [erro, setErro] = useState("");
+
+  const visivel = aberto === bloco;
+
+  useEffect(() => {
+    if (!visivel) return;
+    let vivo = true;
+    setErro(""); setLinhas(null);
+    fetch(`/api/financeiro/painel/detalhe?bloco=${bloco}&mes=${mes}`)
+      .then((x) => x.json())
+      .then((r) => {
+        if (!vivo) return;
+        if (!r?.ok) { setErro(r?.mensagem || r?.erro || "não deu para carregar"); return; }
+        setLinhas(r.linhas || []);
+      })
+      .catch(() => vivo && setErro("não deu para carregar"));
+    return () => { vivo = false; };
+  }, [visivel, bloco, mes]);
+
+  if (!visivel) return null;
+
+  return (
+    <div style={{ ...painel.card, background: "#f8fafc" }}>
+      <p style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 700 }}>{titulo}</p>
+
+      {erro && <p style={{ margin: 0, fontSize: 14, color: cor.perigo }}>{erro}</p>}
+      {!erro && linhas === null && (
+        <p style={{ margin: 0, fontSize: 14, color: cor.cinza }}>Carregando…</p>
+      )}
+      {linhas?.length === 0 && (
+        <p style={{ margin: 0, fontSize: 14, color: cor.cinza }}>Nenhuma linha.</p>
+      )}
+
+      {(linhas || []).map((l: any, i: number) => (
+        <div key={l.id || i}
+             style={{ display: "flex", flexWrap: "wrap", gap: 10,
+                      justifyContent: "space-between",
+                      padding: "8px 0",
+                      borderTop: i ? "1px solid rgb(var(--zm-linha, 226 232 240))" : "none" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14.5 }}>
+              {l.familia_id ? (
+                <Link href={`/painel/clientes/${l.familia_id}`} style={{ color: cor.navy }}>
+                  {l.familia || "sem família"}
+                </Link>
+              ) : (l.familia || "sem família")}
+              {l.jazigo && <span style={{ color: cor.cinza }}> · {l.jazigo}</span>}
+            </div>
+            <div style={{ fontSize: 13, color: cor.cinza }}>
+              {[
+                l.data && new Date(String(l.data) + "T12:00:00").toLocaleDateString("pt-BR"),
+                l.quando && new Date(l.quando).toLocaleDateString("pt-BR"),
+                l.local,
+                l.item && `${Number(l.quantidade)} · ${l.item}`,
+                l.periodicidade,
+                l.assunto,
+                l.autor,
+                l.telefone,
+                // "nunca" é uma resposta, e das mais úteis desta lista.
+                bloco === "nao_atendidos"
+                  ? (l.ultima_lavagem
+                      ? `última em ${new Date(l.ultima_lavagem + "T12:00:00").toLocaleDateString("pt-BR")}`
+                      : "nunca teve limpeza")
+                  : null,
+                l.status,
+                l.motivo && `segurada: ${l.motivo}`,
+              ].filter(Boolean).join(" · ")}
+            </div>
+            {(l.texto || l.descricao) && (
+              <div style={{ fontSize: 13, color: cor.cinza, marginTop: 2 }}>
+                “{l.texto || l.descricao}”
+              </div>
+            )}
+          </div>
+          <div style={{ flexShrink: 0, textAlign: "right", fontSize: 14 }}>
+            {l.valor != null && <b>{brl(l.valor)}</b>}
+            {l.saldo != null && <b>{brl(l.saldo)}</b>}
+            {l.receita != null && <b>{brl(l.receita)}</b>}
+            {l.mensal != null && <span style={{ color: cor.cinza }}>{brl(l.mensal)}/mês</span>}
+            {l.com_foto === false && (
+              <div style={{ fontSize: 12.5, color: "#7c2d12" }}>sem foto</div>
+            )}
+            {l.pelo_campo === false && bloco === "lavagens" && (
+              <div style={{ fontSize: 12.5, color: cor.cinza }}>anotada</div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {(linhas?.length || 0) >= 100 && (
+        <p style={{ margin: "10px 0 0", fontSize: 13, color: cor.cinza }}>
+          Mostrando as 100 primeiras.
+        </p>
       )}
     </div>
   );

@@ -219,3 +219,21 @@ não uma limpeza minha.
 **O sistema não está bloqueando o piloto — o cadastro está.** Os dois itens que
 dependiam de código meu (c, d) foram fechados em 22/08. O que segura a data é
 você ter 5 famílias prontas.
+
+## Retirar `pedidos_extras` e a tela morta `Extras.tsx` (depois da 0117)
+
+A 0045 criou `servicos_extras` (catálogo — **em uso**), `pedidos_extras` (o
+pedido avulso) e `sureya_entregar_extra`. Só o catálogo foi aproveitado.
+
+Estado medido em 23/08: `pedidos_extras` tem **uma linha, cancelada**;
+`Extras.tsx` existe e **não é importado por nenhuma tela**; as rotas
+`/api/extras` e `/api/extras/pedidos` não têm chamador.
+
+Desde a 0117 a entrega avulsa nasce em `entregas_extras` com `assinatura_id`
+nulo, então as duas tabelas respondem à mesma pergunta — que é exatamente o
+defeito de forma que este banco já teve cinco vezes.
+
+Não foi feito agora porque `sureya_entregar_extra` é uma **porta de dinheiro
+com teste vivo** em `escritas.sql`, e mexer nela para apagar código morto é
+troca ruim no meio de um build. Quando for: migrar a linha cancelada, remover a
+função, a tabela, as rotas e o componente, e tirar o bloco de `escritas.sql`.

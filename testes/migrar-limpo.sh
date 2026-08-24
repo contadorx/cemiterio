@@ -135,7 +135,11 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0110  +1  regua_degraus — a regua era tres nomes fixos com os degraus
 #             dentro do TypeScript. Personalizar exigia mexer em codigo, que e
 #             o oposto de "vou ajustando".
-TABELAS_DELTA=${TABELAS_DELTA:-6}
+#   0117  +2  assinaturas_extras e entregas_extras — "flores no ultimo sabado"
+#             so existia na cabeca do Leandro, e a compra do buque era chute.
+#   0119  +1  pausas_tumulo — parar nao e cancelar. O jeito antigo de parar era
+#             desmarcar `contratado`, que APAGA o combinado.
+TABELAS_DELTA=${TABELAS_DELTA:-9}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -201,7 +205,10 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0096  +4  eventos_memoria: a da org e uma restritiva POR COMANDO.
 #   0110  +4  regua_degraus: a da org e uma restritiva POR COMANDO (a licao da
 #             0079 — DELETE nunca consulta `with check`).
-POLICIES_DELTA=${POLICIES_DELTA:-67}
+#   0117  +8  assinaturas_extras e entregas_extras: a da org e uma restritiva
+#              POR COMANDO em cada uma — de novo a licao da 0079.
+#   0119  +4  pausas_tumulo, mesmo desenho.
+POLICIES_DELTA=${POLICIES_DELTA:-79}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -269,7 +276,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-67}
 #             liberacao nao alcancava a tentativa de reenvio: a foto descartada
 #             sairia sozinha no dia em que a entrega voltasse.
 # Saldo: +52.
-FUNCOES_DELTA=${FUNCOES_DELTA:-52}
+#   0117  +4  sureya_proxima_data_extra, sureya_gerar_entregas_extras,
+#             sureya_registrar_entrega, sureya_compras_de_extras
+#   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
+#   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
+#             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
+FUNCOES_DELTA=${FUNCOES_DELTA:-60}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -516,6 +528,36 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/regua.sql 2>&1); then
   echo "$saida" | grep -E "REGUA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Cobrar quem pagou, ou cobrar duas vezes, custa a relacao."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# FLORES E EXTRAS
+#
+# O risco aqui tem nome: comprar buque a mais toda semana, ou deixar a familia
+# sem flor no sabado que ela espera. "Ultimo sabado" nao e "quarto sabado", e
+# em tres meses de cada quatro os dois dao a mesma data — o erro so aparece no
+# mes de cinco sabados, e aparece na mao de quem esperava a flor.
+# ---------------------------------------------------------------------------
+echo "PAUSA — parar e retomar a pedido da familia"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/pausa.sql 2>&1); then
+  echo "$saida" | grep -E "PAUSA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Cobrar de quem pediu para parar e a conversa mais cara desta casa."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+echo "FLORES — o ultimo sabado, a compra prevista e o que virou dinheiro"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/flores.sql 2>&1); then
+  echo "$saida" | grep -E "FLORES FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Buque comprado a mais e prejuizo; buque a menos e telefonema."
   echo "============================================================"
   exit 1
 fi

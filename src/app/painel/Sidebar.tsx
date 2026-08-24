@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, ClipboardCheck, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Flower, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -26,6 +26,11 @@ const DIA_A_DIA = [
   // abria. Ver 0094 e D-16.
   { href: "/painel/conversas", label: "Conversas", icon: Inbox },
   { href: "/painel/avulsos", label: "Avulsos", icon: Sparkles },
+  // A ESTEIRA DAS FLORES é do Leandro, e por isso mora no dia a dia e não na
+  // carteira: sábado de manhã ele abre esta tela para saber o que comprar e o
+  // que entregar. Rota própria, separada da agenda das lavagens de propósito
+  // (0117) — flor não é lavagem e não pode ser contada como uma.
+  { href: "/painel/flores", label: "Flores", icon: Flower },
   { href: "/campo", label: "Campo", icon: MapPin },
 ];
 

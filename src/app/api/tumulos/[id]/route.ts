@@ -225,6 +225,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.proxima_cobranca = /^\d{4}-\d{2}/.test(v) ? `${v.slice(0, 7)}-01` : null;
   }
 
+  // A ÂNCORA DO PERÍODO ACOMPANHA (0119).
+  //
+  // `periodo_inicio` é o primeiro mês do período ABERTO — o que a 0115 deduzia
+  // contando lançamentos e a 0119 passou a gravar, porque a dedução quebra
+  // quando um mês é pulado (é o que a parada faz).
+  //
+  // Mexer nas datas do contrato aqui recomeça o período: quem escreve "cobre a
+  // partir de março" está dizendo que o período aberto começa em março. Sem
+  // esta linha, o jazigo continuaria com a âncora de antes da edição — e o
+  // cobrador lançaria meses que ninguém pediu.
+  if (patch.proxima_cobranca !== undefined || patch.inicio_cobranca !== undefined) {
+    const posPago = body.cobranca_no_fim === true;
+    const base = posPago
+      ? (patch.inicio_cobranca ?? patch.proxima_cobranca)
+      : patch.proxima_cobranca;
+    // Nulo é honesto: sem data de cobrança não há período aberto, e o cobrador
+    // volta a deduzir em vez de ler um valor inventado aqui.
+    patch.periodo_inicio = base ?? null;
+  }
+
   // DE QUANTOS EM QUANTOS MESES SE COBRA (0107).
   //
   // Era um enum na família — mensal, trimestral, semestral, anual — e a

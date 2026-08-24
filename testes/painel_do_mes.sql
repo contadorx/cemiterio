@@ -83,11 +83,22 @@ select ci16('e a lista de devedores soma o mesmo',
      from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
   'a lista mostra um total e o cartao mostra outro');
 
-select ci16('o resultado e receita menos custos, sem terceira conta',
-  (select (p->'resultado'->>'receita')::numeric - (p->'resultado'->>'custos')::numeric
-        = (p->'resultado'->>'margem')::numeric
+-- A MARGEM SO EXISTE SE HOUVER CUSTO LANCADO (0120).
+--
+-- Este teste garantia o contrario ate a auditoria: exigia que a margem fosse
+-- sempre `receita - custos`. Com `lancamentos` VAZIO — e ele esta vazio em
+-- producao desde sempre — isso devolvia a receita inteira com cara de lucro.
+-- Ausencia de registro apresentada como medicao.
+--
+-- Agora nulo, e a tela e obrigada a dizer "nao da para saber".
+select ci16('sem custo lancado, a margem e NULA — e nao a receita inteira',
+  (select (p->'resultado'->>'margem') is null
+      and (p->'resultado'->>'tem_custo')::boolean = false
      from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
-  'a margem nao e a subtracao que a tela promete');
+  'receita menos zero devolvia a receita como se fosse lucro');
+
+-- (o caso COM custo lancado vai no fim do arquivo, depois do teste
+--  que exige a contagem de despesas em zero)
 
 -- ---------------------------------------------------------------------------
 -- 2 · A DIVIDA VELHA CAI NA FAIXA CERTA
@@ -179,3 +190,138 @@ select ci16('e o ticket medio e a media, nao a soma',
   (select (p->'carteira'->>'ticket')::numeric = 80
      from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
   'o ticket medio saiu errado');
+
+-- ---------------------------------------------------------------------------
+-- A MARGEM VOLTA A EXISTIR QUANDO HA O QUE SUBTRAIR
+-- ---------------------------------------------------------------------------
+-- POR ULTIMO de proposito: este bloco LANCA uma despesa, e o teste de
+-- "nenhuma despesa lancada" acima precisa rodar antes com a tabela vazia.
+insert into categorias_financeiras (id, org_id, nome, tipo)
+values ('cf000000-0000-0000-0000-000000000016','aaaaaaaa-0000-0000-0000-000000000016',
+        'Materiais','saida')
+on conflict do nothing;
+insert into lancamentos (org_id, categoria_id, tipo, valor, data, descricao)
+values ('aaaaaaaa-0000-0000-0000-000000000016','cf000000-0000-0000-0000-000000000016',
+        'saida', 40, current_date, 'balde e escova')
+on conflict do nothing;
+
+select ci16('com custo lancado, a margem e receita menos custos',
+  (select (p->'resultado'->>'receita')::numeric - (p->'resultado'->>'custos')::numeric
+        = (p->'resultado'->>'margem')::numeric
+      and (p->'resultado'->>'tem_custo')::boolean = true
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'quando ha o que subtrair, a conta tem de fechar');
+-- ---------------------------------------------------------------------------
+-- OS BLOCOS OPERACIONAIS, E O NUMERO QUE ABRE (0120)
+-- ---------------------------------------------------------------------------
+-- A auditoria de 24/08 achou o painel medindo bem o dinheiro e quase nada da
+-- operacao. O que ela mediu em producao, e que nao aparecia em lugar nenhum:
+--
+--   78 jazigos contratados, 2 atendidos no mes   -> nao havia denominador
+--   5 lavagens, 4 SEM FOTO                       -> a prova nao era contada
+--   159 sugestoes da IA, 157 descartadas         -> nao existia no painel
+--   12 mensagens sairam, 0 pela fila             -> nao existia no painel
+
+-- COBERTURA: o denominador que faltava.
+select ci16('a cobertura diz quantos jazigos ficaram SEM atendimento',
+  (select (p->'cobertura'->>'contratados')::int >= 0
+      and (p->'cobertura'->>'nao_atendidos')::int
+        = greatest(0, (p->'cobertura'->>'em_servico')::int
+                    - (p->'cobertura'->>'atendidos')::int)
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  '"5 lavagens" sem denominador nao diz se a casa entregou ou nao');
+
+-- E o parado NAO conta como nao atendido: quem pediu para parar nao e falha.
+select ci16('quem esta parado sai da conta de cobertura',
+  (select (p->'cobertura'->>'em_servico')::int
+        = (p->'cobertura'->>'contratados')::int - (p->'cobertura'->>'parados')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'contar o jazigo parado como nao atendido cobraria da casa um servico que a familia cancelou');
+
+-- A FOTO E CONTADA: com + sem tem de fechar com as executadas.
+select ci16('com foto mais sem foto fecha com as executadas',
+  (select (p->'lavagens'->>'com_foto')::int + (p->'lavagens'->>'sem_foto')::int
+        = (p->'lavagens'->>'executadas')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'a foto e o entregavel: quatro de cinco lavagens sem prova passavam despercebidas');
+
+-- MENSAGENS E IA existem no painel.
+select ci16('o painel conta mensagem e disparo',
+  (select p ? 'mensagens'
+      and (p->'mensagens') ? 'saidas' and (p->'mensagens') ? 'pela_fila'
+      and (p->'mensagens') ? 'sem_resposta'
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'a casa manda mensagem todo mes e o painel nao dizia quantas');
+
+select ci16('e conta o que a IA sugeriu, o que foi usado e quanto custou',
+  (select p ? 'ia'
+      and (p->'ia') ? 'sugestoes' and (p->'ia') ? 'usadas' and (p->'ia') ? 'custo'
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  '159 sugestoes e 2 usadas e a pergunta "a IA ajuda?" — e nao havia onde ver');
+
+select ci16('o aproveitamento da IA e nulo quando ela nao sugeriu nada',
+  (select (p->'ia'->>'sugestoes')::int > 0
+       or (p->'ia'->>'aproveitamento') is null
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'zero de zero nao e 0%% de aproveitamento, e ausencia de dado');
+
+-- FLORES tem lugar proprio.
+select ci16('as flores tem bloco proprio, com custo e margem',
+  (select p ? 'flores'
+      and (p->'flores') ? 'receita' and (p->'flores') ? 'custo' and (p->'flores') ? 'margem'
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'o servico novo precisa de uma linha propria para se saber se paga');
+
+-- ---------------------------------------------------------------------------
+-- O NUMERO ABRE, E A LISTA BATE COM O CARTAO
+-- ---------------------------------------------------------------------------
+-- E o ponto do pedido: "abrem relatorios de gestao". E o risco e o de sempre —
+-- o cartao dizer 2 e a lista trazer 3.
+select ci16('o detalhe de lavagens traz UMA LINHA POR LAVAGEM do cartao',
+  (select jsonb_array_length(
+            sureya_painel_detalhe('lavagens', current_date, 'aaaaaaaa-0000-0000-0000-000000000016'))
+        = (p->'lavagens'->>'executadas')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'cartao e lista contando o mesmo fato de dois jeitos e o defeito de forma desta casa');
+
+select ci16('o detalhe de NAO ATENDIDOS bate com a cobertura',
+  (select jsonb_array_length(
+            sureya_painel_detalhe('nao_atendidos', current_date, 'aaaaaaaa-0000-0000-0000-000000000016'))
+        = (p->'cobertura'->>'nao_atendidos')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'e a lista mais acionavel do painel: contratado, em servico, e ninguem foi la');
+
+select ci16('o detalhe de SEM FOTO bate com o cartao',
+  (select jsonb_array_length(
+            sureya_painel_detalhe('sem_foto', current_date, 'aaaaaaaa-0000-0000-0000-000000000016'))
+        = (p->'lavagens'->>'sem_foto')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'sem a lista, "4 sem foto" nao diz QUAIS quatro');
+
+select ci16('o detalhe de COBRADA E NAO ENTREGUE bate com o cartao',
+  (select jsonb_array_length(
+            sureya_painel_detalhe('sem_entrega', current_date, 'aaaaaaaa-0000-0000-0000-000000000016'))
+        = (p->'sem_entrega'->>'tumulos')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'este e o numero que cobra da casa: dinheiro lancado sem limpeza no mes');
+
+select ci16('o detalhe de devedores bate com a inadimplencia',
+  (select jsonb_array_length(
+            sureya_painel_detalhe('devedores', current_date, 'aaaaaaaa-0000-0000-0000-000000000016'))
+        = (p->'inadimplencia'->>'familias')::int
+     from (select sureya_painel_do_mes(current_date, 'aaaaaaaa-0000-0000-0000-000000000016') as p) z),
+  'a lista de devedores e o cartao de inadimplencia sao a mesma pergunta');
+
+-- BLOCO DESCONHECIDO E RECUSADO, com a lista do que existe.
+do $$
+declare v_erro text;
+begin
+  begin
+    perform sureya_painel_detalhe('inventado', current_date, 'aaaaaaaa-0000-0000-0000-000000000016');
+    v_erro := 'passou';
+  exception when others then v_erro := sqlerrm;
+  end;
+  perform ci16('bloco desconhecido e recusado, e nao devolve lista vazia',
+    v_erro = 'bloco_desconhecido',
+    'lista vazia por nome errado leria como "nao ha nada", que e mentira diferente');
+end $$;

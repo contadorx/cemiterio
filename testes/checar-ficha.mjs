@@ -15,6 +15,10 @@ const rotaCC      = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
 const rotaFila    = readFileSync("src/app/api/fila/route.ts", "utf8");
 const libFin      = readFileSync("src/lib/financeiro.ts", "utf8");
 const libProativo = readFileSync("src/lib/proativo.ts", "utf8");
+const telaFlores  = readFileSync("src/app/painel/flores/page.tsx", "utf8");
+const rotaFlores  = readFileSync("src/app/api/flores/entregas/route.ts", "utf8");
+const cardFlores  = readFileSync("src/app/painel/clientes/[id]/Flores.tsx", "utf8");
+const cron        = readFileSync("src/app/api/cron/diario/route.ts", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -152,5 +156,48 @@ ok("o corte de INADIMPLENTE na fila usa vencido, nao saldo",
 ok("a cobranca gentil nao cobra o que ainda nao venceu",
    /s\.vencido >= -0\.005\) continue/.test(libProativo)
    && !/s\.saldo >= -0\.005\) continue;\n\n    const valor/.test(libProativo));
+
+// ---------------------------------------------------------------------------
+// FLORES: A ESTEIRA NAO PODE VIRAR UMA SEGUNDA AGENDA (0117)
+//
+// O risco nao e a tela ficar feia — e a flor ser contada como lavagem. Se uma
+// entrega entrar em `servicos`, o painel soma seis buques como seis lavagens e
+// o aviso de "cobrado sem limpeza" cala. Silencioso, que e o pior modo.
+ok("a esteira das flores NAO escreve em servicos",
+   !/from\("servicos"\)/.test(rotaFlores));
+
+ok("e o cartao da ficha tambem nao",
+   !/from\("servicos"\)/.test(cardFlores));
+
+// NADA SAI SOZINHO. Foi o pedido explicito do Leandro ao encomendar isto.
+ok("a entrega poe a foto na LIBERACAO, e nao no WhatsApp",
+   /fila_liberacao/.test(rotaFlores)
+   && /status: "aguardando"/.test(rotaFlores)
+   && !/enviarWhatsapp|enviarMidia/.test(rotaFlores));
+
+// SO SE COBRA O QUE FOI ENTREGUE — o dinheiro nasce na entrega, nunca no
+// gerador. Se o gerador cobrasse, uma entrega cancelada deixaria divida.
+ok("quem cobra e a entrega, e a funcao e uma so",
+   /sureya_registrar_entrega/.test(rotaFlores)
+   && !/conta_corrente/.test(rotaFlores));
+
+// A COMPRA VEM ANTES DA ROTA na tela. A rota se resolve no lugar; a compra
+// nao — e comprar a menos e a familia sem flor no dia em que ela foi ver.
+ok("a tela poe a compra ANTES da lista de entregas",
+   telaFlores.indexOf("A compra de") < telaFlores.indexOf("Nada neste dia"));
+
+ok("e a margem diz o que NAO esta dentro dela",
+   /Não\s+entra aqui o seu tempo/.test(telaFlores));
+
+// PULAR EXIGE MOTIVO. "Pulada" sem motivo, tres meses depois, e um buraco que
+// ninguem sabe explicar para a familia que ligou.
+ok("nao entregue exige o motivo",
+   /Diga por que não foi entregue/.test(rotaFlores));
+
+ok("o gerador roda no cron diario, com organizacao propria",
+   /gerarEsteiraDeExtras/.test(cron) && /resultado\.flores/.test(cron));
+
+ok("e uma falha nas flores nao derruba o resto da rotina",
+   /cron_diario_flores/.test(cron) && /!resultado\.flores\?\.erro/.test(cron));
 
 process.exit(falhas ? 1 : 0);

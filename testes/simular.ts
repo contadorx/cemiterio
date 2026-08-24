@@ -481,14 +481,25 @@ async function rodar() {
       valor: 40, prioridade: 0, adiado_vezes: 0, executora_id: null, ordem_dia: null });
   }
   const alo = await ag.alocarAgenda();
-  // jornada de seg a sex: nada pode cair em sábado ou domingo
+  // JORNADA DE SEG A SEX: nada que o ALOCADOR marcar pode cair em sábado ou
+  // domingo.
+  //
+  // SÓ O QUE ELE MARCOU, e não todo serviço do banco. Este teste olhava a
+  // tabela inteira e por isso afirmava uma coisa medindo outra: o fixture tem
+  // duas lavagens JÁ EXECUTADAS em `diasAtras(30)`, e uma lavagem de verdade
+  // pode ter acontecido num sábado — não é falha de alocação nenhuma.
+  //
+  // Ele passou por acaso até 23/08/2026 e quebrou no dia 24, quando
+  // `hoje − 30` caiu num sábado. Um teste que depende do dia em que roda não
+  // guarda coisa alguma: ele acusa quando não devia e cala quando deveria.
   const foraDaJornada = banco.servicos.filter((x: any) => {
-    if (!x.data_prevista) return false;
+    if (!x.data_prevista || x.status !== "agendado") return false;
     const d = new Date(x.data_prevista + "T12:00:00Z").getUTCDay();
     return d === 0 || d === 6;
   });
   checar("alocador respeita os dias de trabalho configurados", foraDaJornada.length === 0,
-         `${foraDaJornada.length} caíram em fim de semana`);
+         `${foraDaJornada.length} caíram em fim de semana: `
+         + foraDaJornada.map((x: any) => `${x.id}=${x.data_prevista}`).join(", "));
   checar("alocou serviços", alo.agendados > 0, JSON.stringify(alo));
   const agendados = banco.servicos.filter((s) => s.status === "agendado");
   // ---- O ALOCADOR NAO NOMEIA NINGUEM

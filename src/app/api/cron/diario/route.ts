@@ -3,6 +3,7 @@ import { cronAutorizado } from "@/lib/cron-auth";
 import { avisosSaldoBaixo, cobrancaGentil } from "@/lib/proativo";
 import { rotinaDeMemoria } from "@/lib/memoria";
 import { cobrarContratos, rodarRegua } from "@/lib/cobranca";
+import { gerarEsteiraDeExtras } from "@/lib/extras";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { registrarErro } from "@/lib/monitor";
 import { carimbarRotina } from "@/lib/rotinas";
@@ -65,6 +66,22 @@ export async function GET(req: NextRequest) {
     resultado.regua = { erro: true };
   }
 
+  // A ESTEIRA DAS FLORES (0117). Enche as datas previstas até o horizonte.
+  //
+  // Etapa própria porque é operação, não dinheiro: ela não cobra nada — quem
+  // cobra é a entrega, e entrega é o Leandro apertando o botão no sábado.
+  //
+  // A tela também gera ao abrir, e de propósito: chegar no sábado de manhã e
+  // não ver o sábado porque o cron falhou na madrugada seria o pior momento
+  // possível para descobrir isso. Gerar é convergente, então os dois caminhos
+  // não brigam.
+  try {
+    resultado.flores = await gerarEsteiraDeExtras();
+  } catch (e) {
+    await registrarErro("cron_diario_flores", e);
+    resultado.flores = { erro: true };
+  }
+
   // AS DATAS DE MEMÓRIA. Etapa própria, com try próprio: uma falha aqui não
   // pode levar a agenda do dia junto — e o inverso também não.
   //
@@ -82,7 +99,7 @@ export async function GET(req: NextRequest) {
   // rotina inteira no painel.
   const tudoOk = !resultado.agenda?.erro && !resultado.rascunhos?.erro
                  && !resultado.memoria?.erro && !resultado.cobranca?.erro
-                 && !resultado.regua?.erro;
+                 && !resultado.regua?.erro && !resultado.flores?.erro;
   await carimbarRotina("diario", tudoOk, resultado,
     tudoOk ? undefined : "uma das etapas falhou — veja erros_log");
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { MessageCircle, Plus, ChevronDown, Pencil, Link2, Trash2, Camera } from "lucide-react";
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
 import { prepararFoto, motivoFalha } from "@/lib/foto";
+import Flores from "./Flores";
 
 /**
  * A FICHA DA FAMÍLIA.
@@ -232,6 +233,10 @@ export default function Ficha() {
       <Tumulos tumulos={d.tumulos || []} clienteId={clienteId} aoMudar={carregar} />
       {familiaId && <ContaCorrente familiaId={familiaId} clienteId={clienteId} aoMudar={carregar}
                                   aLancar={d?.cobrancasALancar} />}
+      {/* FLORES fica ENTRE o dinheiro e as limpezas de propósito: é a terceira
+          coisa que a casa faz por este jazigo, e a primeira que a família nota
+          quando vai lá. O combinado é do jazigo (0117), como a periodicidade. */}
+      <Flores familiaId={familiaId} tumulos={d.tumulos || []} />
       <Limpezas clienteId={clienteId} tumulos={d.tumulos || []} aoMudar={carregar} />
       {c && <Ajustes clienteId={c.id} nome={c.nome}
                     familiaId={familiaId} familiaNome={fam?.nome || ""} />}
@@ -795,9 +800,172 @@ function Tumulo({ t, aoMudar }: { t: any; aoMudar: () => void }) {
               {salvando ? "Salvando…" : "Salvar"}
             </Botao>
             <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+
+          <div className="mt-3 border-t border-line pt-3">
             <Portal tumuloId={t.id} tokenAtual={t.qr_token} />
           </div>
+
+          <div className="mt-3 border-t border-line pt-3">
+            <PararRetomar tumuloId={t.id} />
+          </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * PARAR E RETOMAR O SERVIÇO (0119).
+ *
+ * Não é cancelar. O combinado fica inteiro — valor, ritmo, datas — e só deixa
+ * de acontecer. Antes disto existir, o jeito de parar era desmarcar
+ * "contratado", que apaga o combinado: retomar significava recadastrar de
+ * memória, e três meses depois ninguém sabia se aquele jazigo tinha parado,
+ * sido cancelado, ou perdido um clique.
+ *
+ * A CONSEQUÊNCIA VEM ESCRITA, antes e depois. Parar mexe na agenda, na esteira
+ * das flores e na cobrança — três coisas que a pessoa não vê desta tela.
+ */
+function PararRetomar({ tumuloId }: { tumuloId: string }) {
+  const [d, setD] = useState<any>(null);
+  const [abrindo, setAbrindo] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [data, setData] = useState("");
+  const [erro, setErro] = useState("");
+  const [feito, setFeito] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  const carregar = useCallback(async () => {
+    const r = await fetch(`/api/tumulos/${tumuloId}/pausa`)
+      .then((x) => x.json()).catch(() => null);
+    if (r?.ok) setD(r);
+  }, [tumuloId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function agir(acao: "parar" | "retomar") {
+    setOcupado(true); setErro(""); setFeito("");
+    try {
+      const r = await fetch(`/api/tumulos/${tumuloId}/pausa`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          acao === "parar"
+            ? { acao, motivo, desde: data || null }
+            : { acao, em: data || null, motivo: motivo || null }),
+      }).then((x) => x.json());
+
+      if (!r?.ok) {
+        setErro(traduzirErro(r, acao === "parar"
+          ? "Não consegui parar o serviço. Tente de novo."
+          : "Não consegui retomar o serviço. Tente de novo."));
+        return;
+      }
+
+      if (acao === "parar") {
+        const partes = [];
+        if (r.lavagensCanceladas) partes.push(`${r.lavagensCanceladas} limpeza(s) saíram da agenda`);
+        if (r.entregasCanceladas) partes.push(`${r.entregasCanceladas} entrega(s) de flores canceladas`);
+        setFeito(partes.length
+          ? `Parado. ${partes.join(" e ")}. A cobrança não corre enquanto estiver parado.`
+          : "Parado. A cobrança não corre enquanto estiver parado.");
+      } else {
+        // O EFEITO NO DINHEIRO, dito por extenso. "Retomado" sem dizer que a
+        // cobrança andou dois meses esconde exatamente o que muda a conta.
+        setFeito(r.mesesParados > 0
+          ? `Retomado. Ficou ${r.mesesParados} mês(es) parado, então a próxima cobrança foi para `
+            + new Date(r.proximaCobranca + "T12:00:00").toLocaleDateString("pt-BR")
+            + " — ela não perde o período contratado."
+          : "Retomado. Não fechou nenhum mês parado, então a cobrança segue na mesma data.");
+      }
+      setAbrindo(false); setMotivo(""); setData("");
+      carregar();
+    } finally { setOcupado(false); }
+  }
+
+  const parado = !!d?.parado;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium text-ink">
+            {parado ? (
+              <span className="text-aviso">
+                Serviço parado desde{" "}
+                {new Date(d.desde + "T12:00:00").toLocaleDateString("pt-BR")}
+              </span>
+            ) : (
+              "Serviço em andamento"
+            )}
+          </p>
+          {parado && d.motivo && (
+            <p className="text-[13px] text-ink-soft">{d.motivo}</p>
+          )}
+        </div>
+        <Botao onClick={() => { setAbrindo((x) => !x); setErro(""); setFeito(""); }}>
+          {parado ? "Retomar" : "Parar serviço"}
+        </Botao>
+      </div>
+
+      {abrindo && (
+        <div className="mt-3 rounded-lg bg-surface p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo rotulo={parado ? "Voltou em" : "Parar a partir de"}
+                   dica="em branco = hoje">
+              <Entrada type="date" value={data}
+                       onChange={(e: any) => setData(e.target.value)} />
+            </Campo>
+            <Campo rotulo={parado ? "Observação (opcional)" : "Por que está parando"}
+                   dica={parado ? undefined : "a família vai perguntar isso depois"}>
+              <Entrada value={motivo} onChange={(e: any) => setMotivo(e.target.value)}
+                       placeholder={parado ? "" : "a família pediu para parar até…"} />
+            </Campo>
+          </div>
+
+          {!parado && (
+            <p className="mt-2 text-[13px] text-ink-soft leading-relaxed">
+              Parar tira as limpezas já agendadas e as entregas de flores da
+              frente, e <b>suspende a cobrança</b>. O combinado fica inteiro —
+              nada é apagado.
+            </p>
+          )}
+          {parado && (
+            <p className="mt-2 text-[13px] text-ink-soft leading-relaxed">
+              Ao retomar, a próxima cobrança anda para frente o tanto de meses
+              que ficou parado: a família não perde o período que contratou.
+            </p>
+          )}
+
+          {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+
+          <div className="mt-3 flex gap-2">
+            <Botao tom={parado ? "principal" : "perigo"}
+                   onClick={() => agir(parado ? "retomar" : "parar")}
+                   disabled={ocupado || (!parado && !motivo.trim())}>
+              {ocupado ? "…" : parado ? "Retomar o serviço" : "Parar o serviço"}
+            </Botao>
+            <Botao onClick={() => setAbrindo(false)}>Cancelar</Botao>
+          </div>
+        </div>
+      )}
+
+      {feito && <p className="mt-2 text-[13px] text-positivo">{feito}</p>}
+
+      {/* O HISTÓRICO responde "quantas vezes essa família já pediu para
+          parar", que é uma pergunta diferente de "está parada agora". */}
+      {(d?.historico || []).filter((h: any) => h.fim).length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[13px] text-ink-soft">
+            paradas anteriores ({(d.historico || []).filter((h: any) => h.fim).length})
+          </summary>
+          {(d.historico || []).filter((h: any) => h.fim).map((h: any) => (
+            <p key={h.id} className="mt-1 text-[13px] text-ink-soft">
+              {new Date(h.inicio + "T12:00:00").toLocaleDateString("pt-BR")} a{" "}
+              {new Date(h.fim + "T12:00:00").toLocaleDateString("pt-BR")} · {h.motivo}
+            </p>
+          ))}
+        </details>
       )}
     </div>
   );
@@ -813,41 +981,86 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
   const [token, setToken] = useState<string | null>(tokenAtual);
   const [copiado, setCopiado] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState("");
 
   const link = token
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/familia/${token}`
     : "";
 
   async function emitir() {
-    setOcupado(true);
+    setOcupado(true); setErro("");
     try {
       const r = await fetch(`/api/tumulos/${tumuloId}/portal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acao: "emitir" }),
       }).then((x) => x.json());
-      if (r?.ok) setToken(r.token || r.qr_token || null);
+      // O ERRO PRECISA APARECER. Antes o `if (r?.ok)` engolia a falha em
+      // silêncio: o botão voltava a dizer "Gerar link do portal" e quem
+      // clicou não sabia se tinha funcionado.
+      if (!r?.ok) { setErro(traduzirErro(r, "Não consegui gerar o link.")); return; }
+      setToken(r.token || r.qr_token || null);
+    } catch {
+      setErro("não deu para gerar o link");
     } finally { setOcupado(false); }
   }
 
   if (!token) {
     return (
-      <Botao onClick={emitir} disabled={ocupado}>
-        <Link2 size={16} /> {ocupado ? "Gerando…" : "Gerar link do portal"}
-      </Botao>
+      <div>
+        <Botao onClick={emitir} disabled={ocupado}>
+          <Link2 size={16} /> {ocupado ? "Gerando…" : "Gerar link do portal"}
+        </Botao>
+        {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+      </div>
     );
   }
 
+  // O LINK APARECE ESCRITO, e não só no clipboard.
+  //
+  // Antes ele existia apenas dentro do `navigator.clipboard.writeText` — que é
+  // opcional (`?.`), falha calado fora de HTTPS e não devolve nada. Quem
+  // clicasse em "Copiar" e colasse no navegador podia estar colando outra
+  // coisa, e não havia como conferir: o endereço não estava em lugar nenhum da
+  // tela. Agora dá para ler, conferir, copiar à mão e abrir para testar.
   return (
-    <Botao
-      onClick={() => {
-        navigator.clipboard?.writeText(link);
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 1500);
-      }}
-    >
-      <Link2 size={16} /> {copiado ? "link copiado" : "Copiar link do portal"}
-    </Botao>
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Botao
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(link);
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 1500);
+            } catch {
+              // Sem clipboard (navegador antigo, página sem HTTPS): o link
+              // está escrito logo abaixo, então dá para copiar à mão.
+              setErro("Não consegui copiar — o endereço está aqui embaixo.");
+            }
+          }}
+        >
+          <Link2 size={16} /> {copiado ? "link copiado" : "Copiar link do portal"}
+        </Botao>
+        <a href={link} target="_blank" rel="noreferrer"
+           className="text-[13px] text-brand underline">
+          abrir para testar
+        </a>
+        <button onClick={emitir} disabled={ocupado}
+                className="text-[13px] text-ink-soft underline">
+          {ocupado ? "gerando…" : "gerar outro"}
+        </button>
+      </div>
+      <p className="mt-2 break-all rounded-lg bg-surface px-3 py-2 text-[12px] text-ink-soft">
+        {link}
+      </p>
+      {/* GERAR OUTRO INVALIDA O ANTERIOR. Se a família já tem o link no
+          WhatsApp, o que ela guardou para de funcionar — e é isso que se quer
+          quando o link vazou, mas não quando foi só um clique errado. */}
+      <p className="mt-1 text-[12px] text-ink-soft">
+        Gerar outro invalida o link que a família já tiver.
+      </p>
+      {erro && <p className="mt-2 text-[13px] text-perigo">{erro}</p>}
+    </div>
   );
 }
 
