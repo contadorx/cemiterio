@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
+import Extras from "./Extras";
 
 export default function Config() {
-  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "regua" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
+  const [aba, setAba] = useState<"casa" | "equipe" | "cemiterios" | "jornada" | "campo" | "mensagens" | "whatsapp" | "regua" | "extras" | "campanhas" | "avaliacoes" | "indicacoes" | "privacidade" | "auditoria" | "erros">("casa");
   // A ABA VEM DO ENDERECO. Sem isto, o redirecionamento de /painel/whatsapp
   // cairia sempre em "A Casa" — e quem clicou em "Reconectar" na fila teria de
   // procurar a aba, justamente na hora em que o WhatsApp esta fora do ar.
@@ -37,6 +38,10 @@ export default function Config() {
             ["whatsapp", "WhatsApp"],
             // A régua de cobrança: os degraus vivem no banco desde a 0110.
             ["regua", "Régua de cobrança"],
+            // O CATÁLOGO DE FLORES E EXTRAS (0117). É preço da CASA — vale
+            // para todo mundo e muda quando o fornecedor muda —, por isso mora
+            // aqui e não na ficha de uma família.
+            ["extras", "Flores e extras"],
             ["jornada", "Dias e horários"],
             ["campanhas", "Campanhas"],
             ["avaliacoes", "Avaliações"],
@@ -58,8 +63,10 @@ export default function Config() {
         {aba === "mensagens" && <Mensagens />}
         {aba === "whatsapp" && <ConexaoWhatsapp />}
         {aba === "regua" && <Regua />}
+        {aba === "extras" && <Extras />}
         {aba !== "casa" && aba !== "equipe" && aba !== "campanhas" && aba !== "jornada"
-          && aba !== "mensagens" && aba !== "whatsapp" && <Agregados aba={aba} />}
+          && aba !== "mensagens" && aba !== "whatsapp" && aba !== "extras"
+          && <Agregados aba={aba} />}
       </div>
     </div>
   );
