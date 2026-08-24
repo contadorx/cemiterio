@@ -117,7 +117,8 @@ export async function GET(req: NextRequest) {
   const familiaIds = [...new Set((data || []).map((f: any) => f.familia_id).filter(Boolean))];
   const tumuloIds  = [...new Set((data || []).map((f: any) => f.tumulo_id).filter(Boolean))];
 
-  const [{ data: ultFam }, { data: ultJaz }, { data: cfg }, { data: ultAcao }] = await Promise.all([
+  const [{ data: ultFam }, { data: ultJaz }, { data: cfg }, { data: ultAcao },
+         { data: jazigosDaCasa }] = await Promise.all([
     familiaIds.length
       ? db.from("sureya_ultima_foto_familia").select("familia_id,ultima_em,total")
           .eq("org_id", org).in("familia_id", familiaIds)
@@ -137,7 +138,41 @@ export async function GET(req: NextRequest) {
       ? db.from("sureya_ultima_acao_familia").select("familia_id,tipo,dia")
           .eq("org_id", org).in("familia_id", familiaIds)
       : Promise.resolve({ data: [] } as any),
+
+    // ONDE FICAM OS JAZIGOS DESTA CASA, e se ela tem contrato (0125).
+    //
+    // A mensagem nem sempre carrega um túmulo: a cobrança de rotina é da
+    // FAMÍLIA, não de uma pedra. Filtrar por `fila_liberacao.tumulo_id` deixaria
+    // metade da fila de fora do filtro sem dizer — e um filtro que esconde em
+    // silêncio é pior que filtro nenhum.
+    //
+    // Então a pergunta vira "esta família tem jazigo nesta quadra?", que é a
+    // pergunta que ela faz de verdade quando quer falar com um pedaço do
+    // cemitério de uma vez.
+    familiaIds.length
+      ? db.from("tumulos")
+          .select("familia_id,contratado,valor_mensal,cemiterios(nome),quadras(codigo),ruas(nome)")
+          .eq("org_id", org).in("familia_id", familiaIds)
+      : Promise.resolve({ data: [] } as any),
   ]);
+
+  // O MESMO CRITÉRIO DO COBRADOR, e não um segundo parecido: `contratado` E
+  // `valor_mensal > 0`. Um jazigo marcado como contratado por R$ 0,00 não gera
+  // competência nenhuma — chamá-lo de "com contrato" aqui faria o filtro
+  // discordar da conta que manda no dinheiro.
+  const daCasa = new Map<string, {
+    cemiterios: Set<string>; quadras: Set<string>; ruas: Set<string>; contrato: boolean;
+  }>();
+  for (const t of ((jazigosDaCasa || []) as any[])) {
+    const fid = t.familia_id as string;
+    if (!fid) continue;
+    let e = daCasa.get(fid);
+    if (!e) { e = { cemiterios: new Set(), quadras: new Set(), ruas: new Set(), contrato: false }; daCasa.set(fid, e); }
+    if (t.cemiterios?.nome) e.cemiterios.add(t.cemiterios.nome);
+    if (t.quadras?.codigo)  e.quadras.add(t.quadras.codigo);
+    if (t.ruas?.nome)       e.ruas.add(t.ruas.nome);
+    if (t.contratado && Number(t.valor_mensal || 0) > 0) e.contrato = true;
+  }
 
   // O SALDO DA FAMÍLIA — para separar "cobrança" de "INADIMPLENTE".
   //
@@ -213,6 +248,12 @@ export async function GET(req: NextRequest) {
     local: f.tumulos
       ? [f.tumulos.quadras?.codigo, f.tumulos.ruas?.nome].filter(Boolean).join(" · ")
       : null,
+    // ONDE A FAMÍLIA TEM JAZIGO — pode ser mais de um lugar, e por isso é lista.
+    cemiterios: [...(daCasa.get(f.familia_id)?.cemiterios || [])].sort(),
+    quadras:    [...(daCasa.get(f.familia_id)?.quadras    || [])].sort(),
+    ruas:       [...(daCasa.get(f.familia_id)?.ruas       || [])].sort(),
+    /** Tem ao menos um jazigo contratado com valor — o mesmo corte do cobrador. */
+    temContrato: !!daCasa.get(f.familia_id)?.contrato,
     // O ESTADO LEGÍVEL. Sem isto a tela só sabe dizer "aguardando" — e uma
     // mensagem que falhou seis vezes fica igualzinha a uma que acabou de
     // entrar na fila.

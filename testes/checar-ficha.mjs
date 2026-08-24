@@ -233,4 +233,45 @@ ok("e quem pediu silencio nao recebe",
 ok("nenhum publico depende mais da tabela `planos`",
    !/from\("planos"\)/.test(libCamp));
 
+// ===========================================================================
+// OS RECORTES DE DISPARO NA FILA (0125)
+//
+// O risco aqui e um filtro que esconde em silencio: a Sureya recorta por
+// quadra, a lista fica vazia, e "nao tem nada para liberar" vira
+// indistinguivel de "eu filtrei e esqueci".
+// ===========================================================================
+const telaFila = readFileSync("src/app/painel/conversas/VisaoLiberacao.tsx", "utf8");
+
+// O CORTE DE "COM CONTRATO" TEM DE SER O MESMO DO COBRADOR.
+// `sureya_cobrar_competencias` exige `contratado AND valor_mensal > 0`. Um
+// jazigo marcado como contratado por R$ 0,00 nao gera competencia nenhuma —
+// chama-lo de "com contrato" no filtro faria a tela discordar da conta que
+// manda no dinheiro.
+ok("o filtro de contrato usa o mesmo corte do cobrador",
+   /t\.contratado && Number\(t\.valor_mensal \|\| 0\) > 0/.test(rotaFila));
+
+// A LOCALIZACAO E DA FAMILIA, e nao do `tumulo_id` da mensagem: a cobranca de
+// rotina nao carrega tumulo, e filtrar por ele deixaria metade da fila de fora
+// sem dizer.
+ok("a quadra vem dos jazigos da FAMILIA, nao do tumulo da mensagem",
+   /from\("tumulos"\)[\s\S]{0,200}in\("familia_id", familiaIds\)/.test(rotaFila));
+
+// O RECORTE VALE PARA TODOS OS TIPOS. Se ele fosse aplicado depois do grupo,
+// ou so dentro de "cobranca", "as fotos da quadra Q1" nao existiria.
+ok("o recorte e aplicado antes do grupo, valendo para todo tipo",
+   /const recortados = itens\.filter/.test(telaFila)
+   && /return recortados\.filter\(g\.pega\)/.test(telaFila));
+
+// O ENVIO EM LOTE TEM DE OBEDECER AO RECORTE — e o pedido: "filtros de
+// disparo". Marcar todas dentro de um recorte nao pode marcar a fila inteira.
+ok("o lote sai do que esta recortado",
+   /const visiveis = itensDoGrupo\(grupoAtual\)/.test(telaFila)
+   && /const enviaveis = visiveis\.filter\(podeEnviar\)/.test(telaFila)
+   && /new Set\(enviaveis\.map\(\(i\) => i\.id\)\)/.test(telaFila));
+
+// VAZIO POR RECORTE PRECISA SE EXPLICAR.
+ok("lista vazia por causa do filtro diz que foi o filtro",
+   /Nenhuma mensagem neste recorte/.test(telaFila)
+   && /limpar o recorte/.test(telaFila));
+
 process.exit(falhas ? 1 : 0);

@@ -113,6 +113,13 @@ interface Item {
    *  da lista — e, se for cobrança, a régua não cria outra (0124). */
   adiadaPara?: string | null;
   motivoAdiamento?: string | null;
+  /** ONDE a família tem jazigo. Lista porque uma casa pode ter mais de um,
+   *  em quadras diferentes — e nesse caso ela aparece nos dois filtros. */
+  cemiterios?: string[];
+  quadras?: string[];
+  ruas?: string[];
+  /** Tem ao menos um jazigo contratado com valor. O mesmo corte do cobrador. */
+  temContrato?: boolean;
 }
 
 /** "2026-08-14T09:30:00Z" -> "14/08 às 09:30". Sem depender de locale do device. */
@@ -154,6 +161,19 @@ export default function VisaoLiberacao() {
   /** Quantas estão guardadas para depois, e se a lista está mostrando ELAS. */
   const [adiadas, setAdiadas] = useState(0);
   const [verAdiadas, setVerAdiadas] = useState(false);
+  /**
+   * OS RECORTES DE DISPARO (0125).
+   *
+   * O grupo responde "que tipo de mensagem é". Estes respondem "para quem" —
+   * e é a pergunta que ela faz quando quer falar com um pedaço do cemitério de
+   * uma vez: os avulsos de uma quadra, os contratos de um cemitério.
+   *
+   * Vazio = não filtra. Combinam entre si e com o grupo.
+   */
+  const [fCemiterio, setFCemiterio] = useState("");
+  const [fQuadra, setFQuadra] = useState("");
+  const [fRua, setFRua] = useState("");
+  const [fContrato, setFContrato] = useState<"" | "com" | "sem">("");
   const [silenciando, setSilenciando] = useState<string | null>(null);
   const [editando, setEditando] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -369,10 +389,44 @@ export default function VisaoLiberacao() {
     });
   }
 
-  /** Os itens de um grupo. O corte usa o item inteiro, não só o tipo. */
+  /**
+   * O RECORTE DE QUEM (0125), aplicado ANTES do grupo.
+   *
+   * Vale para TODOS os tipos, e não só para cobrança: "as fotos da quadra Q1"
+   * e "os avulsos do cemitério do Cantão" são a mesma pergunta feita sobre
+   * listas diferentes.
+   *
+   * A família com jazigo em duas quadras aparece nas duas — é o que ela é.
+   */
+  const recortados = itens.filter((i) => {
+    if (fCemiterio && !(i.cemiterios || []).includes(fCemiterio)) return false;
+    if (fQuadra && !(i.quadras || []).includes(fQuadra)) return false;
+    if (fRua && !(i.ruas || []).includes(fRua)) return false;
+    if (fContrato === "com" && !i.temContrato) return false;
+    if (fContrato === "sem" && i.temContrato) return false;
+    return true;
+  });
+
+  /** Os itens de um grupo, já recortados. O corte usa o item inteiro. */
   function itensDoGrupo(g: Grupo) {
-    return itens.filter(g.pega);
+    return recortados.filter(g.pega);
   }
+
+  /**
+   * AS OPÇÕES SAEM DO QUE ESTÁ NA FILA, e não do cadastro inteiro.
+   *
+   * Oferecer as 40 quadras do cemitério quando a fila só toca 3 é obrigar a
+   * procurar — e escolher uma das 37 devolveria uma lista vazia sem explicar
+   * por quê.
+   *
+   * As de cemitério e contrato saem da fila CRUA; as de quadra e rua saem do
+   * que já está recortado, para escolher um cemitério estreitar as quadras
+   * oferecidas em vez de deixar na lista quadras de outro lugar.
+   */
+  const opcoes = (pega: (i: Item) => string[] | undefined, base: Item[]) =>
+    [...new Set(base.flatMap((i) => pega(i) || []))].sort();
+  const paraQuadraERua = itens.filter((i) =>
+    !fCemiterio || (i.cemiterios || []).includes(fCemiterio));
 
   const grupoAtual = GRUPOS.find((g) => g.id === grupo) || GRUPOS[0];
   /** O que a tela mostra: o grupo escolhido. */
@@ -527,7 +581,7 @@ export default function VisaoLiberacao() {
         )}
 
         {GRUPOS.map((g) => {
-          const n = g.id ? itensDoGrupo(g).length : itens.length;
+          const n = g.id ? itensDoGrupo(g).length : recortados.length;
           return (
             <button
               key={g.id || "tudo"}
@@ -543,6 +597,95 @@ export default function VisaoLiberacao() {
           );
         })}
       </div>
+
+      {/* ================================ PARA QUEM (0125)
+          O grupo acima responde "que tipo de mensagem". Isto responde "para
+          quem" — e é a pergunta que ela faz quando quer falar com um pedaço do
+          cemitério de uma vez: os avulsos de uma quadra, os contratos de um
+          cemitério.
+
+          Aparece só quando há de fato uma escolha a fazer. Uma fila inteira na
+          mesma quadra não ganha um seletor de quadra com uma opção só. */}
+      {(() => {
+        const cems = opcoes((i) => i.cemiterios, itens);
+        const quas = opcoes((i) => i.quadras, paraQuadraERua);
+        const rus  = opcoes((i) => i.ruas, paraQuadraERua);
+        const temContratoEAvulso =
+          itens.some((i) => i.temContrato) && itens.some((i) => !i.temContrato);
+        if (cems.length < 2 && quas.length < 2 && rus.length < 2 && !temContratoEAvulso) return null;
+
+        const filtrando = !!(fCemiterio || fQuadra || fRua || fContrato);
+        const caixa = "rounded-lg border border-line bg-card px-2 py-1.5 text-[13px] text-ink";
+
+        return (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-[13px] text-ink-soft">Para quem:</span>
+
+            {temContratoEAvulso && (
+              <select className={caixa} value={fContrato}
+                      onChange={(e) => { setFContrato(e.target.value as any); setMarcadas(new Set()); }}>
+                <option value="">contrato e avulso</option>
+                <option value="com">só com contrato</option>
+                <option value="sem">só avulso</option>
+              </select>
+            )}
+
+            {cems.length > 1 && (
+              <select className={caixa} value={fCemiterio}
+                      onChange={(e) => {
+                        setFCemiterio(e.target.value);
+                        // Trocar de cemitério zera quadra e rua: a quadra
+                        // escolhida pode não existir no cemitério novo, e o
+                        // resultado seria uma lista vazia sem explicação.
+                        setFQuadra(""); setFRua(""); setMarcadas(new Set());
+                      }}>
+                <option value="">todos os cemitérios</option>
+                {cems.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+
+            {quas.length > 1 && (
+              <select className={caixa} value={fQuadra}
+                      onChange={(e) => { setFQuadra(e.target.value); setFRua(""); setMarcadas(new Set()); }}>
+                <option value="">todas as quadras</option>
+                {quas.map((q) => <option key={q} value={q}>quadra {q}</option>)}
+              </select>
+            )}
+
+            {rus.length > 1 && (
+              <select className={caixa} value={fRua}
+                      onChange={(e) => { setFRua(e.target.value); setMarcadas(new Set()); }}>
+                <option value="">todas as ruas</option>
+                {rus.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            )}
+
+            {filtrando && (
+              <button
+                onClick={() => {
+                  setFCemiterio(""); setFQuadra(""); setFRua(""); setFContrato("");
+                  setMarcadas(new Set());
+                }}
+                className="text-[13px] text-brand underline underline-offset-2">
+                limpar
+              </button>
+            )}
+
+            {/* O QUE O RECORTE DEIXOU DE FORA, dito em número.
+                Sem esta frase, um filtro esquecido faz a fila parecer vazia — e
+                "não tem nada para liberar" e "eu filtrei e esqueci" viram a
+                mesma tela. */}
+            {filtrando && (
+              <span className="text-[13px] text-ink-soft">
+                {recortados.length} de {itens.length}
+                {itens.length - recortados.length > 0 && (
+                  <> · {itens.length - recortados.length} fora do recorte</>
+                )}
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* NADA SAI SOZINHO — e a tela precisa dizer isso.
           Com a chave mestra desligada, a IA não responde por conta própria, a
@@ -677,6 +820,38 @@ export default function VisaoLiberacao() {
             <Undo2 size={16} /> Desfazer
           </Botao>
         </div>
+      )}
+
+      {/* LISTA VAZIA POR CAUSA DO RECORTE (0125).
+          Sem esta caixa, filtrar até sobrar nada devolve uma tela em branco — e
+          "não tem nada para liberar" e "eu filtrei e esqueci" viram a mesma
+          coisa. Um filtro que esconde em silêncio é pior que filtro nenhum. */}
+      {!!itens.length && !visiveis.length && (fCemiterio || fQuadra || fRua || fContrato) && (
+        <Cartao>
+          <p className="text-[16px] font-medium text-ink">
+            Nenhuma mensagem neste recorte
+          </p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
+            Há {itens.length} {itens.length === 1 ? "mensagem esperando" : "mensagens esperando"},
+            mas nenhuma delas é{" "}
+            {[
+              fContrato === "com" ? "de família com contrato" : null,
+              fContrato === "sem" ? "de família sem contrato" : null,
+              fCemiterio ? `do cemitério ${fCemiterio}` : null,
+              fQuadra ? `da quadra ${fQuadra}` : null,
+              fRua ? `da rua ${fRua}` : null,
+            ].filter(Boolean).join(", ")}
+            {grupo && <> dentro de <b>{grupoAtual.rotulo}</b></>}.
+          </p>
+          <button
+            onClick={() => {
+              setFCemiterio(""); setFQuadra(""); setFRua(""); setFContrato("");
+              setMarcadas(new Set());
+            }}
+            className="mt-2 text-[14px] text-brand underline underline-offset-2">
+            limpar o recorte
+          </button>
+        </Cartao>
       )}
 
       {!itens.length && (
