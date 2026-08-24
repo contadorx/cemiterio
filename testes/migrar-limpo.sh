@@ -139,7 +139,10 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #             so existia na cabeca do Leandro, e a compra do buque era chute.
 #   0119  +1  pausas_tumulo — parar nao e cancelar. O jeito antigo de parar era
 #             desmarcar `contratado`, que APAGA o combinado.
-TABELAS_DELTA=${TABELAS_DELTA:-10}
+#   0127  +1  servicos_arquivados — o Leandro mandou apagar 257 lavagens da
+#             tela de Avulsos. A copia vem antes do delete: o que sai do lugar
+#             vivo muda de sala, nao evapora.
+TABELAS_DELTA=${TABELAS_DELTA:-11}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -208,7 +211,9 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0117  +8  assinaturas_extras e entregas_extras: a da org e uma restritiva
 #              POR COMANDO em cada uma — de novo a licao da 0079.
 #   0119  +4  pausas_tumulo, mesmo desenho.
-POLICIES_DELTA=${POLICIES_DELTA:-84}
+#   0127  +5  servicos_arquivados: a da org, uma restritiva POR COMANDO e a que
+#              fecha para o campo. Um arquivo que se apaga nao e arquivo.
+POLICIES_DELTA=${POLICIES_DELTA:-89}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
