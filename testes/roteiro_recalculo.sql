@@ -159,4 +159,26 @@ select ci25('e a de hoje continua intocada depois disso',
   (select status::text = 'agendado' from servicos
     where id='50250000-0000-0000-0000-0000000000b2'), '');
 
+-- ---------------------------------------------------------------------------
+-- 5. O QUE A FAMILIA PEDIU NAO ENTRA NO SORTEIO (0126)
+--
+-- Data pedida e combinado. Refazer o roteiro reorganiza o que o CONTRATO deve;
+-- quem move um combinado e gente, pelo remarcar, com a data na mao.
+-- ---------------------------------------------------------------------------
+insert into servicos
+  (id, org_id, tumulo_id, status, data_prevista, ordem_dia, data_desejada,
+   fixado_em, iniciado_em, foto_antes_url) values
+ ('50250000-0000-0000-0000-0000000000c1','a0250000-0000-0000-0000-000000000001',
+  '40250000-0000-0000-0000-000000000003','agendado', current_date + 5, 2,
+  current_date + 5, null, null, null);
+
+select ci25('o avulso pedido nao e solto',
+  sureya_soltar_roteiro(current_date + 1, 'a0250000-0000-0000-0000-000000000001') = 0,
+  'ele era o unico candidato que sobrou, e tem data pedida');
+
+select ci25('e ele continua agendado, com a ordem do dia',
+  (select status::text = 'agendado' and ordem_dia = 2 from servicos
+    where id='50250000-0000-0000-0000-0000000000c1'),
+  'a familia combinou um dia; o sistema nao muda isso sozinho');
+
 drop function ci25(text, boolean, text);
