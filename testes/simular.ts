@@ -1035,6 +1035,57 @@ async function rodar() {
            pmb({ assunto: "outro", sensivel: false, precisa_humano: true, confianca: "alta" }) === true, "");
   }
 
+  // ==========================================================================
+  console.log("\n=== 10. LEITURA DO COMPROVANTE ===");
+  // A regra que decide se o que a IA leu pode PREENCHER campo de dinheiro.
+  //
+  // O risco tem valor em reais: um número errado pré-preenchido convida a
+  // apertar "Lançar" sem olhar o papel. Campo vazio obriga a olhar.
+  {
+    const { decidirLeitura } = await import("../src/lib/comprovante");
+    const base = { valor: 100, data: "2026-08-21", id_transacao: "E2E-XYZ" };
+
+    const alta = decidirLeitura({ ...base, eh_comprovante: true, confianca: "alta" } as any);
+    checar("comprovante lido com confiança alta preenche",
+           alta.confiavel === true && alta.valor === 100 && alta.data === "2026-08-21", "");
+    checar("e traz o identificador da transação",
+           alta.idTransacao === "E2E-XYZ",
+           "é o E2E que impede o mesmo Pix de entrar pelas duas portas");
+    checar("quando deu certo, a tela não tem nada a dizer",
+           alta.mensagem === null, "");
+
+    const media = decidirLeitura({ ...base, eh_comprovante: true, confianca: "media" } as any);
+    checar("confiança média ainda preenche",
+           media.confiavel === true && media.valor === 100,
+           "só a BAIXA é que barra — média com aviso seria trabalho a mais sem ganho");
+
+    const baixa = decidirLeitura({ ...base, eh_comprovante: true, confianca: "baixa" } as any);
+    checar("confiança baixa NÃO preenche campo de dinheiro",
+           baixa.confiavel === false, "");
+    checar("e não devolve o valor nem 'só para mostrar'",
+           baixa.valor === null && baixa.data === null && baixa.idTransacao === null,
+           "número na mão da tela é número que alguém acaba usando");
+    checar("e explica por que os campos ficaram vazios",
+           typeof baixa.mensagem === "string" && baixa.mensagem.length > 10, "");
+
+    const naoEh = decidirLeitura({ ...base, eh_comprovante: false, confianca: "alta" } as any);
+    checar("foto que não é comprovante não preenche nada",
+           naoEh.confiavel === false && naoEh.valor === null, "");
+    checar("e diz isso com todas as letras",
+           (naoEh.mensagem || "").includes("não me parece um comprovante"),
+           "a Sureya precisa saber se foi a foto ou foi o sistema");
+
+    const semValor = decidirLeitura({
+      eh_comprovante: true, confianca: "alta", valor: null, data: "2026-08-21", id_transacao: null,
+    } as any);
+    checar("comprovante sem valor legível ainda vale pela data",
+           semValor.confiavel === true && semValor.valor === null && semValor.data === "2026-08-21",
+           "ler metade é melhor que não ler nada — ela completa o resto");
+    checar("e sem identificador continua passando",
+           semValor.idTransacao === null,
+           "nem todo print traz o E2E; barrar por isso seria trocar crédito em dobro por crédito nenhum");
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

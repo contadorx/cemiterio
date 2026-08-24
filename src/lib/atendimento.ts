@@ -4,7 +4,7 @@ import { supabaseAdmin } from "./supabase-admin";
 import { baixarMidiaBase64 } from "./evolution";
 import { enviarTextoComRetry } from "./envio";
 import { disparosAtivos } from "./disparos";
-import { extrairComprovante } from "./comprovante";
+import { extrairComprovante, decidirLeitura } from "./comprovante";
 import { registrarComprovante } from "./conciliacao";
 import { transcreverAudio } from "./transcricao";
 import { montarSystemPrompt, responderTool, type Assunto } from "./persona";
@@ -239,7 +239,10 @@ export async function registrarEntrada(params: {
       escalarDireto = true;
     } else {
       const dados = await extrairComprovante(midia);
-      if (dados.eh_comprovante && dados.confianca !== "baixa") {
+      // MESMA REGRA DA PORTA DA MÃO (`/api/comprovantes/ler`). Era escrita
+      // aqui e lá, com as mesmas palavras — e duas cópias de uma regra sempre
+      // começam iguais e terminam discordando.
+      if (decidirLeitura(dados).confiavel) {
         await registrarComprovante(cliente.id, midia, dados);
         const v = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : "valor não identificado";
         const d = dados.data || "data não identificada";

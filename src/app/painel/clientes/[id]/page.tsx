@@ -1464,7 +1464,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
             <Botao tom="principal" onClick={lancar} disabled={ocupado}>
               {ocupado ? "Lançando…" : "Lançar"}
             </Botao>
-            <Botao onClick={() => { setAbrindo(null); setComprovante(null); }}>Cancelar</Botao>
+            <Botao onClick={() => { setAbrindo(null); setComprovante(null); setLeitura(null); }}>Cancelar</Botao>
           </div>
         </div>
       )}

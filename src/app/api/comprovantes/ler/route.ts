@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
-import { extrairComprovante } from "@/lib/comprovante";
+import { extrairComprovante, decidirLeitura } from "@/lib/comprovante";
 import { podeChamarIa } from "@/lib/custo-ia";
 
 export const runtime = "nodejs";
@@ -66,24 +66,19 @@ export async function POST(req: NextRequest) {
   try {
     const dados = await extrairComprovante({ base64: limpo, mimetype });
 
-    // CONFIANÇA BAIXA NÃO PREENCHE CAMPO DE DINHEIRO. No WhatsApp isso já era
-    // regra (`dados.confianca !== "baixa"`); aqui vale igual. Um valor errado
-    // pré-preenchido é pior que campo vazio: o vazio obriga a olhar.
-    const confiavel = dados.eh_comprovante && dados.confianca !== "baixa";
+    // A MESMA REGRA DO CAMINHO DO WHATSAPP, e não uma segunda cópia dela:
+    // `decidirLeitura` mora em `comprovante.ts` e serve as duas portas.
+    const leitura = decidirLeitura(dados);
 
     return NextResponse.json({
       ok: true,
-      leu: confiavel,
+      leu: leitura.confiavel,
       ehComprovante: dados.eh_comprovante,
       confianca: dados.confianca,
-      valor: confiavel ? dados.valor : null,
-      data: confiavel ? dados.data : null,
-      idTransacao: confiavel ? dados.id_transacao : null,
-      mensagem: !dados.eh_comprovante
-        ? "Isto não me parece um comprovante. Se for, digite o valor e a data à mão."
-        : !confiavel
-          ? "Consegui ler, mas não com confiança suficiente. Confira o valor e a data."
-          : null,
+      valor: leitura.valor,
+      data: leitura.data,
+      idTransacao: leitura.idTransacao,
+      mensagem: leitura.mensagem,
     });
   } catch (e: any) {
     // A LEITURA FALHAR NÃO PODE IMPEDIR O LANÇAMENTO. Se a IA está fora do ar,

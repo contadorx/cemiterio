@@ -94,3 +94,46 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
     return { eh_comprovante: false, valor: null, data: null, id_transacao: null, confianca: "baixa" };
   }
 }
+
+/**
+ * O COMPROVANTE VALE OU NÃO VALE — uma regra, um lugar.
+ *
+ * A regra "é comprovante E a confiança não é baixa" estava escrita DUAS VEZES:
+ * uma em `atendimento.ts`, no caminho do WhatsApp, e outra em
+ * `/api/comprovantes/ler`, no caminho da mão. Duas cópias da mesma regra é o
+ * defeito que este projeto mais repete — a agenda (0092), o painel (0105), a
+ * lista de famílias (0106), a competência (0114), a prévia (0115). Sempre
+ * começa igual e sempre termina discordando.
+ *
+ * POR QUE A CONFIANÇA BAIXA NÃO PASSA
+ * Um valor errado pré-preenchido é pior que campo vazio. O campo vazio obriga
+ * a olhar o papel; o campo preenchido convida a confiar e apertar "Lançar".
+ * Dinheiro errado no razão da família é mais caro que trabalho de digitar.
+ */
+export interface Leitura {
+  /** Dá para preencher os campos de dinheiro com isto? */
+  confiavel: boolean;
+  valor: number | null;
+  data: string | null;
+  idTransacao: string | null;
+  /** O que dizer para quem está olhando a tela. `null` = nada a dizer. */
+  mensagem: string | null;
+}
+
+export function decidirLeitura(dados: DadosComprovante): Leitura {
+  const confiavel = !!dados.eh_comprovante && dados.confianca !== "baixa";
+
+  return {
+    confiavel,
+    // FORA DA CONFIANÇA, NADA SAI. Devolver o valor "só para mostrar" faria a
+    // tela ter um número na mão e a tentação de usá-lo.
+    valor: confiavel ? (dados.valor ?? null) : null,
+    data: confiavel ? (dados.data ?? null) : null,
+    idTransacao: confiavel ? (dados.id_transacao || null) : null,
+    mensagem: !dados.eh_comprovante
+      ? "Isto não me parece um comprovante. Se for, digite o valor e a data à mão."
+      : !confiavel
+        ? "Consegui ler, mas não com confiança suficiente. Confira o valor e a data."
+        : null,
+  };
+}
