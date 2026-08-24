@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
-import { mesOperacao } from "@/lib/vencimento";
+import { mesOperacao, diaOperacao, somaDias } from "@/lib/vencimento";
 
 /**
  * AGENDA — a mesa de onde a semana é montada.
@@ -113,6 +113,8 @@ export default function AgendaPage() {
   const [gerando, setGerando] = useState(false);
   const [diag, setDiag] = useState<any>(null);
   const [movendo, setMovendo] = useState<string | null>(null);
+  /** O dia que está sendo empurrado inteiro, para desligar os botões dele. */
+  const [movendoDia, setMovendoDia] = useState<string | null>(null);
 
   // ---- filtros ------------------------------------------------------------
   // Numa agenda de trinta linhas ninguém procura com o olho. Os três recortes
@@ -354,6 +356,54 @@ export default function AgendaPage() {
     else alert(r?.erro || "Não consegui excluir.");
   }
 
+  /**
+   * PUXAR O DIA INTEIRO — para frente ou para trás.
+   *
+   * Choveu na terça, e as quinze limpezas passam para quarta. Fazer isso
+   * quinze vezes, com a data digitada em cada linha, é o trabalho que este
+   * botão existe para tirar.
+   *
+   * Cada limpeza anda pela MESMA porta do Remarcar de uma linha só, e ganha o
+   * mesmo "fixado": sem isso o alocador devolveria tudo para o dia de origem
+   * na próxima geração, de madrugada, desfazendo o trabalho dela em silêncio.
+   */
+  async function moverDia(d: string, passo: number) {
+    const naoFeitas = (dias[d] || []).filter((x: Item) => x.status !== "executado");
+    if (!naoFeitas.length) { alert("Não há limpeza para mover neste dia."); return; }
+
+    const destino = somaDias(d, passo);
+    if (!confirm(
+      `Mover ${naoFeitas.length} ${naoFeitas.length === 1 ? "limpeza" : "limpezas"} ` +
+      `de ${dataBonita(d)} para ${dataBonita(destino)}?\n\n` +
+      `O que já foi feito fica onde está.\n` +
+      `As próximas de cada jazigo NÃO andam junto — só este dia.`
+    )) return;
+
+    setMovendoDia(d);
+    try {
+      const r = await fetch("/api/agenda/dia/mover", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ de: d, dias: passo }),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui mover o dia."); return; }
+
+      // O AVISO SAI DEPOIS, E NÃO TRAVA ANTES. Destino sem dia de trabalho ou
+      // acima da capacidade não é motivo para recusar — ela sabe o que está
+      // fazendo. É motivo para DIZER: uma agenda que estoura em silêncio vira
+      // uma sexta com trinta paradas que ninguém percebeu.
+      const avisos = [
+        !r.diaDeTrabalho ? `${dataBonita(r.para)} não é dia de trabalho no cadastro.` : null,
+        r.estourou ? `O dia ficou com ${r.noDestino} paradas, acima das ${r.capacidade} do padrão.` : null,
+        r.falhas?.length ? `${r.falhas.length} não conseguiram mover.` : null,
+      ].filter(Boolean);
+      if (avisos.length) {
+        alert(`${r.movidos} movida(s) para ${dataBonita(r.para)}.\n\n` + avisos.join("\n"));
+      }
+      carregar();
+    } finally { setMovendoDia(null); }
+  }
+
   async function acao(id: string, corpo: any) {
     const r = await fetch(`/api/servico/${id}`, {
       method: "PATCH",
@@ -442,11 +492,28 @@ export default function AgendaPage() {
         <div style={{ ...painel.card, padding: 12 }}>
           <div data-filtros style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 15, color: cor.cinza, marginRight: 4 }}>Mostrar:</span>
-            {[[1, "Amanhã"], [3, "3 dias"], [7, "7 dias"], [14, "14 dias"], [30, "30 dias"], [90, "90 dias"]]
-              .map(([v, rot]) => (
-                <button key={String(v)}
-                  style={chip(periodo.dias === v && !periodo.fim)}
-                  onClick={() => setPeriodo({ dias: Number(v), inicio: "", fim: "" })}>
+            {/* O PRIMEIRO CHIP DIZIA "AMANHÃ" E MOSTRAVA HOJE.
+                `dias: 1` com `inicio` vazio faz a API começar em
+                `diaOperacao()` — que é HOJE. O rótulo mentia, e quem clicava
+                procurando o dia seguinte via o dia corrente e concluía que a
+                agenda "começa amanhã".
+
+                Agora são dois botões de verdade: Hoje começa hoje, Amanhã
+                começa amanhã. O que distingue os dois não é `dias` (é 1 nos
+                dois) — é o `inicio`. */}
+            {([
+              ["hoje", 1, "", "Hoje"],
+              ["amanha", 1, somaDias(diaOperacao(), 1), "Amanhã"],
+              ["d3", 3, "", "3 dias"],
+              ["d7", 7, "", "7 dias"],
+              ["d14", 14, "", "14 dias"],
+              ["d30", 30, "", "30 dias"],
+              ["d90", 90, "", "90 dias"],
+            ] as [string, number, string, string][])
+              .map(([k, v, ini, rot]) => (
+                <button key={k}
+                  style={chip(periodo.dias === v && !periodo.fim && periodo.inicio === ini)}
+                  onClick={() => setPeriodo({ dias: v, inicio: ini, fim: "" })}>
                   {rot}
                 </button>
               ))}
@@ -686,6 +753,30 @@ export default function AgendaPage() {
                     {todosMarcados ? "desmarcar o dia" : "marcar o dia"}
                   </button>
                 )}
+
+                {/* PUXAR O DIA — para frente ou para trás.
+                    Remarcar já resolvia uma linha. Faltava o dia como unidade:
+                    choveu na terça, e as quinze passam para quarta.
+
+                    Fica no cabeçalho porque o alvo é o dia, não a limpeza. */}
+                {naoFeitas.length > 0 && (
+                  <span style={{ display: "inline-flex", gap: 4, alignItems: "center",
+                                 marginLeft: "auto" }}>
+                    <span style={{ fontSize: 13, color: cor.cinza }}>puxar o dia:</span>
+                    <button
+                      style={{ ...painel.botaoMiniSec, minHeight: 30, padding: "0 10px" }}
+                      disabled={movendoDia === d}
+                      title={`Passar as ${naoFeitas.length} para o dia anterior`}
+                      onClick={() => moverDia(d, -1)}
+                    >← 1 dia</button>
+                    <button
+                      style={{ ...painel.botaoMiniSec, minHeight: 30, padding: "0 10px" }}
+                      disabled={movendoDia === d}
+                      title={`Passar as ${naoFeitas.length} para o dia seguinte`}
+                      onClick={() => moverDia(d, 1)}
+                    >1 dia →</button>
+                  </span>
+                )}
               </div>
 
               {doDia.map((s) => {
@@ -893,9 +984,39 @@ export default function AgendaPage() {
                           </div>
                         ) : (
                           <>
+                            {/* ANTECIPAR OU EMPURRAR UM DIA, sem digitar data.
+                                Remarcar continua ali para a data qualquer; isto
+                                é para o caso comum — "essa aqui faz amanhã", "essa
+                                dá para adiantar" —, que não merecia abrir um
+                                campo de calendário.
+
+                                Passa pela MESMA porta do Remarcar, com a mesma
+                                marca de "decidido por pessoa": sem ela o
+                                alocador desfaz de madrugada. `replanejar` fica
+                                em false, como no Remarcar de um dia inteiro —
+                                mover uma limpeza um dia não deve arrastar o
+                                ciclo inteiro daquele jazigo. */}
+                            <button style={painel.botaoMiniSec}
+                                    title="Fazer um dia antes"
+                                    onClick={() => acao(s.id, {
+                                      acao: "remarcar",
+                                      novaData: somaDias(d, -1),
+                                      replanejar: false,
+                                    })}>
+                              ← 1 dia
+                            </button>
+                            <button style={painel.botaoMiniSec}
+                                    title="Deixar para o dia seguinte"
+                                    onClick={() => acao(s.id, {
+                                      acao: "remarcar",
+                                      novaData: somaDias(d, 1),
+                                      replanejar: false,
+                                    })}>
+                              1 dia →
+                            </button>
                             <button style={painel.botaoMiniSec}
                                     onClick={() => setRemarcando(s.id)}>
-                              Remarcar
+                              Outra data
                             </button>
                             <button style={painel.botaoMiniSec}
                                     onClick={() => {

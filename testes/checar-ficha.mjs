@@ -274,4 +274,49 @@ ok("lista vazia por causa do filtro diz que foi o filtro",
    /Nenhuma mensagem neste recorte/.test(telaFila)
    && /limpar o recorte/.test(telaFila));
 
+// ===========================================================================
+// PUXAR O DIA, E O CHIP QUE MENTIA (agenda)
+// ===========================================================================
+const telaAgenda = readFileSync("src/app/painel/agenda/page.tsx", "utf8");
+const rotaMover  = readFileSync("src/app/api/agenda/dia/mover/route.ts", "utf8");
+
+// O CHIP DIZIA "AMANHA" E MOSTRAVA HOJE: `dias: 1` com `inicio` vazio faz a
+// API comecar em diaOperacao(), que e hoje. Quem clicava procurando o dia
+// seguinte via o dia corrente e concluia que a agenda "comeca amanha".
+ok("existe o filtro de HOJE, comecando hoje",
+   /\["hoje", 1, "", "Hoje"\]/.test(telaAgenda));
+
+ok("e o de AMANHA comeca mesmo amanha",
+   /\["amanha", 1, somaDias\(diaOperacao\(\), 1\), "Amanhã"\]/.test(telaAgenda));
+
+// O que distingue os dois nao e `dias` (e 1 nos dois): e o `inicio`. Sem isso
+// na comparacao, os dois botoes acenderiam juntos.
+ok("e os dois chips nao acendem juntos",
+   /periodo\.dias === v && !periodo\.fim && periodo\.inicio === ini/.test(telaAgenda));
+
+// UMA PORTA SO PARA MOVER. Escrever um segundo movedor daria duas regras para
+// o mesmo ato — comecariam iguais e terminariam discordando.
+ok("mover o dia usa a MESMA porta do remarcar de uma linha",
+   /rpc\("sureya_remarcar_servico"/.test(rotaMover));
+
+// O QUE JA FOI FEITO NAO ANDA: lavagem executada tem foto, data e as vezes
+// cobranca lancada. Mover a data dela seria reescrever um fato.
+ok("o que ja foi executado nao e movido",
+   /\.in\("status", \["pendente", "agendado"\]\)/.test(rotaMover));
+
+// MOVIDO A MAO = DECISAO DE PESSOA (0041). Sem a marca, o alocador devolve
+// tudo para o dia de origem na proxima geracao, de madrugada, em silencio.
+ok("o dia movido fica fixado, para o alocador nao desfazer",
+   /fixado_em: new Date\(\)\.toISOString\(\)/.test(rotaMover));
+
+// REPLANEJAR DESLIGADO no dia inteiro: arrastar o ciclo de quinze jazigos por
+// causa de uma chuva mudaria meses de agenda sem ninguem pedir.
+ok("mover o dia NAO arrasta o ciclo de cada jazigo por padrao",
+   /p_replanejar: b\?\.replanejar === true/.test(rotaMover));
+
+// DESTINO CHEIO OU FORA DO DIA DE TRABALHO NAO E RECUSADO — e dito. Uma
+// agenda que estoura em silencio vira uma sexta com trinta paradas.
+ok("o destino avisa quando nao e dia de trabalho ou estoura a capacidade",
+   /diaDeTrabalho/.test(rotaMover) && /estourou/.test(rotaMover));
+
 process.exit(falhas ? 1 : 0);
