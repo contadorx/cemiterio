@@ -7,6 +7,8 @@ import { gerarEsteiraDeExtras } from "@/lib/extras";
 import { gerarServicosDevidos, alocarAgenda } from "@/lib/agenda";
 import { registrarErro } from "@/lib/monitor";
 import { carimbarRotina } from "@/lib/rotinas";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,6 +95,24 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     await registrarErro("cron_diario_memoria", e);
     resultado.memoria = { erro: true };
+  }
+
+  // O RASTRO VELHO SAI (0121). Cada mensagem que bate no webhook deixa uma
+  // linha; sem varredura, esse log cresce para sempre e vira o problema
+  // seguinte. Sessenta dias e muito mais do que qualquer pergunta do tipo "a
+  // familia mandou semana passada?" precisa.
+  //
+  // FORA DO `tudoOk` DE PROPOSITO: se a faxina falhar, a agenda do dia foi
+  // criada do mesmo jeito, e pintar a rotina de vermelho por causa disto
+  // ensinaria a ignorar o vermelho.
+  try {
+    const { data: apagadas } = await supabaseAdmin().rpc("sureya_limpar_eventos_webhook", {
+      p_dias: 60, p_org: env.orgId(),
+    });
+    resultado.rastro = { apagadas: Number(apagadas) || 0 };
+  } catch (e) {
+    await registrarErro("cron_diario_rastro", e);
+    resultado.rastro = { erro: true };
   }
 
   // "ok" so quando NENHUMA etapa falhou: meia rotina nao pode passar por

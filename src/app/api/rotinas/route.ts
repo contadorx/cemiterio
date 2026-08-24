@@ -62,9 +62,25 @@ export async function GET() {
     };
   });
 
+  // O WHATSAPP TEM UMA PERGUNTA A MAIS QUE AS OUTRAS ROTINAS.
+  //
+  // O carimbo diz "chegou alguma coisa". Não diz se essa coisa VIROU mensagem.
+  // No dia 23/08 chegaram 70 eventos e o carimbo ficou verde — mas nenhum dos
+  // 70 virou mensagem de família. Verde e mudo ao mesmo tempo.
+  //
+  // `sureya_saude_whatsapp` (0121) responde as duas metades: há quanto tempo
+  // está calado, e o que entrou por desfecho. Se a função ainda não existe no
+  // banco, a tela mostra as rotinas sem ela em vez de quebrar.
+  let whatsapp: any = null;
+  try {
+    const { data: saude } = await auth.db.rpc("sureya_saude_whatsapp", {});
+    if (saude) whatsapp = saude;
+  } catch { /* banco sem a 0121: segue sem este bloco */ }
+
   return NextResponse.json({
     ok: true,
     rotinas,
+    whatsapp,
     // o Início só precisa disto para decidir se mostra a faixa vermelha
     problemas: rotinas.filter((r) => r.atrasada).length,
   });

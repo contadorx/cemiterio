@@ -119,6 +119,8 @@ export default function ConexaoWhatsapp() {
     <>
         <h2 style={{ ...painel.h1, fontSize: 18, marginBottom: 8 }}>Conexão do WhatsApp</h2>
 
+        <ChegouAlgumaCoisa />
+
         <section style={painel.card}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 12, height: 12, borderRadius: 999, background: b.corFundo, display: "inline-block" }} />
@@ -174,5 +176,96 @@ export default function ConexaoWhatsapp() {
           </p>
         </section>
     </>
+  );
+}
+
+
+/**
+ * "CONECTADO" NÃO É "CHEGANDO".
+ *
+ * A bolinha verde acima diz que a instância da Evolution está de pé. Ela não
+ * diz que mensagem de família está ENTRANDO no sistema — e as duas coisas já
+ * discordaram, feio:
+ *
+ *   23/08/2026   70 mensagens bateram no servidor.  Zero viraram conversa.
+ *   04/08 a 22/08  dezenove dias sem um único evento, e ninguém soube.
+ *
+ * Este bloco mostra o que a bolinha não mostra: quando chegou a última, e o
+ * que aconteceu com o que chegou. Os desfechos vêm do rastro da 0121.
+ */
+function ChegouAlgumaCoisa() {
+  const [s, setS] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/rotinas")
+      .then((r) => r.json())
+      .then((r) => { if (r?.ok && r.whatsapp) setS(r.whatsapp); })
+      .catch(() => {});
+  }, []);
+
+  if (!s) return null;
+
+  const calado = s.silencio || s.nunca_recebeu;
+  // Chegou bastante coisa e nada virou conversa de família. É o caso mais
+  // traiçoeiro: tudo verde e o sistema surdo.
+  const surdo = !calado && s.total_24h >= 10 && s.gravadas_24h === 0;
+
+  const desfechos = Object.entries((s.em_7d || {}) as Record<string, number>)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+
+  const NOME: Record<string, string> = {
+    gravada: "viraram conversa de família",
+    lead: "de números que não são família",
+    grupo: "de grupos",
+    vazio: "sem texto e sem mídia",
+    duplicado: "repetidas (o WhatsApp reenvia)",
+    espelho_cliente: "que você mandou pelo celular",
+    espelho_eco: "eco do que o painel enviou",
+    espelho_lead: "que você mandou para um contato novo",
+    espelho_nada: "que você mandou para fora do sistema",
+    escalado: "que pararam para uma pessoa ver",
+    ignorado: "de família com a IA desligada",
+    erro: "que falharam no meio (o WhatsApp vai reenviar)",
+    sem_mensagem: "avisos do WhatsApp, sem mensagem",
+    antes_do_rastro: "recebidas antes de existir este registro",
+  };
+
+  return (
+    <section style={{ ...painel.card,
+      borderLeft: `5px solid ${calado || surdo ? "rgb(var(--zm-perigo))" : "rgb(var(--zm-positivo))"}` }}>
+      <strong style={{ color: cor.navy }}>Está chegando alguma coisa?</strong>
+
+      <p style={{ color: cor.cinza, fontSize: 15, margin: "8px 0 0" }}>
+        {s.nunca_recebeu
+          ? "Nunca chegou mensagem nenhuma até agora."
+          : calado
+            ? `A última mensagem chegou há ${Math.round(s.horas_calado)} horas. `
+              + "Mensagem de família pode estar caindo no seu celular e não entrando aqui."
+            : `Última mensagem há ${Math.round(s.horas_calado)}h · `
+              + `${s.total_24h} nas últimas 24 horas, ${s.gravadas_24h} viraram conversa de família.`}
+      </p>
+
+      {surdo && (
+        <p style={{ color: "rgb(var(--zm-perigo))", fontSize: 15, margin: "8px 0 0" }}>
+          Chega e não entra: {s.total_24h} mensagens em 24 horas e nenhuma virou
+          conversa. Ou são só grupos e números desconhecidos, ou alguma família
+          escreveu de um número que não está no cadastro.
+        </p>
+      )}
+
+      {desfechos.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.4,
+                        textTransform: "uppercase", color: cor.cinza, marginBottom: 4 }}>
+            nos últimos 7 dias
+          </div>
+          {desfechos.map(([k, n]) => (
+            <div key={k} style={{ fontSize: 14, color: cor.navy, padding: "2px 0" }}>
+              <b>{String(n)}</b> {NOME[k] || k}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

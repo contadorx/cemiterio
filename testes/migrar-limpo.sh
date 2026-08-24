@@ -281,7 +281,11 @@ POLICIES_DELTA=${POLICIES_DELTA:-79}
 #   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
 #   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
 #             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
-FUNCOES_DELTA=${FUNCOES_DELTA:-60}
+#   0121  +3  sureya_saude_whatsapp, sureya_rastro_telefone,
+#             sureya_limpar_eventos_webhook — as tres respondem a mesma
+#             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
+#             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
+FUNCOES_DELTA=${FUNCOES_DELTA:-63}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -558,6 +562,25 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/flores.sql 2>&1); then
   echo "$saida" | grep -E "FLORES FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Buque comprado a mais e prejuizo; buque a menos e telefonema."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O RASTRO DA MENSAGEM
+#
+# O risco aqui ja se realizou: dezenove dias de WhatsApp mudo (04/08 a 22/08 de
+# 2026) sem que nenhuma tela dissesse isso, e uma pergunta — "o comprovante da
+# Josiane chegou?" — sem resposta possivel. O que este teste protege e a
+# capacidade de RESPONDER, que e diferente de a mensagem chegar.
+# ---------------------------------------------------------------------------
+echo "RASTRO — para onde foi a mensagem, e ha quanto tempo o whats esta calado"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/rastro_whatsapp.sql 2>&1); then
+  echo "$saida" | grep -E "RASTRO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Sem rastro, 'a mensagem sumiu' vira deducao — e deducao ja errou aqui."
   echo "============================================================"
   exit 1
 fi

@@ -58,21 +58,91 @@ function parsePayload(body: any): {
   };
 }
 
-// A2: cada evento do Evolution só passa uma vez.
-async function eventoJaVisto(msgId: string): Promise<boolean> {
+// A2: cada evento do Evolution só passa uma vez — E DEIXA DITO POR ONDE SAIU.
+//
+// POR QUE ISTO MUDOU (0121)
+// Até aqui esta tabela guardava só o id da mensagem, e só era escrita DEPOIS
+// dos filtros de grupo e de vazio. O webhook decidia o destino de cada
+// mensagem — grupo, eco, lead, gravada — devolvia a palavra ao Evolution e
+// esquecia. Ninguém guardava.
+//
+// No dia 23/08 chegaram 70 eventos. Um virou lead, um virou mensagem, e 68
+// não deixaram rastro nenhum. Quando a pergunta foi "o comprovante da Josiane
+// chegou?", não havia resposta possível: nem sim, nem não. Só dedução.
+//
+// Agora toda mensagem que bate no servidor abre uma linha ANTES de qualquer
+// filtro, e fecha essa linha com o desfecho. `sureya_rastro_telefone` responde
+// pelo número, e `sureya_saude_whatsapp` responde pelo conjunto.
+export type Desfecho =
+  | "sem_mensagem" | "grupo" | "vazio" | "duplicado"
+  | "espelho_cliente" | "espelho_eco" | "espelho_lead" | "espelho_nada"
+  | "lead" | "ignorado" | "escalado" | "gravada" | "erro";
+
+// Evento sem chave de mensagem não tem como ser deduplicado. Ele cai todo numa
+// linha só, cujo `visto_em` vai andando: serve para saber QUE existe esse tipo
+// de tráfego, não para contá-lo.
+const SEM_ID = "sem-id";
+
+async function abrirRastro(msgId: string | null, telefone: string | null): Promise<"novo" | "repetido"> {
   const db = supabaseAdmin();
+  const org = env.orgId();
+  const id = msgId || SEM_ID;
+  const agora = new Date().toISOString();
+
   const { data, error } = await db
     .from("eventos_webhook")
     .upsert(
-      { org_id: env.orgId(), evolution_msg_id: msgId },
+      { org_id: org, evolution_msg_id: id, telefone, visto_em: agora },
       { onConflict: "org_id,evolution_msg_id", ignoreDuplicates: true }
     )
     .select("id");
+
   if (error) {
-    console.error("[webhook] dedup falhou (segue mesmo assim):", error.message);
-    return false;
+    // O rastro não pode derrubar a mensagem. Sem ele o evento segue, só fica
+    // cego — que era o estado do sistema inteiro antes da 0121.
+    console.error("[webhook] rastro falhou (segue mesmo assim):", error.message);
+    return "novo";
   }
-  return !data || data.length === 0; // nada inserido = duplicado
+  if (data && data.length > 0) return "novo";
+  if (id === SEM_ID) {
+    await db.from("eventos_webhook").update({ visto_em: agora })
+      .eq("org_id", org).eq("evolution_msg_id", id);
+    return "novo";
+  }
+
+  // JÁ EXISTE. Se a passagem anterior MORREU no meio, o Evolution reenviando é
+  // a segunda chance — e recusá-la como "duplicado" era perder a mensagem de
+  // vez. Só o que terminou é que tranca.
+  const { data: antes } = await db
+    .from("eventos_webhook")
+    .select("desfecho")
+    .eq("org_id", org).eq("evolution_msg_id", id)
+    .maybeSingle();
+
+  const podeRefazer = !antes || (antes as any).desfecho === "erro";
+  await db.from("eventos_webhook")
+    .update({ visto_em: agora, ...(podeRefazer ? { desfecho: null } : {}) })
+    .eq("org_id", org).eq("evolution_msg_id", id);
+
+  return podeRefazer ? "novo" : "repetido";
+}
+
+async function fecharRastro(msgId: string | null, desfecho: Desfecho): Promise<void> {
+  try {
+    const db = supabaseAdmin();
+    await db.from("eventos_webhook")
+      .update({ desfecho })
+      .eq("org_id", env.orgId())
+      .eq("evolution_msg_id", msgId || SEM_ID);
+  } catch (e: any) {
+    console.error("[webhook] não consegui carimbar o desfecho:", e?.message || e);
+  }
+}
+
+/** Fecha o rastro e devolve a resposta ao Evolution na mesma frase. */
+async function encerrar(msgId: string | null, desfecho: Desfecho, extra?: Record<string, any>) {
+  await fecharRastro(msgId, desfecho);
+  return NextResponse.json({ ok: true, desfecho, ...(extra || {}) });
 }
 
 export async function POST(req: NextRequest) {
@@ -127,15 +197,20 @@ export async function POST(req: NextRequest) {
   // painel avisa quando esse instante fica velho demais.
   await carimbarRotina("webhook", true, { evento: evento || "messages.upsert" });
 
-  if (!p) return NextResponse.json({ ok: true, ignorado: "sem_mensagem" });
-  if (p.ehGrupo) return NextResponse.json({ ok: true, ignorado: "grupo" });
-  if (!p.texto && !p.temMidia && !p.temAudio)
-    return NextResponse.json({ ok: true, ignorado: "vazio" });
+  // O RASTRO ABRE ANTES DOS FILTROS.
+  //
+  // Grupo e vazio saíam daqui sem deixar linha nenhuma, e eram justamente a
+  // maior fatia do tráfego. "68 eventos sem rastro" não era um mistério: era
+  // esta ordem. Agora a linha nasce primeiro e o filtro só a carimba.
+  const msgId = p?.msgId || null;
+  const estado = await abrirRastro(msgId, p?.telefone || null);
+
+  if (!p) return encerrar(msgId, "sem_mensagem");
+  if (estado === "repetido") return encerrar(msgId, "duplicado");
+  if (p.ehGrupo) return encerrar(msgId, "grupo");
+  if (!p.texto && !p.temMidia && !p.temAudio) return encerrar(msgId, "vazio");
 
   try {
-    if (p.msgId && (await eventoJaVisto(p.msgId))) {
-      return NextResponse.json({ ok: true, ignorado: "duplicado" });
-    }
 
     // SAIDA: o que ela digitou direto no celular. Antes isso era descartado e
     // o painel mostrava so metade da conversa. Agora vira mensagem de saida na
@@ -147,7 +222,16 @@ export async function POST(req: NextRequest) {
         temMidia: p.temMidia,
         temAudio: p.temAudio,
       });
-      return NextResponse.json({ ok: true, resultado: "saida", espelho: esp.tipo });
+      // O ESPELHO TAMBÉM PRECISA DIZER O QUE FEZ. `{tipo:"nada"}` é o caso
+      // em que a mensagem é descartada de propósito — mídia sem legenda para
+      // um número que não é família nem lead. Descartar de propósito e perder
+      // sem saber davam na mesma linha em branco.
+      const carimbo: Desfecho =
+        esp.tipo === "cliente" ? "espelho_cliente"
+        : esp.tipo === "eco"   ? "espelho_eco"
+        : esp.tipo === "lead"  ? "espelho_lead"
+        : "espelho_nada";
+      return encerrar(msgId, carimbo, { resultado: "saida" });
     }
 
     // ÁUDIO: transcreve antes de registrar, para a conversa já nascer com o texto.
@@ -185,10 +269,10 @@ export async function POST(req: NextRequest) {
         textoFinal || (p.temAudio ? "[áudio que não consegui transcrever]" : "[mídia]"),
         p.pushName
       );
-      return NextResponse.json({ ok: true, resultado: "lead" });
+      return encerrar(msgId, "lead");
     }
     if (reg.tipo === "ignorado" || reg.tipo === "escalado") {
-      return NextResponse.json({ ok: true, resultado: reg.tipo });
+      return encerrar(msgId, reg.tipo, { motivo: (reg as any).motivo });
     }
 
     // Sem agendador: responde ao Evolution já e processa a rajada em background,
@@ -200,11 +284,16 @@ export async function POST(req: NextRequest) {
         .catch(() => 0)
     );
     waitUntil(aguardarEProcessar(reg.conversaId));
-    return NextResponse.json({ ok: true, resultado: "agendado", transcrito });
+    return encerrar(msgId, "gravada", { transcrito });
   } catch (e: any) {
     console.error("[webhook] erro ao processar:", e?.message || e);
     await registrarErro("webhook", e, { telefone: p?.telefone });
     await carimbarRotina("webhook", false, undefined, e?.message || String(e));
+    // `erro` não é um desfecho final: `abrirRastro` deixa o Evolution
+    // reenviar esta mesma mensagem e processá-la de novo. Antes, a linha de
+    // dedupe já estava gravada quando a falha acontecia — e a segunda chance
+    // era recusada como duplicada. A mensagem morria ali, calada.
+    await fecharRastro(msgId, "erro");
     return NextResponse.json({ ok: false, erro: "processamento" });
   }
 }

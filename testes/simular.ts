@@ -868,25 +868,50 @@ async function rodar() {
   checar("dia de trabalho não é movido",
          proximoDiaUtil(quarta).getTime() === quarta.getTime(), "");
 
-  console.log("\n=== 5. CAMPANHAS ===");
+  console.log("\n=== 5. AVISO PARA TODO MUNDO ===");
+  //
+  // O AVISO CAI NA FILA DE LIBERACAO, e nao mais em `interacoes_ia`.
+  //
+  // Estes testes conferiam o destino ANTIGO — a lista solta de rascunhos que a
+  // 0094 apagou. Passavam verdes enquanto a campanha escrevia num lugar sem
+  // tela: o teste guardava o mecanismo e nao o resultado.
   const camp = await import("../src/lib/campanha");
-  const rc = await camp.executarCampanha({ nome: "Finados", mensagem: "Olá, {nome}! Finados chegando.", publico: "ativos" });
-  const rascCamp = banco.interacoes_ia.filter((i) => i.rascunho?.includes("Finados chegando"));
-  checar("campanha criou rascunhos", rc.criados >= 3, `criou ${rc.criados}`);
+  const rc = await camp.executarCampanha({
+    nome: "Aviso das moedas",
+    mensagem: "Olá, {nome}! Um aviso sobre as moedas deixadas no jazigo.",
+    publico: "todas" });
+  // FILTRO POR TIPO **E** TEXTO. So pelo texto, este teste pegava tambem as
+  // comemorativas — ha um modelo de Finados no fixture com frase parecida, e a
+  // contagem vinha somada sem ninguem perceber.
+  const naFila = banco.fila_liberacao.filter(
+    (i: any) => i.tipo === "lembrete" && i.texto?.includes("moedas deixadas"));
+
+  checar("o aviso entrou na fila de liberacao", naFila.length >= 3, `criou ${rc.criados}`);
   checar("{nome} foi substituído pelo primeiro nome",
-         rascCamp.some((r) => r.rascunho.includes("Cecília")), rascCamp[0]?.rascunho || "");
-  checar("campanha NÃO inclui cliente anonimizado",
-         !rascCamp.some((r) => r.cliente_id === "c-anon"), "LGPD");
-  checar("nenhum rascunho de campanha foi enviado sozinho",
-         rascCamp.every((r) => r.acao_humana == null), "todos devem ficar pendentes de aprovação");
-  const rc2 = await camp.executarCampanha({ nome: "Cobrar", mensagem: "Teste de público em aberto aqui", publico: "em_aberto" });
-  const emAberto = ["c-ant", "c-neu", "c-avu", "c-sua", "c-lin"];
-  const rascAberto = banco.interacoes_ia.filter((i) => i.rascunho?.includes("Teste de público em aberto"));
-  checar("público 'em aberto' pega só quem tem saldo negativo",
-         rascAberto.every((r) => emAberto.includes(r.cliente_id)),
-         `pegou ${rascAberto.map((r) => r.cliente_id).join(",")}`);
+         naFila.some((r: any) => r.texto.includes("Cecília")), naFila[0]?.texto || "");
+  checar("nasce AGUARDANDO — nada sai sozinho",
+         naFila.every((r: any) => r.status === "aguardando"),
+         "um aviso enviado sem comando quebra a regra da casa");
+  checar("aviso NÃO inclui cliente anonimizado",
+         !naFila.some((r: any) => r.cliente_id === "c-anon"), "LGPD");
+
+  // UMA POR FAMILIA. Uma casa com tres contatos receberia tres vezes o mesmo
+  // recado — o defeito que a 0102 criou na cobranca gentil, aqui de novo.
+  const familiasAvisadas = naFila.map((r: any) => r.familia_id);
+  checar("uma mensagem por família, sem repetir a casa",
+         new Set(familiasAvisadas).size === familiasAvisadas.length,
+         `${familiasAvisadas.length} mensagens para ${new Set(familiasAvisadas).size} famílias`);
+
+  const rc2 = await camp.executarCampanha({
+    nome: "Cobrar", mensagem: "Teste de público em aberto aqui", publico: "em_aberto" });
+  const abertos = banco.fila_liberacao.filter(
+    (i: any) => i.tipo === "lembrete" && i.texto?.includes("Teste de público em aberto"));
+  const familiasDevendo = ["f-ant", "f-neu", "f-avu", "f-sua", "f-lin"];
+  checar("público 'em aberto' pega só quem deve",
+         abertos.every((r: any) => familiasDevendo.includes(r.familia_id)),
+         `pegou ${abertos.map((r: any) => r.familia_id).join(",")}`);
   checar("público 'em aberto' NÃO pega quem está adiantado",
-         !rascAberto.some((r) => r.cliente_id === "c-cec"), "Cecília tem +160");
+         !abertos.some((r: any) => r.familia_id === "f-cec"), "a família Ramos tem +160");
 
   console.log("\n=== 6. BRIEFING DO CAMPO ===");
   const bri = await import("../src/lib/briefing");

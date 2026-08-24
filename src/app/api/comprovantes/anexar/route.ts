@@ -82,6 +82,34 @@ export async function POST(req: NextRequest) {
   }
 
   const valor = Number(String(b?.valor ?? "").replace(",", "."));
+  // O IDENTIFICADOR DA TRANSAÇÃO É O QUE IMPEDE O CRÉDITO EM DOBRO.
+  //
+  // Com a leitura voltando a valer pelas DUAS portas, o mesmo Pix pode entrar
+  // duas vezes: a família manda a foto no WhatsApp e a Sureya anexa o print do
+  // mesmo pagamento. Sem trava, o razão da família credita dois.
+  //
+  // O E2E do Pix é único por pagamento e vem impresso no comprovante. Onde ele
+  // foi lido, ele tranca (índice único da 0121).
+  const idTransacao = String(b?.idTransacao || "").trim() || null;
+
+  if (idTransacao) {
+    const { data: repetido } = await db
+      .from("comprovantes")
+      .select("id,cliente_id,valor_extraido,data_extraida")
+      .eq("id_transacao", idTransacao)
+      .maybeSingle();
+    if (repetido) {
+      return NextResponse.json({
+        ok: false,
+        erro: "comprovante_repetido",
+        mensagem:
+          "Este mesmo pagamento já está registrado — o identificador da "
+          + "transação bate com um comprovante que já existe. Se for outro "
+          + "pagamento, apague o identificador lido e anexe de novo.",
+        existente: repetido,
+      }, { status: 409 });
+    }
+  }
 
   const { data, error } = await db
     .from("comprovantes")
@@ -91,12 +119,22 @@ export async function POST(req: NextRequest) {
       imagem_url: url,
       valor_extraido: isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : null,
       data_extraida: b?.data || new Date().toISOString().slice(0, 10),
+      id_transacao: idTransacao,
       status: "confirmado",
     })
     .select("id,imagem_url")
     .single();
 
   if (error) {
+    // O índice único da 0121 é a segunda linha de defesa: entre a consulta
+    // acima e este insert, o caminho do WhatsApp pode ter gravado o mesmo Pix.
+    if (String(error.message).includes("idx_comprovante_transacao_unica")) {
+      return NextResponse.json({
+        ok: false,
+        erro: "comprovante_repetido",
+        mensagem: "Este mesmo pagamento acabou de ser registrado por outro caminho.",
+      }, { status: 409 });
+    }
     return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   }
 
