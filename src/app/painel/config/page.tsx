@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
@@ -414,97 +414,164 @@ function Agregados({ aba }: { aba: string }) {
   );
 }
 
+/**
+ * O AVISO PARA TODO MUNDO.
+ *
+ * Uma mensagem, muitas famílias — o aviso das moedas, o recado de Finados, a
+ * mudança do Pix. Uma linha por FAMÍLIA (e não por contato: uma casa com três
+ * telefones receberia três vezes o mesmo recado), entrando na FILA DE
+ * LIBERAÇÃO, onde já existe marcar em lote, enviar em lote e parar no meio.
+ *
+ * NADA SAI DAQUI. Isto enche a fila; quem manda é o comando, em Conversas.
+ */
 function Campanhas() {
   const [hist, setHist] = useState<any[]>([]);
+  const [publicos, setPublicos] = useState<any[]>([]);
+  const [previa, setPrevia] = useState<any>(null);
   const [nome, setNome] = useState("");
   const [mensagem, setMensagem] = useState("");
-  const [publico, setPublico] = useState("ativos");
+  const [publico, setPublico] = useState("todas");
   const [rodando, setRodando] = useState(false);
   const [res, setRes] = useState<string>("");
+  const [erro, setErro] = useState<string>("");
 
-  async function carregar() {
-    const r = await fetch("/api/campanhas").then((x) => x.json()).catch(() => null);
-    if (r?.ok) setHist(r.campanhas);
-  }
-  useEffect(() => {
-    carregar();
-  }, []);
+  // A PRÉVIA ACOMPANHA O PÚBLICO. Trocar o público e não ver o tamanho mudar
+  // é como escolher no escuro — e já houve um público que selecionava quase
+  // ninguém em silêncio, porque olhava uma tabela que tinha esvaziado.
+  const carregar = useCallback(async () => {
+    const r = await fetch(`/api/campanhas?prever=${publico}`)
+      .then((x) => x.json()).catch(() => null);
+    if (r?.ok) {
+      setHist(r.campanhas || []);
+      setPublicos(r.publicos || []);
+      setPrevia(r.previa || null);
+    }
+  }, [publico]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   async function executar() {
-    if (!nome || mensagem.length < 10) return;
-    if (!confirm("Isso cria um rascunho de mensagem para cada cliente do público escolhido. Nada é enviado automaticamente — você aprova um a um em Conversas. Continuar?")) return;
-    setRodando(true);
-    setRes("");
+    setErro("");
+    if (!nome.trim()) { setErro("Dê um nome ao aviso — é só para você achar depois."); return; }
+    if (mensagem.trim().length < 10) { setErro("Escreva a mensagem."); return; }
+
+    const quantas = previa?.familias ?? 0;
+    if (!confirm(
+      `Isto prepara ${quantas} mensagem(ns) na fila de liberação — uma por família.\n\n`
+      + `NADA É ENVIADO AGORA. Você lê e libera em Conversas, e pode mandar em lote.\n\nContinuar?`
+    )) return;
+
+    setRodando(true); setRes("");
     const r = await fetch("/api/campanhas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nome, mensagem, publico }),
     }).then((x) => x.json()).catch(() => null);
     setRodando(false);
+
     if (r?.ok) {
-      setRes(`${r.criados} rascunho(s) criado(s). Vá em Conversas para revisar e enviar.`);
-      setNome("");
-      setMensagem("");
+      const partes = [`${r.criados} mensagem(ns) na fila de liberação.`];
+      if (r.semTelefone) partes.push(`${r.semTelefone} família(s) ficaram de fora por não ter telefone.`);
+      if (r.silenciadas) partes.push(`${r.silenciadas} pediram para não receber avisos.`);
+      setRes(partes.join(" "));
+      setNome(""); setMensagem("");
       carregar();
-    } else setRes("Falhou: " + (r?.erro || "erro"));
+    } else setErro(r?.mensagem || r?.erro || "não deu para preparar o aviso");
   }
 
   const modelos = [
-    { n: "Finados", m: "Olá, {nome}! O Dia de Finados está chegando. Se quiser, deixamos o túmulo especialmente cuidado antes do dia 2, para a sua visita. É só me avisar. 🌿" },
-    { n: "Retorno", m: "Olá, {nome}, tudo bem? Faz um tempo que não cuidamos do túmulo por aí. Se quiser retomar as limpezas, é só me dizer que organizo tudo. 🌿" },
+    { n: "Aviso da casa",
+      m: "Olá, {nome}! Passando um aviso rápido sobre o cemitério: " },
+    { n: "Finados",
+      m: "Olá, {nome}! O Dia de Finados está chegando. Se quiser, deixamos o túmulo especialmente cuidado antes do dia 2, para a sua visita. É só me avisar. 🌿" },
+    { n: "Retorno",
+      m: "Olá, {nome}, tudo bem? Faz um tempo que não cuidamos do túmulo por aí. Se quiser retomar as limpezas, é só me dizer que organizo tudo. 🌿" },
   ];
 
   return (
     <>
       <div style={painel.card}>
-        <strong style={{ color: cor.navy }}>Nova campanha</strong>
-        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
-          Gera um rascunho por cliente — <b>nada sai sem a sua aprovação</b>. Use {"{nome}"} para inserir o
-          primeiro nome de cada pessoa.
+        <strong style={{ color: cor.navy }}>Novo aviso</strong>
+        <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px", lineHeight: 1.55 }}>
+          Uma mensagem por <b>família</b>, preparada na fila de liberação —{" "}
+          <b>nada sai sem o seu comando</b>. Escreva {"{nome}"} onde quiser o primeiro
+          nome de quem recebe.
         </p>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           {modelos.map((mo) => (
-            <button key={mo.n} style={painel.botaoSec} onClick={() => { setNome(mo.n); setMensagem(mo.m); }}>
-              Usar modelo: {mo.n}
+            <button key={mo.n} style={painel.botaoSec}
+                    onClick={() => { setNome(mo.n); setMensagem(mo.m); }}>
+              {mo.n}
             </button>
           ))}
         </div>
 
-        <label style={painel.rotulo}>Nome da campanha (interno)</label>
-        <input style={painel.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Finados 2026" />
+        <label style={painel.rotulo}>Nome do aviso (só para você achar depois)</label>
+        <input style={painel.input} value={nome} onChange={(e) => setNome(e.target.value)}
+               placeholder="Ex.: Aviso das moedas" />
 
         <div style={{ marginTop: 10 }}>
-          <label style={painel.rotulo}>Público</label>
-          <select style={{ ...painel.input, width: "auto" }} value={publico} onChange={(e) => setPublico(e.target.value)}>
-            <option value="ativos">Clientes com plano ativo</option>
-            <option value="todos">Todos os clientes</option>
-            <option value="sem_servico_90d">Sem limpeza há 90 dias</option>
-            <option value="em_aberto">Com valor em aberto</option>
+          <label style={painel.rotulo}>Quem recebe</label>
+          <select style={{ ...painel.input, width: "auto" }} value={publico}
+                  onChange={(e) => { setPublico(e.target.value); setPrevia(null); }}>
+            {publicos.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.rotulo} — {p.explica}</option>
+            ))}
           </select>
         </div>
+
+        {/* O TAMANHO ANTES DE DISPARAR. É a diferença entre mandar um aviso e
+            descobrir depois para quantos ele foi. */}
+        {previa && (
+          <p style={{ margin: "10px 0 0", fontSize: 14.5 }}>
+            <b>{previa.familias} família(s)</b> receberiam este aviso.
+            {previa.semTelefone > 0 && (
+              <span style={{ color: cor.cinza }}>
+                {" "}{previa.semTelefone} ficam de fora por não ter telefone.
+              </span>
+            )}
+            {previa.silenciadas > 0 && (
+              <span style={{ color: cor.cinza }}>
+                {" "}{previa.silenciadas} pediram para não receber avisos.
+              </span>
+            )}
+          </p>
+        )}
 
         <div style={{ marginTop: 10 }}>
           <label style={painel.rotulo}>Mensagem</label>
           <textarea
-            style={{ ...painel.input, minHeight: 110, resize: "vertical", fontFamily: "inherit" }}
+            style={{ ...painel.input, minHeight: 130, resize: "vertical", fontFamily: "inherit" }}
             value={mensagem}
             onChange={(e) => setMensagem(e.target.value)}
+            placeholder="Olá, {nome}! …"
           />
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: cor.cinza }}>
+            {mensagem.trim().length} letras · o texto é o mesmo para todo mundo,
+            só o nome muda.
+          </p>
         </div>
 
+        {erro && <p style={{ color: cor.perigo, marginTop: 10, fontSize: 14 }}>{erro}</p>}
+
         <button style={{ ...painel.botao, marginTop: 12 }} onClick={executar} disabled={rodando}>
-          {rodando ? "Gerando rascunhos..." : "Gerar rascunhos"}
+          {rodando ? "Preparando…" : "Preparar na fila de liberação"}
         </button>
-        {res && <p style={{ color: cor.navy, marginTop: 10 }}>{res}</p>}
+        {res && (
+          <p style={{ color: cor.navy, marginTop: 10, fontSize: 14.5 }}>
+            {res}{" "}
+            <a href="/painel/conversas" style={{ color: cor.navy }}>Ir liberar →</a>
+          </p>
+        )}
       </div>
 
       {hist.length > 0 && (
         <div style={painel.card}>
-          <strong style={{ color: cor.navy }}>Campanhas anteriores</strong>
+          <strong style={{ color: cor.navy }}>Avisos anteriores</strong>
           {hist.map((c) => (
-            <div key={c.id} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`, marginTop: 8, fontSize: 14 }}>
-              <b>{c.nome}</b> · {c.publico} · {c.criados} rascunho(s) ·{" "}
+            <div key={c.id} style={{ padding: "8px 0", borderTop: `1px solid ${cor.linha}`,
+                                     marginTop: 8, fontSize: 14 }}>
+              <b>{c.nome}</b> · {c.publico} · {c.criados} mensagem(ns) ·{" "}
               {c.executada_em ? new Date(c.executada_em).toLocaleDateString("pt-BR") : "—"}
             </div>
           ))}

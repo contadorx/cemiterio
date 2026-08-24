@@ -19,6 +19,7 @@ const telaFlores  = readFileSync("src/app/painel/flores/page.tsx", "utf8");
 const rotaFlores  = readFileSync("src/app/api/flores/entregas/route.ts", "utf8");
 const cardFlores  = readFileSync("src/app/painel/clientes/[id]/Flores.tsx", "utf8");
 const cron        = readFileSync("src/app/api/cron/diario/route.ts", "utf8");
+const libCamp     = readFileSync("src/lib/campanha.ts", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -199,5 +200,37 @@ ok("o gerador roda no cron diario, com organizacao propria",
 
 ok("e uma falha nas flores nao derruba o resto da rotina",
    /cron_diario_flores/.test(cron) && /!resultado\.flores\?\.erro/.test(cron));
+
+// ---------------------------------------------------------------------------
+// O AVISO PARA TODO MUNDO CAI NUMA TELA QUE EXISTE
+//
+// A campanha escrevia em `interacoes_ia` — a lista solta de rascunhos que a
+// 0094 APAGOU. Ela rodava, dizia "criei 338 rascunhos", e os 338 caiam num
+// lugar sem porta. Se alguem apontar de volta para la, a mensagem para todo
+// mundo volta a sumir em silencio, que e o pior modo de falhar.
+ok("o aviso em massa entra na FILA DE LIBERACAO",
+   /fila_liberacao/.test(libCamp) && /status: "aguardando"/.test(libCamp));
+
+ok("e nao na lista de rascunhos que foi apagada",
+   !/from\("interacoes_ia"\)\s*\n?\s*\.insert/.test(libCamp)
+   && !/interacoes_ia[\s\S]{0,80}rascunho:/.test(libCamp));
+
+// UMA POR FAMILIA. Uma casa com tres telefones receberia tres vezes o mesmo
+// recado — o mesmo defeito que a 0102 criou na cobranca gentil.
+ok("uma mensagem por FAMILIA, e nao por contato",
+   /from\("familias"\)/.test(libCamp) && /familia_id: a\.familiaId/.test(libCamp));
+
+// SEM TELEFONE NAO HA PARA ONDE MANDAR (0116), e quem fica de fora e contado.
+ok("familia sem telefone fica de fora, e e contada",
+   /semTelefone/.test(libCamp) && /String\(c\.telefone \|\| ""\)\.trim\(\)/.test(libCamp));
+
+ok("e quem pediu silencio nao recebe",
+   /silenciar/.test(libCamp) && /silenciadas/.test(libCamp));
+
+// O PUBLICO "ativos" OLHAVA `planos`, que tem UMA linha em producao desde que
+// o contrato passou a morar no tumulo (0100). Selecionava quase ninguem, sem
+// erro nenhum na tela.
+ok("nenhum publico depende mais da tabela `planos`",
+   !/from\("planos"\)/.test(libCamp));
 
 process.exit(falhas ? 1 : 0);
