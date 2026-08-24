@@ -479,7 +479,9 @@ function ordenarPorEndereco(itens: ServicoPend[]): ServicoPend[] {
   return [...rota, ...semRua];
 }
 
-export async function alocarAgenda(): Promise<{ agendados: number; dias: number }> {
+export async function alocarAgenda(
+  opts?: { aPartirDe?: string },
+): Promise<{ agendados: number; dias: number }> {
   const db = supabaseAdmin();
   const org = env.orgId();
 
@@ -619,7 +621,13 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
   if (!itens.length) return { agendados: 0, dias: 0 };
 
   const jornada = await carregarJornada();
-  const primeiroDia = proximoDiaUtil(isoHoje(), jornada);
+  // O PISO DA DISTRIBUIÇÃO.
+  //
+  // Normalmente é hoje. Quando o roteiro é REFEITO por inteiro, é amanhã: "o
+  // roteiro deve ser os próximos", e hoje não se mexe — a Nina já abriu a
+  // lista no celular e a rota não pode mudar debaixo dela.
+  const piso = opts?.aPartirDe && opts.aPartirDe > isoHoje() ? opts.aPartirDe : isoHoje();
+  const primeiroDia = proximoDiaUtil(piso, jornada);
 
   // ==========================================================================
   // O QUE JA ESTA NO DIA E NAO VAI SER REMEXIDO
@@ -933,6 +941,55 @@ export async function alocarAgenda(): Promise<{ agendados: number; dias: number 
 
   dias = diasComAlgo.size;
   return { agendados, dias };
+}
+
+/**
+ * REFAZER O ROTEIRO DOS PRÓXIMOS DIAS.
+ *
+ * O QUE ISTO RESOLVE
+ *
+ * `alocarAgenda` só enxerga o que está `pendente` e solto. No instante em que
+ * ela aloca, a lavagem vira `agendado` e some do radar — para sempre. Por isso
+ * contrato novo é encaixado nas frestas dos dias com vaga, e o roteiro que já
+ * existia nunca é repensado. Excluir um túmulo deixa o buraco aberto; puxar
+ * uma lavagem não junta as outras.
+ *
+ * Enquanto eram poucos contratos, encaixar bastava. Com todos os túmulos
+ * virando contrato nesta semana, deixa de bastar.
+ *
+ * O QUE ELA MEXE — e o que não mexe
+ *
+ *   solta e redistribui   agendado, de amanhã em diante, não fixado, não
+ *                         iniciado e sem foto
+ *   não toca              hoje, o passado, o que foi remarcado à mão, o que
+ *                         já começou e o que já tem foto
+ *
+ * A escolha do dia continua sendo do alocador — é ele que conhece capacidade,
+ * jornada, rua e a regra de uma lavagem por jazigo por dia. Aqui só se abre a
+ * mão para ele poder distribuir de novo.
+ */
+export async function refazerRoteiro(
+  aPartirDe?: string,
+): Promise<{ soltos: number; agendados: number; dias: number; de: string }> {
+  const db = supabaseAdmin();
+  const org = env.orgId();
+  const de = aPartirDe && aPartirDe > isoHoje() ? aPartirDe : addDias(isoHoje(), 1);
+
+  const { data: soltos, error } = await db.rpc("sureya_soltar_roteiro", {
+    p_de: de, p_org: org,
+  });
+  if (error) throw new Error(`soltar o roteiro: ${error.message}`);
+
+  const aloc = await alocarAgenda({ aPartirDe: de });
+
+  // O MARCO DO "REFEITO". A tela compara este instante com o nascimento das
+  // lavagens futuras para dizer quantas entraram depois — e só então oferecer
+  // o botão. Sem o marco, "o roteiro está velho" seria palpite.
+  await db.from("orgs")
+    .update({ roteiro_refeito_em: new Date().toISOString() })
+    .eq("id", org);
+
+  return { soltos: Number(soltos) || 0, de, ...aloc };
 }
 
 // ============================================================================

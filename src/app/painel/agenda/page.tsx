@@ -59,6 +59,11 @@ interface Item {
     /** dias entre a última lavagem e o dia em que esta está marcada */
     diasAte: number;
   } | null;
+  /**
+   * A PRÓXIMA DESTE JAZIGO, depois desta (0125). Nula quando esta é a última
+   * que existe — e isso também é informação: pular a última é ficar sem.
+   */
+  proximaLavagem: { dia: string; emDias: number } | null;
 }
 
 interface Saude {
@@ -142,6 +147,11 @@ export default function AgendaPage() {
   const [incluirAvulsos, setIncluirAvulsos] = useState(false);
   const [dataAvulsos, setDataAvulsos] = useState("");
   const [saude, setSaude] = useState<Saude | null>(null);
+  /** Quanto o roteiro envelheceu desde a última distribuição completa (0125). */
+  const [idade, setIdade] = useState<{
+    refeitoEm: string | null; novasDesdeEntao: number; redistribuiveis: number; aPartirDe: string;
+  } | null>(null);
+  const [refazendo, setRefazendo] = useState(false);
 
   const nomeDe = (id: string | null) =>
     (id && equipe.find((m) => m.id === id)?.nome) || null;
@@ -166,6 +176,10 @@ export default function AgendaPage() {
     fetch("/api/agenda/reorganizar")
       .then((x) => x.json())
       .then((r) => r?.ok && setSaude(r))
+      .catch(() => null);
+    fetch("/api/agenda/refazer")
+      .then((x) => x.json())
+      .then((r) => r?.ok && setIdade(r))
       .catch(() => null);
   }, []);
   useEffect(() => { verSaude(); }, [dias, verSaude]);
@@ -404,6 +418,41 @@ export default function AgendaPage() {
     } finally { setMovendoDia(null); }
   }
 
+  /**
+   * REFAZER O ROTEIRO — o recálculo que faltava.
+   *
+   * O alocador só enxerga o que está `pendente`. No instante em que aloca, a
+   * lavagem vira `agendado` e some do radar: por isso contrato novo é encaixado
+   * nas frestas e o roteiro que já existia nunca é repensado.
+   *
+   * Isto abre a mão: devolve para a fila tudo que ainda pode ser redistribuído
+   * — de amanhã em diante, não fixado, não iniciado, sem foto — e deixa o
+   * alocador distribuir de novo, agora com todos os contratos na mesa.
+   *
+   * HOJE NÃO SE MEXE. A Nina já abriu a lista no celular.
+   */
+  async function refazerRoteiro() {
+    if (!confirm(
+      `Refazer o roteiro a partir de amanhã?\n\n` +
+      `${idade?.redistribuiveis ?? 0} lavagem(ns) voltam para a fila e são distribuídas de novo, ` +
+      `agora com todos os contratos cadastrados.\n\n` +
+      `NÃO muda: hoje, o passado, o que você remarcou à mão, o que já começou e o que já tem foto.`
+    )) return;
+
+    setRefazendo(true); setDiag(null);
+    try {
+      const r = await fetch("/api/agenda/refazer", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { alert(r?.erro || "Não consegui refazer o roteiro."); return; }
+      alert(
+        `Roteiro refeito a partir de ${dataBonita(r.de)}.\n\n` +
+        `${r.soltos} voltaram para a fila e ${r.agendados} foram distribuídas em ${r.dias} dia(s).`
+      );
+      carregar(); verSaude();
+    } finally { setRefazendo(false); }
+  }
+
   async function acao(id: string, corpo: any) {
     const r = await fetch(`/api/servico/${id}`, {
       method: "PATCH",
@@ -449,6 +498,39 @@ export default function AgendaPage() {
         {/* ========================================================= SAÚDE
             Primeiro item da tela porque é o único que pede uma decisão hoje.
             E nomeia a causa: "fora do lugar" sozinho não diz o que fazer. */}
+        {/* O ROTEIRO ENVELHECEU (0125).
+            Cada contrato novo, cada exclusão e cada puxada deixa o roteiro um
+            pouco mais desatualizado — porque o alocador não repensa o que já
+            distribuiu. A alternativa (recalcular sozinho a cada Salvar) seria
+            pior: ela está cadastrando duzentos contratos hoje, e a agenda
+            inteira piscando a cada um é uma tela que ninguém aguenta.
+
+            Então o sistema MEDE e OFERECE. O botão só aparece quando há de
+            fato o que redistribuir. */}
+        {idade && idade.redistribuiveis > 0 && (
+          <div style={{ ...painel.card, borderLeft: `4px solid ${cor.navy}` }}>
+            <strong style={{ color: cor.navy }}>
+              {idade.novasDesdeEntao > 0
+                ? `${idade.novasDesdeEntao} lavagem(ns) entraram depois da última distribuição`
+                : "O roteiro pode ser redistribuído"}
+            </strong>
+            <p style={{ fontSize: 14, color: cor.cinza, margin: "6px 0 0", lineHeight: 1.5 }}>
+              Quando um contrato entra, as lavagens novas são encaixadas nos dias com
+              vaga — o roteiro que já existia não é repensado. Refazer devolve{" "}
+              <b>{idade.redistribuiveis}</b> lavagem(ns) para a fila e distribui tudo de novo,
+              a partir de amanhã.
+              {idade.refeitoEm && (
+                <> Última vez: {new Date(idade.refeitoEm).toLocaleDateString("pt-BR")}.</>
+              )}
+            </p>
+            <div style={{ marginTop: 10 }}>
+              <button style={painel.botao} onClick={refazerRoteiro} disabled={refazendo || gerando}>
+                {refazendo ? "Refazendo…" : "Refazer o roteiro de amanhã em diante"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {saude && saude.foraDaJornada > 0 && (
           <div style={{ ...painel.card, borderLeft: "4px solid #d97706",
                         background: "rgb(var(--zm-aviso) / 0.08)" }}>
@@ -929,6 +1011,32 @@ export default function AgendaPage() {
                         ) : (
                           "Primeira lavagem deste jazigo"
                         )}
+
+                        {/* E QUANDO VEM A PRÓXIMA (0125).
+                            Com os dois números na frente, "pular ou excluir"
+                            deixa de ser chute:
+
+                              não lavo há 40 dias e a próxima é só em setembro
+                                  -> não pule
+                              lavei anteontem e tem outra na quinta
+                                  -> pode pular
+
+                            Sem a próxima, a linha só contava metade da
+                            história — e a metade que não decide nada. */}
+                        {s.proximaLavagem ? (
+                          <> · próxima em{" "}
+                            {new Date(s.proximaLavagem.dia + "T12:00:00").toLocaleDateString("pt-BR")}
+                            {" ("}
+                            {s.proximaLavagem.emDias === 1
+                              ? "no dia seguinte"
+                              : `${s.proximaLavagem.emDias} dias depois`}
+                            {")"}
+                          </>
+                        ) : (
+                          <span style={{ color: "rgb(var(--zm-aviso))" }}>
+                            {" "}· <b>não há próxima marcada</b> — pular esta deixa o jazigo sem
+                          </span>
+                        )}
                       </div>
 
                       {s.estornadoEm && (
@@ -1001,7 +1109,12 @@ export default function AgendaPage() {
                                     onClick={() => acao(s.id, {
                                       acao: "remarcar",
                                       novaData: somaDias(d, -1),
-                                      replanejar: false,
+                                      // AS SEGUINTES DESTE JAZIGO ANDAM JUNTO,
+                                      // mantendo o intervalo combinado. Mover só
+                                      // esta encurtaria o vão até a próxima — e
+                                      // a família paga por intervalo, não por
+                                      // data solta.
+                                      replanejar: true,
                                     })}>
                               ← 1 dia
                             </button>
@@ -1010,7 +1123,7 @@ export default function AgendaPage() {
                                     onClick={() => acao(s.id, {
                                       acao: "remarcar",
                                       novaData: somaDias(d, 1),
-                                      replanejar: false,
+                                      replanejar: true,
                                     })}>
                               1 dia →
                             </button>

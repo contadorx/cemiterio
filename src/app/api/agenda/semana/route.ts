@@ -79,6 +79,46 @@ export async function GET(req: NextRequest) {
     : { data: [] as any[] };
   const ultimaDe = new Map(((lavagens as any[]) || []).map((l) => [l.tumulo_id, l]));
 
+  // ---------------------------------------------------------------------
+  // E QUANDO É A PRÓXIMA (0125)
+  //
+  // A linha já dizia há quantos dias o jazigo não é lavado. Faltava o outro
+  // lado: quando vem a seguinte. Com os dois na frente, a decisão de PULAR ou
+  // EXCLUIR deixa de ser um chute —
+  //
+  //   "não lavo há 40 dias e a próxima é só em setembro"  -> não pule
+  //   "lavei anteontem e tem outra na quinta"             -> pode pular
+  //
+  // Uma consulta em lote para todos os jazigos da janela, e não uma por linha:
+  // com quarenta paradas por dia, uma por linha seriam quarenta idas ao banco
+  // para desenhar um pedaço de texto.
+  // ---------------------------------------------------------------------
+  const { data: futuras } = idsJazigo.length
+    ? await db
+        .from("servicos")
+        // Sem filtro de org: esta rota usa a sessão do painel, e a RLS já
+        // limita tudo à organização de quem está logado — como as consultas
+        // acima. Filtrar aqui e não ali seriam duas opiniões sobre o mesmo.
+        .select("tumulo_id,data_prevista")
+        .in("tumulo_id", idsJazigo)
+        .in("status", ["pendente", "agendado"])
+        .gt("data_prevista", inicio)
+        .order("data_prevista", { ascending: true })
+    : { data: [] as any[] };
+
+  /** jazigo -> todas as datas futuras, em ordem. */
+  const futurasDe = new Map<string, string[]>();
+  for (const f of ((futuras as any[]) || [])) {
+    const arr = futurasDe.get(f.tumulo_id) || [];
+    arr.push(f.data_prevista);
+    futurasDe.set(f.tumulo_id, arr);
+  }
+  /** A primeira DEPOIS deste dia — e não a primeira da lista, que pode ser esta mesma. */
+  const proximaDepoisDe = (tumuloId: string | null, dia: string) => {
+    if (!tumuloId) return null;
+    return (futurasDe.get(tumuloId) || []).find((x) => x > dia) || null;
+  };
+
   const porDia: Record<string, any[]> = {};
   for (const s of data || []) {
     const d = (s as any).data_prevista;
@@ -117,6 +157,13 @@ export async function GET(req: NextRequest) {
           // dias entre a última lavagem e o dia em que esta está marcada
           diasAte: Math.round((diaDe(d) - diaDe(u.dia)) / 86_400_000),
         };
+      })(),
+      // A PRÓXIMA DESTE JAZIGO, depois desta. Nula quando esta é a última que
+      // existe — e isso também é uma informação: pular a última é ficar sem.
+      proximaLavagem: (() => {
+        const prox = proximaDepoisDe((s as any).tumulo_id || null, d);
+        if (!prox) return null;
+        return { dia: prox, emDias: Math.round((diaDe(prox) - diaDe(d)) / 86_400_000) };
       })(),
       estornadoEm: (s as any).estornado_em || null,
       motivoEstorno: (s as any).motivo_estorno || null,

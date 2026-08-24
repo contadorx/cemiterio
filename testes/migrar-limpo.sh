@@ -159,7 +159,7 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             lancamentos; sem ela nao ha relatorio por competencia.
 #   0102  +1  trg_guarda_quem_acerta_a_conta — recusa tirar a marca do ULTIMO
 #             que acerta a conta de uma familia que ainda tem gente.
-GATILHOS_DELTA=${GATILHOS_DELTA:-8}
+GATILHOS_DELTA=${GATILHOS_DELTA:-9}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -281,6 +281,8 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #   0119  +3  sureya_tumulo_parado, sureya_parar_servico, sureya_retomar_servico
 #   0120  +1  sureya_painel_detalhe — o relatorio por tras de cada cartao. O
 #             painel era um placar: dizia "11 jazigos" e nao levava aos onze.
+#   0125  +2  sureya_aprender_ordem_na_rua (o gatilho que faz a rua aprender)
+#             e sureya_soltar_roteiro. Mais 1 gatilho.
 #   0124  +2  sureya_cobranca_adiada e sureya_adiar_mensagem. A regua foi
 #             recriada (a lista de retorno ganhou `adiados`), nao acrescentada.
 #   0123  +1  sureya_registrar_pagamento — o pagamento com desconto, juros,
@@ -296,7 +298,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-84}
 #             sureya_limpar_eventos_webhook — as tres respondem a mesma
 #             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
-FUNCOES_DELTA=${FUNCOES_DELTA:-69}
+FUNCOES_DELTA=${FUNCOES_DELTA:-71}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -644,6 +646,23 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/adiar_cobranca.sql 2>&1)
   echo "$saida" | grep -E "ADIAR FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Cobrar depois de combinar uma data e a confianca que nao volta."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O ROTEIRO
+#
+# Dois riscos: o refazer levar junto o que a Nina ja abriu no celular, e a rua
+# aprender por cima da ordem que alguem digitou a mao.
+# ---------------------------------------------------------------------------
+echo "RECALCULO — a rua aprende, e o refazer so solta o que pode"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/roteiro_recalculo.sql 2>&1); then
+  echo "$saida" | grep -E "ROTEIRO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Rota que muda debaixo de quem ja saiu para o campo e dia perdido."
   echo "============================================================"
   exit 1
 fi
