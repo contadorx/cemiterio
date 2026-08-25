@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { auditar } from "@/lib/auditoria";
+import { normalizarTelefone } from "@/lib/evolution";
+import { garantirConversa } from "@/lib/atendimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +80,9 @@ export async function GET(req: NextRequest) {
  *   convertido  — virou cliente
  *   descartar   { motivo? } — não era para a gente
  *   reabrir     — volta para a fila
+ *   virar_familia { familiaId? | nomeFamilia?, nome?, telefone? }
+ *               — o contato do site vira gente de uma família, e a conversa
+ *                 continua na aba Conversas. Ver o comentário grande abaixo.
  */
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
@@ -132,6 +137,122 @@ export async function POST(req: NextRequest) {
     case "convertido":
       patch.status = "convertido";
       break;
+
+    // -----------------------------------------------------------------------
+    // O CONTATO DO SITE VIRA GENTE DE UMA FAMÍLIA (e a conversa vai junto)
+    // -----------------------------------------------------------------------
+    //
+    // "Virou cliente" só escrevia `status = 'convertido'` no lead. Não criava
+    // família, não criava contato, não abria conversa. Medido em 24/08:
+    // 108 de 112 leads com `cliente_id` nulo — ninguém nunca foi ligado a
+    // ninguém, e a pergunta "de cada dez contatos do site, quantos viraram
+    // cliente?" não tinha como ser respondida.
+    //
+    // São TRÊS ESCRITAS que precisam acontecer juntas ou não acontecer:
+    //   1. a família (a que você escolheu, ou uma nova com o nome dado)
+    //   2. o contato dentro dela, com o telefone do site
+    //   3. a conversa, para o assunto continuar onde se conversa
+    //
+    // A ordem importa: se a conversa nascesse antes do contato, ela ficaria
+    // órfã na aba e ninguém saberia de quem é.
+    case "virar_familia": {
+      const nome = String(b?.nome || "").trim().slice(0, 120);
+      const cru = String(b?.telefone || "").trim();
+      const tel = cru ? normalizarTelefone(cru) : null;
+
+      if (!nome) {
+        return NextResponse.json(
+          { ok: false, erro: "faltou", mensagem: "O contato precisa de nome." },
+          { status: 400 });
+      }
+      if (cru && !tel) {
+        return NextResponse.json(
+          { ok: false, erro: "telefone_invalido",
+            mensagem: "Telefone inválido. Use DDD + número, como 11 94013-1413." },
+          { status: 400 });
+      }
+
+      // 1. A FAMÍLIA — a escolhida, ou uma nova.
+      let familiaId = String(b?.familiaId || "").trim();
+      let familiaCriada = false;
+
+      if (familiaId) {
+        const { data: fam } = await auth.db
+          .from("familias").select("id").eq("id", familiaId).eq("org_id", org).maybeSingle();
+        if (!fam) {
+          return NextResponse.json(
+            { ok: false, erro: "familia_nao_encontrada",
+              mensagem: "Essa família não existe mais. Recarregue e escolha de novo." },
+            { status: 404 });
+        }
+      } else {
+        const nomeFam = String(b?.nomeFamilia || "").trim().slice(0, 120) || nome;
+        const { data: nova, error: eFam } = await auth.db
+          .from("familias").insert({ org_id: org, nome: nomeFam }).select("id").single();
+        if (eFam || !nova) {
+          return NextResponse.json(
+            { ok: false, erro: eFam?.message || "familia_nao_criada" }, { status: 500 });
+        }
+        familiaId = (nova as any).id;
+        familiaCriada = true;
+      }
+
+      // 2. O CONTATO. Telefone repetido é o caso comum, não o excepcional:
+      // quem escreveu pelo site pode já estar cadastrado. Aí a resposta diz
+      // ONDE ele está, em vez de um erro de banco.
+      const { data: cli, error: eCli } = await auth.db
+        .from("clientes")
+        .insert({ org_id: org, nome, telefone: tel, familia_id: familiaId })
+        .select("id").single();
+
+      if (eCli || !cli) {
+        const dup = /duplicate|unique/i.test(eCli?.message || "");
+        if (dup && tel) {
+          const { data: jaTem } = await auth.db
+            .from("clientes").select("id,nome,familia_id,familias(nome)")
+            .eq("org_id", org).eq("telefone", tel).maybeSingle();
+          return NextResponse.json({
+            ok: false, erro: "telefone_ja_existe",
+            mensagem: `Esse telefone já é de ${(jaTem as any)?.nome || "outro contato"}`
+              + ((jaTem as any)?.familias?.nome ? `, na família ${(jaTem as any).familias.nome}.` : ".")
+              + " Abra a ficha de lá em vez de criar outro.",
+            clienteId: (jaTem as any)?.id || null,
+            familiaId: (jaTem as any)?.familia_id || null,
+          }, { status: 409 });
+        }
+        return NextResponse.json(
+          { ok: false, erro: eCli?.message || "contato_nao_criado" }, { status: 500 });
+      }
+
+      const clienteId = (cli as any).id as string;
+
+      // 3. A CONVERSA — pela MESMA porta que o WhatsApp usa (`garantirConversa`),
+      // e não um insert próprio. Duas portas para abrir conversa começariam
+      // iguais e terminariam discordando sobre o que é "conversa aberta".
+      let conversaId: string | null = null;
+      try {
+        conversaId = (await garantirConversa(clienteId)).id;
+      } catch {
+        // A conversa é o acabamento, não o ato. Se ela falhar, o contato e a
+        // família já existem — dizer "não deu" aqui faria a pessoa tentar de
+        // novo e criar tudo em duplicata.
+        conversaId = null;
+      }
+
+      patch.status = "convertido";
+      patch.cliente_id = clienteId;
+
+      const { error: eLead } = await auth.db
+        .from("leads").update(patch).eq("id", id).eq("org_id", org);
+      if (eLead) return NextResponse.json({ ok: false, erro: eLead.message }, { status: 500 });
+
+      await auditar(auth.db, org, auth.userId, "contato_virou_familia",
+        { tipo: "lead", id }, { familiaId, clienteId, conversaId, familiaCriada });
+
+      return NextResponse.json({
+        ok: true, familiaId, clienteId, conversaId, familiaCriada,
+      });
+    }
 
     case "descartar":
       patch.status = "descartado";

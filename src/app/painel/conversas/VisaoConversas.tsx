@@ -51,6 +51,23 @@ export default function VisaoConversas() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [f, setF] = useState({ situacao: "pendentes", assunto: "", busca: "", de: "", ate: "" });
+
+  /**
+   * `?ver=aguardando` — o atalho vindo da linha de resumo lá de cima.
+   *
+   * Sem isto, aqueles links abririam a aba e deixariam a pessoa procurando
+   * qual das 161 conversas era. O recorte vem junto com o clique.
+   *
+   * Lido no `window` dentro do efeito, e não com `useSearchParams` — que no
+   * Next 14 exigiria um <Suspense> em volta da página inteira só por isso. É a
+   * mesma escolha que a casca das abas já faz.
+   */
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("ver");
+    if (v && ["aguardando", "pendentes", "escaladas", "resolvidas", "todas", "arquivadas"].includes(v)) {
+      setF((x) => ({ ...x, situacao: v }));
+    }
+  }, []);
   const [maisFiltros, setMaisFiltros] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [emMassa, setEmMassa] = useState(false);

@@ -419,4 +419,71 @@ ok("e nem o gerador do mes sabe fabricar avulso",
    !/incluirAvulsos/.test(libAgenda) && !/avulsosIncluidos/.test(libAgenda) &&
    /if \(!DIAS_CICLO\[p\.cadencia\]\) continue;/.test(libAgenda));
 
+// ===========================================================================
+// A ABA CONVERSAS TAMBEM TEM NUMERO, E O CONTATO DO SITE TEM PARA ONDE IR
+// ===========================================================================
+//
+// Duas guardas sobre o MESMO defeito, que ja custou dezenove dias de silencio:
+// coisa que espera por alguem e nao aparece em lugar nenhum.
+const telaConversas = readFileSync("src/app/painel/conversas/page.tsx", "utf8");
+const visaoConversas = readFileSync("src/app/painel/conversas/VisaoConversas.tsx", "utf8");
+const visaoSite = readFileSync("src/app/painel/conversas/VisaoSite.tsx", "utf8");
+const rotaContatos = readFileSync("src/app/api/contatos/route.ts", "utf8");
+
+// Liberacao e Contatos do site diziam quantos havia; Conversas ficava muda.
+ok("a aba Conversas tem numero, como as outras duas",
+   /conv\?\.pendentes \?\? null/.test(telaConversas));
+
+// E O NUMERO NAO E "QUANTAS CONVERSAS EXISTEM": sao 161, e 3 pedem alguma
+// coisa. Um crachá com 161 vira ruido, e ruido se aprende a ignorar.
+ok("e o numero vem dos CONTADORES, nao do tamanho da lista",
+   /r\.contadores/.test(telaConversas) &&
+   !/\(r\.conversas \|\| \[\]\)\.length/.test(telaConversas));
+
+ok("o cracha diz quantos e a linha de resumo diz o que",
+   /conversas esperam/.test(telaConversas) &&
+   /sem resposta/.test(telaConversas) && /escalada/.test(telaConversas));
+
+// Link que abre a aba e deixa a pessoa procurando qual das 161 nao serve.
+ok("e o atalho do resumo chega com o recorte feito",
+   /ver=aguardando/.test(telaConversas) &&
+   /get\("ver"\)/.test(visaoConversas));
+
+// -- o contato do site vira gente de uma familia -----------------------------
+// "Virou cliente" so escrevia status no lead: 108 de 112 contatos ficaram com
+// `cliente_id` nulo, e a ponte nunca existiu.
+ok("existe a acao que cria familia, contato e conversa",
+   /case "virar_familia"/.test(rotaContatos));
+
+ok("e ela grava o cliente_id no lead — a ponte que faltava",
+   /patch\.cliente_id = clienteId/.test(rotaContatos));
+
+// UMA PORTA SO PARA ABRIR CONVERSA. Duas comecariam iguais e terminariam
+// discordando sobre o que e "conversa aberta".
+ok("a conversa nasce pela MESMA porta do WhatsApp",
+   /garantirConversa\(clienteId\)/.test(rotaContatos) &&
+   !/from\("conversas"\)\s*\n?\s*\.insert/.test(rotaContatos));
+
+// Telefone repetido e o caso comum: quem escreve pelo site pode ja estar na
+// casa. A resposta tem de dizer ONDE, e nao "erro ao salvar".
+ok("telefone repetido responde ONDE a pessoa ja esta",
+   /telefone_ja_existe/.test(rotaContatos));
+
+ok("a tela oferece virar contato de uma familia",
+   /Virar contato de uma família/.test(visaoSite) &&
+   /acao: "virar_familia"/.test(visaoSite));
+
+// Um "pronto" sem para onde ir faz o assunto se perder.
+ok("e depois de converter mostra o caminho para a ficha e para a conversa",
+   /ir para a conversa/.test(visaoSite) && /abrir a ficha/.test(visaoSite));
+
+// O botao antigo prometia "Virou cliente" e nao criava cliente nenhum.
+ok("o botao que so carimbava status nao promete mais o que nao faz",
+   // ancorado no JSX (`/> Virou cliente`), e nao no texto solto: o rotulo
+   // antigo aparece CITADO no comentario que explica a troca, e uma busca
+   // larga acharia a citacao e reprovaria o conserto. Foi o mesmo tropeco da
+   // guarda do `semPlano`, tres blocos acima.
+   !/\/> Virou cliente/.test(visaoSite) &&
+   /Já é cliente — só tirar da fila/.test(visaoSite));
+
 process.exit(falhas ? 1 : 0);

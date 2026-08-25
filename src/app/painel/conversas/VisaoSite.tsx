@@ -87,6 +87,74 @@ export default function VisaoSite() {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [editando, setEditando] = useState<Record<string, { acao: string; prazo: string }>>({});
 
+  /**
+   * VIRAR CONTATO DE UMA FAMÍLIA.
+   *
+   * "Virou cliente" só carimbava `status = 'convertido'` no lead: não criava
+   * família, nem contato, nem conversa. Medido em 24/08: 108 de 112 contatos
+   * do site com `cliente_id` nulo — a ponte nunca existiu, e por isso não
+   * havia como responder "de cada dez contatos, quantos viraram cliente?".
+   *
+   * O painel abre DENTRO do cartão, com o nome e o telefone já preenchidos do
+   * que a pessoa escreveu no site. Buscar a família é opcional: sem escolha,
+   * nasce uma nova com o nome do contato — que é o caso comum de quem chega
+   * pelo site.
+   */
+  const [virando, setVirando] = useState<string | null>(null);
+  const [form, setForm] = useState<{
+    nome: string; telefone: string; nomeFamilia: string;
+    familiaId: string; familiaNome: string; busca: string;
+  }>({ nome: "", telefone: "", nomeFamilia: "", familiaId: "", familiaNome: "", busca: "" });
+  const [achadas, setAchadas] = useState<{ id: string; nome: string; responsavel: string | null }[]>([]);
+  const [feito, setFeito] = useState<
+    { id: string; familiaId: string; conversaId: string | null; familiaCriada: boolean } | null
+  >(null);
+
+  function abrirConversao(c: Contato) {
+    setFeito(null);
+    setAchadas([]);
+    setVirando(c.id);
+    const nome = (c.nome || "").trim();
+    setForm({
+      nome, telefone: c.telefone || "",
+      // Sobrenome como nome de família é o palpite que acerta na maioria e
+      // não atrapalha em nenhuma: é um campo editável, não uma decisão.
+      nomeFamilia: nome.includes(" ") ? `Família ${nome.split(" ").slice(-1)[0]}` : nome,
+      familiaId: "", familiaNome: "", busca: "",
+    });
+  }
+
+  async function buscarFamilias(q: string) {
+    setForm((x) => ({ ...x, busca: q }));
+    if (q.trim().length < 2) { setAchadas([]); return; }
+    const r = await fetch(`/api/familias?q=${encodeURIComponent(q.trim())}`)
+      .then((x) => x.json()).catch(() => null);
+    if (r?.ok) setAchadas((r.familias || []).slice(0, 8));
+  }
+
+  async function converter(id: string) {
+    setOcupado(id);
+    try {
+      const r = await fetch("/api/contatos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id, acao: "virar_familia",
+          nome: form.nome, telefone: form.telefone,
+          ...(form.familiaId ? { familiaId: form.familiaId } : { nomeFamilia: form.nomeFamilia }),
+        }),
+      }).then((x) => x.json());
+      if (!r?.ok) {
+        // A recusa por telefone repetido diz ONDE a pessoa já está — é a
+        // resposta útil, e vale mais que "erro ao salvar".
+        alert(r?.mensagem || r?.erro || "Não consegui converter.");
+        return;
+      }
+      setFeito({ id, familiaId: r.familiaId, conversaId: r.conversaId, familiaCriada: r.familiaCriada });
+      setVirando(null);
+      await carregar();
+    } finally { setOcupado(null); }
+  }
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
@@ -216,9 +284,102 @@ export default function VisaoSite() {
               </p>
             )}
 
+            {/* DEPOIS DE CONVERTER, O CAMINHO. Um "pronto" sem para onde ir
+                obriga a pessoa a procurar a família no menu — e é aí que o
+                assunto se perde. */}
+            {feito?.id === c.id && (
+              <div className="mt-3 rounded-xl2 border border-bom/30 bg-bom/10 p-3 text-[14px]">
+                <b>Pronto.</b>{" "}
+                {feito.familiaCriada ? "A família foi criada e o" : "O"} contato entrou nela.{" "}
+                <a className="underline" href={`/painel/clientes/${feito.familiaId}`}>abrir a ficha</a>
+                {feito.conversaId ? (
+                  <> · <a className="underline" href={`/painel/conversas/${feito.conversaId}`}>
+                    ir para a conversa
+                  </a></>
+                ) : (
+                  <> · a conversa não abriu agora; ela nasce sozinha na primeira mensagem.</>
+                )}
+              </div>
+            )}
+
+            {virando === c.id && (
+              <div className="mt-3 rounded-xl2 border border-line bg-surface p-3">
+                <p className="mb-2 text-[14px] text-ink-soft">
+                  O contato passa a ser gente de uma família, e o assunto continua
+                  na aba <b>Conversas</b>.
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Campo rotulo="Nome do contato">
+                    <Entrada value={form.nome}
+                             onChange={(e: any) => setForm((x) => ({ ...x, nome: e.target.value }))} />
+                  </Campo>
+                  <Campo rotulo="Telefone">
+                    <Entrada value={form.telefone}
+                             onChange={(e: any) => setForm((x) => ({ ...x, telefone: e.target.value }))} />
+                  </Campo>
+                </div>
+
+                <Campo rotulo="Procurar uma família que já existe">
+                  <Entrada placeholder="digite parte do nome…" value={form.busca}
+                           onChange={(e: any) => buscarFamilias(e.target.value)} />
+                </Campo>
+
+                {achadas.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {achadas.map((f) => (
+                      <button key={f.id}
+                        className={`rounded-full border px-3 py-1 text-[13px] ${
+                          form.familiaId === f.id
+                            ? "border-ouro bg-ouro/10 text-ink"
+                            : "border-line text-ink-soft"}`}
+                        onClick={() => setForm((x) => ({
+                          ...x,
+                          familiaId: x.familiaId === f.id ? "" : f.id,
+                          familiaNome: x.familiaId === f.id ? "" : f.nome,
+                        }))}>
+                        {f.nome}{f.responsavel ? ` · ${f.responsavel}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* SEM FAMÍLIA ESCOLHIDA, NASCE UMA. O campo fica à vista para
+                    ninguém descobrir depois que criou "Família João" sem
+                    querer. */}
+                {!form.familiaId && (
+                  <Campo rotulo="…ou criar uma família nova com este nome">
+                    <Entrada value={form.nomeFamilia}
+                             onChange={(e: any) => setForm((x) => ({ ...x, nomeFamilia: e.target.value }))} />
+                  </Campo>
+                )}
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Botao tom="principal" disabled={ocupado === c.id || !form.nome.trim()}
+                         onClick={() => converter(c.id)}>
+                    <Send size={16} />{" "}
+                    {form.familiaId
+                      ? `Pôr em ${form.familiaNome}`
+                      : "Criar a família e o contato"}
+                  </Botao>
+                  <Botao onClick={() => setVirando(null)}>
+                    <ArrowLeft size={16} /> Cancelar
+                  </Botao>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+              <Botao tom="principal" disabled={ocupado === c.id}
+                     onClick={() => abrirConversao(c)}>
+                <Check size={16} /> Virar contato de uma família
+              </Botao>
+              {/* O BOTÃO ANTIGO CHAMAVA-SE "Virou cliente" E NÃO CRIAVA
+                  CLIENTE NENHUM — só carimbava o status do lead. O rótulo
+                  agora diz o que ele de fato faz: tira da fila. Serve para
+                  quem JÁ está cadastrado e só precisa sair daqui. */}
               <Botao disabled={ocupado === c.id} onClick={() => agir(c.id, "convertido")}>
-                <Check size={16} /> Virou cliente
+                Já é cliente — só tirar da fila
               </Botao>
               <Botao tom="perigo" disabled={ocupado === c.id}
                      onClick={() => {

@@ -66,6 +66,21 @@ export default function Conversas() {
   const [nLiberacao, setNLiberacao] = useState<number | null>(null);
   const [nSite, setNSite] = useState<number | null>(null);
   const [nAntiga, setNAntiga] = useState<number | null>(null);
+  /**
+   * O QUE ESPERA POR VOCÊ NA ABA CONVERSAS.
+   *
+   * A aba era a única sem número. Liberação e Contatos do site diziam quantos
+   * havia; Conversas ficava muda, e de fora não dava para saber se havia
+   * alguém esperando resposta — que é justamente o defeito que criou esta
+   * tela: 164 mensagens paradas dezenove dias porque nada as anunciava.
+   *
+   * O NÚMERO NÃO É "QUANTAS CONVERSAS EXISTEM". Medido em 24/08: existem 161,
+   * e só 3 pedem alguma coisa. Um crachá com 161 não seria informação, seria
+   * ruído — e ruído se aprende a ignorar, que é como o silêncio começa.
+   */
+  const [conv, setConv] = useState<{
+    pendentes: number; aguardando: number; escaladas: number;
+  } | null>(null);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("aba");
@@ -88,6 +103,14 @@ export default function Conversas() {
       .then((x) => x.json())
       .then((r) => { if (r?.ok) setNAntiga((r.rascunhos || []).length); })
       .catch(() => {});
+    // Os contadores vêm de `sureya_contadores_conversas`, a MESMA função que
+    // desenha as sub-abas lá dentro. Uma segunda contagem aqui começaria igual
+    // e terminaria discordando — é o defeito de forma que já apareceu cinco
+    // vezes neste sistema.
+    fetch("/api/conversas?situacao=pendentes")
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok && r.contadores) setConv(r.contadores); })
+      .catch(() => {});
   }, []);
   useEffect(() => { contar(); }, [contar]);
 
@@ -98,7 +121,7 @@ export default function Conversas() {
   }
 
   const contagem = (v: Aba) =>
-    v === "liberacao" ? nLiberacao : v === "site" ? nSite : null;
+    v === "liberacao" ? nLiberacao : v === "site" ? nSite : (conv?.pendentes ?? null);
 
   return (
     <div style={painel.wrap}>
@@ -140,6 +163,34 @@ export default function Conversas() {
             <button className="underline" onClick={() => trocar("conversas")}>
               ver as conversas
             </button>
+          </div>
+        )}
+
+        {/* O CRACHÁ DIZ QUANTOS; ESTA LINHA DIZ O QUÊ.
+            "Conversas (3)" faz abrir a aba, e aí começa a procura: qual das
+            161? Aqui a divisão está pronta, e cada pedaço é um botão que já
+            entra com o recorte feito. */}
+        {aba === "conversas" && !!conv?.pendentes && (
+          <div className="mb-4 rounded-xl2 border border-line bg-surface p-3 text-[14px]">
+            <b className="text-ink">
+              {conv.pendentes === 1 ? "1 conversa espera" : `${conv.pendentes} conversas esperam`} por você
+            </b>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-ink-soft">
+              {conv.aguardando > 0 && (
+                <a className="underline" href="/painel/conversas?aba=conversas&ver=aguardando">
+                  {conv.aguardando} sem resposta
+                </a>
+              )}
+              {conv.escaladas > 0 && (
+                <a className="underline" href="/painel/conversas?aba=conversas&ver=escaladas">
+                  {conv.escaladas} escalada{conv.escaladas === 1 ? "" : "s"}
+                </a>
+              )}
+              <span>
+                as demais estão em dia — o número não é quantas conversas existem,
+                é quantas pedem alguma coisa.
+              </span>
+            </div>
           </div>
         )}
 
