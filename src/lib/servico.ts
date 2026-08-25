@@ -3,6 +3,7 @@ import { env } from "./env";
 import { enviarMidiaComRetry } from "./envio";
 import { disparosAtivos } from "./disparos";
 import { MARCA } from "./marca";
+import { primeiroNome as nomeDeSaudacao } from "./mensagens";
 import { subirArquivo, BUCKET_SERVICOS } from "./storage";
 
 // Sobe uma foto do serviço no Storage (bucket 'servicos'). Retorna URL pública.
@@ -134,7 +135,9 @@ export async function notificarFamilia(
     ? `da família ${identificacao}`
     : "da família";
 
-  const primeiroNome = String((cli as any).nome || "").trim().split(/\s+/)[0] || "";
+  // A regra é uma só (0131): a cópia que morava aqui devolvia "Sr." como
+  // saudação, porque cortava no primeiro espaço sem olhar tratamento.
+  const primeiroNome = nomeDeSaudacao(String((cli as any).nome || ""));
   const trat = String((cli as any).tratamento || "");
   const pronome = trat.includes("Dra") || trat.includes("senhora")
     ? "a senhora"

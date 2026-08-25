@@ -26,6 +26,7 @@ insert into anonimo_pode values
  ('sureya_portal_historico',  'idem'),
  ('sureya_portal_irmaos',     'idem'),
  ('sureya_primeiro_nome',     'conta pura sobre um texto que veio de quem chamou'),
+ ('sureya_nome_proprio',      'idem: arruma maiuscula de um texto, sem ler nada do banco'),
  ('sureya_data_no_ano',       'conta pura de data'),
  ('sureya_lavagens_no_mes',   'conta pura sobre uma periodicidade'),
  ('sureya_meses_da_cobranca', 'conta pura sobre uma frequencia'),

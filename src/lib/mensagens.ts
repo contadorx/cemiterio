@@ -137,14 +137,35 @@ export function rascunhoDeCobranca(p: {
   };
 }
 
-/** "Sr. João Batista da Silva" -> "Sr. João". O tratamento importa aqui. */
+/**
+ * O NOME QUE VAI NA MENSAGEM: SÓ O PRIMEIRO.
+ *
+ * "Sr. João Batista da Silva" -> "Sr. João".
+ *
+ * ESTA É A ÚNICA IMPLEMENTAÇÃO EM TypeScript. Havia seis — aqui, em
+ * `ativacao.ts`, em `servico.ts`, em `campanha.ts`, na tela dos contatos do
+ * site e nas duas rotas do campo — e elas já discordavam: as cinco outras
+ * cortavam no primeiro espaço e devolviam "Sr." como saudação.
+ *
+ * A gêmea no banco é `sureya_primeiro_nome`, e as duas têm de responder igual:
+ * a prévia que a Sureya lê é renderizada pelo banco, e o envio passa por aqui.
+ * `testes/nome_proprio.sql` guarda a igualdade caso a caso.
+ *
+ * POR QUE ISTO IMPORTA MAIS DO QUE PARECE: o campo `nome` guarda a referência
+ * que acha a pessoa no cemitério — "Paulo Primo Da Maria Japonesa", "Idalina
+ * Na Frente Do Bozato". Mandar o nome inteiro numa mensagem seria
+ * constrangedor. Vai só "Paulo".
+ */
 export function primeiroNome(completo: string): string {
-  const partes = completo.trim().split(/\s+/);
-  const tratamentos = ["sr.", "sra.", "dona", "dr.", "dra.", "seu"];
-  if (partes.length >= 2 && tratamentos.includes(partes[0].toLowerCase())) {
+  const partes = String(completo || "").trim().split(/\s+/);
+  // com ou sem ponto: em produção há "Sr." e "Sr", "Dra" e "Dona" — a regra
+  // que só conhecia a forma com ponto deixava metade dos casos virar "Ola, Sr"
+  const tratamentos = ["sr", "sra", "dona", "dr", "dra", "seu", "pe", "padre", "irma", "irmao"];
+  const primeiro = (partes[0] || "").toLowerCase().replace(/\.+$/, "");
+  if (partes.length >= 2 && tratamentos.includes(primeiro)) {
     return `${partes[0]} ${partes[1]}`;
   }
-  return partes[0] || completo;
+  return partes[0] || String(completo || "");
 }
 
 /** "2026-03-01" -> "março de 2026" */

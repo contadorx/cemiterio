@@ -1216,6 +1216,40 @@ async function rodar() {
            extrairRemetente("PIX RECEBIDO REM: MARIO KANASHIRO 25/08") === "MARIO KANASHIRO", "");
   }
 
+  // ==========================================================================
+  console.log("\n=== 12. O NOME QUE VAI NA MENSAGEM ===");
+  // As DUAS regras de primeiro nome — esta, em TypeScript, e
+  // `sureya_primeiro_nome`, no banco — tem de responder IGUAL caso a caso.
+  //
+  // Nao e zelo excessivo: a previa que a Sureya le antes de liberar e
+  // renderizada PELO BANCO (`sureya_textos_do_tipo`), e o envio passa pelo
+  // TypeScript. Se as duas discordarem, ela aprova um texto e a familia recebe
+  // outro — e ninguem descobre, porque nao da erro.
+  //
+  // Os mesmos pares estao em `testes/nome_proprio.sql`, do outro lado.
+  {
+    const { primeiroNome } = await import("../src/lib/mensagens");
+    const pares: [string, string][] = [
+      ["José Carlos Cecon", "José"],
+      // o campo `nome` guarda a referencia que acha a pessoa no cemiterio;
+      // mandar isso inteiro numa mensagem seria constrangedor
+      ["Paulo Primo da Maria Japonesa", "Paulo"],
+      ["Sr. João Batista", "Sr. João"],
+      ["Sr João Batista", "Sr João"],
+      ["Dra Marta Lima", "Dra Marta"],
+      ["Nina", "Nina"],
+      ["Ana  Maria", "Ana"],
+      ["Dona", "Dona"],
+      ["  Pedro  ", "Pedro"],
+      ["Maria-José Santos", "Maria-José"],
+    ];
+    for (const [entrada, esperado] of pares) {
+      checar(`primeiro nome de ${JSON.stringify(entrada)}`,
+             primeiroNome(entrada) === esperado,
+             `veio ${JSON.stringify(primeiroNome(entrada))}, esperado ${JSON.stringify(esperado)}`);
+    }
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

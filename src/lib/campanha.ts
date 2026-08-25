@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { calcularSaldosPorFamilia } from "./financeiro";
+import { primeiroNome as nomeDeSaudacao } from "./mensagens";
 
 /**
  * O AVISO PARA TODO MUNDO — uma mensagem, muitas famílias.
@@ -186,7 +187,9 @@ export async function executarCampanha(params: {
   let criados = 0;
 
   for (const a of alvos) {
-    const primeiroNome = (a.nome || "").trim().split(" ")[0] || "";
+    // `split(" ")` ainda quebrava em nome com dois espaços — "Ana  Maria"
+    // devolvia string vazia e a mensagem saía "Olá, !" (0131).
+    const primeiroNome = nomeDeSaudacao(a.nome || "");
     const texto = params.mensagem.replace(/\{nome\}/g, primeiroNome);
 
     const { error } = await db.from("fila_liberacao").insert({

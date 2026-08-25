@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { primeiroNome } from "@/lib/mensagens";
 import { exigirLogado } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
 
   const executoraId = auth.papel === "campo" ? auth.userId : null;
-  const nome = (auth.nome || "").split(" ")[0];
+  const nome = primeiroNome(auth.nome || "");
 
   const b = await montarBriefing(executoraId, nome);
   const contexto = [

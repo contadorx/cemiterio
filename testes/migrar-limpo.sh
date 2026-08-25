@@ -162,7 +162,10 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #             lancamentos; sem ela nao ha relatorio por competencia.
 #   0102  +1  trg_guarda_quem_acerta_a_conta — recusa tirar a marca do ULTIMO
 #             que acerta a conta de uma familia que ainda tem gente.
-GATILHOS_DELTA=${GATILHOS_DELTA:-9}
+#   0131  +2  tg_nome_proprio_cliente e tg_nome_proprio_familia — sao cinco
+#             portas que escrevem nome; consertar numa e deixar quatro
+#             escrevendo torto e o defeito de forma de sempre.
+GATILHOS_DELTA=${GATILHOS_DELTA:-11}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -303,7 +306,9 @@ POLICIES_DELTA=${POLICIES_DELTA:-89}
 #             sureya_limpar_eventos_webhook — as tres respondem a mesma
 #             pergunta em escalas diferentes: "chegou?". Antes delas o sistema
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
-FUNCOES_DELTA=${FUNCOES_DELTA:-71}
+#   0131  +2  sureya_nome_proprio e sureya_arruma_nome — 110 dos 339 contatos
+#             estavam em CAIXA ALTA, e o nome vai nas mensagens.
+FUNCOES_DELTA=${FUNCOES_DELTA:-73}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -668,6 +673,23 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/roteiro_recalculo.sql 2>
   echo "$saida" | grep -E "ROTEIRO FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Rota que muda debaixo de quem ja saiu para o campo e dia perdido."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# O NOME DA PESSOA
+#
+# Um erro aqui nao da erro: da uma mensagem constrangedora para uma familia de
+# luto, e ninguem descobre pelo log.
+# ---------------------------------------------------------------------------
+echo "NOME — maiuscula arrumada sem perder palavra, e so o primeiro na mensagem"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/nome_proprio.sql 2>&1); then
+  echo "$saida" | grep -E "NOME FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "O campo nome guarda a referencia que acha a pessoa no cemiterio."
   echo "============================================================"
   exit 1
 fi

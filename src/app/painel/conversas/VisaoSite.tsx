@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MessageCircle, Phone, Check, X, Clock, AlertTriangle, Send, ArrowLeft, Search } from "lucide-react";
 import { Cartao, Botao, Selo, Campo, Entrada } from "../pecas";
 import { diasDesde, faz } from "@/lib/datas";
+import { primeiroNome } from "@/lib/mensagens";
 
 /**
  * CONTATOS — quem escreveu pelo site e ainda espera resposta.
@@ -205,7 +206,7 @@ export default function VisaoSite() {
         const ed = editando[c.id] || { acao: c.proxima_acao || "", prazo: c.proximo_passo || "" };
         const ultima = (c.mensagens || []).slice(-1)[0]?.texto || c.contexto || null;
         const oi = encodeURIComponent(
-          `Ola${c.nome ? `, ${c.nome.split(" ")[0]}` : ""}! Aqui e da Zelo & Memoria. ` +
+          `Ola${c.nome ? `, ${primeiroNome(c.nome)}` : ""}! Aqui e da Zelo & Memoria. ` +
           `Recebi seu contato pelo site e queria entender como posso ajudar com o jazigo da sua familia.`
         );
 

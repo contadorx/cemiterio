@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { primeiroNome } from "@/lib/mensagens";
 import { exigirLogado } from "@/lib/roles";
 import { montarBriefing } from "@/lib/briefing";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const auth = await exigirLogado();
   if (auth.erro) return auth.erro;
 
-  const nome = (auth.nome || "").split(" ")[0];
+  const nome = primeiroNome(auth.nome || "");
   // o dono também pode abrir o campo: assume a rota que escolher
   const escolhida = req.nextUrl.searchParams.get("executora");
   const executoraId = auth.papel === "campo"

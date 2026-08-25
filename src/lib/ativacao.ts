@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
+import { primeiroNome } from "./mensagens";
 
 /**
  * RÉGUA DE ATIVAÇÃO — para quem é avulso/esporádico.
@@ -8,9 +9,8 @@ import { env } from "./env";
  * Tudo sai como rascunho: nada é enviado sem aprovação.
  */
 
-function primeiroNome(nome: string): string {
-  return (nome || "").trim().split(/\s+/)[0] || "";
-}
+// A regra mora em `mensagens.ts` (0131). A que existia aqui cortava no
+// primeiro espaço e devolvia "Sr." como saudação.
 
 // "a senhora" + "MARIA" => "MARIA"; o tratamento entra no corpo da mensagem
 function saudacaoNome(nome: string): string {

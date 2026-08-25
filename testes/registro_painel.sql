@@ -200,9 +200,17 @@ insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo, v
           'Alcantara','A-1', 0) on conflict (id) do nothing;
 
 -- 1 · O RESPONSAVEL APARECE PELO NOME, e nao como "exatamente um"
+--
+-- A ESPERA MUDOU DE 'CLECIA' PARA 'Clecia' NA 0131, e a mudanca e o conserto,
+-- nao um ajuste para o teste passar: o gatilho `tg_nome_proprio_cliente`
+-- arruma a caixa de todo nome que entra, porque o nome vai nas mensagens e
+-- 110 dos 339 contatos estavam gritando com a familia.
+--
+-- O que este teste garante continua igual: o responsavel aparece PELO NOME, e
+-- nao como "exatamente um".
 select ci6('o responsavel aparece pelo nome',
   (select detalhe from sureya_conferencia_cadastro('bbbbbbbb-0000-0000-0000-000000000097')
-    where item = 'responsavel financeiro'), 'CLECIA');
+    where item = 'responsavel financeiro'), 'Clecia');
 
 -- 2 · NAO DECIDIR E PENDENCIA
 select ci6('familia sem regime definido fica PENDENTE',

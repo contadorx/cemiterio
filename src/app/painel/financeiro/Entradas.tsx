@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { primeiroNome } from "@/lib/mensagens";
 import Link from "next/link";
 import { painel, cor } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
@@ -436,7 +437,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
       </div>
 
       <button style={{ ...painel.botao, marginTop: 12 }} onClick={salvar} disabled={salvando}>
-        {salvando ? "Lançando…" : cliente ? `Lançar e creditar para ${cliente.nome.split(" ")[0]}` : "Lançar sem identificar"}
+        {salvando ? "Lançando…" : cliente ? `Lançar e creditar para ${primeiroNome(cliente.nome)}` : "Lançar sem identificar"}
       </button>
     </div>
   );
