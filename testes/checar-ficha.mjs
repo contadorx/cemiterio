@@ -13,6 +13,7 @@ const lista       = readFileSync("src/app/painel/clientes/page.tsx", "utf8");
 const rotaLista   = readFileSync("src/app/api/clientes/route.ts", "utf8");
 const rotaCC      = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
 const rotaFila    = readFileSync("src/app/api/fila/route.ts", "utf8");
+
 const libFin      = readFileSync("src/lib/financeiro.ts", "utf8");
 const libProativo = readFileSync("src/lib/proativo.ts", "utf8");
 const telaFlores  = readFileSync("src/app/painel/flores/page.tsx", "utf8");
@@ -24,6 +25,12 @@ const libCamp     = readFileSync("src/lib/campanha.ts", "utf8");
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
 // derruba o teste, e a licao fica sem lugar para morar.
+//
+// ESTE AJUDANTE JA EXISTIA E EU TROPECEI NELE TRES VEZES EM DOIS DIAS — no
+// `semPlano` (0128), no "Virou cliente" (conversas) e no botao da avulsa
+// (0132). Nas tres, a guarda achou no COMENTARIO a citacao do que fora
+// trocado, e reprovou um conserto correto. Toda busca NEGATIVA passa por
+// aqui. Numa positiva, achar no comentario e inofensivo.
 const semComentarios = (t) =>
   t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const fichaVisivel = semComentarios(ficha);
@@ -479,11 +486,58 @@ ok("e depois de converter mostra o caminho para a ficha e para a conversa",
 
 // O botao antigo prometia "Virou cliente" e nao criava cliente nenhum.
 ok("o botao que so carimbava status nao promete mais o que nao faz",
-   // ancorado no JSX (`/> Virou cliente`), e nao no texto solto: o rotulo
-   // antigo aparece CITADO no comentario que explica a troca, e uma busca
-   // larga acharia a citacao e reprovaria o conserto. Foi o mesmo tropeco da
-   // guarda do `semPlano`, tres blocos acima.
-   !/\/> Virou cliente/.test(visaoSite) &&
+   // `semComentarios` porque o rotulo antigo aparece CITADO no comentario que
+   // explica a troca — o ancoramento no JSX que eu tinha posto aqui era
+   // fragil, e o ajudante ja existia no topo deste arquivo.
+   !/Virou cliente/.test(semComentarios(visaoSite)) &&
    /Já é cliente — só tirar da fila/.test(visaoSite));
+
+// ===========================================================================
+// A LIMPEZA AVULSA TEM BOTAO (0132)
+// ===========================================================================
+//
+// `POST /api/servico` foi escrita para marcar a avulsa — o cabecalho dela
+// dizia "agora tem botao na ficha da familia" — e NENHUMA tela a chamava. O
+// vazio da tela de Avulsos prometia esse botao. Estas guardas existem para o
+// caminho nao voltar a ser uma promessa.
+const fichaFamilia = readFileSync("src/app/painel/clientes/[id]/page.tsx", "utf8");
+const rotaServico  = readFileSync("src/app/api/servico/route.ts", "utf8");
+
+ok("a ficha da familia CHAMA a rota de marcar avulsa",
+   /fetch\("\/api\/servico", \{/.test(fichaFamilia));
+
+// Dois atos diferentes: uma que ja aconteceu, outra que vai acontecer.
+ok("e os dois botoes dizem qual e qual",
+   /Marcar avulsa/.test(fichaFamilia) && /Registrar feita/.test(fichaFamilia));
+
+ok("o formulario tem os quatro campos pedidos",
+   /Para quando/.test(fichaFamilia) && /rotulo="Valor"/.test(fichaFamilia) &&
+   /rotulo="Recebimento"/.test(fichaFamilia) && /Quem pediu/.test(fichaFamilia));
+
+ok("os contatos da familia alimentam o 'quem pediu'",
+   /\/api\/familias\/\$\{familiaId\}\/contatos/.test(fichaFamilia));
+
+ok("a rota aceita o contato e o momento da cobranca",
+   /momentoCobranca/.test(rotaServico) && /momento_cobranca: momento/.test(rotaServico));
+
+// Um id de outra familia passaria pelo banco e poria o pedido no nome de um
+// estranho: a coluna so exige que o contato exista.
+ok("e confere se o contato e MESMO daquela familia",
+   /contato_de_outra_familia/.test(rotaServico));
+
+// "Antes" so e escolha de verdade se FIZER alguma coisa.
+ok("recebimento ANTES cria a divida na hora",
+   /momento === "antes" && valor !== null && valor > 0/.test(rotaServico) &&
+   /origem: "avulso"/.test(rotaServico));
+
+// `valorDaLimpeza()` devolve ZERO para familia sem contrato em modo consumo —
+// a avulsa viraria um debito de R$ 0,00, trabalho feito que nunca vira dinheiro.
+ok("e cobra o preco DO SERVICO, nao o da conta do contrato",
+   /valor,\n        descricao: `Limpeza avulsa/.test(rotaServico));
+
+ok("o vazio da tela de Avulsos nao promete mais o botao que nao existia",
+   !/🧽 Nova limpeza avulsa/.test(
+     semComentarios(readFileSync("src/app/painel/avulsos/page.tsx", "utf8"))) &&
+   /no botão Marcar avulsa/.test(readFileSync("src/app/painel/avulsos/page.tsx", "utf8")));
 
 process.exit(falhas ? 1 : 0);

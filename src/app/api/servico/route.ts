@@ -20,7 +20,8 @@ export const dynamic = "force-dynamic";
  * O serviço esporádico chega por qualquer canal: telefonema, alguém que passou
  * no cemitério, você lembrando. Agora tem botão na ficha da família.
  *
- * Corpo: { tumuloId, dataPrevista, valor?, observacao?, prioridade? }
+ * Corpo: { tumuloId, dataPrevista, valor?, observacao?, prioridade?,
+ *           clienteId?, momentoCobranca? }
  * Nasce com plano_id = null (avulso) e status "pendente" — é assim que o
  * alocador da agenda enxerga e o app de campo recebe.
  *
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   const { data: tum } = await db
     .from("tumulos")
-    .select("id,cliente_id,identificacao")
+    .select("id,cliente_id,familia_id,identificacao,codigo")
     .eq("id", tumuloId)
     .maybeSingle();
   if (!tum) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
@@ -90,8 +91,42 @@ export async function POST(req: NextRequest) {
 
   const valor =
     b?.valor === "" || b?.valor === null || b?.valor === undefined ? null : Number(b.valor);
-  if (valor !== null && !Number.isFinite(valor)) {
+  if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
     return NextResponse.json({ ok: false, erro: "valor_invalido" }, { status: 400 });
+  }
+
+  // QUANDO SE RECEBE (0132). Vazio herda "depois", que é como o sistema sempre
+  // se comportou. `contra_foto` existe no enum desde sempre e continua aceito.
+  const momento = String(b?.momentoCobranca || "").trim();
+  if (momento && !["antes", "depois", "contra_foto"].includes(momento)) {
+    return NextResponse.json(
+      { ok: false, erro: "momento_invalido",
+        mensagem: "O recebimento é antes, depois, ou contra a foto." },
+      { status: 400 });
+  }
+
+  // QUEM PEDIU, DENTRE OS CONTATOS DA FAMÍLIA.
+  //
+  // Sem escolha, herda o contato que acerta a conta do jazigo — o que esta
+  // rota já fazia. Com escolha, o pedido fica no nome de quem ligou: numa
+  // família com quatro pessoas, "foi a Sônia que pediu" é a diferença entre
+  // saber e adivinhar na hora de cobrar.
+  //
+  // O contato é conferido contra a FAMÍLIA do jazigo: um id de outra família
+  // passaria pelo banco (a coluna só exige que exista) e poria o pedido no
+  // nome de um estranho.
+  let clienteId = (tum as any).cliente_id as string | null;
+  if (b?.clienteId) {
+    const { data: quem } = await db
+      .from("clientes").select("id,familia_id")
+      .eq("id", String(b.clienteId)).eq("org_id", org).maybeSingle();
+    if (!quem || (quem as any).familia_id !== (tum as any).familia_id) {
+      return NextResponse.json(
+        { ok: false, erro: "contato_de_outra_familia",
+          mensagem: "Esse contato não é desta família." },
+        { status: 400 });
+    }
+    clienteId = (quem as any).id;
   }
 
   const base: Record<string, any> = {
@@ -101,7 +136,8 @@ export async function POST(req: NextRequest) {
     // Esta porta SÓ é aberta por alguém pedindo — é a tela de marcar uma
     // limpeza para um jazigo, com a data que a família quer (0128).
     origem: "pedido",
-    cliente_id: (tum as any).cliente_id,
+    cliente_id: clienteId,
+    ...(momento ? { momento_cobranca: momento } : {}),
     data_prevista: data,
     status: jaFeita ? "executado" : "pendente",
     ...(jaFeita ? { data_executada: new Date(`${data}T12:00:00`).toISOString() } : {}),
@@ -174,11 +210,54 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ==========================================================================
+  // RECEBIMENTO ANTES: A DÍVIDA NASCE AGORA (0132)
+  // ==========================================================================
+  //
+  // "Antes" só é uma escolha de verdade se ela FIZER alguma coisa. Guardar a
+  // palavra e cobrar do mesmo jeito na conclusão seria um rótulo.
+  //
+  // Então o débito entra hoje, com o preço que foi digitado — e a partir daí a
+  // régua de cobrança enxerga e a família pode pagar antes da limpeza.
+  //
+  // O PREÇO É O DO SERVIÇO, e não `valorDaLimpeza()`. Aquela conta devolve
+  // ZERO para família que não seja contratada em modo consumo — uma avulsa
+  // para quem não tem contrato viraria um débito de R$ 0,00, trabalho feito
+  // que nunca vira dinheiro.
+  //
+  // Sem valor não há débito: cobrar R$ 0,00 é pior que não cobrar, porque
+  // parece cobrança feita.
+  let cobrancaCriada = false;
+  if (!jaFeita && momento === "antes" && valor !== null && valor > 0) {
+    const fam = (tum as any).familia_id;
+    if (fam) {
+      const onde = (tum as any)?.codigo ? ` · ${(tum as any).codigo}` : "";
+      const { error: eDeb } = await db.from("conta_corrente").insert({
+        org_id: org,
+        familia_id: fam,
+        tumulo_id: tumuloId,
+        cliente_id: clienteId,
+        servico_id: (srv as any)?.id || null,
+        tipo: "debito",
+        // `avulso` é a origem que a 0073 reservou para "a limpeza fora do
+        // plano, o arranjo de flores, o bronze" — é exatamente este caso.
+        origem: "avulso",
+        competencia: null,
+        valor,
+        descricao: `Limpeza avulsa${onde}`,
+        data,
+      });
+      cobrancaCriada = !eDeb;
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     servicoId: (srv as any)?.id,
     jaFeita,
     dataPrevista: data,
+    momentoCobranca: momento || "depois",
+    cobrancaCriada,
     semMigration: semColuna,
   });
 }

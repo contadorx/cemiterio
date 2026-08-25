@@ -131,7 +131,12 @@ export default function AvulsosPage() {
           <div style={painel.card}>
             <p style={{ color: cor.cinza, margin: 0, lineHeight: 1.6 }}>
               {situacao === "abertos"
-                ? "Nenhuma limpeza pedida em aberto — e vazio aqui é uma boa notícia, não uma tela quebrada. Só entra o que alguém pediu: pela ficha da família, no botão 🧽 Nova limpeza avulsa, ou pelo aviso de pedido que chega na conversa. As lavagens de contrato ficam na Agenda."
+                // O TEXTO ANTERIOR PROMETIA UM BOTÃO QUE NÃO EXISTIA.
+                // Dizia "no botão 🧽 Nova limpeza avulsa" da ficha da família,
+                // e a ficha só sabia registrar limpeza JÁ FEITA. A rota estava
+                // pronta e nenhuma tela a chamava. O botão nasceu na 0132 e
+                // chama-se "Marcar avulsa".
+                ? "Nenhuma limpeza pedida em aberto — e vazio aqui é uma boa notícia, não uma tela quebrada. Só entra o que alguém pediu: na ficha da família, no botão Marcar avulsa, ou pelo aviso de pedido que chega na conversa. As lavagens de contrato ficam na Agenda."
                 : "Nenhuma limpeza pedida concluída ainda."}
             </p>
           </div>

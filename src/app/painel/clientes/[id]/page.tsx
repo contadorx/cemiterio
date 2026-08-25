@@ -237,7 +237,8 @@ export default function Ficha() {
           coisa que a casa faz por este jazigo, e a primeira que a família nota
           quando vai lá. O combinado é do jazigo (0117), como a periodicidade. */}
       <Flores familiaId={familiaId} tumulos={d.tumulos || []} />
-      <Limpezas clienteId={clienteId} tumulos={d.tumulos || []} aoMudar={carregar} />
+      <Limpezas clienteId={clienteId} familiaId={familiaId}
+                tumulos={d.tumulos || []} aoMudar={carregar} />
       {c && <Ajustes clienteId={c.id} nome={c.nome}
                     familiaId={familiaId} familiaNome={fam?.nome || ""} />}
     </>
@@ -1714,8 +1715,8 @@ function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
 
 /* ------------------------------------------------------------------ */
 
-function Limpezas({ clienteId, tumulos, aoMudar }: {
-  clienteId: string | null; tumulos: any[]; aoMudar: () => void;
+function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
+  clienteId: string | null; familiaId: string | null; tumulos: any[]; aoMudar: () => void;
 }) {
   const [lista, setLista] = useState<any[]>([]);
   const [lancando, setLancando] = useState(false);
@@ -1727,6 +1728,69 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
   const [antes, setAntes] = useState<{ b64: string; mt: string; previa: string } | null>(null);
   const [fotoErro, setFotoErro] = useState("");
   const [feito, setFeito] = useState<any>(null);
+
+  /**
+   * MARCAR UMA LIMPEZA AVULSA — a que ainda VAI ser feita.
+   *
+   * Este cartão só sabia registrar o que JÁ ACONTECEU. Para marcar uma avulsa
+   * combinada por telefone não havia botão em lugar nenhum: `POST /api/servico`
+   * foi escrita para isso — o cabeçalho dela até diz "agora tem botão na ficha
+   * da família" — e nenhuma tela a chamava. O texto vazio da tela de Avulsos
+   * prometia o botão. Ele não existia.
+   *
+   * São duas coisas diferentes e o cartão agora diz qual é qual:
+   *   REGISTRAR — já foi feita, entra executada, aceita foto
+   *   MARCAR    — vai ser feita, entra pendente, o alocador põe no roteiro
+   */
+  const [marcando, setMarcando] = useState(false);
+  const [mTumulo, setMTumulo] = useState("");
+  const [mData, setMData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [mValor, setMValor] = useState("");
+  const [mQuando, setMQuando] = useState<"depois" | "antes">("depois");
+  const [mQuem, setMQuem] = useState("");
+  const [mObs, setMObs] = useState("");
+  const [contatos, setContatos] = useState<{ id: string; nome: string }[]>([]);
+  const [marcado, setMarcado] = useState<any>(null);
+
+  // Os contatos da família, para o pedido ficar no nome de quem ligou. Numa
+  // família com quatro pessoas, "foi a Sônia que pediu" é a diferença entre
+  // saber e adivinhar na hora de cobrar.
+  useEffect(() => {
+    if (!familiaId) return;
+    fetch(`/api/familias/${familiaId}/contatos`)
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setContatos(r.contatos || []); })
+      .catch(() => {});
+  }, [familiaId]);
+
+  async function marcar() {
+    if (!mTumulo) return;
+    setOcupado(true); setErro("");
+    try {
+      const r = await fetch("/api/servico", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tumuloId: mTumulo,
+          dataPrevista: mData,
+          valor: mValor.trim() === "" ? null : Number(mValor.replace(",", ".")),
+          momentoCobranca: mQuando,
+          clienteId: mQuem || undefined,
+          observacao: mObs.trim() || undefined,
+        }),
+      }).then((x) => x.json()).catch(() => null);
+
+      if (!r?.ok) {
+        setErro(traduzirErro(r, "Não consegui marcar a limpeza."));
+        return;
+      }
+      setMarcado(r);
+      setMarcando(false);
+      setMTumulo(""); setMValor(""); setMObs(""); setMQuem("");
+      aoMudar();
+      recarregar();
+    } finally { setOcupado(false); }
+  }
+
   // Câmera e galeria são inputs SEPARADOS: sem o atributo `capture` o celular
   // só abre a galeria, e o painel não conseguiria tirar a foto na hora.
   const refDep = useRef<HTMLInputElement>(null);
@@ -1808,12 +1872,109 @@ function Limpezas({ clienteId, tumulos, aoMudar }: {
       titulo="Limpezas"
       acao={
         tumulos.length ? (
-          <Botao onClick={() => setLancando((x) => !x)}>
-            <Plus size={16} /> Registrar
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            {/* DOIS BOTÕES, DOIS ATOS. "Registrar" sozinho parecia servir para
+                as duas coisas, e não servia: só sabia anotar o que já tinha
+                acontecido. */}
+            <Botao tom="principal" onClick={() => { setMarcando((x) => !x); setLancando(false); }}>
+              <Plus size={16} /> Marcar avulsa
+            </Botao>
+            <Botao onClick={() => { setLancando((x) => !x); setMarcando(false); }}>
+              Registrar feita
+            </Botao>
+          </div>
         ) : undefined
       }
     >
+      {marcado && (
+        <div className="mb-3 rounded-xl2 border border-bom/30 bg-bom/10 p-3 text-[14px]">
+          {/* T12:00:00 e nao meia-noite: com meia-noite o fuso joga a data
+              para o dia anterior na tela. E a mesma forma usada no resto da
+              ficha. */}
+          <b>Limpeza marcada para{" "}
+            {new Date(marcado.dataPrevista + "T12:00:00").toLocaleDateString("pt-BR")}.</b>{" "}
+          Ela entra no roteiro pela data pedida.{" "}
+          {marcado.cobrancaCriada
+            ? "A cobrança já está no extrato da família — é o pré-pago."
+            : marcado.momentoCobranca === "antes"
+              ? "Sem valor não lancei cobrança: cobrar R$ 0,00 parece cobrança feita."
+              : "A cobrança entra quando a limpeza for concluída."}{" "}
+          <a className="underline" href="/painel/avulsos">ver na lista de avulsos</a>
+        </div>
+      )}
+
+      {marcando && (
+        <div className="mb-3 rounded-lg bg-surface p-3">
+          <p className="mb-3 text-[14px] text-ink-soft">
+            A limpeza que <b>ainda vai ser feita</b> — combinada por telefone, no
+            cemitério, ou porque você lembrou. Entra no roteiro pela data pedida,
+            e o alocador nunca passa dela.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo rotulo="Qual túmulo">
+              <Selecao value={mTumulo} onChange={(e: any) => setMTumulo(e.target.value)}>
+                <option value="">escolha</option>
+                {tumulos.map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {[t.quadras?.codigo, t.ruas?.nome, t.identificacao].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </Selecao>
+            </Campo>
+            <Campo rotulo="Para quando" dica="a data que a família pediu">
+              <Entrada type="date" value={mData}
+                       onChange={(e: any) => setMData(e.target.value)} />
+            </Campo>
+
+            <Campo rotulo="Valor" dica="o preço desta limpeza, não o do contrato">
+              <Entrada inputMode="decimal" placeholder="0,00" value={mValor}
+                       onChange={(e: any) => setMValor(e.target.value)} />
+            </Campo>
+            <Campo rotulo="Quem pediu" dica="fica no nome de quem ligou">
+              <Selecao value={mQuem} onChange={(e: any) => setMQuem(e.target.value)}>
+                <option value="">quem acerta a conta do jazigo</option>
+                {contatos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </Selecao>
+            </Campo>
+          </div>
+
+          {/* RECEBIMENTO ANTES OU DEPOIS.
+              Não é um rótulo: "antes" põe a dívida no extrato AGORA, e é por
+              isso que a régua de cobrança passa a enxergar. */}
+          <Campo rotulo="Recebimento">
+            <div className="flex flex-wrap gap-2">
+              {([["depois", "Depois de feita"], ["antes", "Antes — pré-pago"]] as const)
+                .map(([v, rot]) => (
+                  <button key={v} onClick={() => setMQuando(v)}
+                    className={`rounded-full border px-3 py-1 text-[13px] ${
+                      mQuando === v ? "border-ouro bg-ouro/10 text-ink" : "border-line text-ink-soft"}`}>
+                    {rot}
+                  </button>
+                ))}
+            </div>
+          </Campo>
+          <p className="-mt-1 mb-2 text-[13px] text-ink-soft">
+            {mQuando === "antes"
+              ? "A cobrança entra no extrato agora, e a família pode pagar antes da limpeza."
+              : "A cobrança entra quando a limpeza for concluída."}
+          </p>
+
+          <Campo rotulo="Observação" dica="opcional — o que combinaram">
+            <Entrada value={mObs} onChange={(e: any) => setMObs(e.target.value)} />
+          </Campo>
+
+          <div className="flex flex-wrap gap-2">
+            <Botao tom="principal" disabled={ocupado || !mTumulo} onClick={marcar}>
+              {ocupado ? "Marcando…" : "Marcar a limpeza"}
+            </Botao>
+            <Botao onClick={() => setMarcando(false)}>Cancelar</Botao>
+          </div>
+        </div>
+      )}
+
       {lancando && (
         <div className="mb-3 rounded-lg bg-surface p-3">
           <div className="grid gap-3 sm:grid-cols-2">

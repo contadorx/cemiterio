@@ -160,4 +160,53 @@ select ci28('e a receita de ida e volta funciona com a coluna nova',
     where id='50280000-0000-0000-0000-0000000000a2') = 'pedido',
   'a receita do LEIA-ME da 0127 precisa continuar valendo depois da 0128');
 
+-- ============================================================================
+-- 6. O MOMENTO DA COBRANCA E DO SERVICO (0132)
+-- ============================================================================
+--
+-- O enum `sureya_momento_cobranca` existia desde sempre e morava so em
+-- `planos`. A conclusao lia dali — e como `plano_id` e nulo em toda lavagem
+-- desde a 0100, resolvia SEMPRE para 'depois'. O pre-pago era codigo morto.
+create or replace function ci28b(nome text, condicao boolean, porque text) returns void
+language plpgsql as $$
+begin
+  if condicao is distinct from true then
+    raise exception 'ORIGEM FALHOU — %: %', nome, porque;
+  end if;
+  raise notice '  ok  %', nome;
+end $$;
+
+select ci28b('a coluna do momento existe no servico',
+  (select count(*) from information_schema.columns
+    where table_name='servicos' and column_name='momento_cobranca') = 1, '');
+
+select ci28b('vazio continua sendo "depois", que e como sempre foi',
+  (select momento_cobranca from servicos
+    where id='50280000-0000-0000-0000-0000000000a1') is null,
+  'a lavagem de contrato nao tem momento proprio: quem gera divida e a competencia');
+
+insert into servicos (id, org_id, tumulo_id, status, data_prevista, data_desejada,
+                      origem, valor, momento_cobranca) values
+ ('50280000-0000-0000-0000-0000000000b1','a0280000-0000-0000-0000-000000000001',
+  '40280000-0000-0000-0000-000000000002','pendente', current_date + 5, current_date + 5,
+  'pedido', 80, 'antes');
+
+select ci28b('a avulsa pre-paga guarda o proprio preco e o proprio momento',
+  (select valor = 80 and momento_cobranca::text = 'antes' from servicos
+    where id='50280000-0000-0000-0000-0000000000b1'),
+  'o preco da avulsa e dela: valorDaLimpeza() devolve ZERO para familia sem contrato');
+
+-- A CONCLUSAO PASSOU A OLHAR O SERVICO PRIMEIRO.
+select ci28b('a conclusao le o momento DO SERVICO antes do plano',
+  position('v_s.momento_cobranca::text' in
+    (select pg_get_functiondef(oid) from pg_proc where proname='sureya_concluir_lavagem')) > 0,
+  'sem isto, pre-pago e contra-foto continuam sendo palavra sem efeito');
+
+select ci28b('e o plano legado continua na cascata, depois dele',
+  position('from planos p where p.id = v_s.plano_id' in
+    (select pg_get_functiondef(oid) from pg_proc where proname='sureya_concluir_lavagem')) > 0,
+  'as quatro lavagens que ainda tem plano_id nao podem mudar de comportamento');
+
+drop function ci28b(text, boolean, text);
+
 drop function ci28(text, boolean, text);
