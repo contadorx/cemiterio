@@ -3,6 +3,7 @@ import { env } from "./env";
 import type { DadosComprovante, Midia } from "./comprovante";
 import { subirArquivo, BUCKET_COMPROVANTES } from "./storage";
 import { diaOperacao } from "./vencimento";
+import { registrarErro } from "./monitor";
 
 // Sobe a imagem do comprovante no Storage (best-effort). Se falhar, segue sem URL:
 // o registro do pagamento é mais importante que a imagem.
@@ -78,12 +79,31 @@ export async function registrarComprovante(
       p_data: dados.data || diaOperacao(),
       p_status: "a_conferir",
       p_comprovante: comprovanteId,
+      // A ORG VAI EXPLÍCITA (0133) — a lição da 0103, de novo.
+      //
+      // Quem chama aqui é o webhook do WhatsApp, com o cliente de service_role
+      // e SEM sessão de painel. `sureya_lancar` resolvia a org por
+      // `current_org_id()`, que é nulo fora de uma sessão: a chamada morria com
+      // `sem_org` em TODO comprovante que chegasse por mensagem.
+      //
+      // Medido em 26/08, com um comprovante de verdade: R$ 40,00 lidos certo,
+      // gravados em `comprovantes`, e nenhuma linha no razão.
+      p_org: org,
     });
     // NAO derruba o comprovante se o lancamento falhar: a imagem ja esta
-    // guardada e a conferencia manual continua possivel. Mas o erro tem de
-    // aparecer no log — foi um `catch` mudo como este que escondeu, por meses,
-    // o extrato da familia nunca funcionando.
-    if (e2) console.error("[conciliacao] lancamento pendente falhou:", e2.message);
+    // guardada e a conferencia manual continua possivel.
+    //
+    // MAS O ERRO PRECISA DE UM LUGAR ONDE ALGUEM OLHE. Este `console.error`
+    // sozinho era o problema: o comentario ao lado dizia "foi um catch mudo
+    // como este que escondeu, por meses, o extrato da familia nunca
+    // funcionando" — e mesmo assim o erro so ia para um log que ninguem le.
+    // `erros_log` aparece no painel de rotinas.
+    if (e2) {
+      console.error("[conciliacao] lancamento pendente falhou:", e2.message);
+      await registrarErro("comprovante_sem_lancamento", e2, {
+        comprovanteId, clienteId, valor: dados.valor,
+      });
+    }
   }
 
   return { comprovanteId };

@@ -680,6 +680,23 @@ echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
 # ---------------------------------------------------------------------------
+# O COMPROVANTE VIRA DINHEIRO
+#
+# O defeito nao dava erro: a familia pagava, a imagem era lida certo, e o razao
+# ficava vazio. Descoberto com um Pix de verdade em 26/08.
+# ---------------------------------------------------------------------------
+echo "COMPROVANTE — o Pix do WhatsApp precisa chegar ao razao"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/comprovante_vira_dinheiro.sql 2>&1); then
+  echo "$saida" | grep -E "COMPROVANTE FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Dinheiro que entra e nao aparece no razao e o pior defeito possivel."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
 # O NOME DA PESSOA
 #
 # Um erro aqui nao da erro: da uma mensagem constrangedora para uma familia de
