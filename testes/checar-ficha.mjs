@@ -540,4 +540,47 @@ ok("o vazio da tela de Avulsos nao promete mais o botao que nao existia",
      semComentarios(readFileSync("src/app/painel/avulsos/page.tsx", "utf8"))) &&
    /no botão Marcar avulsa/.test(readFileSync("src/app/painel/avulsos/page.tsx", "utf8")));
 
+// ===========================================================================
+// CONFERIR UM COMPROVANTE E DECIDIR, NAO E SO DIZER SIM (0134)
+// ===========================================================================
+//
+// A tela mostrava imagem, valor, data e o nome do contato, e oferecia dois
+// botoes. Para dizer "sim, este dinheiro entrou" faltava de quem e, quanto a
+// familia deve e a que se refere. Confirmar virava um sim automatico.
+const telaFin  = readFileSync("src/app/painel/financeiro/page.tsx", "utf8");
+const rotaComp = readFileSync("src/app/api/comprovantes/route.ts", "utf8");
+const rotaConc = readFileSync("src/app/api/financeiro/conciliar/route.ts", "utf8");
+
+ok("a lista de comprovantes traz o contexto da decisao",
+   /familiaId/.test(rotaComp) && /devendo/.test(rotaComp) &&
+   /competencias/.test(rotaComp) && /jazigos/.test(rotaComp));
+
+// O contato e quem apertou o botao; a conta e da FAMILIA.
+ok("a tela mostra a familia, e nao so quem mandou",
+   /c\.familia \|\| c\.cliente/.test(telaFin) && /mandado por/.test(telaFin));
+
+ok("e diz quanto essa familia deve",
+   /em aberto:/.test(telaFin) && /saldo a favor dela/.test(telaFin));
+
+// A leitura da IA e palpite bom, nao fato: quem tem o extrato do banco e ela.
+ok("o valor e a data sao corrigiveis na conferencia",
+   /Valor que entrou/.test(telaFin) && /Dia em que caiu/.test(telaFin) &&
+   /a leitura dizia/.test(telaFin));
+
+ok("da para dizer de qual jazigo e a que se refere",
+   /De qual jazigo/.test(telaFin) && /A que se refere/.test(telaFin));
+
+// Familia sem contrato e o caso de quem esta sendo cadastrada agora — nao e
+// erro, mas quem confirma precisa saber.
+ok("e avisa quando a familia ainda nao tem contrato",
+   /ainda não tem contrato/.test(telaFin) && /cadastrar o contrato/.test(telaFin));
+
+ok("a rota leva a decisao inteira para o banco",
+   /p_valor: valor/.test(rotaConc) && /p_tumulo/.test(rotaConc) &&
+   /p_competencia: competencia/.test(rotaConc));
+
+// Vazio e DIFERENTE de zero: vazio quer dizer "nao corrigi nada".
+ok("campo vazio nao vira zero na hora de conferir",
+   /cru === "" \|\| cru === null \|\| cru === undefined/.test(rotaConc));
+
 process.exit(falhas ? 1 : 0);

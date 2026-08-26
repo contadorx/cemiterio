@@ -18,6 +18,17 @@ interface Comp {
   data: string | null;
   idTransacao: string | null;
   cliente: string;
+  clienteId: string | null;
+  /** O CONTEXTO DA DECISÃO (0134) — sem ele, confirmar é carimbo. */
+  familiaId: string | null;
+  familia: string | null;
+  /** "contrato" | "avulso" | "nao_definido" — `null` quando não há família. */
+  regime: string | null;
+  /** positivo = deve; negativo = tem saldo a favor. `null` = sem família. */
+  devendo: number | null;
+  competencias: { competencia: string; valor: number; venceu: string }[];
+  jazigos: { id: string; rotulo: string; contratado: boolean }[];
+  semContrato: boolean;
 }
 
 /**
@@ -139,26 +150,84 @@ function Conferir() {
   );
 }
 
+/** "2026-08" -> "agosto/2026" */
+const MES_NOME = ["janeiro","fevereiro","março","abril","maio","junho",
+                  "julho","agosto","setembro","outubro","novembro","dezembro"];
+function mesPorExtenso(c: string) {
+  const m = Number(c.slice(5, 7)) - 1;
+  return `${MES_NOME[m] || c} de ${c.slice(0, 4)}`;
+}
+function dinheiroBR(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/**
+ * A CONFERÊNCIA DE UM COMPROVANTE.
+ *
+ * Era um cartão com imagem, valor, data e dois botões. Para dizer "sim, este
+ * dinheiro entrou" faltava tudo: de quem é, quanto essa família deve, e a que
+ * o pagamento se refere. Confirmar virava um sim automático — e sim automático
+ * não é conferência, é carimbo.
+ *
+ * O que a pessoa decide aqui, e que agora fica gravado:
+ *   · o VALOR e a DATA, corrigíveis — a leitura da IA é um palpite bom, e quem
+ *     tem o extrato do banco do lado é ela
+ *   · o JAZIGO, quando a família tem mais de um
+ *   · A QUE SE REFERE: uma competência em aberto, ou nada
+ */
 function Comprovantes() {
   const [itens, setItens] = useState<Comp[]>([]);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [erro, setErro] = useState("");
+  /** O que foi mexido, por comprovante. Vazio = "não corrigi nada". */
+  const [ed, setEd] = useState<Record<string, {
+    valor: string; data: string; tumuloId: string; competencia: string;
+  }>>({});
+
+  function campos(c: Comp) {
+    return ed[c.id] || {
+      valor: c.valor != null ? String(c.valor) : "",
+      data: c.data || "",
+      // Um jazigo só não é escolha: já vem escolhido.
+      tumuloId: (c.jazigos || []).length === 1 ? c.jazigos[0].id : "",
+      competencia: "",
+    };
+  }
+  function mexer(c: Comp, campo: string, v: string) {
+    setEd((x) => ({ ...x, [c.id]: { ...campos(c), [campo]: v } }));
+  }
 
   async function carregar() {
-    const r = await fetch("/api/comprovantes").then((x) => x.json());
-    if (r.ok) setItens(Array.isArray(r.comprovantes) ? r.comprovantes : []);
+    const r = await fetch("/api/comprovantes").then((x) => x.json()).catch(() => null);
+    if (r?.ok) setItens(Array.isArray(r.comprovantes) ? r.comprovantes : []);
   }
   useEffect(() => {
     carregar();
   }, []);
 
-  async function conciliar(id: string, aprovar: boolean) {
-    setOcupado(id);
-    await fetch("/api/financeiro/conciliar", {
+  async function conciliar(c: Comp, aprovar: boolean) {
+    setOcupado(c.id);
+    setErro("");
+    const f = campos(c);
+    const r = await fetch("/api/financeiro/conciliar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ comprovanteId: id, aprovar }),
-    });
+      body: JSON.stringify({
+        comprovanteId: c.id,
+        aprovar,
+        // Só vai o que a pessoa realmente mexeu: mandar tudo faria uma
+        // correção que ela não fez parecer decisão dela.
+        ...(aprovar ? {
+          valor: f.valor,
+          data: f.data || undefined,
+          tumuloId: f.tumuloId || undefined,
+          competencia: f.competencia || undefined,
+        } : {}),
+      }),
+    }).then((x) => x.json()).catch(() => null);
     setOcupado(null);
+    if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+    setEd((x) => { const y = { ...x }; delete y[c.id]; return y; });
     carregar();
   }
 
@@ -166,33 +235,139 @@ function Comprovantes() {
 
   return (
     <>
-      {itens.map((c) => (
+      {erro && (
+        <div style={{ ...painel.card, borderLeft: "4px solid #dc2626" }}>
+          <strong style={{ color: "rgb(var(--zm-perigo))" }}>{erro}</strong>
+        </div>
+      )}
+      {itens.map((c) => {
+        const f = campos(c);
+        const mudouValor = c.valor != null && f.valor !== String(c.valor);
+        return (
         <div key={c.id} style={painel.card}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <strong style={{ color: cor.navy }}>{c.cliente}</strong>
-            <span style={{ fontWeight: 800, color: cor.teal }}>
-              {c.valor != null ? `R$ ${Number(c.valor).toFixed(2)}` : "valor não lido"}
-            </span>
+          {/* DE QUEM É — a família, e não só o contato que mandou.
+              O contato é quem apertou o botão; a conta é da família. */}
+          <div style={{ display: "flex", justifyContent: "space-between",
+                        gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+            <div>
+              <strong style={{ color: cor.navy, fontSize: 16 }}>
+                {c.familia || c.cliente}
+              </strong>
+              {c.familia && c.cliente !== c.familia && (
+                <span style={{ color: cor.cinza, fontSize: 14 }}> · mandado por {c.cliente}</span>
+              )}
+            </div>
+            {c.familiaId && (
+              <a href={`/painel/clientes/${c.familiaId}`} style={{ fontSize: 14, textDecoration: "underline" }}>
+                abrir a ficha
+              </a>
+            )}
           </div>
-          <div style={{ fontSize: 14, color: cor.cinza }}>
-            {c.data || "sem data"} {c.idTransacao ? `· ${c.idTransacao}` : ""}
+
+          {/* O QUE ELA DEVE. Sem este número, "confirmar" é um sim no escuro. */}
+          <div style={{ fontSize: 14, color: cor.cinza, marginBottom: 8 }}>
+            {c.devendo === null ? "sem família ligada a este contato"
+              : c.devendo > 0.005 ? <>em aberto: <b style={{ color: "rgb(var(--zm-perigo))" }}>{dinheiroBR(c.devendo)}</b></>
+              : c.devendo < -0.005 ? <>saldo a favor dela: <b>{dinheiroBR(-c.devendo)}</b></>
+              : "conta zerada"}
+            {c.idTransacao ? ` · ${c.idTransacao}` : ""}
           </div>
+
+          {/* FAMÍLIA SEM CONTRATO não é erro — é o caso de quem está sendo
+              cadastrada agora. Mas quem confirma precisa saber, porque o
+              dinheiro vai ficar como saldo a favor até haver o que abater. */}
+          {c.semContrato && (
+            <div style={{ marginBottom: 10, padding: 10, borderRadius: 8,
+                          background: "rgb(var(--zm-aviso) / 0.10)", fontSize: 14,
+                          color: "rgb(var(--zm-aviso))" }}>
+              <b>Esta família ainda não tem contrato.</b> O pagamento entra como saldo
+              a favor dela e fica lá até existir o que abater.{" "}
+              {c.familiaId && (
+                <a href={`/painel/clientes/${c.familiaId}`} style={{ textDecoration: "underline" }}>
+                  cadastrar o contrato
+                </a>
+              )}
+            </div>
+          )}
+
           {c.imagem && (
             <a href={c.imagem} target="_blank" rel="noreferrer">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.imagem} alt="comprovante" style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, marginTop: 10 }} />
+              <img src={c.imagem} alt="comprovante"
+                   style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, marginBottom: 10 }} />
             </a>
           )}
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button style={painel.botao} disabled={ocupado === c.id} onClick={() => conciliar(c.id, true)}>
-              Confirmar pagamento
+
+          {/* A DECISÃO. O que a IA leu vem preenchido; quem confere é você,
+              com o extrato do banco do lado. */}
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            <div>
+              <label style={painel.rotulo}>Valor que entrou</label>
+              <input style={{ ...painel.input, margin: 0 }} inputMode="decimal"
+                     value={f.valor} placeholder="não lido"
+                     onChange={(e) => mexer(c, "valor", e.target.value)} />
+              {mudouValor && (
+                <p style={{ fontSize: 12.5, color: cor.cinza, margin: "4px 0 0" }}>
+                  a leitura dizia {dinheiroBR(Number(c.valor))}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={painel.rotulo}>Dia em que caiu</label>
+              <input type="date" style={{ ...painel.input, margin: 0 }} value={f.data}
+                     onChange={(e) => mexer(c, "data", e.target.value)} />
+            </div>
+            {(c.jazigos || []).length > 1 && (
+              <div>
+                <label style={painel.rotulo}>De qual jazigo</label>
+                <select style={{ ...painel.input, margin: 0 }} value={f.tumuloId}
+                        onChange={(e) => mexer(c, "tumuloId", e.target.value)}>
+                  <option value="">não sei / a família toda</option>
+                  {(c.jazigos || []).map((j) => (
+                    <option key={j.id} value={j.id}>{j.rotulo}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* A QUE SE REFERE.
+              Escolher aqui grava uma REFERÊNCIA no lançamento — "isto era o
+              agosto dela" —, e NÃO marca aquela competência como paga: o razão
+              desta casa é um saldo corrente, não uma lista de faturas. Prometer
+              quitação item a item seria inventar um mecanismo que não existe. */}
+          <div style={{ marginTop: 10 }}>
+            <label style={painel.rotulo}>A que se refere</label>
+            {(c.competencias || []).length === 0 ? (
+              <p style={{ fontSize: 14, color: cor.cinza, margin: 0 }}>
+                Não há mensalidade em aberto para apontar. Entra como pagamento sem
+                destino — o saldo dela sobe e o abate acontece quando houver cobrança.
+              </p>
+            ) : (
+              <select style={{ ...painel.input, margin: 0, maxWidth: 420 }} value={f.competencia}
+                      onChange={(e) => mexer(c, "competencia", e.target.value)}>
+                <option value="">sem apontar — só entra no saldo</option>
+                {(c.competencias || []).map((k) => (
+                  <option key={k.competencia + k.venceu} value={k.competencia}>
+                    {mesPorExtenso(k.competencia)} · {dinheiroBR(k.valor)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            <button style={painel.botao} disabled={ocupado === c.id || !f.valor.trim()}
+                    onClick={() => conciliar(c, true)}>
+              {ocupado === c.id ? "…" : "Confirmar pagamento"}
             </button>
-            <button style={painel.botaoPerigo} disabled={ocupado === c.id} onClick={() => conciliar(c.id, false)}>
+            <button style={painel.botaoPerigo} disabled={ocupado === c.id}
+                    onClick={() => conciliar(c, false)}>
               Rejeitar
             </button>
           </div>
         </div>
-      ))}
+      );})}
     </>
   );
 }

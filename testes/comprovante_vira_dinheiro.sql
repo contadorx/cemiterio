@@ -134,4 +134,89 @@ select ci33('confirmar duas vezes nao cria dois creditos',
     where comprovante_id='0c330000-0000-0000-0000-000000000001') = 1,
   'o clique duplo e a coisa mais comum que existe numa tela');
 
+-- ============================================================================
+-- 4. CONFERIR E DECIDIR (0134) — o valor, a data, o jazigo e a referencia
+-- ============================================================================
+--
+-- A tela oferecia so "Confirmar" e "Rejeitar". Confirmar sem saber de quem e,
+-- quanto a familia deve e a que se refere nao e conferencia: e carimbo.
+insert into cemiterios (id, org_id, nome) values
+ ('d0330000-0000-0000-0000-000000000001','a0330000-0000-0000-0000-000000000001','CI Cem Pix')
+on conflict do nothing;
+insert into quadras (id, org_id, cemiterio_id, codigo, ordem) values
+ ('e0330000-0000-0000-0000-000000000001','a0330000-0000-0000-0000-000000000001',
+  'd0330000-0000-0000-0000-000000000001','Q Pix', 1) on conflict do nothing;
+insert into tumulos (id, org_id, quadra_id, cemiterio_id, familia_id, identificacao) values
+ ('40330000-0000-0000-0000-000000000001','a0330000-0000-0000-0000-000000000001',
+  'e0330000-0000-0000-0000-000000000001','d0330000-0000-0000-0000-000000000001',
+  'f0330000-0000-0000-0000-000000000001','Jazigo CI Pix')
+on conflict do nothing;
+
+insert into comprovantes (id, org_id, cliente_id, valor_extraido, data_extraida,
+                          id_transacao, status) values
+ ('0c330000-0000-0000-0000-000000000004','a0330000-0000-0000-0000-000000000001',
+  'c0330000-0000-0000-0000-000000000001', 40.00, current_date - 3, 'E-CI-0134', 'a_conferir');
+
+-- A LEITURA DA IA E UM PALPITE BOM, NAO UM FATO: entrou 55, nao 40.
+select sureya_conciliar_comprovante(
+  p_comprovante := '0c330000-0000-0000-0000-000000000004',
+  p_aprovar     := true,
+  p_org         := 'a0330000-0000-0000-0000-000000000001',
+  p_valor       := 55.00,
+  p_data        := current_date,
+  p_tumulo      := '40330000-0000-0000-0000-000000000001',
+  p_competencia := date_trunc('month', current_date)::date);
+
+select ci33('o valor corrigido e o que vale, nao o que a IA leu',
+  (select valor = 55.00 from conta_corrente
+    where comprovante_id='0c330000-0000-0000-0000-000000000004'),
+  'quem tem o extrato do banco do lado e a pessoa');
+
+select ci33('e a correcao volta para o COMPROVANTE tambem',
+  (select valor_extraido = 55.00 and data_extraida = current_date from comprovantes
+    where id='0c330000-0000-0000-0000-000000000004'),
+  'senao a tela seguiria mostrando um numero que ja nao e o que entrou');
+
+select ci33('o jazigo escolhido fica gravado',
+  (select tumulo_id = '40330000-0000-0000-0000-000000000001' from conta_corrente
+    where comprovante_id='0c330000-0000-0000-0000-000000000004'), '');
+
+select ci33('e a competencia fica como REFERENCIA no lancamento',
+  (select competencia = date_trunc('month', current_date)::date from conta_corrente
+    where comprovante_id='0c330000-0000-0000-0000-000000000004'),
+  'referencia, e nao quitacao: o razao desta casa e saldo corrente');
+
+select ci33('o texto do lancamento diz o mes a que se refere',
+  (select descricao like '%' || to_char(current_date,'MM/YYYY') || '%' from conta_corrente
+    where comprovante_id='0c330000-0000-0000-0000-000000000004'), '');
+
+-- E O QUE NAO PODE: conferir com zero.
+do $$
+begin
+  begin
+    perform sureya_conciliar_comprovante(
+      p_comprovante := '0c330000-0000-0000-0000-000000000004',
+      p_aprovar := true, p_org := 'a0330000-0000-0000-0000-000000000001',
+      p_valor := 0);
+    raise exception 'COMPROVANTE FALHOU — aceitou conferir com R$ 0,00';
+  exception when others then
+    if sqlerrm not like '%valor_invalido%' then raise; end if;
+    raise notice '  ok  conferir com R$ 0,00 e recusado';
+  end;
+end $$;
+
+-- Corrigir DEPOIS de ja existir lancamento tem de mexer nos DOIS lugares.
+select sureya_conciliar_comprovante(
+  p_comprovante := '0c330000-0000-0000-0000-000000000004',
+  p_aprovar     := true,
+  p_org         := 'a0330000-0000-0000-0000-000000000001',
+  p_valor       := 60.00);
+
+select ci33('corrigir de novo acerta o razao E o comprovante juntos',
+  (select cc.valor = 60.00 from conta_corrente cc
+    where cc.comprovante_id='0c330000-0000-0000-0000-000000000004')
+  and (select cp.valor_extraido = 60.00 from comprovantes cp
+        where cp.id='0c330000-0000-0000-0000-000000000004'),
+  'duas versoes do mesmo dinheiro e o pior resultado possivel');
+
 drop function ci33(text, boolean, text);

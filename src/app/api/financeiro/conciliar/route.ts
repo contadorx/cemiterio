@@ -7,7 +7,17 @@ import { orgAtual } from "@/lib/org";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Corpo: { comprovanteId, aprovar: boolean }
+/**
+ * Corpo: { comprovanteId, aprovar,
+ *          valor?, data?, tumuloId?, competencia?, descricao? }
+ *
+ * Os cinco últimos são A DECISÃO de quem confere (0134). A tela oferecia só
+ * "Confirmar" e "Rejeitar" — e confirmar sem saber de quem é, quanto a família
+ * deve e a que o pagamento se refere não é conferência, é carimbo.
+ *
+ * `valor` e `data` CORRIGEM o comprovante: a leitura da IA é um palpite bom,
+ * não um fato. Quem tem o extrato do banco do lado é a pessoa.
+ */
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
@@ -18,6 +28,25 @@ export async function POST(req: NextRequest) {
   const aprovar: boolean = !!body?.aprovar;
   if (!comprovanteId) return NextResponse.json({ ok: false, erro: "parametros" }, { status: 400 });
 
+  // Vazio é DIFERENTE de zero aqui: vazio quer dizer "não corrigi nada, use o
+  // que a leitura achou". Um `Number("")` viraria 0 e a função recusaria.
+  const cru = body?.valor;
+  const valor = cru === "" || cru === null || cru === undefined
+    ? null
+    : Number(String(cru).replace(",", "."));
+  if (valor !== null && (!Number.isFinite(valor) || valor <= 0)) {
+    return NextResponse.json(
+      { ok: false, erro: "valor_invalido",
+        mensagem: "O valor conferido precisa ser maior que zero." },
+      { status: 400 });
+  }
+
+  const data = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.data || "")) ? String(body.data) : null;
+  // A competência chega como "2026-08" e o banco guarda data: o dia 1 é a
+  // convenção que o resto do sistema já usa para dizer "o mês inteiro".
+  const competencia = /^\d{4}-\d{2}$/.test(String(body?.competencia || ""))
+    ? `${body.competencia}-01` : null;
+
   const { data: comp } = await db
     .from("comprovantes")
     .select("cliente_id")
@@ -27,8 +56,20 @@ export async function POST(req: NextRequest) {
   const { error } = await db.rpc("sureya_conciliar_comprovante", {
     p_comprovante: comprovanteId,
     p_aprovar: aprovar,
+    p_valor: valor,
+    p_data: data,
+    p_tumulo: body?.tumuloId || null,
+    p_competencia: competencia,
+    p_descricao: String(body?.descricao || "").trim().slice(0, 300) || null,
   });
-  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({
+      ok: false, erro: error.message,
+      mensagem: /valor_invalido/.test(error.message)
+        ? "O valor conferido precisa ser maior que zero."
+        : error.message,
+    }, { status: 400 });
+  }
 
   // pagamento entrou e quitou? zera a régua de cobrança gentil
   if (aprovar && (comp as any)?.cliente_id) {
