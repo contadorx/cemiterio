@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -35,10 +37,30 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return r2.data;
   }
 
-  const [msgs, { data: rasc }] = await Promise.all([
+  const [msgsCruas, { data: rasc }] = await Promise.all([
     carregarMensagens(),
     db.from("interacoes_ia").select("id,rascunho,assunto,motivo_retencao").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+
+  // O LINK QUE ABRE, NO LUGAR DO ENDEREÇO CRU (0139).
+  //
+  // `conversas` é um balde FECHADO — é o que a família mandou no privado, e
+  // nunca saiu daqui para lugar nenhum. A imagem continua aparecendo na
+  // conversa; o que muda é que o link morre em uma hora em vez de valer para
+  // sempre para quem o tiver.
+  const adm139 = supabaseAdmin();
+  // "NÃO TEM IMAGEM" E "NÃO CONSEGUI ABRIR A IMAGEM" SÃO COISAS DIFERENTES.
+  //
+  // Sem `midia_falhou`, um link que não assinou vira `midia_url: null` — e a
+  // tela, que só testa `m.midia_url &&`, simplesmente não desenha nada. A
+  // mensagem apareceria como se a família nunca tivesse mandado foto nenhuma.
+  // É o mesmo defeito que fez 39 imagens sumirem antes da 0134, agora pela
+  // porta do link em vez da porta do upload.
+  const msgs = await Promise.all(((msgsCruas || []) as any[]).map(async (m) => {
+    if (!m.midia_url) return m;
+    const link = await assinar(adm139, m.midia_url);
+    return { ...m, midia_url: link, midia_falhou: !link };
+  }));
 
   // abriu = leu (mas ainda não respondeu)
   await db.rpc("sureya_marcar_conversa", { p_conversa: id, p_acao: "lida" }).then(() => null, () => null);

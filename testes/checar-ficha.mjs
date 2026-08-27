@@ -1433,4 +1433,62 @@ ok("as funcoes do 0138 nao ficam abertas para anon",
    && /revoke execute on function sureya_retirar_consentimento\(uuid, text\)\s+from public, anon/.test(mig38)
    && /revoke execute on function sureya_consentimentos_por_versao\(uuid\)\s+from public, anon/.test(mig38));
 
+// ===========================================================================
+// OS BALDES QUE NAO ABREM SOZINHOS (0139)
+//
+// Medido em 27/08: os tres baldes estavam publicos. Balde publico abre para
+// qualquer um que tenha o endereco, sem senha, para sempre.
+//
+// Estas guardas existem porque o defeito e MUDO nos dois sentidos: um balde
+// reaberto continua mostrando as imagens (so que para mais gente), e um link
+// que nao assinou some da tela sem dizer nada — a Sureya confirmaria dinheiro
+// sem ter visto o comprovante.
+// ===========================================================================
+const stor = readFileSync("src/lib/storage.ts", "utf8");
+const mig39 = readFileSync("migrations/0139_os_baldes_que_nao_abrem_sozinhos.sql", "utf8");
+const rComp = readFileSync("src/app/api/comprovantes/route.ts", "utf8");
+const rConta = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+const rConv = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
+const tFin = readFileSync("src/app/painel/financeiro/page.tsx", "utf8");
+const tConv = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+
+ok("os dois baldes sensiveis estao na lista dos fechados",
+   /BALDES_PRIVADOS[\s\S]{0,120}BUCKET_COMPROVANTES[\s\S]{0,60}BUCKET_CONVERSAS/.test(stor));
+
+// A funcao cria o balde sozinha quando ele falta (conserto da 0009). Se
+// continuasse criando tudo aberto, um balde recriado por engano voltaria
+// publico sem erro nenhum — so a porta destrancada de novo.
+ok("balde que se cria sozinho nasce fechado quando e dos fechados",
+   /public: !BALDES_PRIVADOS\.has\(bucket\)/.test(stor));
+
+// Uma porta so: quem transforma endereco guardado em link que abre.
+ok("assinar e a porta unica, e devolve null em vez do endereco cru",
+   /export async function assinar/.test(stor)
+   && /if \(!BALDES_PRIVADOS\.has\(balde\)\) return url;/.test(stor)
+   && /return null;/.test(stor));
+
+// As quatro rotas que emitem esses enderecos.
+ok("as quatro rotas assinam antes de devolver",
+   [rComp, rConta, rConv].every((r) => /assinar\(/.test(r))
+   && /assinar\(supabaseAdmin\(\), data\.imagem_url\)/.test(
+        readFileSync("src/app/api/comprovantes/anexar/route.ts", "utf8")));
+
+// `map` nao espera promessa: um await dentro dele devolveria Promise para a
+// tela, e o extrato mostraria [object Promise] no lugar do link.
+ok("o extrato assina em lote, fora do map",
+   /linksComp/.test(rConta) && !/comprovanteUrl: await/.test(rConta));
+
+// NAO CONSEGUI ABRIR != NAO TEM. Sem isto a tela cala e a falha vira ausencia.
+ok("comprovante que nao abriu avisa, em vez de sumir",
+   /imagemFalhou/.test(rComp) && /imagemFalhou/.test(tFin)
+   && /sem ver o comprovante/.test(tFin));
+
+ok("e imagem da conversa que nao abriu tambem",
+   /midia_falhou/.test(rConv) && /midia_falhou/.test(tConv));
+
+// A decisao de deixar `servicos` aberto e uma decisao, e esta escrita.
+ok("a migration diz por que servicos continua aberto",
+   /NAO\*\* FAZ: fechar `servicos`|NAO. FAZ: fechar .servicos./.test(mig39)
+   && /Evolution BAIXA a URL/.test(mig39));
+
 process.exit(falhas ? 1 : 0);

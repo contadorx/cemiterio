@@ -81,6 +81,15 @@ create table if not exists storage.buckets (id text primary key, name text,
   created_at timestamptz default now());
 create table if not exists storage.objects (id uuid primary key default gen_random_uuid(),
   bucket_id text, name text, owner uuid, created_at timestamptz default now(), metadata jsonb);
+-- OS TRES BALDES NASCEM ABERTOS, COMO ESTAVAM EM PRODUCAO ATE A 0139.
+--
+-- Sem estas linhas o `update storage.buckets set public=false` da 0139 nao
+-- encontraria linha nenhuma, e o teste que cobra "fechado" passaria sem ter
+-- exercitado nada — verde por vacuidade, que e pior que vermelho. O ensaio tem
+-- de partir do estado em que a producao estava.
+insert into storage.buckets (id, name, public) values
+  ('servicos','servicos',true), ('comprovantes','comprovantes',true), ('conversas','conversas',true)
+  on conflict (id) do nothing;
 -- `unaccent_simples` é usada por sureya_palpites_entrada e também só existe no
 -- banco de produção. Não tem prefixo `sureya_`, então nem saiu na extração.
 create or replace function unaccent_simples(t text) returns text language sql immutable as $$
@@ -773,6 +782,23 @@ echo
 # So aparecem no dia em que alguem perguntar com que direito uma familia foi
 # contatada — e nesse dia nao ha mais o que medir.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# OS BALDES QUE NAO ABREM SOZINHOS
+#
+# Balde que volta a ser publico nao muda tela nenhuma, nao aparece em log e nao
+# quebra nada: as imagens continuam abrindo, so que para mais gente.
+# ---------------------------------------------------------------------------
+echo "BALDES — o comprovante e a conversa nao abrem para quem tem o link"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/baldes_fechados.sql 2>&1); then
+  echo "$saida" | grep -E "BALDES FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Porta destrancada nao faz barulho nenhum."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "TERMO — quem aceitou aceitou uma versao, e ela nao muda depois"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/termo_versao.sql 2>&1); then
   echo "$saida" | grep -E "TERMO FALHOU|ERROR" | sed 's/^/  /'

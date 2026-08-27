@@ -155,6 +155,22 @@ export default function Thread() {
                        style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 10, display: "block" }} />
                 </a>
               )}
+              {/* NÃO CONSEGUI ABRIR ≠ NÃO TEM IMAGEM (0139).
+                  O balde das conversas fechou, e a imagem passa a ser lida por
+                  link que expira. Se ele não sair, calar faria a mensagem
+                  parecer que a família nunca mandou foto — que é exatamente o
+                  defeito que a 0134 consertou pela outra ponta. */}
+              {m.midia_falhou && (
+                <div style={{
+                  marginBottom: 6, padding: "8px 10px", borderRadius: 10,
+                  border: "1px solid rgb(var(--zm-aviso) / 0.4)",
+                  background: "rgb(var(--zm-aviso) / 0.1)",
+                  color: "rgb(var(--zm-aviso))", fontSize: 12.5, lineHeight: 1.45,
+                }}>
+                  A família mandou uma imagem aqui e eu não consegui abri-la agora.
+                  Recarregue a conversa; se continuar, o arquivo pode ter sido removido.
+                </div>
+              )}
               {m.texto}
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
                   {m.pelo_celular ? "você · pelo celular" : m.autor}

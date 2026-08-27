@@ -17,6 +17,8 @@ import { diaOperacao, mesOperacao } from "@/lib/vencimento";
 interface Comp {
   id: string;
   imagem: string | null;
+  /** Há arquivo anexado e o link não saiu (0139) — diferente de não ter. */
+  imagemFalhou?: boolean;
   valor: number | null;
   data: string | null;
   idTransacao: string | null;
@@ -326,6 +328,24 @@ function Comprovantes() {
               <img src={c.imagem} alt="comprovante"
                    style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, marginBottom: 10 }} />
             </a>
+          )}
+
+          {/* NÃO CONSEGUI ABRIR ≠ NÃO TEM COMPROVANTE (0139).
+              O balde dos comprovantes fechou e a imagem passa a ser lida por
+              link que expira. Calar aqui seria pior que em qualquer outra tela:
+              esta é a tela onde se confirma que o dinheiro entrou, e ela
+              confirmaria sem ter visto o extrato. */}
+          {c.imagemFalhou && (
+            <div style={{
+              marginBottom: 10, padding: "10px 12px", borderRadius: 10,
+              border: "1px solid rgb(var(--zm-perigo) / 0.4)",
+              background: "rgb(var(--zm-perigo) / 0.06)",
+              color: "rgb(var(--zm-perigo))", fontSize: 13.5, lineHeight: 1.5,
+            }}>
+              <b>Não consegui abrir este comprovante agora.</b> Existe um arquivo
+              anexado, mas o link não saiu. Recarregue a tela antes de confirmar —
+              confirmar sem ver o comprovante é dar entrada em dinheiro no escuro.
+            </div>
           )}
 
           {/* A DECISÃO. O que a IA leu vem preenchido; quem confere é você,

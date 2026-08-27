@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { subirArquivo } from "@/lib/storage";
@@ -138,5 +140,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, id: data.id, url: data.imagem_url });
+  // Balde fechado: quem acabou de anexar precisa conseguir conferir o que
+  // anexou, e o endereço cru não abre.
+  return NextResponse.json({
+    ok: true, id: data.id,
+    url: await assinar(supabaseAdmin(), data.imagem_url),
+  });
 }

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 
@@ -58,6 +60,17 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
+  // O LINK QUE ABRE, NO LUGAR DO ENDEREÇO CRU (0139). Assinado em lote antes
+  // do `map`, porque `map` não espera promessa — um `await` lá dentro devolveria
+  // Promise para a tela e o extrato mostraria [object Promise] no lugar do link.
+  const adm = supabaseAdmin();
+  const linksComp = new Map<string, string | null>();
+  await Promise.all((data || []).map(async (l: any) => {
+    if (l.comprovantes?.imagem_url) {
+      linksComp.set(l.id, await assinar(adm, l.comprovantes.imagem_url));
+    }
+  }));
+
   const linhas = (data || []).map((l: any) => ({
     id: l.id,
     tipo: l.tipo,
@@ -69,7 +82,7 @@ export async function GET(req: NextRequest) {
     temComprovante: !!l.comprovante_id,
     // A URL vai junto: sem ela a Sureya veria "tem comprovante" e não teria
     // como abrir — pior que não mostrar nada.
-    comprovanteUrl: l.comprovantes?.imagem_url ?? null,
+    comprovanteUrl: linksComp.get(l.id) ?? null,
     local: l.tumulos
       ? [l.tumulos.quadras?.codigo, l.tumulos.ruas?.nome].filter(Boolean).join(" · ")
       : null,

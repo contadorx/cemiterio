@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 
@@ -43,6 +45,18 @@ export async function GET() {
     .order("created_at", { ascending: true });
 
   const linhas = (data || []) as any[];
+
+  // O LINK QUE ABRE, NO LUGAR DO ENDEREÇO CRU (0139).
+  //
+  // `comprovantes` é um balde FECHADO: o endereço guardado no banco não abre
+  // sozinho. Assinar em lote, aqui, é o que mantém o N+1 fora da tela — e
+  // `assinar` devolve `null` quando não consegue, para a fila dizer "não
+  // consegui abrir este" em vez de mostrar uma imagem quebrada.
+  const adm = supabaseAdmin();
+  const links = new Map<string, string | null>();
+  await Promise.all(linhas.map(async (c) => {
+    links.set(c.id, await assinar(adm, c.imagem_url));
+  }));
   const familias = [...new Set(linhas.map((c) => c.clientes?.familia_id).filter(Boolean))];
 
   // UMA consulta por assunto, e não uma por comprovante: são poucas linhas na
@@ -99,7 +113,11 @@ export async function GET() {
 
     return {
       id: c.id,
-      imagem: c.imagem_url,
+      imagem: links.get(c.id) ?? null,
+      // NÃO CONSEGUI ABRIR ≠ NÃO TEM IMAGEM, e aqui a diferença decide
+      // dinheiro: sem este aviso a tela mostraria a linha SEM o comprovante e
+      // ela confirmaria o recebimento sem ter olhado nada.
+      imagemFalhou: !!c.imagem_url && !links.get(c.id),
       valor: c.valor_extraido === null ? null : Number(c.valor_extraido),
       data: c.data_extraida,
       idTransacao: c.id_transacao,
