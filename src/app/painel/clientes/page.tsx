@@ -7,6 +7,7 @@ import { Falhou } from "../pecas";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
+import CadastrarFamilia from "./CadastrarFamilia";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
@@ -127,7 +128,13 @@ function VisaoFamilias() {
     if (a === "proxima_lavagem") setF((x) => ({ ...x, ordem: "lavagem" }));
   }, []);
   const [quadras, setQuadras] = useState<any[]>([]);
-  const [abrindo, setAbrindo] = useState(false);
+  // DUAS TAREFAS DIFERENTES, DUAS PORTAS (CA-05).
+  // "Nova família / importar" era um botão só que abria um cartão com duas
+  // abas: o cadastro do atendimento por telefone e a colagem de uma planilha.
+  // São trabalhos de momentos opostos — um é com a família na linha, o outro é
+  // uma migração feita uma vez. Dividir a mesma área entre os dois fazia a
+  // planilha aparecer quando ela queria cadastrar uma senhora.
+  const [abrindo, setAbrindo] = useState<null | "nova" | "csv">(null);
   /** As famílias marcadas para a ação em lote. Guarda o id da FAMÍLIA. */
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
   const [excluindo, setExcluindo] = useState(false);
@@ -360,13 +367,24 @@ function VisaoFamilias() {
                 <b>{d.totais.faltaData}</b> sem data de lavagem ou cobrança
               </span>
             )}
-            <button style={{ ...painel.botaoSec, marginLeft: "auto" }} onClick={() => setAbrindo(!abrindo)}>
-              {abrindo ? "Fechar" : "+ Nova família / importar"}
+            <button style={{ ...painel.botao, marginLeft: "auto" }}
+                    onClick={() => setAbrindo(abrindo === "nova" ? null : "nova")}>
+              {abrindo === "nova" ? "Fechar" : "+ Nova família"}
+            </button>
+            <button style={painel.botaoSec}
+                    onClick={() => setAbrindo(abrindo === "csv" ? null : "csv")}>
+              {abrindo === "csv" ? "Fechar" : "Importar planilha"}
             </button>
           </div>
         )}
 
-        {abrindo && <Importar onPronto={() => { setAbrindo(false); carregar(); }} />}
+        {abrindo === "nova" && (
+          <CadastrarFamilia
+            onPronto={() => { setAbrindo(null); carregar(); }}
+            onCancelar={() => setAbrindo(null)}
+          />
+        )}
+        {abrindo === "csv" && <Importar onPronto={() => { setAbrindo(null); carregar(); }} />}
 
         {!!erroLista && <Falhou mensagem={erroLista} aoTentar={carregar} parcial={!!d} />}
         {!d && !erroLista && <p style={{ color: cor.cinza }}>Carregando…</p>}
@@ -516,68 +534,19 @@ function VisaoFamilias() {
 }
 
 
+/**
+ * IMPORTAR PLANILHA — só isto.
+ *
+ * Este componente carregava DUAS tarefas: o cadastro de uma família durante a
+ * ligação e a colagem de uma planilha inteira. Elas dividiam a mesma área com
+ * duas abas, e são de momentos opostos — uma é com a família na linha, a outra
+ * é uma migração que se faz uma vez. O cadastro saiu para
+ * `CadastrarFamilia.tsx`, em quatro passos (CA-05).
+ */
 function Importar({ onPronto }: { onPronto: () => void }) {
   const recado = useRecado();
-  const [modo, setModo] = useState<"nova" | "csv">("nova");
-  const [f, setF] = useState({
-    nome: "", telefone: "", tratamento: "a senhora", consentimento: false,
-    // jazigo
-    jazigoModo: "novo" as "novo" | "vincular",
-    vincularTumuloId: "",
-    identificacao: "", quadraCodigo: "", rua: "", falecidoNome: "",
-    // plano
-    atalho: 2, // índice em ATALHOS_FREQUENCIA (2 = "Uma vez por mês")
-    valorMensal: "", inicio: "",  // texto: pt-BR aceita "40,50"
-  });
-  const [quadras, setQuadras] = useState<string[]>([]);
-  const [semDono, setSemDono] = useState<any[]>([]);
   const [csv, setCsv] = useState("");
   const [ocupado, setOcupado] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/tumulos").then((x) => x.json()).then((r) => {
-      if (!r?.ok) return;
-      const codigos = (r.cemiterios || []).flatMap((c: any) => (c.quadras || []).map((q: any) => q.codigo));
-      setQuadras([...new Set<string>(codigos)]);
-      setSemDono(r.semDono || []);
-    }).catch(() => {});
-  }, []);
-
-  async function criar() {
-    if (!f.nome.trim() || !f.telefone.trim()) return recado.aviso("Nome e telefone são obrigatórios.");
-    if (f.jazigoModo === "vincular" && !f.vincularTumuloId) return recado.aviso("Escolha o jazigo já cadastrado ou troque para “novo”.");
-
-
-    const at = ATALHOS_FREQUENCIA[f.atalho];
-    const temJazigo = f.jazigoModo === "vincular" ? !!f.vincularTumuloId : !!f.identificacao.trim();
-    // valor em pt-BR: NaN quando nao entende, e NaN barra aqui em vez de virar
-    // preco errado no banco (antes o padrao 40 entrava calado como honorario).
-    const mensal = numeroBR(f.valorMensal);
-    if (temJazigo && at.cadencia !== "avulso" && (!isFinite(mensal) || mensal <= 0)) {
-      return recado.aviso("Digite o valor de UMA limpeza como 40 ou 40,50 (sem R$ e sem separador de milhar).");
-    }
-
-    setOcupado(true);
-    const r = await fetch("/api/clientes", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: f.nome, telefone: f.telefone, tratamento: f.tratamento, consentimento: f.consentimento,
-        jazigo: f.jazigoModo === "vincular"
-          ? { vincularTumuloId: f.vincularTumuloId, falecidoNome: f.falecidoNome }
-          : { identificacao: f.identificacao, quadraCodigo: f.quadraCodigo, rua: f.rua, falecidoNome: f.falecidoNome },
-        // só manda plano se há jazigo e a periodicidade não é avulso
-        plano: temJazigo && at.cadencia !== "avulso"
-          ? { cadencia: at.cadencia, lavagensPorCiclo: at.lavagens, valorMensal: Math.round(mensal * 100) / 100, inicio: f.inicio || undefined }
-          : undefined,
-      }),
-    }).then((x) => x.json()).catch(() => null);
-    setOcupado(false);
-    if (!r?.ok) return recado.erro("Falhou: " + (r?.erro || "erro"));
-    // a familia e criada mesmo se o jazigo/plano falhar — antes isso era mudo.
-    if (r.avisoJazigo) recado.erro("Familia cadastrada, mas o jazigo NAO entrou:\n\n" + r.avisoJazigo);
-    else if (r.avisoPlano) recado.aviso("Familia e jazigo cadastrados, mas o plano nao foi criado:\n\n" + r.avisoPlano);
-    onPronto();
-  }
 
   async function importar() {
     if (!csv.trim()) return;
@@ -602,7 +571,8 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     if (erros.length) {
       const lista = erros.slice(0, 20).map((e) => `linha ${e.linha}: ${e.motivo}`).join("\n");
       const resto = erros.length > 20 ? `\n… e mais ${erros.length - 20} linha(s).` : "";
-      recado.ok(
+      // AVISO, e nao recibo verde: entrou pela metade.
+      recado.aviso(
         `Importado: ${partes}.\n\n${erros.length} linha(s) NAO entraram:\n\n${lista}${resto}` +
         "\n\nCorrija essas linhas na planilha e importe so elas de novo."
       );
@@ -612,169 +582,24 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     onPronto();
   }
 
-  const secao: React.CSSProperties = { borderTop: `1px solid ${cor.linha}`, marginTop: 14, paddingTop: 12 };
-  const tituloSecao: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: cor.cinza, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 };
-
   return (
     <div style={painel.card}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <button style={modo === "nova" ? painel.botao : painel.botaoSec} onClick={() => setModo("nova")}>
-          Nova família
-        </button>
-        <button style={modo === "csv" ? painel.botao : painel.botaoSec} onClick={() => setModo("csv")}>
-          Importar planilha
-        </button>
-      </div>
-
-      {modo === "nova" && (
-        <>
-          {/* FAMÍLIA */}
-          <div style={tituloSecao}>Família</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={painel.rotulo}>Nome da família</label>
-              <input style={painel.input} value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })}
-                     placeholder="Família SILVA" />
-            </div>
-            <div>
-              <label style={painel.rotulo}>WhatsApp</label>
-              <input style={{ ...painel.input, width: 170 }} value={f.telefone}
-                     onChange={(e) => setF({ ...f, telefone: e.target.value })} placeholder="11 99999-9999" />
-            </div>
-            <div>
-              <label style={painel.rotulo}>Tratamento</label>
-              <select style={{ ...painel.input, width: 130 }} value={f.tratamento}
-                      onChange={(e) => setF({ ...f, tratamento: e.target.value })}>
-                <option value="a senhora">a senhora</option>
-                <option value="o senhor">o senhor</option>
-                <option value="a Dra">a Dra</option>
-              </select>
-            </div>
-          </div>
-
-          {/* JAZIGO E LOCALIZAÇÃO */}
-          <div style={secao}>
-            <div style={tituloSecao}>Jazigo e localização</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <button style={f.jazigoModo === "novo" ? painel.botaoMiniSec : { ...painel.botaoMiniSec, opacity: 0.6 }}
-                      onClick={() => setF({ ...f, jazigoModo: "novo" })}>Novo jazigo</button>
-              {semDono.length > 0 && (
-                <button style={f.jazigoModo === "vincular" ? painel.botaoMiniSec : { ...painel.botaoMiniSec, opacity: 0.6 }}
-                        onClick={() => setF({ ...f, jazigoModo: "vincular" })}>
-                  Vincular jazigo do campo ({semDono.length})
-                </button>
-              )}
-            </div>
-
-            {f.jazigoModo === "novo" ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 150 }}>
-                  <label style={painel.rotulo}>Identificação (lote/número)</label>
-                  <input style={painel.input} value={f.identificacao}
-                         onChange={(e) => setF({ ...f, identificacao: e.target.value })} placeholder="045 · lote 12" />
-                </div>
-                <div>
-                  <label style={painel.rotulo}>Quadra</label>
-                  <input style={{ ...painel.input, width: 130 }} value={f.quadraCodigo} list="quadras-cad"
-                         onChange={(e) => setF({ ...f, quadraCodigo: e.target.value })} placeholder="Q-12" />
-                  <datalist id="quadras-cad">{quadras.map((c) => <option key={c} value={c} />)}</datalist>
-                </div>
-                <div>
-                  <label style={painel.rotulo}>Rua</label>
-                  <input style={{ ...painel.input, width: 100 }} value={f.rua}
-                         onChange={(e) => setF({ ...f, rua: e.target.value })} placeholder="RUA 1" />
-                </div>
-                {/* a quadra deixou de ser obrigatoria: quem ainda nao mapeou o
-                    cemiterio precisa cadastrar hoje. Mas o balde "S/Q" junta
-                    todos, e dois jazigos com o mesmo numero la dentro sao
-                    tratados como o MESMO jazigo — por isso o aviso. */}
-                <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0", width: "100%" }}>
-                  Sem quadra? Deixe em branco: o jazigo entra em “S/Q” e ganha a quadra
-                  certa na primeira passagem do campo. Atenção: dentro de “S/Q”, dois
-                  jazigos com a mesma identificação são tratados como o mesmo túmulo.
-                </p>
-              </div>
-            ) : (
-              <div>
-                <label style={painel.rotulo}>Jazigo já cadastrado (capturado no campo)</label>
-                <select style={painel.input} value={f.vincularTumuloId}
-                        onChange={(e) => setF({ ...f, vincularTumuloId: e.target.value })}>
-                  <option value="">— escolha —</option>
-                  {semDono.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {[t.quadra, t.identificacao, t.rua].filter(Boolean).join(" · ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div style={{ marginTop: 10 }}>
-              <label style={painel.rotulo}>Falecido (opcional)</label>
-              <input style={painel.input} value={f.falecidoNome}
-                     onChange={(e) => setF({ ...f, falecidoNome: e.target.value })} placeholder="Nome no jazigo" />
-            </div>
-          </div>
-
-          {/* PLANO / PERIODICIDADE / VENCIMENTO */}
-          <div style={secao}>
-            <div style={tituloSecao}>Plano e periodicidade</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div style={{ flex: 1, minWidth: 190 }}>
-                <label style={painel.rotulo}>Frequência das lavagens</label>
-                <select style={painel.input} value={f.atalho}
-                        onChange={(e) => setF({ ...f, atalho: Number(e.target.value) })}>
-                  {ATALHOS_FREQUENCIA.map((a, i) => <option key={i} value={i}>{a.rotulo}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={painel.rotulo}>Valor por limpeza</label>
-                <input type="text" inputMode="decimal" placeholder="40,00"
-                       style={{ ...painel.input, width: 110 }} value={f.valorMensal}
-                       onChange={(e) => setF({ ...f, valorMensal: e.target.value })} />
-              </div>
-              <div>
-                <label style={painel.rotulo}>1ª lavagem</label>
-                <input type="date" style={{ ...painel.input, width: 160 }} value={f.inicio}
-                       onChange={(e) => setF({ ...f, inicio: e.target.value })} />
-              </div>
-            </div>
-            <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0" }}>
-              A 1ª lavagem e a próxima cobrança já entram na data escolhida (ou hoje). “Só quando pedirem” não cria plano.
-            </p>
-          </div>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, margin: "14px 0" }}>
-            <input type="checkbox" checked={f.consentimento}
-                   onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
-            A família autorizou o contato por WhatsApp (LGPD)
-          </label>
-          <button style={painel.botao} onClick={criar} disabled={ocupado}>
-            {ocupado ? "…" : "Cadastrar família"}
-          </button>
-        </>
-      )}
-
-      {modo === "csv" && (
-        <>
-          <label style={painel.rotulo}>
-            Cole a planilha COM a linha de cabeçalho
-          </label>
-          {/* o rotulo antigo anunciava uma ordem de colunas que a API nao aceita
-              (e sem cabecalho); quem seguia a tela levava erro de cabecalho. */}
-          <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 15 }}
-                    value={csv} onChange={(e) => setCsv(e.target.value)}
-                    placeholder={"quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor\nQD 1;128;JOSE SILVA;MARIA SILVA;11999998888;mensal;1;40,00"} />
-          <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0" }}>
-            Obrigatórias: <b>quadra, identificacao, cliente_nome, telefone</b>. As outras são
-            opcionais — sem <b>cadencia</b> o jazigo entra sem plano. Valor em reais (40 ou 40,00);
-            valor que o sistema não entender faz a linha ser recusada, nunca vira um preço chutado.
-          </p>
-          <button style={{ ...painel.botao, marginTop: 10 }} onClick={importar} disabled={ocupado}>
-            {ocupado ? "Importando…" : "Importar"}
-          </button>
-        </>
-      )}
+      <label style={painel.rotulo}>
+        Cole a planilha COM a linha de cabeçalho
+      </label>
+      {/* o rotulo antigo anunciava uma ordem de colunas que a API nao aceita
+          (e sem cabecalho); quem seguia a tela levava erro de cabecalho. */}
+      <textarea style={{ ...painel.input, minHeight: 140, fontFamily: "monospace", fontSize: 15 }}
+                value={csv} onChange={(e) => setCsv(e.target.value)}
+                placeholder={"quadra;identificacao;falecido;cliente_nome;telefone;cadencia;qtd;valor\nQD 1;128;JOSE SILVA;MARIA SILVA;11999998888;mensal;1;40,00"} />
+      <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0" }}>
+        Obrigatórias: <b>quadra, identificacao, cliente_nome, telefone</b>. As outras são
+        opcionais — sem <b>cadencia</b> o jazigo entra sem plano. Valor em reais (40 ou 40,00);
+        valor que o sistema não entender faz a linha ser recusada, nunca vira um preço chutado.
+      </p>
+      <button style={{ ...painel.botao, marginTop: 10 }} onClick={importar} disabled={ocupado}>
+        {ocupado ? "Importando…" : "Importar"}
+      </button>
     </div>
   );
 }

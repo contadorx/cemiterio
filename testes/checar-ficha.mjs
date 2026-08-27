@@ -40,6 +40,7 @@ const assistente  = readFileSync("src/app/campo/Assistente.tsx", "utf8");
 const vocab       = readFileSync("src/lib/vocabulario.ts", "utf8");
 const funilTela   = readFileSync("src/app/painel/financeiro/Funil.tsx", "utf8");
 const funilRota   = readFileSync("src/app/api/financeiro/funil/route.ts", "utf8");
+const cadastro    = readFileSync("src/app/painel/clientes/CadastrarFamilia.tsx", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -1035,5 +1036,55 @@ ok("a tela inicial fala 'a receber', nao 'falta pagar'",
   ok(`nenhum alert do navegador no painel (${arquivos.length} arquivos)`,
      sobrando.length === 0, sobrando.join(", "));
 }
+
+// ===================== BUILD F: cadastrar e uma tarefa so =====================
+//
+// CA-05: uma tela longa com nome, tratamento, telefone, jazigo novo ou
+// existente, quadra, rua, falecido, frequencia, valor, primeira lavagem e
+// consentimento — mais uma aba de planilha na mesma area. Um erro no fim
+// obrigava a reler tudo, e o sucesso PELA METADE nao era dito.
+
+const cadVisivel = semComentarios(cadastro);
+ok("cadastrar familia virou quatro passos",
+   /const PASSOS = \["Família", "Jazigo", "Contrato", "Conferir"\]/.test(cadastro));
+
+// O passo 4 e o que resolve o erro tardio: ele aparece antes de gravar.
+ok("e o ultimo passo confere antes de gravar",
+   /Nada foi gravado ainda/.test(cadVisivel));
+
+// Errar o valor no passo 3 nao pode fazer voltar ao nome.
+ok("cada passo valida so o que e dele",
+   /function podeAvancar\(p: number\)/.test(cadastro));
+
+// Pular para a frente sem passar pela validacao do meio recriaria o buraco.
+ok("da para voltar pelos numeros, mas nao pular para a frente",
+   /i < passo && setPasso\(i\)/.test(cadVisivel) && /disabled=\{i > passo\}/.test(cadVisivel));
+
+// A rota cria familia, depois jazigo, depois plano — cada um pode falhar
+// sozinho, e devolve ok:true com aviso. Um recado que some em 4s nao serve.
+ok("sucesso pela metade vira tela, nao recado que some",
+   /Entrou pela metade/.test(cadVisivel) && /O jazigo NÃO entrou/.test(cadVisivel));
+
+ok("e ela diz para terminar na ficha, nao cadastrar de novo",
+   /cadastrar de novo criaria/.test(cadVisivel));
+
+// CSV e cadastro sao trabalhos de momentos opostos: um com a familia na linha,
+// o outro uma migracao feita uma vez.
+ok("planilha e cadastro sao duas portas",
+   /\+ Nova família/.test(listaVisivel) && /Importar planilha/.test(listaVisivel) &&
+   /abrindo === "nova"/.test(listaVisivel) && /abrindo === "csv"/.test(listaVisivel));
+
+// CA-11, primeira fatia: a auditoria manda comecar por formulario e acao
+// critica, e cadastrar familia e os dois.
+ok("o cadastro novo usa as pecas unicas, nao estilo em objeto",
+   /from "\.\.\/pecas"/.test(cadastro) && !/React\.CSSProperties/.test(cadastro));
+
+// O botao aparecia em 9 de 10 cartoes e nao dizia nada sobre o jazigo.
+ok("'fazer este agora' parou de parecer distintivo",
+   /s\.linkAgora/.test(campoB) && !/style=\{s\.botaoAgora\}/.test(campoB));
+
+// O que E prioridade tem selo proprio, e vem antes dos outros avisos.
+ok("e a prioridade de verdade ganhou selo",
+   /it\.adiadoVezes >= 2/.test(campoB) && /PRIORIDADE/.test(campoB));
 
 process.exit(falhas ? 1 : 0);

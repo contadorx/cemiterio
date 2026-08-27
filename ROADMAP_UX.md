@@ -10,9 +10,9 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 22 |
-| Aplicado pela metade | 0 |
-| Não aplicado | 3 |
+| Aplicado | 24 |
+| Aplicado pela metade | 1 |
+| Não aplicado | 0 |
 | Não dá para provar lendo código | 1 |
 
 Três de vinte e seis é pouco, mas as duas auditorias são de antes de boa parte
@@ -27,13 +27,13 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-02 | O mês é a fotografia da competência | **sim** | `src/app/api/mes/route.ts:75` corta em `{ ate: ultimoDia }` |
 | CA-03 | Se a home não carregar, ela sabe | **sim (Build A)** | `useBusca` + `Falhou` com hora da última atualização |
 | CA-04 | Famílias é uma lista simples | **sim (Build D)** | busca + três atalhos; filtros em "Mais filtros", que abre sozinho quando algum está em uso |
-| CA-05 | Cadastrar família é uma tarefa só | **não** | formulário único, sem etapas nem resumo final |
+| CA-05 | Cadastrar família é uma tarefa só | **sim (Build F)** | quatro passos com conferência antes de gravar; planilha virou porta própria |
 | CA-06 | A agenda mostra trabalho, não engenharia | **sim (Build D), à sua maneira** | o trabalho vem antes da máquina que o fabrica, na MESMA tela — sem segunda tela, por correção sua |
 | CA-07 | Ação destrutiva é consistente e segura | **sim (Build C+E)** | os 193 diálogos do navegador viraram duas peças. Painel e campo em zero |
 | CA-08 | Liberação deixa revisar com segurança | **sim (Build C)** | descarte confirmado, "limpo em 14/08 às 09:30" no cartão, fotos rotuladas, desfazer |
 | CA-09 | Financeiro tem uma porta só | **sim (Build E)** | abre no funil: a identificar → a conferir → a receber → fechar o mês |
 | CA-10 | Configuração é fácil de achar | **sim** | `config/page.tsx` tem `GRUPOS` com quatro domínios e diagnóstico por último |
-| CA-11 | O painel é visualmente consistente | **não** | 3 telas com estilo em objeto inline, 14 com classe — dois vocabulários visuais |
+| CA-11 | O painel é visualmente consistente | **parcial (Build F)** | o cadastro de família, que a auditoria manda migrar primeiro, usa só `pecas.tsx`. Agenda, Famílias e Financeiro seguem em `ui.tsx` |
 | CA-12 | O mobile administrativo é simples | **não dá para provar** | responsividade se prova em aparelho, com teclado aberto e voltando do navegador |
 | CA-13 | O sistema separa vazio de falha | **sim nas cinco telas caras** | O mês, Liberação, Agenda, Financeiro e Famílias têm os quatro estados; telas de segunda ordem vão no Build C |
 | CA-14 | Termo igual quer dizer coisa igual | **sim (Build E)** | cinco palavras em `src/lib/vocabulario.ts`; escolhi `conferido` em vez de `conciliado` — ver o LEIA-ME |
@@ -195,8 +195,9 @@ acima de zero, **zero** já adiados.
 
 Duas coisas separadas, as duas esperando decisão sua:
 
-1. **A confusão de tela** — o botão vira link discreto em vez de bloco com
-   seta, e o cartão ganha selo só quando o jazigo É prioridade. Cabe no Build D.
+1. ~~**A confusão de tela**~~ — **feito no Build F**: o botão virou link
+   discreto e o cartão ganhou selo próprio (`⚠ PRIORIDADE — ficou para depois
+   3×`) só quando o jazigo é prioridade de verdade.
 2. **A régua de prioridade** — hoje só levanta prioridade o que a Nina adiou.
    Família que ligou pedindo, data de memória chegando, atrasado do mês
    passado: nada disso levanta. Se deve levantar, e quais casos, é decisão do
@@ -204,15 +205,15 @@ Duas coisas separadas, as duas esperando decisão sua:
 
 ## Onde estamos
 
-**22 das 26 contraprovas aplicadas.** Builds A a E entregues.
+**24 das 26 contraprovas aplicadas.** Builds A a F entregues.
 
 O que resta:
 
 | | |
 |---|---|
-| **Build F** | CA-05 (cadastro em etapas) e CA-11 (unificação visual) |
+| **CA-11 inteiro** | migrar Agenda, Famílias e Financeiro de `ui.tsx` para `pecas.tsx`. Trabalho grande, sem risco de dados |
 | **CA-12** | não é código: teste em aparelho de verdade, com a Sureya |
-| **CP-03** | nunca foi conserto — a câmera do celular pede confirmação e isso não está na nossa mão. Vira métrica |
+| **CP-03** | nunca foi conserto — a câmera do celular pede confirmação e isso não está na nossa mão. É métrica |
 
 E as duas decisões guardadas acima, esperando você: o **"Fazer este agora"** que
 não é prioridade e parece que é, e a **régua de prioridade** (hoje só levanta

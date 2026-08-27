@@ -864,6 +864,16 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
 
       <Fotos it={it} emAndamento={emAndamento} />
 
+      {/* O QUE É PRIORIDADE DE VERDADE, dito uma vez e forte.
+          `prioridade` sobe +15 a cada "não deu para fazer" e ordena a geração
+          da agenda; no cartão isso só virava texto a partir de dois adiamentos,
+          no meio dos outros avisos. Agora é selo, e vem antes deles. */}
+      {it.adiadoVezes >= 2 && (
+        <div style={s.seloPrioridade}>
+          ⚠ PRIORIDADE — ficou para depois {it.adiadoVezes}×
+        </div>
+      )}
+
       {(it.avisos || []).map((a, i) => (
         <div key={i} style={{ ...s.aviso, ...(a.tipo === "adiado" ? s.avisoUrgente : {}) }}>
           {a.tipo === "memoria" ? "🌷" : a.tipo === "adiado" ? "⏰" : "📷"} {a.texto}
@@ -912,7 +922,7 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
             Não aparece no que já é o primeiro: botão que não faz nada ensina a
             desconfiar dos que fazem. */}
         {!primeiro && !it.iniciadoEm && (
-          <button style={s.botaoAgora} onClick={onAgora}>⬆ Fazer este agora</button>
+          <button style={s.linkAgora} onClick={onAgora}>⬆ fazer este agora</button>
         )}
       </div>
 
@@ -999,6 +1009,8 @@ const s: Record<string, React.CSSProperties> = {
              borderRadius: 10, marginTop: 12, lineHeight: 1.4 },
   aviso: { fontSize: 16, color: "#92400e", background: "#fffbeb", padding: "10px 12px",
            borderRadius: 10, marginTop: 10, lineHeight: 1.4 },
+  seloPrioridade: { background: "#7f1d1d", color: "#fff", fontSize: 15, fontWeight: 700,
+                    padding: "10px 12px", borderRadius: 10, marginBottom: 8 },
   avisoUrgente: { color: "#991b1b", background: "#fef2f2" },
   cronometro: { fontSize: 16, color: TEAL, fontWeight: 600, marginTop: 12 },
   botaoChegar: { width: "100%", minHeight: 56, marginTop: 14, background: "#fff", color: NAVY,
@@ -1013,6 +1025,25 @@ const s: Record<string, React.CSSProperties> = {
               padding: "12px 14px", margin: "12px 0 0", fontSize: 16, color: "#8B2020" },
   botaoTerminar: { background: "#1565C0" },
   cartaoDestacado: { outline: "3px solid #1565C0", outlineOffset: 2 },
+  // "FAZER ESTE AGORA" NÃO É SINAL DE PRIORIDADE — E PARECIA (27/08).
+  //
+  // O Leandro perguntou se os jazigos com este botão eram prioridade. Não são:
+  // ele aparece em TODO cartão que ainda não é o primeiro e não foi começado —
+  // num dia de 10 jazigos, em 9 deles. E só mexe na ordem de HOJE (`ordem_dia`);
+  // não encosta em `prioridade`.
+  //
+  // Botão em bloco, com seta, em quase tudo, é lido como distintivo. Virou link
+  // discreto: continua fazendo o mesmo, mas parou de fingir que diz algo sobre
+  // o jazigo. O que É prioridade tem selo próprio, logo acima.
+  //
+  // A OUTRA METADE DISSO É DECISÃO DO LEANDRO, e está guardada no
+  // ROADMAP_UX.md: hoje só levanta prioridade o que a Nina adiou duas vezes.
+  // Família que ligou pedindo, data de memória chegando e atrasado do mês
+  // passado não levantam — e isso é régua de negócio, não ajuste de tela.
+  linkAgora: { display: "block", width: "100%", minHeight: 44, marginTop: 8,
+               background: "none", border: "none", color: "#0f766e", fontSize: 15,
+               textDecoration: "underline", cursor: "pointer", padding: "10px 0",
+               textAlign: "left" },
   botaoAgora: {
     width: "100%", minHeight: 52, marginTop: 10, padding: 14,
     background: "#fff", color: "#12284b", border: "2px solid #12284b",
