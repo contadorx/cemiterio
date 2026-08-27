@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * A FICHA DO JAZIGO.
@@ -319,6 +320,7 @@ function NovaFamiliaAqui({ tumuloId, aoPronto }: { tumuloId: string; aoPronto: (
  * lembrete em 1º de janeiro, uma data que o sistema inventou.
  */
 function QuemDescansa({ tumuloId }: { tumuloId: string }) {
+  const perguntar = useConfirmar();
   const [lista, setLista] = useState<any[] | null>(null);
   const [erro, setErro] = useState("");
   const [abrindo, setAbrindo] = useState(false);
@@ -349,7 +351,11 @@ function QuemDescansa({ tumuloId }: { tumuloId: string }) {
   }
 
   async function remover(p: any) {
-    if (!confirm(`Tirar ${p.nome} deste jazigo?`)) return;
+    if (!await perguntar({
+      oQue: `Tirar ${p.nome} deste jazigo?`,
+      efeito: "A pessoa continua cadastrada — sai só o vínculo com este jazigo.",
+      confirmar: "Tirar", tom: "perigo",
+    })) return;
     const r = await fetch(`/api/falecidos?id=${p.id}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setErro(r?.mensagem || "Não consegui tirar."); return; }

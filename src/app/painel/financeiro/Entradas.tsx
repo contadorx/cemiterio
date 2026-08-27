@@ -6,6 +6,7 @@ import Link from "next/link";
 import { painel, cor } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
 import ImportarExtrato from "./ImportarExtrato";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * ENTRADAS DO BANCO
@@ -18,6 +19,7 @@ import ImportarExtrato from "./ImportarExtrato";
  * crédito da família e a cobrança para.
  */
 export default function Entradas() {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [pendentes, setPendentes] = useState(true);
   const [meses, setMeses] = useState(3);
@@ -33,7 +35,11 @@ export default function Entradas() {
   useEffect(() => { carregar(); }, [carregar]);
 
   async function desfazer(id: string) {
-    if (!confirm("Desfazer a identificação? O crédito sai da conta da família.")) return;
+    if (!await perguntar({
+      oQue: "Desfazer a identificação desta entrada?",
+      efeito: "O crédito sai da conta da família e o saldo dela muda na hora. A entrada volta para 'a identificar'.",
+      confirmar: "Desfazer", tom: "perigo",
+    })) return;
     setOcupado(id);
     await fetch("/api/financeiro/entradas", {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -43,7 +49,11 @@ export default function Entradas() {
   }
 
   async function apagar(id: string) {
-    if (!confirm("Apagar esta entrada? Use quando tiver lançado errado.")) return;
+    if (!await perguntar({
+      oQue: "Apagar esta entrada?",
+      efeito: "Ela some do caixa e não dá para voltar. Use quando tiver lançado errado — não para corrigir valor.",
+      confirmar: "Apagar", tom: "perigo",
+    })) return;
     setOcupado(id);
     await fetch(`/api/financeiro/entradas?id=${id}`, { method: "DELETE" });
     setOcupado(null); carregar();
@@ -114,6 +124,8 @@ export default function Entradas() {
 }
 
 function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [palpites, setPalpites] = useState<any[] | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [busca, setBusca] = useState("");
@@ -137,12 +149,16 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
   }
 
   async function identificar(clienteId: string, nome: string) {
-    if (!confirm(`Esta entrada de ${money(e.valor)} é da família ${nome}?`)) return;
+    if (!await perguntar({
+      oQue: `Esta entrada de ${money(e.valor)} é da família ${nome}?`,
+      efeito: "O valor entra na conta dela e abate o que estiver em aberto.",
+      confirmar: "É dessa família",
+    })) return;
     const r = await fetch("/api/financeiro/entradas", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entradaId: e.id, clienteId }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) onMudou(); else alert("Não consegui identificar.");
+    if (r?.ok) onMudou(); else recado.erro("Não consegui identificar.");
   }
 
   const identificada = !!e.identificada_em;

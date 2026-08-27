@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { painel, cor } from "./ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * O aviso de SERVIÇO ADICIONAL.
@@ -54,6 +55,7 @@ export function PedidosAdicionais({
   conversaId?: string;      // na tela da conversa, mostra só os desta conversa
   aoMudar?: () => void;
 }) {
+  const perguntar = useConfirmar();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [semMigration, setSemMigration] = useState(false);
   const [abertoId, setAbertoId] = useState<string | null>(null);
@@ -139,7 +141,11 @@ export function PedidosAdicionais({
               <button
                 style={painel.botaoMiniSec}
                 onClick={async () => {
-                  if (!confirm("Descartar este pedido? Ele some da lista.")) return;
+                  if (!await perguntar({
+                    oQue: "Descartar este pedido?",
+                    efeito: "Ele some da lista e a família não é avisada.",
+                    confirmar: "Descartar", tom: "perigo",
+                  })) return;
                   await fetch("/api/pedidos-conversa", {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },

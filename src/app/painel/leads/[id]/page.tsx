@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 interface MsgLead { t?: string; texto: string; de?: "nos"; via?: "celular" }
 interface ClienteBusca { id: string; nome: string; telefone: string | null }
 
 export default function LeadThread() {
+  const perguntar = useConfirmar();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
@@ -56,7 +58,11 @@ export default function LeadThread() {
   }
 
   async function converter() {
-    if (!confirm(`Transformar ${lead.nome || lead.nome_wa || lead.telefone} em cliente? A conversa vai junto e você completa a ficha em seguida.`)) return;
+    if (!await perguntar({
+      oQue: `Transformar ${lead.nome || lead.nome_wa || lead.telefone} em cliente?`,
+      efeito: "A conversa vai junto e você completa a ficha em seguida.",
+      confirmar: "Transformar em cliente",
+    })) return;
     setOcupado(true);
     const r = await fetch(`/api/leads/${id}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -85,11 +91,12 @@ export default function LeadThread() {
   }, [busca, abrirVinculo]);
 
   async function vincular(c: ClienteBusca) {
-    if (!confirm(
-      `Vincular esta conversa a ${c.nome}?\n\n` +
-      `O histórico vai para a conversa dessa família e o número ${lead.telefone} passa a ser reconhecido como dela — ` +
-      `a próxima mensagem deste aparelho não vira lead de novo.`
-    )) return;
+    if (!await perguntar({
+      oQue: `Vincular esta conversa a ${c.nome}?`,
+      efeito: `O histórico vai para a conversa dessa família e o número ${lead.telefone} passa a ser `
+            + "reconhecido como dela — a próxima mensagem deste aparelho não vira lead de novo.",
+      confirmar: "Vincular",
+    })) return;
     setOcupado(true);
     const r = await fetch(`/api/leads/${id}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -111,13 +118,23 @@ export default function LeadThread() {
     else alert("Não consegui atualizar: " + (r?.erro || "erro"));
   }
 
-  function descartar() {
-    if (confirm("Descartar este lead? Ele some da lista ativa (volta se a pessoa escrever de novo).")) {
+  async function descartar() {
+    if (await perguntar({
+      oQue: "Descartar este lead?",
+      efeito: "Ele some da lista ativa. Volta se a pessoa escrever de novo.",
+      confirmar: "Descartar", tom: "perigo",
+    })) {
       patch({ status: "descartado" }, true);
     }
   }
-  function naoEhLead() {
-    const motivo = prompt("Marcar como \"não é lead\"? O número entra na lista de bloqueio e não volta a aparecer.\n\nMotivo (opcional):", "");
+  async function naoEhLead() {
+    const r0 = await perguntar({
+      oQue: 'Marcar como "não é lead"?',
+      efeito: "O número entra na lista de bloqueio e não volta a aparecer nem se a pessoa escrever de novo.",
+      confirmar: "Não é lead", tom: "perigo",
+      pedirMotivo: "Motivo (opcional)", motivoOpcional: true,
+    });
+    const motivo = !r0 ? null : (r0 === true ? "" : r0.motivo);
     if (motivo === null) return;
     patch({ ignorado: true, motivoIgnorado: motivo || null }, true);
   }

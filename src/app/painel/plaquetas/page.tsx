@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import { MARCA } from "@/lib/marca";
+import { useConfirmar } from "@/components/Dialogos";
 
 export default function Plaquetas() {
+  const perguntar = useConfirmar();
   const [itens, setItens] = useState<any[]>([]);
   const [semPortal, setSemPortal] = useState(0);
   const [quadras, setQuadras] = useState<any[]>([]);
@@ -34,7 +36,11 @@ export default function Plaquetas() {
     const alvo = f.quadra
       ? `os jazigos da quadra selecionada`
       : `todos os ${semPortal} jazigos sem portal`;
-    if (!confirm(`Gerar o link do portal para ${alvo}? Cada jazigo ganha um QR próprio.`)) return;
+    if (!await perguntar({
+      oQue: `Gerar o link do portal para ${alvo}?`,
+      efeito: "Cada jazigo ganha um QR próprio, que a família pode ler no cemitério.",
+      confirmar: "Gerar os links",
+    })) return;
     setGerando(true);
     const r = await fetch("/api/plaquetas", {
       method: "POST", headers: { "Content-Type": "application/json" },

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * AS DATAS QUE VÊM.
@@ -39,6 +40,7 @@ const ROTULO_TIPO: Record<string, string> = {
 };
 
 export default function Memoria() {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -55,10 +57,12 @@ export default function Memoria() {
   async function alternar() {
     if (!d) return;
     const novo = !d.ligado;
-    if (novo && !confirm(
-      "Ligar os lembretes de memória?\n\n" +
-      "Nada é enviado sozinho: tudo passa pela fila de liberação, e alguém lê antes " +
-      "de a família ler. Os limites de luto e de frequência valem sempre.")) return;
+    if (novo && !await perguntar({
+      oQue: "Ligar os lembretes de memória?",
+      efeito: "Nada é enviado sozinho: tudo passa pela fila de liberação, e alguém lê antes "
+            + "de a família ler. Os limites de luto e de frequência valem sempre.",
+      confirmar: "Ligar",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/memoria", {
       method: "PUT", headers: { "Content-Type": "application/json" },

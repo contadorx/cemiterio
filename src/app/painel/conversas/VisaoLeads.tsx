@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
+import { useConfirmar, useRecado, type Pedido } from "@/components/Dialogos";
 
 /**
  * LEADS — duas naturezas bem diferentes:
@@ -16,6 +17,7 @@ import { painel, cor } from "../ui";
  *  · quem a Sureya QUER abordar (prospecção, com o contexto que ela conhece)
  */
 export default function VisaoLeads() {
+  const perguntar = useConfirmar();
   const [lista, setLista] = useState<any[]>([]);
   const [f, setF] = useState({ status: "", origem: "", ocultos: false });
   const [novo, setNovo] = useState(false);
@@ -46,10 +48,13 @@ export default function VisaoLeads() {
   function alternarTodas() {
     setSel(todasMarcadas ? new Set() : new Set(lista.map((l) => l.id)));
   }
-  async function acaoMassa(acao: string, confirmar?: string) {
+  async function acaoMassa(acao: string, confirmar?: Pedido) {
     const ids = [...sel];
     if (!ids.length) return;
-    if (confirmar && !confirm(confirmar)) return;
+    if (confirmar && !await perguntar({
+      oQue: confirmar.oQue, efeito: confirmar.efeito,
+      confirmar: confirmar.confirmar, tom: confirmar.tom,
+    })) return;
     setEmMassa(true);
     const r = await fetch("/api/leads/acao-massa", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -122,15 +127,27 @@ export default function VisaoLeads() {
             {sel.size > 0 && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
                 <button style={painel.botaoMini} disabled={emMassa}
-                        onClick={() => acaoMassa("converter", `Transformar ${sel.size} lead(s) em cliente? Cada um cria uma ficha (você completa depois).`)}>
+                        onClick={() => acaoMassa("converter", {
+                          oQue: `Transformar ${sel.size} lead(s) em cliente?`,
+                          efeito: "Cada um cria uma ficha, que você completa depois. A conversa vai junto.",
+                          confirmar: "Transformar",
+                        })}>
                   Transformar em cliente
                 </button>
                 <button style={painel.botaoMiniSec} disabled={emMassa}
                         onClick={() => acaoMassa("em_conversa")}>Em conversa</button>
                 <button style={painel.botaoMiniSec} disabled={emMassa}
-                        onClick={() => acaoMassa("descartar", `Descartar ${sel.size} lead(s)?`)}>Descartar</button>
+                        onClick={() => acaoMassa("descartar", {
+                          oQue: `Descartar ${sel.size} lead(s)?`,
+                          efeito: "Somem da lista ativa. Voltam se a pessoa escrever de novo.",
+                          confirmar: "Descartar", tom: "perigo",
+                        })}>Descartar</button>
                 <button style={painel.botaoMiniPerigo} disabled={emMassa}
-                        onClick={() => acaoMassa("nao_eh_lead", `Marcar ${sel.size} como "não é lead"? Os números entram na lista de bloqueio.`)}>
+                        onClick={() => acaoMassa("nao_eh_lead", {
+                          oQue: `Marcar ${sel.size} como "não é lead"?`,
+                          efeito: "Os números entram na lista de bloqueio e não voltam a aparecer nem se escreverem de novo.",
+                          confirmar: "Não são leads", tom: "perigo",
+                        })}>
                   🚫 Não é lead
                 </button>
                 <button style={{ ...painel.botaoMiniSec, background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}
@@ -205,6 +222,8 @@ function NovoLead({ onPronto }: { onPronto: () => void }) {
 function Lead({ l, onMudou, marcado, onMarcar }: {
   l: any; onMudou: () => void; marcado: boolean; onMarcar: () => void;
 }) {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [sugestao, setSugestao] = useState("");
   const [pensando, setPensando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -215,7 +234,11 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
   const convertido = l.status === "convertido" || !!l.cliente_id;
 
   async function converter() {
-    if (!confirm(`Transformar ${l.nome || l.nome_wa || l.telefone} em cliente? A conversa vai junto e você completa a ficha depois.`)) return;
+    if (!await perguntar({
+      oQue: `Transformar ${l.nome || l.nome_wa || l.telefone} em cliente?`,
+      efeito: "A conversa vai junto e você completa a ficha depois.",
+      confirmar: "Transformar em cliente",
+    })) return;
     setOcupado(true);
     const r = await fetch(`/api/leads/${l.id}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -245,13 +268,14 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
 
   /** Não é cliente e não vai ser: some da lista e não volta nem escrevendo de novo. */
   async function naoEhLead() {
-    const motivo = prompt(
-      `Marcar ${l.nome || l.nome_wa || l.telefone} como "não é lead"?\n\n` +
-      `Some da lista e o número não volta a aparecer nem se escrever de novo.\n` +
-      `Se quiser, anote o motivo (opcional):`,
-      ""
-    );
-    if (motivo === null) return;   // cancelou
+    const r0 = await perguntar({
+      oQue: `Marcar ${l.nome || l.nome_wa || l.telefone} como "não é lead"?`,
+      efeito: "Some da lista e o número não volta a aparecer nem se escrever de novo.",
+      confirmar: "Não é lead", tom: "perigo",
+      pedirMotivo: "Motivo (opcional)", motivoOpcional: true,
+    });
+    if (!r0) return;
+    const motivo = r0 === true ? "" : r0.motivo;
     const r = await fetch(`/api/leads/${l.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ignorado: true, motivoIgnorado: motivo || null }),

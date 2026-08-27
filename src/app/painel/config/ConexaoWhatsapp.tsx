@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { painel, cor } from "../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * A CONEXAO DO WHATSAPP — agora dentro de Configuracoes.
@@ -20,6 +21,7 @@ import { painel, cor } from "../ui";
 type Estado = "conectado" | "conectando" | "desconectado" | "inexistente" | "erro" | "carregando";
 
 export default function ConexaoWhatsapp() {
+  const perguntar = useConfirmar();
   const [estado, setEstado] = useState<Estado>("carregando");
   const [detalhe, setDetalhe] = useState<string>("");
   const [instancia, setInstancia] = useState<string>("");
@@ -79,7 +81,12 @@ export default function ConexaoWhatsapp() {
   }
 
   async function desconectar() {
-    if (!confirm("Desconectar o WhatsApp? A IA para de receber mensagens até reconectar.")) return;
+    if (!await perguntar({
+      oQue: "Desconectar o WhatsApp?",
+      efeito: "As mensagens das famílias param de chegar no sistema até alguém reconectar. "
+            + "Elas continuam chegando no celular, mas ninguém aqui fica sabendo.",
+      confirmar: "Desconectar", tom: "perigo",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/whatsapp", {
       method: "POST",

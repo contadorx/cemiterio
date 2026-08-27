@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import BuscaSelect from "../BuscaSelect";
 import { diasDesde, faz } from "@/lib/datas";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * /painel/jazigos — a tela de correção em lote.
@@ -231,6 +232,7 @@ export default function JazigosPage() {
 function Cartao({
   j, quadras, clientes, onMudou,
 }: { j: Jazigo; quadras: Quadra[]; clientes: Cliente[]; onMudou: () => void }) {
+  const perguntar = useConfirmar();
   const [f, setF] = useState({
     identificacao: j.identificacao || "",
     rua: j.rua || "",
@@ -328,7 +330,11 @@ function Cartao({
   }
 
   async function excluir() {
-    if (!confirm(`Excluir o jazigo ${j.identificacao}? Só dá certo se ele não tiver limpeza feita.`)) return;
+    if (!await perguntar({
+      oQue: `Excluir o jazigo ${j.identificacao}?`,
+      efeito: "Só dá certo se ele não tiver limpeza feita. Se tiver, o histórico segura a exclusão.",
+      confirmar: "Excluir", tom: "perigo",
+    })) return;
     setSalvando(true); setErro("");
     const r = await fetch(`/api/tumulos/${j.id}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);
@@ -585,8 +591,12 @@ function Cartao({
               <button
                 style={painel.botaoMiniSec}
                 disabled={salvando}
-                onClick={() => {
-                  if (!confirm("Apagar a posição deste jazigo? Ele sai do mapa até alguém remarcar no campo.")) return;
+                onClick={async () => {
+                  if (!await perguntar({
+                    oQue: "Apagar a posição deste jazigo?",
+                    efeito: "Ele sai do mapa até alguém marcar a localização de novo no campo.",
+                    confirmar: "Apagar a posição", tom: "perigo",
+                  })) return;
                   patch({ limparGps: true }, "posição apagada — remarque na próxima passagem");
                 }}
               >
@@ -689,6 +699,7 @@ function Separar({ j, onPronto }: { j: Jazigo; onPronto: () => void }) {
 /* ========================================================================== */
 
 function Foto({ url, rotulo, onApagar }: { url: string | null; rotulo: string; onApagar: () => void }) {
+  const perguntar = useConfirmar();
   if (!url) {
     return (
       <div style={{
@@ -712,8 +723,12 @@ function Foto({ url, rotulo, onApagar }: { url: string | null; rotulo: string; o
       </a>
       <button
         style={{ ...painel.botaoMiniSec, width: "100%", marginTop: 4, fontSize: 13 }}
-        onClick={() => {
-          if (confirm(`Apagar a foto (${rotulo}) deste jazigo?`)) onApagar();
+        onClick={async () => {
+          if (await perguntar({
+            oQue: `Apagar a foto (${rotulo}) deste jazigo?`,
+            efeito: "Quem for lavar perde essa referência para achar o jazigo no corredor.",
+            confirmar: "Apagar a foto", tom: "perigo",
+          })) onApagar();
         }}
       >
         apagar {rotulo}

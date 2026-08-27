@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * SERVIÇOS EXTRAS
@@ -18,6 +19,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
   tumulos: any[];
   onMudou: () => void;
 }) {
+  const perguntar = useConfirmar();
   const [catalogo, setCatalogo] = useState<any[]>([]);
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -63,8 +65,16 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
   }
 
   async function agir(pedidoId: string, acao: "entregar" | "cancelar") {
-    if (acao === "entregar" && !confirm("Marcar como entregue? O valor entra na conta da família.")) return;
-    if (acao === "cancelar" && !confirm("Cancelar este pedido?")) return;
+    if (acao === "entregar" && !await perguntar({
+      oQue: "Marcar como entregue?",
+      efeito: "O valor entra na conta da família como dívida.",
+      confirmar: "Marcar entregue",
+    })) return;
+    if (acao === "cancelar" && !await perguntar({
+      oQue: "Cancelar este pedido?",
+      efeito: "Ele sai da lista e nada é cobrado da família.",
+      confirmar: "Cancelar o pedido", tom: "perigo",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/extras/pedidos", {
       method: "PUT", headers: { "Content-Type": "application/json" },

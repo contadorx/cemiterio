@@ -1,4 +1,5 @@
 import AppShell from "./AppShell";
+import Dialogos from "@/components/Dialogos";
 
 /**
  * O painel inteiro passa a viver dentro do mesmo esqueleto: coluna escura no
@@ -9,5 +10,12 @@ import AppShell from "./AppShell";
  * Era esse remonte que fazia cada tela parecer um site diferente.
  */
 export default function LayoutPainel({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  // O balcão de perguntar e avisar vive AQUI, junto do esqueleto: uma tela que
+  // monta o próprio provedor perderia o recado ao trocar de página, que é
+  // justamente quando ele importa ("3 movidas" ao sair da agenda).
+  return (
+    <Dialogos>
+      <AppShell>{children}</AppShell>
+    </Dialogos>
+  );
 }

@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { painel, cor } from "../ui";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 interface Cand {
   planoId: string;
@@ -29,6 +30,7 @@ interface Cand {
 const CORES: Record<string, string> = { quente: "rgb(var(--zm-perigo))", morna: "rgb(var(--zm-aviso))", fria: "#0f766e" };
 
 export default function Reajustes() {
+  const perguntar = useConfirmar();
   const [itens, setItens] = useState<Cand[]>([]);
   const [aberto, setAberto] = useState<string | null>(null);
   const [valores, setValores] = useState<Record<string, number>>({});
@@ -76,7 +78,11 @@ export default function Reajustes() {
   }
 
   async function aplicar(c: Cand) {
-    if (!confirm(`Aplicar R$ ${valores[c.planoId].toFixed(2)} para ${c.cliente}?`)) return;
+    if (!await perguntar({
+      oQue: `Passar a cobrar R$ ${valores[c.planoId].toFixed(2)} de ${c.cliente}?`,
+      efeito: "Vale das próximas competências em diante. O que já foi cobrado não muda.",
+      confirmar: "Aplicar o reajuste",
+    })) return;
     setOcupado(c.planoId);
     await fetch("/api/reajuste/aplicar", {
       method: "POST",

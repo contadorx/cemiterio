@@ -7,6 +7,7 @@ import { Falhou } from "../pecas";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * CARTEIRA — familia, jazigo e servico na MESMA tela.
@@ -105,6 +106,7 @@ interface Cli {
 }
 
 function VisaoFamilias() {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [f, setF] = useState({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
                                regua: "", venceEm: "", ordem: "nome", teste: false, etapa: "" });
@@ -130,10 +132,12 @@ function VisaoFamilias() {
   async function excluirMarcadas() {
     const alvos = [...marcadas];
     if (!alvos.length) return;
-    if (!confirm(
-      `Excluir ${alvos.length} ${alvos.length === 1 ? "família" : "famílias"}?\n\n`
-      + `Só saem as que estiverem VAZIAS — sem contato, sem jazigo e sem lançamento. `
-      + `As demais continuam onde estão, e eu digo o motivo de cada uma.`)) return;
+    if (!await perguntar({
+      oQue: `Excluir ${alvos.length} ${alvos.length === 1 ? "família" : "famílias"}?`,
+      efeito: "Só saem as que estiverem VAZIAS — sem contato, sem jazigo e sem lançamento. "
+            + "As demais continuam onde estão, e eu digo o motivo de cada uma.",
+      confirmar: "Excluir as vazias", tom: "perigo",
+    })) return;
 
     setExcluindo(true);
     const recusadas: string[] = [];

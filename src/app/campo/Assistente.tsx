@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
+import { resumoFila } from "@/lib/offline-fila";
 
 interface Briefing {
   saudacao: string;
@@ -12,7 +14,14 @@ interface Briefing {
   meta: string;
 }
 
-export default function Assistente({ onMudou }: { onMudou: () => void }) {
+export default function Assistente({ onMudou, feitos = 0, faltam = 0 }: {
+  onMudou: () => void;
+  /** O que a lista do dia já sabe — para o resumo do encerramento (CP-12). */
+  feitos?: number;
+  faltam?: number;
+}) {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [b, setB] = useState<Briefing | null>(null);
   const [aberto, setAberto] = useState(false);
   const [msgs, setMsgs] = useState<{ papel: "ajudante" | "sistema"; texto: string }[]>([]);
@@ -69,24 +78,69 @@ export default function Assistente({ onMudou }: { onMudou: () => void }) {
     }
   }
 
+  /**
+   * ENCERRAR O DIA — UMA FOLHA SÓ (CP-12).
+   *
+   * Eram três diálogos do navegador em fila: `confirm`, depois `prompt`, depois
+   * `alert`. Três telas travadas, uma atrás da outra, com aparência que muda de
+   * aparelho para aparelho — e nenhuma delas dizendo o que ia ser encerrado.
+   * Encerrar virava reflexo: toca, toca, toca.
+   *
+   * Agora é uma folha com o RESUMO do que está sendo fechado — feitas, o que
+   * ainda não subiu, o que fica para depois — e um botão que diz o que faz.
+   *
+   * O QUE AINDA NÃO SUBIU É A PARTE QUE FALTAVA. Encerrar o dia com três
+   * lavagens paradas no aparelho é diferente de encerrar com tudo entregue, e
+   * ela não tinha como saber a diferença na hora de decidir.
+   */
   async function fecharDia() {
-    if (!confirm("Encerrar o dia? O que não foi feito volta para a lista e é priorizado nos próximos dias.")) return;
-    const obs = prompt("Quer deixar alguma observação sobre o dia? (opcional)") || "";
+    const fila = await resumoFila().catch(() => null);
+    const esperando = fila?.lavagens || 0;
+    const recusados = fila?.precisamDeAjuda.length || 0;
+
+    const linhas = [
+      `${feitos} ${feitos === 1 ? "lavagem feita" : "lavagens feitas"} hoje.`,
+      faltam > 0
+        ? `${faltam} ${faltam === 1 ? "fica" : "ficam"} para os próximos dias, na frente da fila.`
+        : "Nenhuma ficou para trás.",
+      esperando > 0
+        ? `⚠ ${esperando} ainda não ${esperando === 1 ? "subiu" : "subiram"} — está tudo guardado e vai sozinho quando o sinal voltar.`
+        : "",
+      recusados > 0
+        ? `⚠ ${recusados} não ${recusados === 1 ? "vai subir" : "vão subir"} sem alguém resolver — veja o aviso vermelho na lista.`
+        : "",
+    ].filter(Boolean);
+
+    const r0 = await perguntar({
+      oQue: "Encerrar o dia?",
+      efeito: linhas.join(" "),
+      confirmar: "Encerrar o dia",
+      pedirMotivo: "Quer deixar alguma observação? (opcional)",
+      motivoOpcional: true,
+    });
+    if (!r0) return;
+    const obs = r0 === true ? "" : r0.motivo;
+
     const r = await fetch("/api/campo/fechar-dia", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ observacoes: obs }),
     }).then((x) => x.json()).catch(() => null);
+
     if (r?.ok) {
-      alert(`Dia encerrado. ${r.feitos} feito(s)${r.devolvidos ? `, ${r.devolvidos} remarcado(s) para os próximos dias.` : "."}\n\nObrigado pelo seu trabalho hoje. 🌿`);
+      recado.ok(
+        `Dia encerrado. ${r.feitos} feito(s)` +
+        (r.devolvidos ? `, ${r.devolvidos} remarcado(s) para os próximos dias.` : ".") +
+        " Obrigado pelo seu trabalho hoje. 🌿"
+      );
       setAberto(false);
       onMudou();
     } else if (r?.erro === "executora_obrigatoria") {
       // acontece quando quem está no /campo é o DONO: ele não pode encerrar o
       // dia de todo mundo sem querer (0042)
-      alert(r.mensagem || "Diga de quem é o dia que você quer encerrar.");
+      recado.erro(r.mensagem || "Diga de quem é o dia que você quer encerrar.");
     } else {
-      alert("Não consegui encerrar o dia agora. Tente de novo daqui a pouco.");
+      recado.erro("Não consegui encerrar o dia agora. Tente de novo daqui a pouco.");
     }
   }
 

@@ -20,6 +20,7 @@
 
 import { useState } from "react";
 import { painel, cor } from "../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 type Leitura = {
   id: string;
@@ -45,6 +46,7 @@ function quandoBr(s: string | null) {
 }
 
 export default function CorrigirGps({ tumuloId, onMudou }: { tumuloId: string; onMudou: () => void }) {
+  const perguntar = useConfirmar();
   const [aberto, setAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -73,10 +75,14 @@ export default function CorrigirGps({ tumuloId, onMudou }: { tumuloId: string; o
   }
 
   async function apagar(leituraId: string | null) {
-    const texto = leituraId
-      ? "Apagar esta leitura? A posição do jazigo é recalculada com as que sobrarem."
-      : "Apagar TODAS as leituras deste jazigo? Ele sai do mapa até alguém marcar a localização de novo no campo.";
-    if (!confirm(texto)) return;
+    const pedido = leituraId
+      ? { oQue: "Apagar esta leitura?",
+          efeito: "A posição do jazigo é recalculada com as que sobrarem.",
+          confirmar: "Apagar", tom: "perigo" as const }
+      : { oQue: "Apagar TODAS as leituras deste jazigo?",
+          efeito: "Ele sai do mapa até alguém marcar a localização de novo no campo.",
+          confirmar: "Apagar todas", tom: "perigo" as const };
+    if (!await perguntar(pedido)) return;
 
     setOcupado(leituraId || "tudo");
     setErro("");

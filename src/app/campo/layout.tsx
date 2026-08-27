@@ -1,6 +1,7 @@
 
 
 import { MARCA } from "@/lib/marca";
+import Dialogos from "@/components/Dialogos";
 
 export const metadata = {
   title: `Campo — ${MARCA.nome}`,
@@ -12,9 +13,6 @@ export const viewport = {
 };
 
 export default function CampoLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      {children}
-    </>
-  );
+  // `campo` deixa tudo maior: quem lê isto está de pé, no sol, às vezes de luva.
+  return <Dialogos campo>{children}</Dialogos>;
 }

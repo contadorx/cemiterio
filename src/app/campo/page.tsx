@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sincronizar, resumoFila, estadoLocalDosServicos, descartar, migrarFilaAntiga,
          iniciarOuEnfileirar, concluirOuEnfileirar, type ResumoFila } from "@/lib/offline-fila";
 import { capturarGps } from "@/lib/gps";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 import InstalarApp from "../InstalarApp";
 import Assistente from "./Assistente";
@@ -94,6 +95,8 @@ async function reconciliar(base: Item[]): Promise<Item[]> {
 }
 
 export default function Campo() {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [lista, setLista] = useState<Item[]>([]);
   const [brief, setBrief] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
@@ -249,8 +252,8 @@ export default function Campo() {
     setIniciando(null);
 
     if (desfecho === "perdido") {
-      alert(
-        "A memória do aparelho encheu e eu não consegui guardar.\n\n" +
+      recado.erro(
+        "A memória do aparelho encheu e eu não consegui guardar. " +
         "Procure um lugar com sinal e abra o app: assim que a internet voltar, " +
         "o que já está guardado sobe e libera espaço."
       );
@@ -260,7 +263,7 @@ export default function Campo() {
     // vermelha o que houve — em vez de o cartão sumir como se tivesse dado
     // certo (CP-06).
     if (desfecho === "recusado") {
-      alert(`Não consegui começar esta limpeza.\n\n${motivo || "O sistema recusou."}`);
+      recado.erro(`Não consegui começar esta limpeza. ${motivo || "O sistema recusou."}`);
       setFila(await resumoFila());
       return;
     }
@@ -300,15 +303,15 @@ export default function Campo() {
     setIniciando(null);
 
     if (desfecho === "perdido") {
-      alert(
-        "A memória do aparelho encheu e eu não consegui guardar esta foto.\n\n" +
+      recado.erro(
+        "A memória do aparelho encheu e eu não consegui guardar esta foto. " +
         "Procure um lugar com sinal e abra o app: o que já está guardado sobe e libera espaço."
       );
       return;
     }
     if (desfecho === "recusado") {
-      alert(`Não consegui fechar esta limpeza.\n\n${motivo || "O sistema recusou."}\n\n` +
-            "A foto está guardada. Não precisa tirar de novo.");
+      recado.erro(`Não consegui fechar esta limpeza. ${motivo || "O sistema recusou."} ` +
+                  "A foto está guardada — não precisa tirar de novo.");
       setFila(await resumoFila());
       return;
     }
@@ -357,7 +360,7 @@ export default function Campo() {
         body: JSON.stringify({ servicoId: it.id }),
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) {
-        alert(r?.erro?.includes("ja_executado")
+        recado.erro(r?.erro?.includes("ja_executado")
           ? "Este já foi feito."
           : r?.erro?.includes("outra_executora")
             ? "Este serviço é de outra pessoa."
@@ -434,7 +437,12 @@ export default function Campo() {
                 <button
                   style={s.botaoDescartar}
                   onClick={async () => {
-                    if (!confirm("Tirar este da fila? O trabalho não vai ser registrado.")) return;
+                    if (!await perguntar({
+                      oQue: "Tirar este da fila?",
+                      efeito: "O trabalho não vai ser registrado no sistema. "
+                            + "Se for uma lavagem que você fez, fale com a Sureya antes.",
+                      confirmar: "Tirar da fila", tom: "perigo",
+                    })) return;
                     await descartar(p.id);
                     setFila(await resumoFila());
                   }}
@@ -461,7 +469,11 @@ export default function Campo() {
             </button>
           )}
           <button style={s.sair} onClick={async () => {
-            if (!confirm("Sair?")) return;
+            if (!await perguntar({
+              oQue: "Sair do aplicativo?",
+              efeito: "O que estiver guardado no aparelho continua guardado e sobe quando você entrar de novo.",
+              confirmar: "Sair",
+            })) return;
             await fetch("/api/sair", { method: "POST" });
             location.href = "/login";
           }}>Sair</button>
@@ -501,7 +513,7 @@ export default function Campo() {
       </div>
 
       <InstalarApp contexto="campo" />
-      <Assistente onMudou={carregar} />
+      <Assistente onMudou={carregar} feitos={feitos} faltam={pendentesLista.length} />
 
       <button style={s.botaoMaterial} onClick={() => setPedirMaterial(true)}>
         🧴 Pedir material que está faltando

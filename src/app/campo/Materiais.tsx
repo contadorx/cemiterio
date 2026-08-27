@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { materialOuEnfileirar } from "@/lib/offline-fila";
+import { useRecado } from "@/components/Dialogos";
 
 interface Mat {
   id: string;
@@ -13,6 +14,7 @@ interface Mat {
 
 /** Pedido de material pela ajudante: marca o que acabou e avisa o dono. */
 export default function Materiais({ onFechar }: { onFechar: () => void }) {
+  const recado = useRecado();
   const [itens, setItens] = useState<Mat[]>([]);
   const [marcados, setMarcados] = useState<Record<string, boolean>>({});
   const [outro, setOutro] = useState("");
@@ -40,11 +42,11 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
     setEnviando(false);
 
     if (desfecho === "perdido") {
-      alert("A memória do aparelho encheu e eu não consegui guardar o pedido.");
+      recado.erro("A memória do aparelho encheu e eu não consegui guardar o pedido.");
       return;
     }
     if (desfecho === "recusado") {
-      alert(`Não consegui enviar.\n\n${motivo || "O sistema recusou."}`);
+      recado.erro(`Não consegui enviar. ${motivo || "O sistema recusou."}`);
       return;
     }
     setGuardado(desfecho === "offline");

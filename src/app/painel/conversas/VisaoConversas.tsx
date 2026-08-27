@@ -10,6 +10,7 @@ import Link from "next/link";
 import { painel, cor } from "../ui";
 import Notificacoes from "../../_pwa/Notificacoes";
 import InstalarApp, { avisar } from "../../InstalarApp";
+import { useConfirmar, type Pedido } from "@/components/Dialogos";
 
 interface Conversa {
   id: string;
@@ -72,6 +73,8 @@ export default function VisaoConversas() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [emMassa, setEmMassa] = useState(false);
 
+  const perguntar = useConfirmar();
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro("");
@@ -132,8 +135,11 @@ export default function VisaoConversas() {
     return () => clearInterval(t);
   }, [carregar]);
 
-  async function acao(id: string, acao: string, confirmar?: string) {
-    if (confirmar && !confirm(confirmar)) return;
+  async function acao(id: string, acao: string, confirmar?: Pedido) {
+    if (confirmar && !await perguntar({
+      oQue: confirmar.oQue, efeito: confirmar.efeito,
+      confirmar: confirmar.confirmar, tom: confirmar.tom,
+    })) return;
     const r = await fetch(`/api/conversas/${id}/acao`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ acao }),
@@ -158,10 +164,13 @@ export default function VisaoConversas() {
     setSel(todasMarcadas ? new Set() : new Set(selecionaveis.map((c) => c.id)));
   }
 
-  async function acaoMassa(acao: string, confirmar?: string) {
+  async function acaoMassa(acao: string, confirmar?: Pedido) {
     const ids = [...sel];
     if (!ids.length) return;
-    if (confirmar && !confirm(confirmar)) return;
+    if (confirmar && !await perguntar({
+      oQue: confirmar.oQue, efeito: confirmar.efeito,
+      confirmar: confirmar.confirmar, tom: confirmar.tom,
+    })) return;
     setEmMassa(true);
     const r = await fetch("/api/conversas/acao-massa", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -271,8 +280,11 @@ export default function VisaoConversas() {
                   </>
                 )}
                 <button style={painel.botaoMiniPerigo} disabled={emMassa}
-                        onClick={() => acaoMassa("excluir",
-                          `Excluir ${sel.size} conversa(s)? As mensagens serão apagadas. O histórico financeiro não é afetado.`)}>
+                        onClick={() => acaoMassa("excluir", {
+                          oQue: `Excluir ${sel.size} conversa(s)?`,
+                          efeito: "As mensagens serão apagadas e não voltam. O histórico financeiro não é afetado.",
+                          confirmar: "Excluir", tom: "perigo",
+                        })}>
                   Excluir
                 </button>
                 <button style={{ ...painel.botaoMiniSec, background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}
@@ -413,8 +425,11 @@ export default function VisaoConversas() {
                           onClick={() => acao(c.id, "desarquivar")}>Reabrir</button>
                 )}
                 {c.tipo !== "equipe" && <button style={painel.botaoMiniPerigo}
-                        onClick={() => acao(c.id, "excluir",
-                          `Excluir a conversa com ${c.cliente}? As mensagens serão apagadas. O histórico financeiro não é afetado.`)}>
+                        onClick={() => acao(c.id, "excluir", {
+                          oQue: `Excluir a conversa com ${c.cliente}?`,
+                          efeito: "As mensagens serão apagadas e não voltam. O histórico financeiro não é afetado.",
+                          confirmar: "Excluir", tom: "perigo",
+                        })}>
                   Excluir
                 </button>}
               </div>

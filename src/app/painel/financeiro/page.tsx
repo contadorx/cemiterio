@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import { Falhou } from "../pecas";
+import { useConfirmar } from "@/components/Dialogos";
 import { PainelFechamento } from "../fechamento/Fechamento";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
@@ -404,6 +405,7 @@ const linha: React.CSSProperties = {
 
 
 function Gestao() {
+  const perguntar = useConfirmar();
   const [mes, setMes] = useState(mesOperacao());
   const [d, setD] = useState<any>(null);
   // "Recebido no mês" foi dobrado aqui dentro: um lugar só para o mês, mesmo seletor.
@@ -435,7 +437,11 @@ function Gestao() {
   }
 
   async function excluir(id: string) {
-    if (!confirm("Excluir este lançamento?")) return;
+    if (!await perguntar({
+      oQue: "Excluir este lançamento?",
+      efeito: "O saldo da família muda na hora, e não dá para voltar.",
+      confirmar: "Excluir", tom: "perigo",
+    })) return;
     await fetch(`/api/financeiro/lancamentos/${id}`, { method: "DELETE" });
     carregar();
   }
@@ -736,6 +742,7 @@ function PorJazigo() {
  * Aqui você abre o extrato ao lado e vai dando o visto.
  */
 function BaterComBanco() {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [meses, setMeses] = useState(6);
   const [soPendentes, setSoPendentes] = useState(true);
@@ -849,11 +856,16 @@ function BaterComBanco() {
                     Achei no extrato
                   </button>
                   <button style={painel.botaoSec} disabled={ocupado === x.id}
-                          onClick={() => {
-                            const nota = prompt(
-                              "Não achou no extrato? Anote o que fazer:\n" +
-                              "(ex.: perguntar a data certa, conferir outra conta)", "");
-                            if (nota !== null) marcar(x.id, false, nota || "não localizado no extrato");
+                          onClick={async () => {
+                            const r0 = await perguntar({
+                              oQue: "Não achou no extrato?",
+                              efeito: "Fica marcado como pendente de conferência, com a sua anotação.",
+                              confirmar: "Anotar",
+                              pedirMotivo: "O que fazer depois?",
+                              motivoOpcional: true,
+                              dica: "ex.: perguntar a data certa, conferir outra conta",
+                            });
+                            if (r0) marcar(x.id, false, (r0 === true ? "" : r0.motivo) || "não localizado no extrato");
                           }}>
                     Não achei
                   </button>

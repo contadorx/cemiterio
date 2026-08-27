@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * CONTA DA AJUDANTE
@@ -14,6 +15,8 @@ import { diaOperacao } from "@/lib/vencimento";
  * Ao pagar, sai do caixa classificado como "Pagamento da ajudante".
  */
 export default function Equipe() {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [d, setD] = useState<any>(null);
   const [materiais, setMateriais] = useState<any[]>([]);
   const [novo, setNovo] = useState(false);
@@ -50,13 +53,16 @@ export default function Equipe() {
   }
 
   async function pagar(membroId: string, nome: string, total: number) {
-    const txt = prompt(
-      `Pagar quanto para ${nome}?\n\nEm aberto: R$ ${total.toFixed(2)}\n` +
-      `Deixe como está para pagar tudo, ou digite um valor menor.`,
-      total.toFixed(2)
-    );
-    if (txt === null) return;
-    const v = Number(txt.replace(",", "."));
+    const r0 = await perguntar({
+      oQue: `Pagar quanto para ${nome}?`,
+      efeito: `Em aberto: R$ ${total.toFixed(2)}. Deixe como está para pagar tudo, `
+            + `ou escreva um valor menor para um pagamento parcial.`,
+      confirmar: "Registrar o pagamento",
+      pedirValor: "Valor a pagar (R$)",
+      valorInicial: total.toFixed(2),
+    });
+    if (!r0 || r0 === true) return;
+    const v = Number(r0.valor.replace(",", "."));
     if (!v || v <= 0) return;
     setOcupado(true);
     const r = await fetch("/api/equipe/conta", {
@@ -71,10 +77,14 @@ export default function Equipe() {
   }
 
   async function remover(id: string) {
-    if (!confirm("Remover este lançamento?")) return;
+    if (!await perguntar({
+      oQue: "Remover este lançamento da conta da equipe?",
+      efeito: "O saldo com essa pessoa muda na hora, e não dá para voltar.",
+      confirmar: "Remover", tom: "perigo",
+    })) return;
     const r = await fetch(`/api/equipe/conta?id=${id}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);
-    if (r?.ok) carregar(); else alert(r?.erro || "Não consegui remover.");
+    if (r?.ok) carregar(); else recado.erro(r?.erro || "Não consegui remover.");
   }
 
   if (!d) return <p style={{ color: cor.cinza }}>Carregando…</p>;

@@ -5,6 +5,7 @@ import { MessageCircle, Phone, Check, X, Clock, AlertTriangle, Send, ArrowLeft, 
 import { Cartao, Botao, Selo, Campo, Entrada } from "../pecas";
 import { diasDesde, faz } from "@/lib/datas";
 import { primeiroNome } from "@/lib/mensagens";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * CONTATOS — quem escreveu pelo site e ainda espera resposta.
@@ -80,6 +81,7 @@ function telBonito(t: string) {
 }
 
 export default function VisaoSite() {
+  const perguntar = useConfirmar();
   const [pendentes, setPendentes] = useState<Contato[]>([]);
   const [feitos, setFeitos] = useState<any[]>([]);
   const [resumo, setResumo] = useState<any>(null);
@@ -383,8 +385,14 @@ export default function VisaoSite() {
                 Já é cliente — só tirar da fila
               </Botao>
               <Botao tom="perigo" disabled={ocupado === c.id}
-                     onClick={() => {
-                       const m = prompt("Por que este contato não segue? (fica registrado)");
+                     onClick={async () => {
+                       const r0 = await perguntar({
+                         oQue: "Por que este contato não segue?",
+                         efeito: "Fica registrado, para você enxergar o padrão depois.",
+                         confirmar: "Registrar",
+                         pedirMotivo: "O que houve?",
+                       });
+                       const m = !r0 || r0 === true ? null : r0.motivo;
                        if (m === null) return;
                        agir(c.id, "descartar", { motivo: m });
                      }}>

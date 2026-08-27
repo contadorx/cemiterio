@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * A RÉGUA DE COBRANÇA — editável, degrau a degrau.
@@ -28,6 +29,7 @@ const REGUAS: [string, string][] = [
 ];
 
 export default function Regua() {
+  const perguntar = useConfirmar();
   const [regua, setRegua] = useState("padrao");
   const [d, setD] = useState<any>(null);
   const [novo, setNovo] = useState({ dias: "", texto: "" });
@@ -173,8 +175,13 @@ export default function Regua() {
                   {g.ativo ? "Desligar" : "Ligar"}
                 </button>
                 <button style={painel.botaoMiniSec} disabled={ocupado}
-                        onClick={() => {
-                          if (!confirm(`Apagar o degrau de ${quando(g.dias)}?`)) return;
+                        onClick={async () => {
+                          if (!await perguntar({
+                            oQue: `Apagar o degrau de ${quando(g.dias)}?`,
+                            efeito: "A régua deixa de preparar cobrança nesse ponto. "
+                                  + "As famílias que já estavam nele passam para o degrau seguinte.",
+                            confirmar: "Apagar o degrau", tom: "perigo",
+                          })) return;
                           acao("DELETE", null, `/api/config/regua?id=${g.id}`);
                         }}>
                   Apagar

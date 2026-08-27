@@ -10,9 +10,9 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 11 |
-| Aplicado pela metade | 1 |
-| Não aplicado | 13 |
+| Aplicado | 14 |
+| Aplicado pela metade | 0 |
+| Não aplicado | 11 |
 | Não dá para provar lendo código | 1 |
 
 Três de vinte e seis é pouco, mas as duas auditorias são de antes de boa parte
@@ -29,8 +29,8 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-04 | Famílias é uma lista simples | **não** | 701 linhas, nenhum agrupamento de filtro avançado |
 | CA-05 | Cadastrar família é uma tarefa só | **não** | formulário único, sem etapas nem resumo final |
 | CA-06 | A agenda mostra trabalho, não engenharia | **não** | "Gerar limpezas" continua na tela principal (`agenda/page.tsx:675`) |
-| CA-07 | Ação destrutiva é consistente e segura | **não** | **175** `confirm`/`prompt`/`alert` do navegador em `src/app/painel/` |
-| CA-08 | Liberação deixa revisar com segurança | **metade** | `Foto.etapa: "antes" \| "depois"` e o desfazer do último descarte existem em `VisaoLiberacao.tsx`; falta data e hora da lavagem no cartão |
+| CA-07 | Ação destrutiva é consistente e segura | **sim (Build C)** | 66 `confirm`/`prompt` do painel e os 18 do campo viraram uma peça só; 99 `alert` de desfecho ainda por converter |
+| CA-08 | Liberação deixa revisar com segurança | **sim (Build C)** | descarte confirmado, "limpo em 14/08 às 09:30" no cartão, fotos rotuladas, desfazer |
 | CA-09 | Financeiro tem uma porta só | **não** | continua abas dentro de abas; não é funil |
 | CA-10 | Configuração é fácil de achar | **sim** | `config/page.tsx` tem `GRUPOS` com quatro domínios e diagnóstico por último |
 | CA-11 | O painel é visualmente consistente | **não** | 3 telas com estilo em objeto inline, 14 com classe — dois vocabulários visuais |
@@ -53,7 +53,7 @@ de regra — não de tela. O que segue é a lista honesta.
 | CP-09 | As fotos simplificam o cartão | **não** | carrossel de miniaturas em `Fotos` (`campo/page.tsx:473`), empurra a ação para baixo |
 | CP-10 | Existe uma implementação do cartão | **não** | **710 linhas mortas**: `CardTumulo.tsx` 167, `Concluir.tsx` 276, `ConfirmarJazigo.tsx` 189, `DistanciaAoVivo.tsx` 78 — nenhuma importada pela tela viva |
 | CP-11 | Ela sabe o que já foi enviado | **sim (Build B)** | conta lavagens e diz quais jazigos; recados contados à parte |
-| CP-12 | Encerrar o dia é simples e seguro | **não** | `Assistente.tsx:73–89` — `confirm`, depois `prompt`, depois `alert` |
+| CP-12 | Encerrar o dia é simples e seguro | **sim (Build C)** | uma folha com o resumo: feitas, o que fica para depois, o que ainda não subiu |
 
 ## O que já vai nesta entrega: CP-07
 
@@ -106,8 +106,8 @@ ao voltar o foco da janela, e a fila ganha idempotência por `servicoId + tipo`.
 E "Não deu para fazer" e o pedido de material entram na fila — são justamente o
 que ela precisa fazer onde o sinal é pior.
 
-### Build C — uma porta só para o que não tem volta
-**CA-07, CA-08, CP-12**
+### Build C — uma porta só para o que não tem volta ✅ ENTREGUE
+**CA-07, CA-08, CP-12** — ver `LEIA-ME_uma_porta_so.md`
 
 **187** diálogos do navegador entre painel e campo. Cada um com aparência
 diferente, nenhum dizendo o que vai acontecer depois, nenhum com desfazer.
@@ -170,6 +170,37 @@ inteiro e achar que mudou o app.
 CA-12 não é código: é sentar com a Sureya num aparelho de verdade, com teclado
 aberto e voltando do navegador.
 
+## Decisões guardadas, esperando você
+
+### O "Fazer este agora" não é prioridade — e parece (27/08)
+
+Você perguntou se os jazigos com o botão "⬆ Fazer este agora" eram prioridades.
+Não são. O botão aparece em todo cartão que ainda não é o primeiro da lista e
+ainda não foi começado — num dia de 10 jazigos, em 9 deles. E ele só mexe na
+ordem de HOJE (`ordem_dia`); não encosta em `prioridade`.
+
+Prioridade de verdade existe e é outra coisa: `servicos.prioridade` sobe **+15**
+a cada "Não deu para fazer", `adiado_vezes` sobe **+1**, o alocador ordena por
+ela ao gerar a agenda (`agenda.ts:789`), e no campo isso só vira texto a partir
+de dois adiamentos: *"ficou pra depois 3x — hoje é prioridade"*.
+
+Medido em 27/08 na produção: 10 serviços pendentes, **zero** com prioridade
+acima de zero, **zero** já adiados.
+
+Duas coisas separadas, as duas esperando decisão sua:
+
+1. **A confusão de tela** — o botão vira link discreto em vez de bloco com
+   seta, e o cartão ganha selo só quando o jazigo É prioridade. Cabe no Build D.
+2. **A régua de prioridade** — hoje só levanta prioridade o que a Nina adiou.
+   Família que ligou pedindo, data de memória chegando, atrasado do mês
+   passado: nada disso levanta. Se deve levantar, e quais casos, é decisão do
+   Leandro — não é ajuste de tela.
+
 ## Onde estamos
 
-Builds A e B entregues. O próximo é o C — os 187 diálogos do navegador.
+Builds A, B e C entregues. O próximo é o D — e ele já vem com as suas duas
+correções escritas acima.
+
+Sobrou do C: 99 `alert` de desfecho no painel. Não converti em massa porque
+distinguir sucesso de falha mecanicamente arrisca marcar um erro como recibo
+verde. Entram numa passada lida.

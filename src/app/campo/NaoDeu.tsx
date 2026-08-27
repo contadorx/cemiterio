@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { naoFeitoOuEnfileirar } from "@/lib/offline-fila";
+import { useRecado } from "@/components/Dialogos";
 
 /**
  * "Não deu para fazer" — sem julgamento, com o motivo.
@@ -11,6 +12,7 @@ import { naoFeitoOuEnfileirar } from "@/lib/offline-fila";
 export default function NaoDeu({ it, onFechar, onPronto }: {
   it: any; onFechar: () => void; onPronto: () => void;
 }) {
+  const recado = useRecado();
   const [motivo, setMotivo] = useState("");
   const [outro, setOutro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -36,7 +38,7 @@ export default function NaoDeu({ it, onFechar, onPronto }: {
    */
   async function enviar() {
     const texto = (motivo === "Outro" ? outro : motivo).trim();
-    if (!texto) return alert("Me conta rapidinho o que houve.");
+    if (!texto) return recado.aviso("Me conta rapidinho o que houve.");
     setEnviando(true);
     const { desfecho, motivo: porque } = await naoFeitoOuEnfileirar({
       servicoId: it.id,
@@ -46,16 +48,16 @@ export default function NaoDeu({ it, onFechar, onPronto }: {
     setEnviando(false);
 
     if (desfecho === "perdido") {
-      alert("A memória do aparelho encheu e eu não consegui guardar.\n\n" +
-            "Procure um lugar com sinal e abra o app.");
+      recado.erro("A memória do aparelho encheu e eu não consegui guardar. " +
+                  "Procure um lugar com sinal e abra o app.");
       return;
     }
     if (desfecho === "recusado") {
-      alert(`Não consegui registrar.\n\n${porque || "O sistema recusou."}`);
+      recado.erro(`Não consegui registrar. ${porque || "O sistema recusou."}`);
       return;
     }
     if (desfecho === "offline") {
-      alert("Guardado. Vai subir sozinho quando o sinal voltar — pode seguir.");
+      recado.ok("Guardado. Vai subir sozinho quando o sinal voltar — pode seguir.");
     }
     onPronto();
   }

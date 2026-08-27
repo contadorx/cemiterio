@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Send, Trash2, AlertTriangle, Undo2, Shuffle, CheckSquare, Square, StopCircle, XCircle } from "lucide-react";
 import { Cartao, Botao, Selo, Falhou } from "../pecas";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 import { BellOff, Bell, CalendarClock } from "lucide-react";
 import { diasDesde, faz } from "@/lib/datas";
 
@@ -212,7 +213,7 @@ export default function VisaoLiberacao() {
     }
 
     if (!lista.length) {
-      alert("Não há outros textos cadastrados. Você pode escrever os seus em Config › Textos das mensagens.");
+      recado.aviso("Não há outros textos cadastrados. Você pode escrever os seus em Config › Textos das mensagens.");
       return;
     }
 
@@ -221,7 +222,7 @@ export default function VisaoLiberacao() {
     const i = lista.indexOf(atual);
     const proximo = lista[(i + 1) % lista.length];
     if (proximo === atual && lista.length === 1) {
-      alert("Só há um texto cadastrado para este tipo. Cadastre outros em Config › Textos das mensagens.");
+      recado.aviso("Só há um texto cadastrado para este tipo. Cadastre outros em Config › Textos das mensagens.");
       return;
     }
     setEditando((x) => ({ ...x, [item.id]: proximo }));
@@ -246,6 +247,8 @@ export default function VisaoLiberacao() {
    * no console, sem nada na tela.
    */
   const [erro, setErro] = useState("");
+  const perguntar = useConfirmar();
+  const recado = useRecado();
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -283,17 +286,20 @@ export default function VisaoLiberacao() {
    */
   async function silenciar(item: Item) {
     if (!item.familiaId) {
-      alert("Esta mensagem não está ligada a uma família — não dá para silenciar por aqui.");
+      recado.erro("Esta mensagem não está ligada a uma família — não dá para silenciar por aqui.");
       return;
     }
     const jaMudo = item.silenciados.includes(item.tipo);
     const rotulo = (ROTULO[item.tipo] ?? item.tipo).toLowerCase();
     const quem = item.familia || item.para || "esta família";
 
-    if (!confirm(jaMudo
-      ? `Voltar a preparar mensagens de ${rotulo} para ${quem}?`
-      : `Não preparar mais mensagens de ${rotulo} para ${quem}?\n\n` +
-        `As próximas não entram nesta fila. Esta aqui continua, para você decidir.`)) return;
+    if (!await perguntar(jaMudo
+      ? { oQue: `Voltar a preparar mensagens de ${rotulo} para ${quem}?`,
+          efeito: "As próximas voltam a entrar nesta fila, para você decidir uma a uma.",
+          confirmar: "Voltar a preparar" }
+      : { oQue: `Não preparar mais mensagens de ${rotulo} para ${quem}?`,
+          efeito: "As próximas não entram nesta fila. Esta aqui continua, para você decidir.",
+          confirmar: "Parar de preparar", tom: "perigo" })) return;
 
     setSilenciando(item.id);
     try {
@@ -301,8 +307,8 @@ export default function VisaoLiberacao() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tipo: item.tipo, silenciar: !jaMudo }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
-      alert(r.mensagem);
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      recado.ok(r.mensagem);
       await carregar();
     } finally { setSilenciando(null); }
   }
@@ -321,18 +327,25 @@ export default function VisaoLiberacao() {
   async function adiar(item: Item) {
     const hoje = new Date();
     const sugestao = new Date(hoje.getTime() + 7 * 86400000).toISOString().slice(0, 10);
-    const ate = prompt(
-      `Adiar para quando?\n\n`
-      + (item.tipo === "cobranca"
-          ? "Até essa data, nenhuma outra cobrança sai para esta família.\n\n"
-          : "")
-      + "Data no formato AAAA-MM-DD:",
-      sugestao,
-    );
-    if (ate === null) return;                       // cancelou
-    const limpo = ate.trim();
+    // ERAM DOIS `prompt` EM FILA: a data e depois o combinado. Duas caixas do
+    // navegador seguidas, e desistir na segunda deixava a primeira no ar sem
+    // que ela soubesse se tinha adiado ou não. Agora é um pedido só.
+    const combinado = await perguntar({
+      oQue: "Adiar esta mensagem para quando?",
+      efeito: item.tipo === "cobranca"
+        ? "Até essa data nenhuma outra cobrança sai para esta família. O silêncio é a promessa."
+        : "Esta mensagem sai da fila e volta na data combinada.",
+      confirmar: "Adiar",
+      pedirData: "Voltar a aparecer em",
+      dataInicial: sugestao,
+      pedirMotivo: "Combinado o quê? (opcional)",
+      motivoOpcional: true,
+      dica: "Fica anotado na mensagem, para você não ter de lembrar de cabeça.",
+    });
+    if (!combinado || combinado === true) return;
+    const limpo = combinado.data;
     if (!limpo) return;
-    const motivo = prompt("Combinado o quê? (opcional — fica anotado na mensagem)", "") || null;
+    const motivo = combinado.motivo || null;
 
     setOcupado(item.id);
     try {
@@ -340,7 +353,7 @@ export default function VisaoLiberacao() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id, acao: "adiar", ate: limpo, motivo }),
       }).then((x) => x.json());
-      if (!r.ok) { alert(r.mensagem || r.erro || "Não consegui adiar."); return; }
+      if (!r.ok) { recado.erro(r.mensagem || r.erro || "Não consegui adiar."); return; }
       await carregar();
     } finally { setOcupado(null); }
   }
@@ -353,7 +366,7 @@ export default function VisaoLiberacao() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id, acao: "adiar", ate: null }),
       }).then((x) => x.json());
-      if (!r.ok) { alert(r.mensagem || r.erro || "Não consegui trazer de volta."); return; }
+      if (!r.ok) { recado.erro(r.mensagem || r.erro || "Não consegui trazer de volta."); return; }
       await carregar();
     } finally { setOcupado(null); }
   }
@@ -371,7 +384,7 @@ export default function VisaoLiberacao() {
         // A mensagem VOLTA para a fila quando o envio falha — e agora a fila
         // GUARDA o motivo. Recarregar faz o cartão mostrar a tentativa e o erro
         // em vez de a informação morrer neste alert.
-        alert(r.erro || "Não consegui enviar.");
+        recado.erro(r.erro || "Não consegui enviar.");
         await carregar();
         return;
       }
@@ -475,9 +488,11 @@ export default function VisaoLiberacao() {
 
     const quem = alvos.slice(0, 3).map((a) => a.para || a.familia || "sem nome").join(", ");
     const resto = alvos.length > 3 ? ` e mais ${alvos.length - 3}` : "";
-    if (!confirm(
-      `Não enviar ${alvos.length} ${alvos.length === 1 ? "mensagem" : "mensagens"}?\n\n` +
-      `${quem}${resto}.\n\nElas saem da fila. Dá para desfazer em seguida.`)) return;
+    if (!await perguntar({
+      oQue: `Não enviar ${alvos.length} ${alvos.length === 1 ? "mensagem" : "mensagens"}?`,
+      efeito: `${quem}${resto}. Elas saem da fila e a família não recebe. Dá para desfazer em seguida.`,
+      confirmar: "Não enviar", tom: "perigo",
+    })) return;
 
     for (const item of alvos) {
       await fetch("/api/fila", {
@@ -495,11 +510,12 @@ export default function VisaoLiberacao() {
 
     const quem = alvos.slice(0, 3).map((a) => a.para || a.familia || "sem nome").join(", ");
     const resto = alvos.length > 3 ? ` e mais ${alvos.length - 3}` : "";
-    if (!confirm(
-      `Enviar ${alvos.length} ${alvos.length === 1 ? "mensagem" : "mensagens"} agora?\n\n` +
-      `Para: ${quem}${resto}.\n\n` +
-      `Sai uma de cada vez, com as fotos. Você pode parar no meio — o que já tiver saído não volta.`
-    )) return;
+    if (!await perguntar({
+      oQue: `Enviar ${alvos.length} ${alvos.length === 1 ? "mensagem" : "mensagens"} agora?`,
+      efeito: `Para: ${quem}${resto}. Sai uma de cada vez, com as fotos. Você pode parar no meio — `
+            + `o que já tiver saído não volta.`,
+      confirmar: "Enviar agora",
+    })) return;
 
     pararLote.current = false;
     setLote({ total: alvos.length, feitos: 0, falhas: [] });
@@ -546,9 +562,13 @@ export default function VisaoLiberacao() {
    *
    * A confirmação é uma pergunta só, e o desfazer fica no topo depois.
    */
-  function pedirDescarte(item: Item) {
+  async function pedirDescarte(item: Item) {
     const quem = item.para || item.familia || "esta família";
-    if (!confirm(`Não enviar esta mensagem para ${quem}?\n\nEla sai da fila. Você pode desfazer logo em seguida.`)) return;
+    if (!await perguntar({
+      oQue: `Não enviar esta mensagem para ${quem}?`,
+      efeito: "Ela sai da fila e a família não recebe. Você pode desfazer logo em seguida.",
+      confirmar: "Não enviar", tom: "perigo",
+    })) return;
     decidir(item, "descartar");
   }
 

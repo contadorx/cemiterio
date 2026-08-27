@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { painel, cor } from "../ui";
 import { Funil } from "./Funil";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * O FECHAMENTO DO MÊS.
@@ -32,6 +33,7 @@ const dinheiro = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function PainelFechamento() {
+  const perguntar = useConfirmar();
   const [competencia, setCompetencia] = useState(competenciaAtual);
   const [previa, setPrevia] = useState<any>(null);
   const [emAberto, setEmAberto] = useState<any>(null);
@@ -51,10 +53,11 @@ export function PainelFechamento() {
 
   async function lancar() {
     if (!previa?.novos) return;
-    if (!confirm(
-      `Vou lançar ${previa.novos} cobrança(s) de ${nomearPeriodo(competencia)}, ` +
-      `somando ${dinheiro(previa.total)}.\n\nConfirma?`
-    )) return;
+    if (!await perguntar({
+      oQue: `Lançar ${previa.novos} cobrança(s) de ${nomearPeriodo(competencia)}, somando ${dinheiro(previa.total)}?`,
+      efeito: "Elas entram no conta corrente das famílias como dívida. Nada é enviado a ninguém.",
+      confirmar: "Lançar",
+    })) return;
 
     setOcupado(true);
     setMsg("");

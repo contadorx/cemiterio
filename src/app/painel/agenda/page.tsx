@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import { Falhou } from "../pecas";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 import { mesOperacao, diaOperacao, somaDias } from "@/lib/vencimento";
 
 /**
@@ -117,6 +118,8 @@ async function reordenarDia(data: string, ids: string[]) {
 }
 
 export default function AgendaPage() {
+  const perguntar = useConfirmar();
+  const recado = useRecado();
   const [dias, setDias] = useState<Record<string, Item[]>>({});
   const [capacidadeDia, setCapacidadeDia] = useState(20);
   const [carregando, setCarregando] = useState(true);
@@ -266,10 +269,13 @@ export default function AgendaPage() {
     if (!marcados.size) return;
     const emAberto = quem === "";
     const nome = emAberto ? "em aberto (qualquer pessoa da equipe)" : nomeDe(quem) || "essa pessoa";
-    if (!confirm(
-      `Marcar ${marcados.size} ${marcados.size === 1 ? "limpeza" : "limpezas"} como ${nome}?`
-      + (emAberto ? "\n\nElas voltam a aparecer para toda a equipe." : "")
-    )) return;
+    if (!await perguntar({
+      oQue: `Marcar ${marcados.size} ${marcados.size === 1 ? "limpeza" : "limpezas"} como ${nome}?`,
+      efeito: emAberto
+        ? "Elas voltam a aparecer para toda a equipe."
+        : "Só essa pessoa vai ver essas lavagens no app de campo.",
+      confirmar: "Marcar",
+    })) return;
 
     setAtribuindo(true);
     try {
@@ -372,14 +378,17 @@ export default function AgendaPage() {
    * procurar quando estranhar a cobrança.
    */
   async function estornar(id: string, jazigo: string) {
-    const motivo = prompt(
-      `Estornar a lavagem de ${jazigo}?\n\n` +
-      `A lavagem é anulada e o valor cobrado volta como crédito para a família.\n` +
-      `O registro continua visível com o motivo — o extrato dela mostra que houve\n` +
-      `um erro e que foi corrigido.\n\nO que aconteceu?`,
-      ""
-    );
-    if (motivo === null) return;
+    const r0 = await perguntar({
+      oQue: `Estornar a lavagem de ${jazigo}?`,
+      efeito: "A lavagem é anulada e o valor cobrado volta como crédito para a família. "
+            + "O registro continua visível com o motivo — o extrato dela mostra que houve "
+            + "um erro e que foi corrigido.",
+      confirmar: "Estornar", tom: "perigo",
+      pedirMotivo: "O que aconteceu?",
+      dica: "Fica no extrato da família, à vista dela.",
+    });
+    if (!r0) return;
+    const motivo = r0 === true ? "" : r0.motivo;
     if (!motivo.trim()) return alert("Preciso do motivo — ele fica no extrato da família.");
 
     const r = await fetch(`/api/servico/${id}/estornar`, {
@@ -418,12 +427,12 @@ export default function AgendaPage() {
     if (!naoFeitas.length) { alert("Não há limpeza para mover neste dia."); return; }
 
     const destino = somaDias(d, passo);
-    if (!confirm(
-      `Mover ${naoFeitas.length} ${naoFeitas.length === 1 ? "limpeza" : "limpezas"} ` +
-      `de ${dataBonita(d)} para ${dataBonita(destino)}?\n\n` +
-      `O que já foi feito fica onde está.\n` +
-      `As próximas de cada jazigo NÃO andam junto — só este dia.`
-    )) return;
+    if (!await perguntar({
+      oQue: `Mover ${naoFeitas.length} ${naoFeitas.length === 1 ? "limpeza" : "limpezas"} `
+          + `de ${dataBonita(d)} para ${dataBonita(destino)}?`,
+      efeito: "O que já foi feito fica onde está. As próximas de cada jazigo NÃO andam junto — só este dia.",
+      confirmar: "Mover o dia",
+    })) return;
 
     setMovendoDia(d);
     try {
@@ -464,12 +473,13 @@ export default function AgendaPage() {
    * HOJE NÃO SE MEXE. A Nina já abriu a lista no celular.
    */
   async function refazerRoteiro() {
-    if (!confirm(
-      `Refazer o roteiro a partir de amanhã?\n\n` +
-      `${idade?.redistribuiveis ?? 0} lavagem(ns) voltam para a fila e são distribuídas de novo, ` +
-      `agora com todos os contratos cadastrados.\n\n` +
-      `NÃO muda: hoje, o passado, o que você remarcou à mão, o que já começou e o que já tem foto.`
-    )) return;
+    if (!await perguntar({
+      oQue: "Refazer o roteiro a partir de amanhã?",
+      efeito: `${idade?.redistribuiveis ?? 0} lavagem(ns) voltam para a fila e são distribuídas de novo, `
+            + "agora com todos os contratos cadastrados. NÃO muda: hoje, o passado, o que você "
+            + "remarcou à mão, o que já começou e o que já tem foto.",
+      confirmar: "Refazer o roteiro",
+    })) return;
 
     setRefazendo(true); setDiag(null);
     try {
@@ -1184,12 +1194,16 @@ export default function AgendaPage() {
                               Outra data
                             </button>
                             <button style={painel.botaoMiniSec}
-                                    onClick={() => {
-                                      const motivo = prompt(
-                                        "Pular esta lavagem?\n\n" +
-                                        "A próxima do jazigo já vem no ciclo seguinte.\n" +
-                                        "Motivo (opcional):", "");
-                                      if (motivo !== null) acao(s.id, { acao: "pular", motivo });
+                                    onClick={async () => {
+                                      const r0 = await perguntar({
+                                        oQue: `Pular a lavagem de ${s.jazigo}?`,
+                                        efeito: "A próxima do jazigo já vem no ciclo seguinte. "
+                                              + "Não é o mesmo que excluir: o ciclo continua.",
+                                        confirmar: "Pular",
+                                        pedirMotivo: "Motivo (opcional)",
+                                        motivoOpcional: true,
+                                      });
+                                      if (r0) acao(s.id, { acao: "pular", motivo: r0 === true ? "" : r0.motivo });
                                     }}>
                               Pular
                             </button>
@@ -1198,22 +1212,25 @@ export default function AgendaPage() {
                             {s.fixado && (
                               <button style={painel.botaoMiniSec}
                                       title="Devolve esta lavagem para a distribuição automática"
-                                      onClick={() => {
-                                        if (!confirm(
-                                          `Devolver ${s.jazigo} para a agenda automática?\n\n` +
-                                          "A data que você escolheu deixa de ser respeitada: na próxima " +
-                                          "geração ela pode mudar de dia."
-                                        )) return;
+                                      onClick={async () => {
+                                        if (!await perguntar({
+                                          oQue: `Devolver ${s.jazigo} para a agenda automática?`,
+                                          efeito: "A data que você escolheu deixa de ser respeitada: na próxima "
+                                                + "geração ela pode mudar de dia.",
+                                          confirmar: "Soltar a data",
+                                        })) return;
                                         acao(s.id, { acao: "desfixar" });
                                       }}>
                                 Soltar data
                               </button>
                             )}
                             <button style={painel.botaoMiniPerigo}
-                                    onClick={() => {
-                                      if (!confirm(
-                                        `Excluir a lavagem de ${s.jazigo}?\n\n` +
-                                        `Some da agenda de vez. Para só adiar, use Remarcar.`)) return;
+                                    onClick={async () => {
+                                      if (!await perguntar({
+                                        oQue: `Excluir a lavagem de ${s.jazigo}?`,
+                                        efeito: "Some da agenda de vez. Para só adiar, use Remarcar.",
+                                        confirmar: "Excluir", tom: "perigo",
+                                      })) return;
                                       excluir(s.id);
                                     }}>
                               Excluir

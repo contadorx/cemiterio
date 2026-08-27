@@ -33,6 +33,20 @@ const telaLib     = readFileSync("src/app/painel/conversas/VisaoLiberacao.tsx", 
 const libFila     = readFileSync("src/lib/offline-fila.ts", "utf8");
 const telaNaoDeu  = readFileSync("src/app/campo/NaoDeu.tsx", "utf8");
 const telaMat     = readFileSync("src/app/campo/Materiais.tsx", "utf8");
+const dialogos    = readFileSync("src/components/Dialogos.tsx", "utf8");
+const layPainel   = readFileSync("src/app/painel/layout.tsx", "utf8");
+const layCampo    = readFileSync("src/app/campo/layout.tsx", "utf8");
+const assistente  = readFileSync("src/app/campo/Assistente.tsx", "utf8");
+const { readdirSync, statSync } = await import("node:fs");
+const { join } = await import("node:path");
+function varrer(dir, achados = []) {
+  for (const nome of readdirSync(dir)) {
+    const cheio = join(dir, nome);
+    if (statSync(cheio).isDirectory()) varrer(cheio, achados);
+    else if (/\.tsx?$/.test(nome)) achados.push(cheio);
+  }
+  return achados;
+}
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -786,5 +800,89 @@ ok("pedido de material entra na fila",
 
 ok("e a tela diz que guardou, em vez de dizer que enviou",
    /Pedido guardado/.test(telaMat) && /sinal voltar/.test(telaNaoDeu));
+
+// ===================== BUILD C: uma porta so para o que nao tem volta ===============
+//
+// Eram 193 dialogos do navegador: 57 confirm, 9 prompt e 109 alert no painel,
+// mais 18 no campo. Todos com a mesma cara, nenhum dizendo o que acontece
+// DEPOIS de confirmar. Confirmar vira reflexo, e reflexo apaga a coisa errada.
+
+// A CONTAGEM E A GUARDA. Uma unica volta de `confirm` num arquivo novo desfaz
+// o trabalho todo, e nao quebraria nenhum outro teste.
+{
+  const arquivos = [...varrer("src/app/painel"), ...varrer("src/app/campo")];
+  const sobrando = [];
+  for (const f of arquivos) {
+    const visivel = semComentarios(readFileSync(f, "utf8"));
+    // `window.confirm` no proprio Dialogos.tsx e a saida de emergencia de quem
+    // usa o gancho fora do provedor — essa fica.
+    if (/(^|[^.\w])(confirm|prompt)\s*\(/.test(visivel)) sobrando.push(f);
+  }
+  ok(`nenhum confirm/prompt do navegador no painel nem no campo (${arquivos.length} arquivos)`,
+     sobrando.length === 0, sobrando.join(", "));
+}
+
+// O campo e o unico que ficou 100% limpo tambem de `alert`: quem esta de pe,
+// no sol, nao pode levar uma caixa cinza que trava a tela.
+ok("o campo nao tem mais nenhum dialogo do navegador",
+   !/(^|[^.\w])(confirm|prompt|alert)\s*\(/.test(semComentarios(telaCampo)) &&
+   !/(^|[^.\w])(confirm|prompt|alert)\s*\(/.test(semComentarios(telaNaoDeu)) &&
+   !/(^|[^.\w])(confirm|prompt|alert)\s*\(/.test(semComentarios(telaMat)) &&
+   !/(^|[^.\w])(confirm|prompt|alert)\s*\(/.test(semComentarios(assistente)));
+
+// A PARTE QUE O `confirm()` NUNCA TEVE: o que acontece depois.
+ok("todo pedido de confirmacao exige dizer o efeito",
+   /oQue: string;/.test(dialogos) && /efeito: string;/.test(dialogos));
+
+// Sincrono era o que fazia o `confirm()` facil de usar. A promessa mantem isso.
+ok("perguntar devolve promessa, para a chamada mudar uma linha so",
+   /perguntar: \(p: Pedido\) => Promise<Resposta>/.test(dialogos));
+
+// Toque acidental tem de cair para o lado seguro.
+ok("tocar fora desiste, nunca confirma",
+   /if \(e\.target === e\.currentTarget\) fechar\(false\)/.test(dialogos));
+
+// Confirmar sem escrever o motivo obrigatorio nao e decisao informada.
+ok("motivo obrigatorio trava o botao",
+   /pedido\.pedirMotivo && !pedido\.motivoOpcional && !motivo\.trim\(\)/.test(dialogos));
+
+// Um "nao consegui salvar" que some em tres segundos e o mesmo que nao avisar.
+ok("recado de erro nao some sozinho",
+   /if \(tom !== "erro"\)/.test(dialogos));
+
+ok("e o desfazer existe para o que nao e dinheiro",
+   /r\.desfazer/.test(dialogos) && /Desfazer/.test(dialogos));
+
+// Fora do provedor, sumir seria pior: o botao pareceria quebrado, e devolver
+// true executaria o ato sem ninguem confirmar.
+ok("fora do provedor cai no dialogo do navegador, nao no silencio",
+   /const SEM_PROVEDOR/.test(dialogos) && /window\.confirm/.test(dialogos));
+
+// Uma tela que montasse o proprio provedor perderia o recado ao trocar de
+// pagina — que e justamente quando ele importa.
+ok("o balcao vive nos dois layouts",
+   /<Dialogos>/.test(layPainel) && /<Dialogos campo>/.test(layCampo));
+
+// CP-12: eram confirm, depois prompt, depois alert. Tres telas travadas em
+// fila, e nenhuma dizendo o que estava sendo encerrado.
+const assistenteVisivel = semComentarios(assistente);
+ok("encerrar o dia e uma folha so, com o resumo do que esta sendo fechado",
+   /oQue: "Encerrar o dia\?"/.test(assistenteVisivel) &&
+   /lavagem feita|lavagens feitas/.test(assistenteVisivel));
+
+// Encerrar com tres lavagens paradas no aparelho e diferente de encerrar com
+// tudo entregue, e ela nao tinha como saber a diferenca na hora de decidir.
+ok("e o resumo diz o que ainda nao subiu",
+   /resumoFila/.test(assistenteVisivel) && /ainda não .*subi/.test(assistenteVisivel));
+
+// CA-08: a mensagem some da fila e a familia nunca recebe, sem ninguem ver.
+ok("descartar uma mensagem para familia pede confirmacao",
+   /oQue: `Não enviar esta mensagem para \$\{quem\}\?`/.test(telaLib));
+
+ok("e o cartao diz quando o jazigo foi limpo, com hora",
+   /limpo em \$\{quando\(item\.executadoEm\)\}/.test(telaLib));
+
+ok("e rotula as fotos de antes e depois",
+   /f\.etapa === "antes" \? "antes"/.test(telaLib));
 
 process.exit(falhas ? 1 : 0);

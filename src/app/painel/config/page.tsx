@@ -5,6 +5,7 @@ import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
 import Extras from "./Extras";
+import { useConfirmar } from "@/components/Dialogos";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -175,6 +176,7 @@ function Abas({ atual, aoTrocar }: { atual: Aba; aoTrocar: (a: Aba) => void }) {
 
 // Chave mestra dos disparos automáticos. Fica no topo da Config, sempre visível.
 function ChaveDisparos() {
+  const perguntar = useConfirmar();
   const [ativo, setAtivo] = useState<boolean | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -188,7 +190,12 @@ function ChaveDisparos() {
   async function alternar() {
     if (ativo === null) return;
     const novo = !ativo;
-    if (novo && !confirm("Ligar os disparos automáticos? A IA volta a responder sozinha e os avisos automáticos passam a sair.")) return;
+    if (novo && !await perguntar({
+      oQue: "Ligar os disparos automáticos?",
+      efeito: "A IA volta a responder sozinha e os avisos automáticos passam a sair — "
+            + "sem ninguém ler antes de a família ler.",
+      confirmar: "Ligar", tom: "perigo",
+    })) return;
     setSalvando(true);
     const r = await fetch("/api/config/disparos", {
       method: "PUT",
@@ -234,6 +241,7 @@ function ChaveDisparos() {
 }
 
 function Equipe() {
+  const perguntar = useConfirmar();
   const [membros, setMembros] = useState<any[]>([]);
   const [form, setForm] = useState(false);
   const [nome, setNome] = useState("");
@@ -268,7 +276,11 @@ function Equipe() {
   }
 
   async function remover(userId: string) {
-    if (!confirm("Remover este acesso? A conta de login também será apagada.")) return;
+    if (!await perguntar({
+      oQue: "Remover este acesso?",
+      efeito: "A conta de login também é apagada. A pessoa perde o app de campo na hora.",
+      confirmar: "Remover o acesso", tom: "perigo",
+    })) return;
     const r = await fetch(`/api/membros/${userId}`, { method: "DELETE" }).then((x) => x.json());
     if (r?.ok) carregar();
     else alert("Falhou: " + (r?.erro || "erro"));
@@ -533,6 +545,7 @@ function Agregados({ aba }: { aba: string }) {
  * NADA SAI DAQUI. Isto enche a fila; quem manda é o comando, em Conversas.
  */
 function Campanhas() {
+  const perguntar = useConfirmar();
   const [hist, setHist] = useState<any[]>([]);
   const [publicos, setPublicos] = useState<any[]>([]);
   const [previa, setPrevia] = useState<any>(null);
@@ -564,10 +577,11 @@ function Campanhas() {
     if (mensagem.trim().length < 10) { setErro("Escreva a mensagem."); return; }
 
     const quantas = previa?.familias ?? 0;
-    if (!confirm(
-      `Isto prepara ${quantas} mensagem(ns) na fila de liberação — uma por família.\n\n`
-      + `NADA É ENVIADO AGORA. Você lê e libera em Conversas, e pode mandar em lote.\n\nContinuar?`
-    )) return;
+    if (!await perguntar({
+      oQue: `Preparar ${quantas} mensagem(ns) na fila de liberação?`,
+      efeito: "Uma por família. NADA É ENVIADO AGORA — você lê e libera em Conversas, e pode mandar em lote.",
+      confirmar: "Preparar",
+    })) return;
 
     setRodando(true); setRes("");
     const r = await fetch("/api/campanhas", {
@@ -700,6 +714,7 @@ function Campanhas() {
  * foi. Você escolhe o jeito depois de ver na prática qual funciona.
  */
 function Cemiterios() {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState("");
   const [novo, setNovo] = useState({ nome: "", endereco: "" });
@@ -821,11 +836,12 @@ function Cemiterios() {
 
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <button style={painel.botaoMiniSec} disabled={salvando}
-              onClick={() => {
-                if (c.ativo && !confirm(
-                  `Desativar ${c.nome}?\n\nA rota do dia para de incluir os jazigos daqui. ` +
-                  `Nada é apagado — é só parar de agendar.`
-                )) return;
+              onClick={async () => {
+                if (c.ativo && !await perguntar({
+                  oQue: `Desativar ${c.nome}?`,
+                  efeito: "A rota do dia para de incluir os jazigos daqui. Nada é apagado — é só parar de agendar.",
+                  confirmar: "Desativar", tom: "perigo",
+                })) return;
                 patch({ id: c.id, ativo: !c.ativo });
               }}>
               {c.ativo ? "Desativar" : "Reativar"}
@@ -988,6 +1004,7 @@ function Casa() {
 
 
 function Materiais() {
+  const perguntar = useConfirmar();
   const [itens, setItens] = useState<any[]>([]);
   const [novo, setNovo] = useState({ nome: "", unidade: "un", estoque: 0, alertaMinimo: 1 });
   const [criando, setCriando] = useState(false);
@@ -1015,7 +1032,11 @@ function Materiais() {
   }
 
   async function remover(id: string, nome: string) {
-    if (!confirm(`Remover "${nome}" da lista de materiais?`)) return;
+    if (!await perguntar({
+      oQue: `Remover "${nome}" da lista de materiais?`,
+      efeito: "Ele some das opções que a Nina marca quando pede material.",
+      confirmar: "Remover", tom: "perigo",
+    })) return;
     await fetch(`/api/config/materiais/${id}`, { method: "DELETE" });
     carregar();
   }
@@ -1164,6 +1185,7 @@ function Materiais() {
 
 
 function Jornada() {
+  const perguntar = useConfirmar();
   const [j, setJ] = useState<any>(null);
   const [bloq, setBloq] = useState<any[]>([]);
   const [novo, setNovo] = useState({ data: "", motivo: "" });
@@ -1193,10 +1215,11 @@ function Jornada() {
     // Mudar os dias não mexe no que já estava marcado — pergunta se quer arrumar.
     const c = await fetch("/api/agenda/reorganizar").then((x) => x.json()).catch(() => null);
     if (c?.ok && c.foraDaJornada > 0) {
-      const arrumar = confirm(
-        `${c.foraDaJornada} lavagem(ns) já agendada(s) ficaram em dias que não são mais de trabalho.\n\n` +
-        `Quer reorganizar agora? Elas vão para o próximo dia de trabalho.`
-      );
+      const arrumar = await perguntar({
+        oQue: `Reorganizar ${c.foraDaJornada} lavagem(ns) que ficaram fora da jornada?`,
+        efeito: "Elas estão em dias que não são mais de trabalho. Vão para o próximo dia de trabalho.",
+        confirmar: "Reorganizar",
+      });
       if (arrumar) {
         const rr = await fetch("/api/agenda/reorganizar", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -1375,6 +1398,7 @@ function CompraMaterial({ m, onFechar, onConfirmar }:
  * pediu para receber — por isso a contagem de exceções aparece junto.
  */
 function Mensagens() {
+  const perguntar = useConfirmar();
   const [ativo, setAtivo] = useState<boolean | null>(null);
   const [excecoes, setExcecoes] = useState<{ desligadas: number; ligadas: number }>({ desligadas: 0, ligadas: 0 });
   const [dias, setDias] = useState("");
@@ -1406,10 +1430,12 @@ function Mensagens() {
   async function alternarChave() {
     if (ativo === null) return;
     const novo = !ativo;
-    if (!novo && !confirm(
-      "Desligar o envio de fotos para as famílias?\n\n" +
-      "As limpezas continuam sendo registradas e você continua vendo as fotos no painel. " +
-      "O que para é a mensagem para a família.")) return;
+    if (!novo && !await perguntar({
+      oQue: "Desligar o envio de fotos para as famílias?",
+      efeito: "As limpezas continuam sendo registradas e você continua vendo as fotos no painel. "
+            + "O que para é a mensagem para a família.",
+      confirmar: "Desligar", tom: "perigo",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/config/fotos", {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -1577,8 +1603,12 @@ function Mensagens() {
                   {m.ativo ? "Desligar" : "Ligar"}
                 </button>
                 <button style={painel.botaoSec} disabled={ocupado}
-                        onClick={() => {
-                          if (!confirm("Apagar este texto de vez?")) return;
+                        onClick={async () => {
+                          if (!await perguntar({
+                            oQue: "Apagar este texto de vez?",
+                            efeito: "Ele sai do sorteio das mensagens. As já preparadas na fila não mudam.",
+                            confirmar: "Apagar", tom: "perigo",
+                          })) return;
                           acao("DELETE", null, `/api/config/textos?id=${m.id}`);
                         }}>
                   Apagar

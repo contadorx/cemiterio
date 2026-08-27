@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
 import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
+import { useConfirmar } from "@/components/Dialogos";
 
 export default function Thread() {
+  const perguntar = useConfirmar();
   const params = useParams();
   const id = params?.id as string;
   const [d, setD] = useState<any>(null);
@@ -34,7 +36,11 @@ export default function Thread() {
    * é dela, e uma sugestão que apaga o trabalho de alguém não é ajuda.
    */
   async function sugerir() {
-    if (texto.trim() && !confirm("Substituir o que você já escreveu pela sugestão da IA?")) return;
+    if (texto.trim() && !await perguntar({
+      oQue: "Substituir o que você já escreveu pela sugestão da IA?",
+      efeito: "O seu texto se perde. Se quiser guardar, copie antes.",
+      confirmar: "Substituir", tom: "perigo",
+    })) return;
     setSugerindo(true);
     setLeu(null);
     try {

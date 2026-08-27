@@ -7,6 +7,7 @@ import { MessageCircle, Plus, ChevronDown, Pencil, Link2, Trash2, Camera } from 
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
 import { prepararFoto, motivoFalha } from "@/lib/foto";
 import Flores from "./Flores";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * A FICHA DA FAMÍLIA.
@@ -1076,6 +1077,7 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
  * O botão só aparece quando FALTA alguma coisa. Mês completo não pede ação.
  */
 function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
+  const perguntar = useConfirmar();
   const [p, setP] = useState<any>(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -1092,11 +1094,12 @@ function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => v
   if (!p || p.jaAjustado || p.falta <= 0.005) return null;
 
   async function fechar() {
-    if (!confirm(
-      `Este mês teve ${p.limpezas} limpeza(s), somando ${dinheiro(p.consumido)}.\n` +
-      `O combinado é ${dinheiro(p.devidoNoMes)}.\n\n` +
-      `Lançar ${dinheiro(p.falta)} para fechar o mês no valor do contrato?`
-    )) return;
+    if (!await perguntar({
+      oQue: `Lançar ${dinheiro(p.falta)} para fechar o mês no valor do contrato?`,
+      efeito: `Este mês teve ${p.limpezas} limpeza(s), somando ${dinheiro(p.consumido)}, `
+            + `e o combinado é ${dinheiro(p.devidoNoMes)}. A diferença entra como dívida da família.`,
+      confirmar: "Lançar a diferença",
+    })) return;
 
     setOcupado(true);
     try {
@@ -1130,6 +1133,7 @@ function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => v
  * dia, ele não ocupa espaço nem convida a clicar à toa.
  */
 function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
+  const perguntar = useConfirmar();
   const [previa, setPrevia] = useState<any>(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -1155,10 +1159,12 @@ function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => 
     const faixa = previa.novos === 1
       ? rotulo(primeiro)
       : `${rotulo(primeiro)} até ${rotulo(ultimo)}`;
-    if (!confirm(
-      `Vou lançar ${previa.novos} cobrança(s) — ${faixa} — somando ` +
-      `${dinheiro(previa.total)}.\n\nConfirma?`
-    )) return;
+    if (!await perguntar({
+      oQue: `Lançar ${previa.novos} cobrança(s), somando ${dinheiro(previa.total)}?`,
+      efeito: `${faixa}. Elas entram no conta corrente como dívida da família. `
+            + `Nada é enviado a ninguém — a mensagem é decisão sua, na fila.`,
+      confirmar: "Lançar",
+    })) return;
 
     setOcupado(true);
     try {
@@ -1188,6 +1194,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   familiaId: string | null; clienteId: string | null; aoMudar: () => void;
   aLancar?: { competencias: number; valor: number; desde: string | null } | null;
 }) {
+  const perguntar = useConfirmar();
   const [cobrando, setCobrando] = useState(false);
 
   /**
@@ -1199,10 +1206,12 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
    */
   async function cobrarAgora() {
     if (!familiaId || !aLancar?.competencias) return;
-    if (!confirm(
-      `Lançar ${aLancar.competencias} ${aLancar.competencias === 1 ? "competência" : "competências"} `
-      + `no valor de R$ ${Number(aLancar.valor).toFixed(2).replace(".", ",")}?\n\n`
-      + `Elas entram no conta corrente como dívida da família. Nada é enviado a ninguém.`)) return;
+    if (!await perguntar({
+      oQue: `Lançar ${aLancar.competencias} ${aLancar.competencias === 1 ? "competência" : "competências"} `
+          + `no valor de R$ ${Number(aLancar.valor).toFixed(2).replace(".", ",")}?`,
+      efeito: "Elas entram no conta corrente como dívida da família. Nada é enviado a ninguém.",
+      confirmar: "Lançar",
+    })) return;
     setCobrando(true);
     try {
       const r = await fetch(`/api/familias/${familiaId}`, {
@@ -1616,6 +1625,7 @@ function PartesDoPagamento({ recebido, desconto, setDesconto, juros, setJuros,
  * registrar — e aí o extrato deixa de valer.
  */
 function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
+  const perguntar = useConfirmar();
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState({ data: l.data, valor: String(l.valor), descricao: l.descricao || "" });
   const [erro, setErro] = useState("");
@@ -1638,7 +1648,11 @@ function Lancamento({ l, aoMudar }: { l: any; aoMudar: () => void }) {
   }
 
   async function apagar() {
-    if (!confirm("Apagar este lançamento? O saldo muda na hora.")) return;
+    if (!await perguntar({
+      oQue: "Apagar este lançamento?",
+      efeito: "O saldo da família muda na hora, e não dá para voltar.",
+      confirmar: "Apagar", tom: "perigo",
+    })) return;
     setOcupado(true);
     await fetch(`/api/conta-corrente?id=${l.id}`, { method: "DELETE" });
     setOcupado(false);
@@ -2137,6 +2151,7 @@ function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
  * há trabalho a fazer.
  */
 function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
+  const perguntar = useConfirmar();
   const [dados, setDados] = useState<any>(null);
   const [editando, setEditando] = useState<string | null>(null);
   const [ed, setEd] = useState<any>({});
@@ -2243,9 +2258,11 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
    * quem acerta a conta"), e não o efeito colateral de remover um contato.
    */
   async function removerPessoa(p: any) {
-    if (!confirm(
-      `Remover ${p.nome} desta família?\n\n` +
-      `Os jazigos e o histórico ficam onde estão — sai só a pessoa.`)) return;
+    if (!await perguntar({
+      oQue: `Remover ${p.nome} desta família?`,
+      efeito: "Os jazigos e o histórico ficam onde estão — sai só a pessoa.",
+      confirmar: "Remover", tom: "perigo",
+    })) return;
     setMexendo(p.id); setErro("");
     try {
       const r = await fetch(`/api/familias/${familiaId}/contatos?contatoId=${p.id}`, {
@@ -2729,13 +2746,16 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
  */
 function Ajustes({ clienteId, nome, familiaId, familiaNome }:
   { clienteId: string; nome: string; familiaId: string | null; familiaNome: string }) {
+  const perguntar = useConfirmar();
   const [aberto, setAberto] = useState(true);
   const [ocupado, setOcupado] = useState(false);
 
   async function excluir() {
-    if (!confirm(
-      `Excluir a ficha de ${nome}?\n\nOs túmulos ficam cadastrados e podem ser ligados a outra família. Esta ação não volta.`
-    )) return;
+    if (!await perguntar({
+      oQue: `Excluir a ficha de ${nome}?`,
+      efeito: "Os túmulos ficam cadastrados e podem ser ligados a outra família. Esta ação não volta.",
+      confirmar: "Excluir a ficha", tom: "perigo",
+    })) return;
     setOcupado(true);
     const r = await fetch(`/api/clientes/${clienteId}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);
@@ -2787,6 +2807,7 @@ function Ajustes({ clienteId, nome, familiaId, familiaNome }:
  */
 function FundirOuExcluir({ familiaId, familiaNome }:
   { familiaId: string; familiaNome: string }) {
+  const perguntar = useConfirmar();
   const [abrindo, setAbrindo] = useState(false);
   const [busca, setBusca] = useState("");
   const [achadas, setAchadas] = useState<any[]>([]);
@@ -2811,10 +2832,12 @@ function FundirOuExcluir({ familiaId, familiaNome }:
   }
 
   async function fundir(destino: any) {
-    if (!confirm(
-      `Fundir "${familiaNome}" em "${destino.nome}"?\n\n` +
-      `Os contatos, os jazigos e o histórico passam para "${destino.nome}", ` +
-      `e "${familiaNome}" some da lista.\n\nIsto não tem desfazer.`)) return;
+    if (!await perguntar({
+      oQue: `Fundir "${familiaNome}" em "${destino.nome}"?`,
+      efeito: `Os contatos, os jazigos e o histórico passam para "${destino.nome}", `
+            + `e "${familiaNome}" some da lista. Isto não tem desfazer.`,
+      confirmar: "Fundir", tom: "perigo",
+    })) return;
     setOcupado(true); setErro("");
     const r = await fetch(`/api/familias/${familiaId}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -2829,7 +2852,11 @@ function FundirOuExcluir({ familiaId, familiaNome }:
   }
 
   async function excluirFamilia() {
-    if (!confirm(`Excluir a família "${familiaNome}"?\n\nSó dá certo se ela estiver vazia.`)) return;
+    if (!await perguntar({
+      oQue: `Excluir a família "${familiaNome}"?`,
+      efeito: "Só dá certo se ela estiver vazia — sem contato, sem jazigo e sem histórico.",
+      confirmar: "Excluir", tom: "perigo",
+    })) return;
     setOcupado(true); setErro("");
     const r = await fetch(`/api/familias/${familiaId}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);

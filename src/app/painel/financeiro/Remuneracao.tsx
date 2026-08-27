@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
 import { mesOperacao } from "@/lib/vencimento";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * PAGAMENTO DA EQUIPE — por mês, por jazigo, ou os dois.
@@ -27,6 +28,7 @@ function nomeDoMes(m: string) {
 }
 
 export default function Remuneracao() {
+  const perguntar = useConfirmar();
   const [mes, setMes] = useState(mesAtual());
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState("");
@@ -42,10 +44,11 @@ export default function Remuneracao() {
   useEffect(() => { carregar(); }, [carregar]);
 
   async function recalcular() {
-    if (!confirm(
-      "Recalcular aplica a regra de HOJE em todos os jazigos que ainda não foram pagos.\n\n" +
-      "O que já foi acertado não muda. Seguir?"
-    )) return;
+    if (!await perguntar({
+      oQue: "Recalcular a remuneração dos jazigos ainda não pagos?",
+      efeito: "Aplica a regra de HOJE em todos eles. O que já foi acertado com alguém não muda.",
+      confirmar: "Recalcular",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/equipe/remuneracao", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -67,14 +70,15 @@ export default function Remuneracao() {
    */
   async function acertar(p: any, incluirMensal: boolean) {
     const total = p.aPagar.jazigos + (incluirMensal ? p.mensalDevido : 0);
-    if (!confirm(
-      `Acertar com ${p.nome}\n\n` +
-      `${p.aPagar.servicos} jazigo(s): ${money(p.aPagar.jazigos)}\n` +
-      (incluirMensal ? `Fixo de ${nomeDoMes(mes)}: ${money(p.mensalDevido)}\n` : "") +
-      `TOTAL: ${money(total)}\n\n` +
-      `Sai uma saída no caixa e os jazigos ficam marcados como pagos.` +
-      (incluirMensal ? `\nO fixo deste mês não poderá ser pago de novo.` : "")
-    )) return;
+    if (!await perguntar({
+      oQue: `Acertar ${money(total)} com ${p.nome}?`,
+      efeito:
+        `${p.aPagar.servicos} jazigo(s): ${money(p.aPagar.jazigos)}. ` +
+        (incluirMensal ? `Fixo de ${nomeDoMes(mes)}: ${money(p.mensalDevido)}. ` : "") +
+        `Sai uma saída no caixa e os jazigos ficam marcados como pagos.` +
+        (incluirMensal ? ` O fixo deste mês não poderá ser pago de novo.` : ""),
+      confirmar: "Acertar",
+    })) return;
     setOcupado(true);
     const r = await fetch("/api/equipe/remuneracao", {
       method: "POST", headers: { "Content-Type": "application/json" },

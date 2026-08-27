@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * O CATÁLOGO DE FLORES E EXTRAS — a lista de preços da casa.
@@ -34,6 +35,7 @@ const VAZIO = {
 };
 
 export default function Extras() {
+  const perguntar = useConfirmar();
   const [lista, setLista] = useState<any[] | null>(null);
   const [f, setF] = useState<typeof VAZIO>({ ...VAZIO });
   const [editando, setEditando] = useState(false);
@@ -74,10 +76,15 @@ export default function Extras() {
 
   async function apagar(e: any) {
     const quantos = Number(e.combinados) || 0;
-    const frase = quantos > 0
-      ? `${e.nome} está em ${quantos} combinado(s). Vou desligar em vez de apagar — some de quem escolhe e o histórico fica. Continuar?`
-      : `Apagar ${e.nome} do catálogo?`;
-    if (!confirm(frase)) return;
+    const pedido = quantos > 0
+      ? { oQue: `Desligar ${e.nome} do catálogo?`,
+          efeito: `Ele está em ${quantos} combinado(s), então não dá para apagar: some de quem escolhe `
+                + "e o histórico fica de pé.",
+          confirmar: "Desligar", tom: "perigo" as const }
+      : { oQue: `Apagar ${e.nome} do catálogo?`,
+          efeito: "Ninguém combinou este item ainda, então ele sai de vez.",
+          confirmar: "Apagar", tom: "perigo" as const };
+    if (!await perguntar(pedido)) return;
     const r = await fetch(`/api/extras?id=${e.id}`, { method: "DELETE" }).then((x) => x.json());
     if (r?.mensagem) setAviso(r.mensagem);
     carregar();

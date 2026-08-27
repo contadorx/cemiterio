@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
+import { useConfirmar } from "@/components/Dialogos";
 
 /**
  * O COMBINADO DE FLORES — mora no JAZIGO, não na família.
@@ -39,6 +40,7 @@ export default function Flores({ familiaId, tumulos }: {
   familiaId: string | null;
   tumulos: any[];
 }) {
+  const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [abrindo, setAbrindo] = useState(false);
   const [erro, setErro] = useState("");
@@ -84,7 +86,11 @@ export default function Flores({ familiaId, tumulos }: {
   }
 
   async function desligar(id: string) {
-    if (!confirm("Tirar este combinado? As entregas já feitas ficam no histórico.")) return;
+    if (!await perguntar({
+      oQue: "Tirar este combinado?",
+      efeito: "As entregas já feitas ficam no histórico. Só param as próximas.",
+      confirmar: "Tirar", tom: "perigo",
+    })) return;
     const r = await fetch(`/api/flores/assinaturas?id=${id}`, { method: "DELETE" })
       .then((x) => x.json());
     if (r?.mensagem) alert(r.mensagem);
