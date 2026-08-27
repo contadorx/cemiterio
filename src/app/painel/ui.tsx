@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { MARCA } from "@/lib/marca";
 import { useState, useEffect } from "react";
-import EstiloMobile from "./EstiloMobile";
+import { ALVO, ALVO_MINI, ALVO_CAMPO, RAIO_CARTAO, RAIO_CONTROLE,
+         PAD_CARTAO, GAP_CARTAO, TEXTO_CONTROLE } from "./medidas";
 
 /**
  * As cores agora vêm dos TOKENS (app/tema.css), e não de hex cravado.
@@ -157,22 +158,25 @@ export const painel: Record<string, React.CSSProperties> = {
   wrap: {},
   conteudo: {},
   h1: { fontSize: 22, fontWeight: 600, color: "rgb(var(--zm-ink))", margin: "0 0 16px" },
-  card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: 14, padding: 16, marginBottom: 12, color: "rgb(var(--zm-ink))" },
+  card: { background: cor.card, border: `1px solid ${cor.linha}`, borderRadius: RAIO_CARTAO, padding: PAD_CARTAO, marginBottom: GAP_CARTAO, color: "rgb(var(--zm-ink))" },
 
-  // ── Botões tamanho padrão (altura de toque confortável no celular, >= 48px) ──
-  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 48 },
-  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 48 },
-  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: 15, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 48 },
+  // ── Botões tamanho padrão ──
+  // A altura vem de `medidas.ts`, e nao de um numero cravado aqui: `pecas.tsx`
+  // usa a MESMA constante. Enquanto eram dois numeros, o sistema novo tinha 44
+  // e o antigo 48, e ninguem notou — ver o comentario de `medidas.ts`.
+  botao: { ...botaoBase, padding: "13px 20px", fontSize: 16, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: ALVO },
+  botaoSec: { ...botaoBase, padding: "13px 18px", fontSize: TEXTO_CONTROLE, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: ALVO },
+  botaoPerigo: { ...botaoBase, padding: "13px 18px", fontSize: TEXTO_CONTROLE, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: ALVO },
 
   // ── Botões compactos (linhas densas de ação: uma medida única, sem improviso) ──
   // Antes cada tela inventava um padding ("4px 10px", "6px 12px", "8px 14px"…);
   // agora é um só tamanho para todos os botões pequenos.
-  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: 40 },
-  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: 40 },
-  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: 40 },
+  botaoMini: { ...botaoBase, padding: "8px 14px", fontSize: 14, fontWeight: 700, border: "none", background: cor.navy, color: cor.sobre, minHeight: ALVO_MINI },
+  botaoMiniSec: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", minHeight: ALVO_MINI },
+  botaoMiniPerigo: { ...botaoBase, padding: "8px 14px", fontSize: 14, border: "none", background: "rgb(var(--zm-perigo))", color: "#fff", minHeight: ALVO_MINI },
 
   // fontSize 16 evita o zoom automático do iOS ao focar o campo
-  input: { width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 8, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", boxSizing: "border-box" },
+  input: { width: "100%", padding: "10px 12px", fontSize: TEXTO_CONTROLE, minHeight: ALVO_CAMPO, borderRadius: RAIO_CONTROLE, border: `1px solid ${cor.linha}`, background: cor.card, color: "rgb(var(--zm-ink))", boxSizing: "border-box" },
   rotulo: { fontSize: 13, fontWeight: 500, color: cor.cinza, marginBottom: 4, display: "block" },
 };
 

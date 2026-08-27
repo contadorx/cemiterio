@@ -41,6 +41,9 @@ const vocab       = readFileSync("src/lib/vocabulario.ts", "utf8");
 const funilTela   = readFileSync("src/app/painel/financeiro/Funil.tsx", "utf8");
 const funilRota   = readFileSync("src/app/api/financeiro/funil/route.ts", "utf8");
 const cadastro    = readFileSync("src/app/painel/clientes/CadastrarFamilia.tsx", "utf8");
+const medidas     = readFileSync("src/app/painel/medidas.ts", "utf8");
+const uiTsx       = readFileSync("src/app/painel/ui.tsx", "utf8");
+const estiloMovel = readFileSync("src/app/painel/EstiloMobile.tsx", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -1086,5 +1089,41 @@ ok("'fazer este agora' parou de parecer distintivo",
 // O que E prioridade tem selo proprio, e vem antes dos outros avisos.
 ok("e a prioridade de verdade ganhou selo",
    /it\.adiadoVezes >= 2/.test(campoB) && /PRIORIDADE/.test(campoB));
+
+// ===================== BUILD G: os dois sistemas param de divergir ==============
+//
+// A auditoria (CA-11) descreveu isto como estetica. Ao comparar os dois para
+// unificar, o que estava variando nao era so aparencia.
+
+// `ui.tsx` escrevia a regra e a cumpria ("altura de toque confortavel >= 48px").
+// `pecas.tsx` — o sistema NOVO, usado na Liberacao e no cadastro — nao tinha
+// min-height nenhum: ~44px, e encolheria junto se alguem mudasse a fonte.
+ok("as medidas dos controles vivem num lugar so",
+   /export const ALVO = 48/.test(medidas) && /export const ALVO_MINI/.test(medidas));
+
+ok("e os dois sistemas bebem da mesma fonte",
+   /from "\.\/medidas"/.test(pecas) && /from "\.\/medidas"/.test(uiTsx));
+
+// Numero cravado e como a divergencia volta na proxima peca que alguem escrever.
+ok("nenhum dos dois crava a altura na mao",
+   !/minHeight: 48/.test(uiTsx) && !/minHeight: 40/.test(uiTsx) &&
+   /minHeight: ALVO/.test(pecas));
+
+// A FALHA MAIOR DESTE BUILD, e ela nao e de estilo:
+// `EstiloMobile` chegou em 23/08, `ui.tsx` a IMPORTAVA, e NENHUM arquivo
+// escrevia <EstiloMobile />. Import sem uso nao quebra build, nao acende lint e
+// nao aparece em teste: o painel passou quatro dias sem uma linha daquilo no
+// DOM, com todo mundo achando que o celular estava corrigido.
+ok("a folha do celular esta REALMENTE montada",
+   /<EstiloMobile \/>/.test(layPainel));
+
+// E no LAYOUT, nao no menu: 17 das 32 telas nao montam PainelNav — entre elas a
+// inicial e a ficha da familia, que e a maior do sistema.
+ok("e no layout, por onde o painel inteiro passa",
+   !/EstiloMobile/.test(uiTsx));
+
+// Tudo o que ela faz e dentro do media query: no desktop, nada muda.
+ok("e o que ela faz fica todo dentro do celular",
+   /@media \(max-width: 640px\)/.test(estiloMovel));
 
 process.exit(falhas ? 1 : 0);

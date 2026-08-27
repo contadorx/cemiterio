@@ -10,8 +10,8 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 24 |
-| Aplicado pela metade | 1 |
+| Aplicado | 25 |
+| Aplicado pela metade | 1 (CA-12) |
 | Não aplicado | 0 |
 | Não dá para provar lendo código | 1 |
 
@@ -33,8 +33,8 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-08 | Liberação deixa revisar com segurança | **sim (Build C)** | descarte confirmado, "limpo em 14/08 às 09:30" no cartão, fotos rotuladas, desfazer |
 | CA-09 | Financeiro tem uma porta só | **sim (Build E)** | abre no funil: a identificar → a conferir → a receber → fechar o mês |
 | CA-10 | Configuração é fácil de achar | **sim** | `config/page.tsx` tem `GRUPOS` com quatro domínios e diagnóstico por último |
-| CA-11 | O painel é visualmente consistente | **parcial (Build F)** | o cadastro de família, que a auditoria manda migrar primeiro, usa só `pecas.tsx`. Agenda, Famílias e Financeiro seguem em `ui.tsx` |
-| CA-12 | O mobile administrativo é simples | **não dá para provar** | responsividade se prova em aparelho, com teclado aberto e voltando do navegador |
+| CA-11 | O painel é visualmente consistente | **sim (Build G)** | as medidas vivem em `medidas.ts` e os dois sistemas bebem de lá; o botão novo tinha 44px contra 48 do antigo |
+| CA-12 | O mobile administrativo é simples | **metade (Build G)** | a folha do celular NUNCA esteve no ar — importada, nunca renderizada. Agora está, no layout. A outra metade é aparelho |
 | CA-13 | O sistema separa vazio de falha | **sim nas cinco telas caras** | O mês, Liberação, Agenda, Financeiro e Famílias têm os quatro estados; telas de segunda ordem vão no Build C |
 | CA-14 | Termo igual quer dizer coisa igual | **sim (Build E)** | cinco palavras em `src/lib/vocabulario.ts`; escolhi `conferido` em vez de `conciliado` — ver o LEIA-ME |
 
@@ -205,15 +205,18 @@ Duas coisas separadas, as duas esperando decisão sua:
 
 ## Onde estamos
 
-**24 das 26 contraprovas aplicadas.** Builds A a F entregues.
+**25 das 26 contraprovas aplicadas.** Builds A a G entregues.
 
 O que resta:
 
 | | |
 |---|---|
-| **CA-11 inteiro** | migrar Agenda, Famílias e Financeiro de `ui.tsx` para `pecas.tsx`. Trabalho grande, sem risco de dados |
-| **CA-12** | não é código: teste em aparelho de verdade, com a Sureya |
+| **Olhar o painel no celular** | a folha de correção móvel nunca esteve no ar (ver `LEIA-ME_a_folha_que_nunca_rodou.md`). Agora está — e nunca foi vista rodando |
+| **A régua de prioridade** | sua decisão, guardada acima |
 | **CP-03** | nunca foi conserto — a câmera do celular pede confirmação e isso não está na nossa mão. É métrica |
+
+Fora do roteiro de UX, o que está em `PENDENCIAS.md` — as **409 fotos sem
+segunda cópia** são o item mais velho e o mais caro se der errado.
 
 E as duas decisões guardadas acima, esperando você: o **"Fazer este agora"** que
 não é prioridade e parece que é, e a **régua de prioridade** (hoje só levanta

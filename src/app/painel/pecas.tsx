@@ -1,5 +1,7 @@
 "use client";
 
+import { ALVO, ALVO_CAMPO } from "./medidas";
+
 /**
  * As peças de tela, num lugar só.
  *
@@ -52,12 +54,24 @@ const CONTROLE =
   "w-full rounded-lg border border-line bg-card px-3 py-2.5 text-[15px] text-ink " +
   "placeholder:text-ink-soft focus:border-brand focus:outline-none";
 
+/**
+ * A ALTURA VEM DE `medidas.ts`, NÃO DE CLASSE.
+ *
+ * Sem isto, a altura era o que sobrasse do padding mais a linha do texto — e
+ * mudar o tamanho da fonte encolheria o alvo de toque junto, sem ninguém ver.
+ * Ver o comentário de `medidas.ts`: o sistema antigo tinha essa regra escrita e
+ * o novo a perdeu.
+ */
+const ALTURA_CAMPO = { minHeight: ALVO_CAMPO };
+
 export function Entrada(p: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...p} className={`${CONTROLE} ${p.className || ""}`} />;
+  return <input {...p} style={{ ...ALTURA_CAMPO, ...p.style }}
+                className={`${CONTROLE} ${p.className || ""}`} />;
 }
 
 export function Selecao(p: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...p} className={`${CONTROLE} ${p.className || ""}`} />;
+  return <select {...p} style={{ ...ALTURA_CAMPO, ...p.style }}
+                 className={`${CONTROLE} ${p.className || ""}`} />;
 }
 
 /**
@@ -77,6 +91,9 @@ export function Botao({
   return (
     <button
       {...p}
+      // 48px de alvo, pela mesma medida que as telas antigas usam. Antes eram
+      // ~44 aqui e 48 lá, e a peça NOVA era a menor das duas.
+      style={{ minHeight: ALVO, ...p.style }}
       className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5
                   text-[15px] font-medium transition-colors disabled:opacity-50
                   ${tons[tom]} ${className}`}
