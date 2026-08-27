@@ -22,6 +22,14 @@ const cardFlores  = readFileSync("src/app/painel/clientes/[id]/Flores.tsx", "utf
 const cron        = readFileSync("src/app/api/cron/diario/route.ts", "utf8");
 const libCamp     = readFileSync("src/lib/campanha.ts", "utf8");
 const telaCampo   = readFileSync("src/app/campo/page.tsx", "utf8");
+const libBuscar   = readFileSync("src/lib/buscar.ts", "utf8");
+const home        = readFileSync("src/app/painel/page.tsx", "utf8");
+const sinais      = readFileSync("src/app/painel/SinaisDeVida.tsx", "utf8");
+const blocoPrec   = readFileSync("src/app/painel/PrecisaDeVoce.tsx", "utf8");
+const rotaPrec    = readFileSync("src/app/api/precisa-de-voce/route.ts", "utf8");
+const pecas       = readFileSync("src/app/painel/pecas.tsx", "utf8");
+const telaAgenda2 = readFileSync("src/app/painel/agenda/page.tsx", "utf8");
+const telaLib     = readFileSync("src/app/painel/conversas/VisaoLiberacao.tsx", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -598,5 +606,108 @@ ok("cancelar a camera limpa a acao que estava pendente",
 ok("a foto executa a acao que foi pedida, nao a que sobrou no ref",
    /if \(acao === "comecar"\) onIniciar\(foto\);/.test(campoVisivel) &&
    !/if \(pendente\.current === "comecar"\)/.test(campoVisivel));
+
+// ===================== BUILD A: falha nao pode parecer vazio =====================
+//
+// A tela inicial dizia "Nenhuma pendencia neste mes" quando /api/mes CAIA — a
+// mesma frase de um mes em dia. Vazio nao e zero, agora tambem na tela.
+
+// O ajudante tem de reprovar as TRES formas de nao saber. A terceira e a que
+// mais passava batido: a rota responde 200 dizendo {ok:false} e o .then sai
+// sem fazer nada, deixando a tela no estado inicial — vazio.
+ok("o ajudante de busca reprova rede, HTTP e corpo negativo",
+   /if \(!r\.ok\) throw new Error/.test(libBuscar) &&
+   /corpo\?\.ok === false\) throw new Error/.test(libBuscar) &&
+   /catch \(e\)/.test(libBuscar));
+
+ok("e guarda a hora em que o dado virou verdade",
+   /setAtualizadoEm\(new Date\(\)\)/.test(libBuscar) && /atualizadoEm/.test(libBuscar));
+
+// Apagar a tela quando a ATUALIZACAO falha castiga quem esta olhando por um
+// problema que nao e dela. O dado velho fica, com a hora.
+ok("uma atualizacao que falha nao apaga o que ja estava na tela",
+   !/setDados\(null\)/.test(semComentarios(libBuscar)));
+
+const homeVisivel = semComentarios(home);
+ok("a tela inicial nao engole mais a falha do mes",
+   /useBusca/.test(homeVisivel) && /<Falhou/.test(homeVisivel) &&
+   !/catch\(\(\) => \{\}\)/.test(homeVisivel) &&
+   !/catch\(\(\) => null\)/.test(homeVisivel));
+
+// O pior caso possivel desta tela: anunciar "nenhuma pendencia" sem ter
+// conseguido perguntar.
+ok("e so diz 'nenhuma pendencia' depois de ter conseguido perguntar",
+   /mes\.fase !== "erro" && !linhas\.length/.test(homeVisivel));
+
+ok("a tela inicial diz de que hora sao os numeros",
+   /<Desde hora=\{horaCurta\(mes\.atualizadoEm\)\}/.test(homeVisivel));
+
+// O alarme existe porque o WhatsApp ficou 19 dias calado sem ninguem ver. Ele
+// sumir quando nao consegue medir repete a falha que o criou.
+const sinaisVisivel = semComentarios(sinais);
+ok("o alarme do sistema nao falha calado",
+   /useBusca/.test(sinaisVisivel) && /fase === "erro"/.test(sinaisVisivel) &&
+   !/catch\(\(\) => \{\}\)/.test(sinaisVisivel));
+
+ok("existe uma peca unica de falha, com botao de tentar de novo",
+   /export function Falhou/.test(pecas) && /Tentar novamente/.test(pecas));
+
+// Erro e vazio tem de ser DIFERENTES na tela, senao a peca nao serve.
+ok("e ela diz que nao saber nao e estar em dia",
+   /nao quer dizer que esta tudo em dia|não quer dizer que está tudo em dia/.test(pecas));
+
+// ---- CA-01: as filas que ficavam atras do menu ----
+
+ok("a tela inicial mostra o que espera decisao fora do mes",
+   /<PrecisaDeVoce \/>/.test(homeVisivel));
+
+const precVisivel = semComentarios(blocoPrec);
+ok("o bloco cobre as quatro filas com gente do outro lado",
+   /liberacao/.test(precVisivel) && /conversas/.test(precVisivel) &&
+   /comprovantes/.test(precVisivel) && /contatos/.test(precVisivel));
+
+// Duas contas sobre os mesmos fatos comecam iguais e terminam discordando —
+// ja mordeu a agenda (0092), o painel (0105) e a lista de familias (0106).
+ok("o numero de conversas vem da MESMA funcao da aba 'Precisam de voce'",
+   /sureya_contadores_conversas/.test(rotaPrec) && /contadores\?\.pendentes/.test(rotaPrec));
+
+ok("e a fila de liberacao usa o mesmo filtro de adiada da tela dela",
+   /adiada_para\.is\.null,adiada_para\.lte\./.test(rotaPrec));
+
+// Vazio nao e zero tambem do lado do servidor: consulta que falhou nao pode
+// virar "nada para conferir".
+ok("fila que nao respondeu vem nula, nao zerada",
+   /r\?\.error \? null/.test(rotaPrec));
+
+ok("e a tela avisa quais filas ela nao conseguiu ler",
+   /naoSoube/.test(precVisivel) && /f\.n === null/.test(precVisivel));
+
+// Bloco com quatro zeros todo dia vira moldura, e moldura ninguem le. Mas
+// falhar em silencio e o defeito inteiro da CA-13.
+ok("o bloco some quando esta tudo em dia, mas nao quando falhou",
+   /!comTrabalho\.length && !naoSoube\.length && !semJazigo && fase !== "erro"/.test(precVisivel));
+
+// As quatro afirmacoes que so podem ser feitas depois de ter conseguido
+// perguntar. Cada uma delas era dita, antes, tambem quando a rota caia.
+const agenda2Visivel = semComentarios(telaAgenda2);
+ok("'nada agendado no periodo' so aparece se nao houve erro",
+   /!carregando && !erro && chaves\.length === 0/.test(agenda2Visivel) &&
+   /<Falhou mensagem=\{erro\}/.test(agenda2Visivel));
+
+// Esta e a unica porta de saida de mensagem para familia. Nada sai sem o toque
+// dela — entao a tela dizer que a fila esta vazia tem peso.
+const libVisivel = semComentarios(telaLib);
+ok("'nada esperando liberacao' so aparece se a fila foi mesmo lida",
+   /itens\.length === 0 && !erro/.test(libVisivel) &&
+   /!itens\.length && !erro/.test(libVisivel));
+
+ok("e a fila avisa quando nao conseguiu ser lida",
+   /setErro\("Não consegui ler a fila/.test(telaLib));
+
+ok("'nada para conferir' nao esconde comprovante que nao deu para ler",
+   /if \(erroLista\) return <Falhou/.test(semComentarios(telaFin)));
+
+ok("a lista de familias nao fica presa em 'Carregando'",
+   /!d && !erroLista && <p/.test(semComentarios(lista)));
 
 process.exit(falhas ? 1 : 0);

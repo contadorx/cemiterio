@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
+import { Falhou } from "../pecas";
 import { mesOperacao, diaOperacao, somaDias } from "@/lib/vencimento";
 
 /**
@@ -164,17 +165,36 @@ export default function AgendaPage() {
   const nomeDe = (id: string | null) =>
     (id && equipe.find((m) => m.id === id)?.nome) || null;
 
+  /**
+   * AGENDA VAZIA E AGENDA QUE NAO CARREGOU SAO A MESMA TELA — eram.
+   *
+   * `setDias(r?.dias || {})` com `catch(() => null)`: se a rota caisse, a
+   * agenda ficava vazia e a tela dizia que nao havia nada marcado. Numa tela de
+   * planejamento do dia da Nina, isso e pior do que um erro na cara.
+   */
+  const [erro, setErro] = useState("");
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     const qs = new URLSearchParams();
     if (periodo.inicio) qs.set("inicio", periodo.inicio);
     if (periodo.fim) qs.set("fim", periodo.fim);
     qs.set("dias", String(periodo.dias));
-    const r = await fetch(`/api/agenda/semana?${qs}`).then((x) => x.json()).catch(() => null);
-    setDias(r?.dias || {});
-    setEquipe(r?.equipe || []);
-    if (r?.capacidadeDia) setCapacidadeDia(r.capacidadeDia);
-    setCarregando(false);
+    try {
+      const x = await fetch(`/api/agenda/semana?${qs}`);
+      if (!x.ok) throw new Error(`HTTP ${x.status}`);
+      const r = await x.json();
+      if (r?.ok === false) throw new Error(r?.erro || "resposta_negativa");
+      setDias(r?.dias || {});
+      setEquipe(r?.equipe || []);
+      if (r?.capacidadeDia) setCapacidadeDia(r.capacidadeDia);
+      setErro("");
+    } catch (e) {
+      console.error("[agenda] carregar:", e);
+      setErro("Não consegui carregar a agenda. Isto não quer dizer que o dia está livre.");
+    } finally {
+      setCarregando(false);
+    }
   }, [periodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -754,7 +774,13 @@ export default function AgendaPage() {
         </div>
 
         {carregando && <p style={{ color: cor.cinza }}>Carregando...</p>}
-        {!carregando && chaves.length === 0 && (
+
+        {/* O ERRO VEM ANTES DO VAZIO, e o vazio so aparece se nao houve erro:
+            "Nada agendado no periodo" e uma afirmacao, e ela so pode ser feita
+            depois de ter conseguido perguntar. */}
+        {!!erro && <Falhou mensagem={erro} aoTentar={carregar} parcial={chaves.length > 0} />}
+
+        {!carregando && !erro && chaves.length === 0 && (
           <section style={painel.card}>
             <p style={{ color: cor.cinza, margin: 0 }}>
               {filtrando

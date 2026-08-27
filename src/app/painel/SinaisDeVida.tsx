@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useBusca } from "@/lib/buscar";
+import { Falhou } from "./pecas";
 
 /**
  * SINAIS DE VIDA — a faixa que faltava.
@@ -55,21 +56,20 @@ function faz(minutos: number | null): string {
 }
 
 export default function SinaisDeVida() {
-  const [rotinas, setRotinas] = useState<Rotina[]>([]);
-  const [whats, setWhats] = useState<Saude | null>(null);
-
-  useEffect(() => {
-    fetch("/api/rotinas")
-      .then((r) => r.json())
-      .then((r) => {
-        if (!r?.ok) return;
-        setRotinas(r.rotinas || []);
-        setWhats(r.whatsapp || null);
-      })
-      // Silencioso: o Início é sobre o mês. Se o diagnóstico não responder, o
-      // mês continua aparecendo — só o aviso não sai.
-      .catch(() => {});
-  }, []);
+  /**
+   * O ALARME QUE NÃO PODIA FALHAR CALADO.
+   *
+   * Estava `.catch(() => {})`, com o comentário "se o diagnóstico não
+   * responder, só o aviso não sai". Só que este bloco existe porque o WhatsApp
+   * ficou dezenove dias sem entregar nada e ninguém percebeu. Um alarme que
+   * some quando não consegue medir repete exatamente a falha que o criou:
+   * ausência de aviso passando por ausência de problema.
+   *
+   * Agora, se /api/rotinas não responder, o bloco aparece dizendo isso.
+   */
+  const { fase, dados, erro, recarregar } = useBusca<any>("/api/rotinas");
+  const rotinas: Rotina[] = dados?.rotinas || [];
+  const whats: Saude | null = dados?.whatsapp || null;
 
   const paradas = rotinas.filter((r) => r.atrasada);
 
@@ -81,6 +81,15 @@ export default function SinaisDeVida() {
   const calado = !!whats && (whats.silencio || whats.nunca_recebeu);
   const surdo =
     !!whats && !calado && whats.total_24h >= 10 && whats.gravadas_24h === 0;
+
+  if (fase === "erro") {
+    return (
+      <Falhou
+        mensagem={erro || "Não consegui checar se o sistema está rodando."}
+        aoTentar={recarregar}
+      />
+    );
+  }
 
   if (paradas.length === 0 && !calado && !surdo) return null;
 

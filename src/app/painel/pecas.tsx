@@ -108,3 +108,58 @@ export function Selo({
 
 export const dinheiro = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/**
+ * O AVISO DE FALHA — a peça que faltava para vazio e erro pararem de se
+ * parecer.
+ *
+ * Toda lista do painel tem quatro estados (ver `src/lib/buscar.ts`), e três
+ * deles já tinham cara: carregando, vazio, conteúdo. Erro não tinha nenhuma:
+ * virava vazio. Esta peça existe para que nenhuma tela precise inventar a
+ * sua — e para que a saída seja sempre a mesma: dizer o que houve e dar o
+ * botão de tentar de novo.
+ *
+ * `parcial` é quando havia dado bom na tela e a ATUALIZAÇÃO é que falhou. Aí o
+ * aviso é uma faixa fina em cima do que já está ali, e não um bloco no lugar
+ * do conteúdo: o número velho continua útil desde que se saiba que é velho.
+ */
+export function Falhou({
+  mensagem, aoTentar, parcial = false, desde,
+}: {
+  mensagem: string;
+  aoTentar: () => void;
+  parcial?: boolean;
+  desde?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl2 border p-4 ${
+        parcial
+          ? "mb-3 border-aviso/40 bg-aviso/10"
+          : "mb-3 border-perigo/40 bg-perigo/5"
+      }`}
+    >
+      <div className="min-w-0">
+        <p className={`text-[15px] font-semibold ${parcial ? "text-aviso" : "text-perigo"}`}>
+          {parcial ? "Não consegui atualizar" : mensagem}
+        </p>
+        <p className="mt-0.5 text-[13px] text-ink-soft">
+          {parcial
+            ? `${mensagem} O que está na tela é de ${desde || "antes"}.`
+            : "Isto não quer dizer que está tudo em dia — quer dizer que não deu para saber."}
+        </p>
+      </div>
+      <Botao onClick={aoTentar}>Tentar novamente</Botao>
+    </div>
+  );
+}
+
+/**
+ * A hora em que o número era verdade. Vai embaixo do conteúdo, discreta.
+ * Sem ela, "3 esperando" não diz se é de agora ou de quando a aba abriu.
+ */
+export function Desde({ hora }: { hora: string }) {
+  if (!hora) return null;
+  return <p className="mt-2 text-[12px] text-ink-soft">Atualizado às {hora}.</p>;
+}

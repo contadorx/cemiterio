@@ -10,9 +10,9 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 3 |
+| Aplicado | 6 |
 | Aplicado pela metade | 1 |
-| Não aplicado | 21 |
+| Não aplicado | 18 |
 | Não dá para provar lendo código | 1 |
 
 Três de vinte e seis é pouco, mas as duas auditorias são de antes de boa parte
@@ -23,9 +23,9 @@ de regra — não de tela. O que segue é a lista honesta.
 
 | # | Promessa | Situação | Onde eu vi |
 |---|---|---|---|
-| CA-01 | A home mostra tudo que precisa de atenção | **não** | `src/app/painel/page.tsx` não tem bloco de pendências nem contagem; o menu não tem marcador |
+| CA-01 | A home mostra tudo que precisa de atenção | **sim (Build A)** | bloco "Precisa de você" com as quatro filas, cada número pela regra da tela que ele aponta |
 | CA-02 | O mês é a fotografia da competência | **sim** | `src/app/api/mes/route.ts:75` corta em `{ ate: ultimoDia }` |
-| CA-03 | Se a home não carregar, ela sabe | **não** | `src/app/painel/page.tsx:64` — `.catch(() => {})`. A falha vira tela vazia |
+| CA-03 | Se a home não carregar, ela sabe | **sim (Build A)** | `useBusca` + `Falhou` com hora da última atualização |
 | CA-04 | Famílias é uma lista simples | **não** | 701 linhas, nenhum agrupamento de filtro avançado |
 | CA-05 | Cadastrar família é uma tarefa só | **não** | formulário único, sem etapas nem resumo final |
 | CA-06 | A agenda mostra trabalho, não engenharia | **não** | "Gerar limpezas" continua na tela principal (`agenda/page.tsx:675`) |
@@ -35,7 +35,7 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-10 | Configuração é fácil de achar | **sim** | `config/page.tsx` tem `GRUPOS` com quatro domínios e diagnóstico por último |
 | CA-11 | O painel é visualmente consistente | **não** | 3 telas com estilo em objeto inline, 14 com classe — dois vocabulários visuais |
 | CA-12 | O mobile administrativo é simples | **não dá para provar** | responsividade se prova em aparelho, com teclado aberto e voltando do navegador |
-| CA-13 | O sistema separa vazio de falha | **não** | **144** `catch(() => null)` e **22** `catch(() => {})` em `src/app/painel/` |
+| CA-13 | O sistema separa vazio de falha | **sim nas cinco telas caras** | O mês, Liberação, Agenda, Financeiro e Famílias têm os quatro estados; telas de segunda ordem vão no Build C |
 | CA-14 | Termo igual quer dizer coisa igual | **não** | "em aberto" 39×, "saldo" 57×, "recebido" 22×, "falta pagar" 4×, "a receber" 2×; "a identificar" e "conciliado" 0× |
 
 ## Campo
@@ -73,8 +73,8 @@ A ordem não é a das auditorias. É por dano: primeiro o que faz alguém decidi
 errado, depois o que faz perder trabalho, depois o que assusta, e só então o
 que incomoda.
 
-### Build A — falha não pode parecer vazio
-**CA-03, CA-13, CA-01**
+### Build A — falha não pode parecer vazio ✅ ENTREGUE
+**CA-03, CA-13, CA-01** — ver `LEIA-ME_falha_nao_e_vazio.md`
 
 É o mais perigoso da lista e o mais barato de arrumar. Hoje a home engole o
 erro em `.catch(() => {})` e mostra tela vazia. Você olha, vê zero pendência,
@@ -145,9 +145,6 @@ inteiro e achar que mudou o app.
 CA-12 não é código: é sentar com a Sureya num aparelho de verdade, com teclado
 aberto e voltando do navegador.
 
-## O que eu faria primeiro
+## Onde estamos
 
-Build A. Ele é pequeno, não mexe em banco, e é o único da lista que pode fazer
-você tomar uma decisão errada com dinheiro na mesa achando que está tudo certo.
-
-Depois B, porque trabalho perdido no cemitério não volta.
+Build A entregue. O próximo é o B — trabalho perdido no cemitério não volta.

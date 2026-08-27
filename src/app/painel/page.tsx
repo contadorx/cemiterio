@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Cartao, Selo, dinheiro } from "./pecas";
+import { Cartao, Selo, Falhou, Desde, dinheiro } from "./pecas";
+import { useBusca, horaCurta } from "@/lib/buscar";
 import PainelDoMes from "./financeiro/PainelDoMes";
 import SinaisDeVida from "./SinaisDeVida";
+import PrecisaDeVoce from "./PrecisaDeVoce";
 
 /**
  * O MÊS — a tela inicial.
@@ -49,32 +51,23 @@ function competenciaAtual() {
 
 export default function Painel() {
   const [competencia, setCompetencia] = useState(competenciaAtual);
-  const [dados, setDados] = useState<any>(null);
-  const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<"todas" | "pendentes">("pendentes");
-  /** Quem escreveu pelo site e ainda espera — ver o comentário do bloco abaixo. */
-  const [contatos, setContatos] = useState<{ total: number; atrasados: number } | null>(null);
 
-  useEffect(() => {
-    fetch("/api/contatos")
-      .then((r) => r.json())
-      .then((r) => { if (r?.ok) setContatos({ total: r.resumo.total, atrasados: r.resumo.atrasados }); })
-      // Silencioso de propósito: esta tela é sobre o mês. Se a fila de contatos
-      // não responder, o mês continua aparecendo — só o aviso não sai.
-      .catch(() => {});
-  }, []);
-
-  const carregar = useCallback(async () => {
-    setCarregando(true);
-    try {
-      const r = await fetch(`/api/mes?competencia=${competencia}`).then((x) => x.json());
-      if (r?.ok) setDados(r);
-    } finally {
-      setCarregando(false);
-    }
-  }, [competencia]);
-
-  useEffect(() => { carregar(); }, [carregar]);
+  /**
+   * OS QUATRO ESTADOS DO MÊS (CA-03).
+   *
+   * O que havia aqui: `try { ... if (r?.ok) setDados(r) } finally { ... }`. Sem
+   * `catch`, sem estado de erro. Se `/api/mes` caísse — 500, rede, sessão
+   * expirada — `dados` continuava nulo, `carregando` virava falso, e a tela
+   * dizia "Nenhuma pendência neste mês. 🌿". A MESMA FRASE de um mês em dia.
+   *
+   * Dava para fechar o dia tranquila com o sistema fora do ar. É o "vazio não é
+   * zero" que já custou caro no dinheiro, e estava solto aqui na tela que ela
+   * mais abre.
+   */
+  const mes = useBusca<any>(`/api/mes?competencia=${competencia}`);
+  const dados = mes.dados;
+  const carregando = mes.fase === "carregando";
 
   const linhas = (dados?.linhas || []).filter((l: any) =>
     filtro === "todas" ? true : !l.limpezaOk || !l.pagamentoOk
@@ -99,33 +92,16 @@ export default function Painel() {
           estão esperando. */}
       <SinaisDeVida />
 
-      {/* PRECISA DE VOCÊ — quem escreveu pelo site e ainda espera.
-          Fica ACIMA dos números do mês porque é a única coisa desta tela com
-          relógio correndo: o site promete "respondemos no mesmo dia".
+      {/* PRECISA DE VOCÊ — as filas com gente do outro lado (CA-01).
+          Fica ACIMA dos números do mês porque é a única parte desta tela com
+          relógio correndo.
 
-          Existia um card assim e ele saiu quando esta tela virou "O mês" — sem
-          que os avisos do formulário soubessem: eles continuaram apontando
-          para /painel/leads, que o middleware devolve como 404. Um contato do
-          site podia ficar no banco sem tela nenhuma em que aparecesse. */}
-      {contatos && contatos.total > 0 && (
-        <Link
-          href="/painel/contatos"
-          className={`mb-4 block rounded-xl2 border p-4 ${
-            contatos.atrasados > 0
-              ? "border-aviso/40 bg-aviso/10"
-              : "border-line bg-card hover:bg-surface"}`}
-        >
-          <p className={`text-[16px] font-semibold ${contatos.atrasados > 0 ? "text-aviso" : "text-ink"}`}>
-            {contatos.total} {contatos.total === 1 ? "pessoa escreveu" : "pessoas escreveram"} pelo site
-            {contatos.atrasados > 0 && (
-              <> — {contatos.atrasados} sem ninguém ter tentado falar</>
-            )}
-          </p>
-          <p className="mt-0.5 text-[13px] text-ink-soft">
-            Abrir a fila de contatos →
-          </p>
-        </Link>
-      )}
+          Aqui havia só a fila de contatos do site, e ela mesma nasceu de um
+          buraco: os avisos do formulário apontavam para /painel/leads, que o
+          middleware devolve 404 — contato podia ficar no banco sem tela nenhuma
+          em que aparecesse. O bloco agora junta as quatro filas, e a busca dele
+          fala quando falha em vez de sumir. */}
+      <PrecisaDeVoce />
 
       {/* ================= O PAINEL DO MÊS =================
           Mesmo componente do Financeiro — não uma segunda versão. Duas telas
@@ -188,7 +164,20 @@ export default function Painel() {
 
       {carregando && <p className="text-[15px] text-ink-soft">Carregando {mesNome}…</p>}
 
-      {!carregando && !linhas.length && (
+      {/* ERRO NÃO É VAZIO. Se já havia mês bom na tela, a falha é uma faixa em
+          cima dele com a hora do que está sendo mostrado; se não havia, ela
+          toma o lugar da lista — porque anunciar "nenhuma pendência" sem ter
+          conseguido perguntar é a pior coisa que esta tela pode fazer. */}
+      {mes.fase === "erro" && (
+        <Falhou
+          mensagem={mes.erro || "Não consegui carregar o mês."}
+          aoTentar={mes.recarregar}
+          parcial={!!dados}
+          desde={horaCurta(mes.atualizadoEm)}
+        />
+      )}
+
+      {!carregando && mes.fase !== "erro" && !linhas.length && (
         <Cartao>
           <p className="text-[16px] font-semibold text-positivo">
             {filtro === "pendentes"
@@ -243,6 +232,8 @@ export default function Painel() {
           </div>
         </Link>
       ))}
+
+      {dados && <Desde hora={horaCurta(mes.atualizadoEm)} />}
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
+import { Falhou } from "../pecas";
 import { PainelFechamento } from "../fechamento/Fechamento";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
@@ -197,9 +198,27 @@ function Comprovantes() {
     setEd((x) => ({ ...x, [c.id]: { ...campos(c), [campo]: v } }));
   }
 
+  /**
+   * "NADA PARA CONFERIR AGORA" NAO PODE SER O QUE A TELA DIZ QUANDO NAO SABE.
+   *
+   * Comprovante e dinheiro que a familia ja mandou e que ainda nao entrou no
+   * caixa. Com `catch(() => null)`, uma falha da rota deixava `itens` vazio e a
+   * tela dizia que nao havia nada — com dinheiro parado esperando decisao.
+   */
+  const [erroLista, setErroLista] = useState("");
+
   async function carregar() {
-    const r = await fetch("/api/comprovantes").then((x) => x.json()).catch(() => null);
-    if (r?.ok) setItens(Array.isArray(r.comprovantes) ? r.comprovantes : []);
+    try {
+      const x = await fetch("/api/comprovantes");
+      if (!x.ok) throw new Error(`HTTP ${x.status}`);
+      const r = await x.json();
+      if (!r?.ok) throw new Error(r?.erro || "resposta_negativa");
+      setItens(Array.isArray(r.comprovantes) ? r.comprovantes : []);
+      setErroLista("");
+    } catch (e) {
+      console.error("[comprovantes] carregar:", e);
+      setErroLista("Não consegui ler os comprovantes. Pode haver dinheiro esperando conferência.");
+    }
   }
   useEffect(() => {
     carregar();
@@ -231,6 +250,7 @@ function Comprovantes() {
     carregar();
   }
 
+  if (erroLista) return <Falhou mensagem={erroLista} aoTentar={carregar} parcial={itens.length > 0} />;
   if (itens.length === 0) return <p style={{ color: cor.cinza }}>Nada para conferir agora.</p>;
 
   return (

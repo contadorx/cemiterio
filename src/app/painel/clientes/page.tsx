@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor, numeroBR } from "../ui";
+import { Falhou } from "../pecas";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
@@ -160,14 +161,28 @@ function VisaoFamilias() {
           : ""));
   }
 
+  const [erroLista, setErroLista] = useState("");
+
   const carregar = useCallback(async () => {
     const p = new URLSearchParams();
     Object.entries(f).forEach(([k, v]) => {
       if (k === "teste") { if (v) p.set("teste", "1"); }
       else if (v) p.set(k, String(v));
     });
-    const r = await fetch(`/api/clientes?${p}`).then((x) => x.json()).catch(() => null);
-    if (r?.ok) setD(r);
+    try {
+      const x = await fetch(`/api/clientes?${p}`);
+      if (!x.ok) throw new Error(`HTTP ${x.status}`);
+      const r = await x.json();
+      if (!r?.ok) throw new Error(r?.erro || "resposta_negativa");
+      setD(r);
+      setErroLista("");
+    } catch (e) {
+      // Com `catch(() => null)` e `if (r?.ok)`, uma falha deixava `d` nulo para
+      // sempre e a tela ficava presa em "Carregando…" — sem erro, sem botao,
+      // sem nada a fazer alem de recarregar a pagina no chute.
+      console.error("[familias] carregar:", e);
+      setErroLista("Não consegui carregar a lista de famílias.");
+    }
   }, [f]);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -291,7 +306,8 @@ function VisaoFamilias() {
 
         {abrindo && <Importar onPronto={() => { setAbrindo(false); carregar(); }} />}
 
-        {!d && <p style={{ color: cor.cinza }}>Carregando…</p>}
+        {!!erroLista && <Falhou mensagem={erroLista} aoTentar={carregar} parcial={!!d} />}
+        {!d && !erroLista && <p style={{ color: cor.cinza }}>Carregando…</p>}
         {d && d.clientes.length === 0 && (
           <div style={painel.card}><p style={{ color: cor.cinza, margin: 0 }}>Nenhuma família com esses filtros.</p></div>
         )}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Send, Trash2, AlertTriangle, Undo2, Shuffle, CheckSquare, Square, StopCircle, XCircle } from "lucide-react";
-import { Cartao, Botao, Selo } from "../pecas";
+import { Cartao, Botao, Selo, Falhou } from "../pecas";
 import { BellOff, Bell, CalendarClock } from "lucide-react";
 import { diasDesde, faz } from "@/lib/datas";
 
@@ -234,18 +234,36 @@ export default function VisaoLiberacao() {
   // `tipo`. Carregar tudo também deixa a contagem de cada grupo correta sem
   // uma segunda consulta — e a fila de liberação é curta por natureza: se um
   // dia deixar de ser, o problema é a fila, não a consulta.
+  /**
+   * "NADA ESPERANDO LIBERACAO" E UMA AFIRMACAO FORTE.
+   *
+   * Esta tela e a unica porta de saida de mensagem para familia — nada sai sem
+   * o toque dela. Quando /api/fila falhava, o `if (r.ok)` saia sem fazer nada,
+   * `itens` ficava vazio, e a tela dizia "Nada esperando liberacao" com
+   * mensagens paradas do outro lado. Ela fecharia a aba tranquila.
+   *
+   * Nao havia nem `catch`: a promessa rejeitada morria como unhandled rejection
+   * no console, sem nada na tela.
+   */
+  const [erro, setErro] = useState("");
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const r = await fetch(`/api/fila${verAdiadas ? "?adiadas=1" : ""}`).then((x) => x.json());
-      if (r.ok) {
-        setItens(r.itens);
-        setWhatsapp(r.whatsapp || "");
-        setDiasEntreFotos(Number(r.diasEntreFotos) || 0);
-        setDisparosAutomaticos(!!r.disparosAutomaticos);
-        setPorTipo(r.porTipo || {});
-        setAdiadas(Number(r.adiadas) || 0);
-      }
+      const x = await fetch(`/api/fila${verAdiadas ? "?adiadas=1" : ""}`);
+      if (!x.ok) throw new Error(`HTTP ${x.status}`);
+      const r = await x.json();
+      if (!r?.ok) throw new Error(r?.erro || "resposta_negativa");
+      setItens(r.itens);
+      setWhatsapp(r.whatsapp || "");
+      setDiasEntreFotos(Number(r.diasEntreFotos) || 0);
+      setDisparosAutomaticos(!!r.disparosAutomaticos);
+      setPorTipo(r.porTipo || {});
+      setAdiadas(Number(r.adiadas) || 0);
+      setErro("");
+    } catch (e) {
+      console.error("[liberacao] carregar:", e);
+      setErro("Não consegui ler a fila. Pode haver mensagem esperando que não estou mostrando.");
     } finally { setCarregando(false); }
   }, [verAdiadas]);
 
@@ -704,7 +722,9 @@ export default function VisaoLiberacao() {
       {/* FILA VAZIA NÃO É DEFEITO — mas parece um, se a tela só ficar branca.
           Hoje ela está: nada foi gerado ainda, e os disparos automáticos estão
           desligados de propósito. Dizer isso evita o chamado. */}
-      {itens.length === 0 && (
+      {!!erro && <Falhou mensagem={erro} aoTentar={carregar} parcial={itens.length > 0} />}
+
+      {itens.length === 0 && !erro && (
         <div className="mb-4 rounded-xl2 border border-line bg-card p-4">
           <p className="text-[15px] font-semibold text-ink">Nada esperando liberação.</p>
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
@@ -854,7 +874,7 @@ export default function VisaoLiberacao() {
         </Cartao>
       )}
 
-      {!itens.length && (
+      {!itens.length && !erro && (
         <Cartao>
           <p className="text-[16px] font-medium text-ink">Nada esperando aprovação</p>
           <p className="mt-1 text-[14px] text-ink-soft">
