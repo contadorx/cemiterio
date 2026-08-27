@@ -213,10 +213,13 @@ export async function PATCH(
   if (typeof b?.tratamento === "string") campos.tratamento = b.tratamento.trim() || null;
   if (typeof b?.observacoes === "string") campos.observacoes = b.observacoes.trim() || null;
 
-  // O CONSENTIMENTO é uma data, não um texto: marcar registra AGORA, desmarcar
-  // apaga. É o que a conferência cobra, e é onde se conserta.
-  if (b?.consentimento === true) campos.consentimento_em = new Date().toISOString();
-  if (b?.consentimento === false) campos.consentimento_em = null;
+  // O CONSENTIMENTO SAIU DAQUI (0138).
+  //
+  // Marcar escrevia a data e desmarcar a APAGAVA — e apagar a data apagava
+  // junto o fato de que houve autorização um dia. Sob a LGPD o que se precisa
+  // mostrar é justamente o contrário: que foi dada, e que foi retirada quando
+  // pediram. Agora as duas coisas deixam linha em `consentimentos`, pelas
+  // mesmas funções que a ficha usa. Ver depois do `update`.
 
   if (typeof b?.telefone === "string") {
     const t = b.telefone.trim();
@@ -256,14 +259,48 @@ export async function PATCH(
     campos.responsavel_financeiro = b.acertaConta;
   }
 
-  if (!Object.keys(campos).length) {
+  // A AUTORIZAÇÃO É PEDIDO DE VERDADE, mesmo sozinha: sem esta linha, marcar
+  // só a caixinha voltaria "nada mudou" e a autorização não seria registrada.
+  const mexeNoConsentimento = typeof b?.consentimento === "boolean";
+
+  if (!Object.keys(campos).length && !mexeNoConsentimento) {
     return NextResponse.json(
       { ok: false, erro: "nada_para_mudar",
         mensagem: "Nada mudou — não havia o que salvar." },
       { status: 400 });
   }
 
-  const { error } = await auth.db.from("clientes").update(campos).eq("id", contatoId);
+  const { error } = Object.keys(campos).length
+    ? await auth.db.from("clientes").update(campos).eq("id", contatoId)
+    : { error: null as any };
+
+  // ==========================================================================
+  // DAR E RETIRAR A AUTORIZAÇÃO, PELAS FUNÇÕES (0138)
+  // ==========================================================================
+  //
+  // As duas deixam linha em `consentimentos`: a que dá carimba a VERSÃO do
+  // aviso que estava valendo, a que retira guarda que foi retirada. Antes,
+  // desmarcar apagava a data e com ela o fato de que houve autorização — e é
+  // justamente o histórico que a LGPD manda poder mostrar.
+  //
+  // O erro NÃO derruba o resto do salvamento: o nome e o telefone que ela
+  // acabou de corrigir estão gravados. Mas ele volta escrito, porque uma
+  // autorização que a pessoa acha que registrou e não registrou é pior que
+  // nenhuma.
+  let consentimentoRecado: string | null = null;
+  if (!error && mexeNoConsentimento) {
+    const { error: eCons } = b.consentimento === true
+      ? await auth.db.rpc("sureya_registrar_consentimento",
+                          { p_cliente: contatoId, p_via: "ficha" })
+      : await auth.db.rpc("sureya_retirar_consentimento",
+                          { p_cliente: contatoId, p_motivo: null });
+    if (eCons) {
+      consentimentoRecado = `${eCons.message}`.includes("sem_termo_publicado")
+        ? "A autorização NÃO foi registrada: ainda não há aviso de privacidade publicado. Publique em Configurações → Privacidade."
+        : "Não consegui registrar a autorização.";
+      console.error("[contatos] consentimento:", eCons.message);
+    }
+  }
 
   // SEM TITULAR, O PRIMEIRO MARCADO ASSUME.
   //
@@ -306,7 +343,7 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, consentimentoRecado });
 }
 
 /**

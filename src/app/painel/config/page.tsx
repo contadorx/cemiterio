@@ -8,6 +8,7 @@ import Extras from "./Extras";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 import Prioridade from "./Prioridade";
 import Manutencao from "./Manutencao";
+import Termo from "./Termo";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -45,6 +46,7 @@ export default function Config() {
         {aba === "prioridade" && <Prioridade />}
         {aba === "extras" && <Extras />}
         {aba === "manutencao" && <Manutencao />}
+        {aba === "privacidade" && <Termo />}
         {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
             Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
             LEMBRAR de se excluir daqui, e a Régua de cobrança não lembrou —
@@ -135,7 +137,10 @@ const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
  * log de erros quando não reconhece a aba. Cemitérios e Régua de cobrança
  * mostravam, coladas embaixo, a lista de erros do sistema.
  */
-const AGREGADAS: Aba[] = ["campo", "avaliacoes", "indicacoes", "privacidade", "auditoria", "erros"];
+// "privacidade" SAIU DAQUI na 0138: ela tem componente proprio (Termo), e uma
+// aba que aparece nas duas listas e desenhada duas vezes — foi o defeito que a
+// lista positiva veio consertar.
+const AGREGADAS: Aba[] = ["campo", "avaliacoes", "indicacoes", "auditoria", "erros"];
 
 function Abas({ atual, aoTrocar }: { atual: Aba; aoTrocar: (a: Aba) => void }) {
   // O PONTO VERMELHO. O Diagnóstico é a aba onde se descobre que o WhatsApp
@@ -445,26 +450,16 @@ function Agregados({ aba }: { aba: string }) {
     );
   }
 
-  if (aba === "privacidade") {
-    return (
-      <div style={painel.card}>
-        <label style={painel.rotulo}>
-          Aviso de privacidade (LGPD). Este texto pode ser enviado ao cliente no primeiro contato e
-          publicado. A remoção dos dados de um cliente é feita na ficha dele (botão &ldquo;Remover dados&rdquo;).
-        </label>
-        <textarea
-          style={{ ...painel.input, minHeight: 160, resize: "vertical", fontFamily: "inherit" }}
-          value={aviso}
-          onChange={(e) => setAviso(e.target.value)}
-          placeholder={"Ex.: Guardamos seu nome, contato e o histórico de serviços apenas para prestar o atendimento. Não compartilhamos com terceiros. Você pode pedir a remoção dos seus dados a qualquer momento."}
-        />
-        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
-          <button style={painel.botao} onClick={salvarAviso}>Salvar</button>
-          {ok && <span style={{ color: cor.teal }}>✓ salvo</span>}
-        </div>
-      </div>
-    );
-  }
+  // O AVISO DE PRIVACIDADE SAIU DAQUI (0138).
+  //
+  // Era um campo de texto livre, unico e sem versao — e com ZERO caracteres:
+  // nunca houve texto. Enquanto isso, 62 contatos estavam marcados como tendo
+  // autorizado o contato. Pior, um campo assim muda em silencio: bastaria
+  // reescrever para que todas passassem a "ter aceitado" o texto novo sem
+  // nunca o terem visto.
+  //
+  // Agora mora em `Termo.tsx`, com versoes. Nada foi perdido: o campo antigo
+  // estava vazio, e continua na tabela `orgs` intacto.
 
   if (aba === "campo") {
     const totalImpacto = (d.ocorrencias || []).reduce((s: number, o: any) => s + (o.impacto || 0), 0);

@@ -305,13 +305,47 @@ export async function POST(req: NextRequest) {
       tratamento: body?.tratamento || null,
       modo: body?.modo === "automatico" ? "automatico" : "copiloto",
       ativo_ia: true,
-      consentimento_em: body?.consentimento ? new Date().toISOString() : null,
-      consentimento_via: body?.consentimento ? "cadastro" : null,
+      // O CONSENTIMENTO NAO E ESCRITO AQUI (0138).
+      //
+      // Escrever a coluna direto registrava a autorizacao SEM DIZER A QUE: era
+      // uma das tres portas, e as tres discordavam. Agora ela entra logo abaixo
+      // pela mesma funcao das outras duas, que carimba a versao do termo que
+      // estava valendo naquele instante.
     })
     .select("id")
     .single();
   if (e1) return NextResponse.json({ ok: false, erro: e1.message }, { status: 500 });
   const clienteId = (cli as any).id as string;
+
+  // ==========================================================================
+  // A AUTORIZACAO, PELA PORTA UNICA (0138)
+  // ==========================================================================
+  //
+  // A FAMILIA NAO SE PERDE POR CAUSA DA CAIXINHA. O cadastro ja esta gravado
+  // acima; se a autorizacao nao puder ser registrada — porque ainda nao ha
+  // aviso publicado —, quem volta e um recado, nao um erro que apaga meia hora
+  // de digitacao.
+  //
+  // Mas ele volta ALTO. Antes daqui a caixinha marcada gravava um consentimento
+  // a um texto que nao existia, e foi assim que se chegou a 62 autorizacoes sem
+  // documento nenhum. Dizer "cadastrei" calando que a autorizacao nao entrou
+  // seria continuar a mesma coisa, agora por omissao.
+  let consentimentoRegistrado = false;
+  let consentimentoRecado: string | null = null;
+  if (body?.consentimento) {
+    const { error: eCons } = await db.rpc("sureya_registrar_consentimento", {
+      p_cliente: clienteId,
+      p_via: "cadastro",
+    });
+    if (eCons) {
+      consentimentoRecado = `${eCons.message}`.includes("sem_termo_publicado")
+        ? "A família foi cadastrada, mas a autorização NÃO foi registrada: ainda não há aviso de privacidade publicado. Publique em Configurações → Privacidade e marque a autorização na ficha dela."
+        : "A família foi cadastrada, mas a autorização não foi registrada. Marque de novo na ficha dela.";
+      console.error("[clientes] consentimento nao registrado:", eCons.message);
+    } else {
+      consentimentoRegistrado = true;
+    }
+  }
 
   // JAZIGO + PLANO: a mesma funcao que a ficha da familia usa (src/lib/jazigo.ts).
   // Antes isto vivia so aqui, em linha, e falhava CALADO: se a identificacao ja
@@ -345,5 +379,6 @@ export async function POST(req: NextRequest) {
   }
 
   // A familia FOI criada mesmo quando o jazigo falha — por isso ok:true com aviso.
-  return NextResponse.json({ ok: true, clienteId, tumuloId, avisoJazigo, avisoPlano });
+  return NextResponse.json({ ok: true, clienteId, tumuloId, avisoJazigo, avisoPlano,
+                             consentimentoRegistrado, consentimentoRecado });
 }

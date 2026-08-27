@@ -1360,4 +1360,77 @@ ok("as funcoes do 0137 nao ficam abertas para anon",
 ok("o conserto conta o que sobrou, e diz",
    /aindaIncompletas/.test(rotaLav) && /aindaIncompletas/.test(telaManut));
 
+// ===========================================================================
+// O TERMO TEM VERSAO (0138)
+//
+// Medido em 27/08: 62 contatos marcados como tendo autorizado o contato, 59
+// deles vindos de uma importacao de planilha em 18/07 — e ZERO caracteres em
+// `orgs.aviso_privacidade`. Nunca houve texto. O sistema afirmava que 62
+// pessoas concordaram, e nao havia com o que.
+//
+// Estas guardas existem porque NADA disto aparece em tela: um consentimento
+// gravado sem versao nao da erro, nao entra em log e nao muda numero nenhum. O
+// dia em que se descobre e o dia em que alguem pergunta — e ai nao ha mais o
+// que medir.
+// ===========================================================================
+const mig38 = readFileSync("migrations/0138_o_termo_tem_versao.sql", "utf8");
+const rotaTermo = readFileSync("src/app/api/config/termo/route.ts", "utf8");
+const telaTermo = readFileSync("src/app/painel/config/Termo.tsx", "utf8");
+const rotaCli38  = readFileSync("src/app/api/clientes/route.ts", "utf8");
+const rotaCont38 = readFileSync("src/app/api/familias/[id]/contatos/route.ts", "utf8");
+const cadFam38   = readFileSync("src/app/painel/clientes/CadastrarFamilia.tsx", "utf8");
+
+// Havia TRES portas gravando consentimento, e duas escreviam a coluna direto —
+// sem dizer a que texto. Agora as tres passam pela mesma funcao.
+ok("cadastrar familia registra o consentimento pela funcao",
+   /rpc\("sureya_registrar_consentimento"/.test(rotaCli38)
+   && !/consentimento_em: body\?\.consentimento/.test(semComentarios(rotaCli38)));
+
+ok("a ficha da familia tambem, e retirar tem funcao propria",
+   /rpc\("sureya_registrar_consentimento"/.test(rotaCont38)
+   && /rpc\("sureya_retirar_consentimento"/.test(rotaCont38)
+   && !/campos\.consentimento_em/.test(semComentarios(rotaCont38)));
+
+// Sem esta trava "versao" e enfeite: bastaria reescrever a 1 para todo mundo
+// passar a ter aceitado outra coisa, sem nunca a ter visto.
+ok("versao publicada nao se edita, e a trava mora no banco",
+   /tg_termo_publicado_nao_muda/.test(mig38)
+   && /termo_publicado_nao_muda/.test(rotaTermo));
+
+// Carimbar as 62 de julho com a versao 1 seria fabricar um fato juridico.
+ok("consentimento antigo fica como versao desconhecida, nao como versao 1",
+   /termo_id is null and versao is null/.test(mig38)
+   && /vers\u00e3o desconhecida/.test(semComentarios(telaTermo)));
+
+// ACHADO PELO TESTE: era um insert solto na migration, valia so para as 62.
+ok("semear o consentimento antigo e funcao, nao instrucao de uma vez",
+   /create or replace function sureya_semear_consentimentos_antigos/.test(mig38));
+
+// ACHADO PELO TESTE: `now()` nao anda dentro da transacao, e "qual foi o
+// ultimo evento" virava sorteio numa tabela que so serve para isso.
+ok("o evento carimba o relogio de parede, nao o inicio da transacao",
+   /em            timestamptz not null default clock_timestamp\(\)/.test(mig38));
+
+// A recusa nao pode chegar de surpresa com a familia do outro lado do telefone.
+ok("sem aviso publicado, o cadastro nem oferece a caixinha",
+   /temAviso === false/.test(cadFam38));
+
+// Achar que registrou uma autorizacao que nao entrou e o erro que nao se
+// descobre olhando a tela.
+ok("e autorizacao que nao entrou volta escrita, nao calada",
+   /consentimentoRecado/.test(rotaCli38) && /parcial\.consentimento/.test(cadFam38));
+
+// Vazio nao e zero, numa tela sobre consentimento: contagem que falhou nao
+// pode virar "ninguem autorizou".
+ok("contagem que falhou nao vira 'ninguem autorizou'",
+   /porVersao: porVersao\.error \? null/.test(rotaTermo)
+   && /porVersao === null/.test(telaTermo));
+
+// SECURITY DEFINER ignora RLS e o Supabase concede EXECUTE a anon por padrao.
+// Estas escrevem consentimento de pessoa fisica.
+ok("as funcoes do 0138 nao ficam abertas para anon",
+   /revoke execute on function sureya_registrar_consentimento\(uuid, text\)\s+from public, anon/.test(mig38)
+   && /revoke execute on function sureya_retirar_consentimento\(uuid, text\)\s+from public, anon/.test(mig38)
+   && /revoke execute on function sureya_consentimentos_por_versao\(uuid\)\s+from public, anon/.test(mig38));
+
 process.exit(falhas ? 1 : 0);

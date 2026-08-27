@@ -59,7 +59,25 @@ export default function CadastrarFamilia({ onPronto, onCancelar }: {
   const [passo, setPasso] = useState(0);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
-  const [parcial, setParcial] = useState<{ nome: string; jazigo: string | null; plano: string | null } | null>(null);
+  // HÁ AVISO DE PRIVACIDADE PUBLICADO? (0138)
+  //
+  // Sem um, o sistema RECUSA registrar a autorização — é o que impede a lista
+  // de 62 "versão desconhecida" de crescer. A caixinha então não é oferecida,
+  // em vez de ser marcada e recusada depois: erro que só aparece no fim, com a
+  // família do outro lado do telefone, é o pior lugar para descobrir isto.
+  //
+  // `null` = ainda não sei. Nesse estado a caixinha continua disponível: quem
+  // decide é o servidor, e presumir "não há" bloquearia o cadastro por causa de
+  // uma consulta lenta.
+  const [temAviso, setTemAviso] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/config/termo")
+      .then((x) => x.json())
+      .then((r) => { if (r?.ok) setTemAviso(!!r.vigente); })
+      .catch(() => {});
+  }, []);
+
+  const [parcial, setParcial] = useState<{ nome: string; jazigo: string | null; plano: string | null; consentimento?: string | null } | null>(null);
 
   const [f, setF] = useState({
     nome: "", telefone: "", tratamento: "a senhora", consentimento: false,
@@ -137,8 +155,11 @@ export default function CadastrarFamilia({ onPronto, onCancelar }: {
     // A rota devolve `ok: true` mesmo quando o jazigo ou o plano não entraram.
     // Um recado que some em quatro segundos não serve para isso: ela precisa
     // ler com calma e saber o que ainda falta fazer.
-    if (r.avisoJazigo || r.avisoPlano) {
-      setParcial({ nome: f.nome, jazigo: r.avisoJazigo || null, plano: r.avisoPlano || null });
+    // AUTORIZAÇÃO QUE NÃO ENTROU É "O QUE NÃO EXISTE", como o jazigo e o plano.
+    // Ela some do recado rápido e vira o aviso que fica na tela.
+    if (r.avisoJazigo || r.avisoPlano || r.consentimentoRecado) {
+      setParcial({ nome: f.nome, jazigo: r.avisoJazigo || null, plano: r.avisoPlano || null,
+                   consentimento: r.consentimentoRecado || null });
       return;
     }
     recado.ok(`Família ${f.nome} cadastrada.`);
@@ -160,6 +181,15 @@ export default function CadastrarFamilia({ onPronto, onCancelar }: {
           {parcial.plano && (
             <li className="rounded-lg border border-aviso/40 bg-aviso/10 p-3 text-[14px] text-aviso">
               <b>O contrato não foi criado.</b> {parcial.plano}
+            </li>
+          )}
+          {/* AUTORIZAÇÃO NÃO REGISTRADA É EM VERMELHO, como o jazigo.
+              Achar que registrou uma autorização que não entrou é o erro que
+              não se descobre olhando a tela — só no dia em que alguém
+              perguntar com que direito a família foi contatada. */}
+          {parcial.consentimento && (
+            <li className="rounded-lg border border-perigo/40 bg-perigo/5 p-3 text-[14px] text-perigo">
+              <b>A autorização NÃO foi registrada.</b> {parcial.consentimento}
             </li>
           )}
         </ul>
@@ -229,11 +259,19 @@ export default function CadastrarFamilia({ onPronto, onCancelar }: {
               </Campo>
             </div>
           </div>
-          <label className="flex items-center gap-2 text-[14px] text-ink">
-            <input type="checkbox" checked={f.consentimento}
-                   onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
-            A família autorizou o contato por WhatsApp (LGPD)
-          </label>
+          {temAviso === false ? (
+            <p className="rounded-lg border border-aviso/40 bg-aviso/10 p-3 text-[13.5px] leading-relaxed text-aviso">
+              Não dá para registrar a autorização ainda: não há aviso de privacidade publicado.
+              Cadastre a família mesmo assim — depois publique o aviso em Configurações →
+              Privacidade e marque a autorização na ficha dela.
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-[14px] text-ink">
+              <input type="checkbox" checked={f.consentimento}
+                     onChange={(e) => setF({ ...f, consentimento: e.target.checked })} />
+              A família autorizou o contato por WhatsApp (LGPD)
+            </label>
+          )}
         </div>
       )}
 

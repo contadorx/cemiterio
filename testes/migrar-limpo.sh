@@ -142,7 +142,7 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0127  +1  servicos_arquivados — o Leandro mandou apagar 257 lavagens da
 #             tela de Avulsos. A copia vem antes do delete: o que sai do lugar
 #             vivo muda de sala, nao evapora.
-TABELAS_DELTA=${TABELAS_DELTA:-12}
+TABELAS_DELTA=${TABELAS_DELTA:-14}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -165,7 +165,7 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #   0131  +2  tg_nome_proprio_cliente e tg_nome_proprio_familia — sao cinco
 #             portas que escrevem nome; consertar numa e deixar quatro
 #             escrevendo torto e o defeito de forma de sempre.
-GATILHOS_DELTA=${GATILHOS_DELTA:-12}
+GATILHOS_DELTA=${GATILHOS_DELTA:-13}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-67}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -216,7 +216,7 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0119  +4  pausas_tumulo, mesmo desenho.
 #   0127  +5  servicos_arquivados: a da org, uma restritiva POR COMANDO e a que
 #              fecha para o campo. Um arquivo que se apaga nao e arquivo.
-POLICIES_DELTA=${POLICIES_DELTA:-89}
+POLICIES_DELTA=${POLICIES_DELTA:-99}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -320,7 +320,14 @@ POLICIES_DELTA=${POLICIES_DELTA:-89}
 #             lavagens executadas, DUAS nao tinham preco nenhum: `POST
 #             /api/servico` criava a limpeza ja executada sem passar pela
 #             transacao de conclusao — a quarta implementacao do mesmo ato.
-FUNCOES_DELTA=${FUNCOES_DELTA:-80}
+#   0138  +5  sureya_termo_vigente, sureya_retirar_consentimento,
+#             sureya_consentimentos_por_versao, sureya_termo_publicado_nao_muda
+#             e sureya_semear_consentimentos_antigos.
+#             sureya_registrar_consentimento NAO conta: ela ja existia desde a
+#             0010, e foi reescrita — passou a gravar o evento com a versao.
+#             Em 27/08: 62 contatos marcados como tendo autorizado o contato e
+#             ZERO caracteres em orgs.aviso_privacidade — nunca houve texto.
+FUNCOES_DELTA=${FUNCOES_DELTA:-85}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -758,6 +765,25 @@ echo
 # lavagem por uma configuracao que falta, e alarme que sempre grita ensina a
 # ignorar alarme.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# O TERMO TEM VERSAO
+#
+# Um consentimento gravado sem versao, ou uma versao publicada que ainda se
+# deixa editar, nao produzem erro, nao entram em log e nao mudam numero nenhum.
+# So aparecem no dia em que alguem perguntar com que direito uma familia foi
+# contatada — e nesse dia nao ha mais o que medir.
+# ---------------------------------------------------------------------------
+echo "TERMO — quem aceitou aceitou uma versao, e ela nao muda depois"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/termo_versao.sql 2>&1); then
+  echo "$saida" | grep -E "TERMO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Consentimento sem versao nao da erro — da problema, depois."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "MARCAS — toda limpeza feita deixa preco, material, pagamento e fila"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/lavagens_incompletas.sql 2>&1); then
   echo "$saida" | grep -E "LAVAGEM INCOMPLETA FALHOU|ERROR" | sed 's/^/  /'
