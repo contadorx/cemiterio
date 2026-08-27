@@ -308,7 +308,13 @@ POLICIES_DELTA=${POLICIES_DELTA:-89}
 #             recebeu 1215 eventos e nao sabia dizer o destino de nenhum.
 #   0131  +2  sureya_nome_proprio e sureya_arruma_nome — 110 dos 339 contatos
 #             estavam em CAIXA ALTA, e o nome vai nas mensagens.
-FUNCOES_DELTA=${FUNCOES_DELTA:-73}
+#   0135  +2  sureya_arquivos_do_tumulo e sureya_arquivos_orfaos. Em 27/08 o
+#             balde tinha 817 arquivos e 282 orfaos (105 MB, 36%), sendo 281
+#             de tumulos apagados: a rota de exclusao nunca tocou no Storage.
+#             Pior que desperdicio — a remocao por LGPD monta a lista a partir
+#             dos TUMULOS DA FAMILIA, e tumulo apagado nao esta mais la, entao
+#             dava para responder "removido" com a foto ainda abrindo.
+FUNCOES_DELTA=${FUNCOES_DELTA:-75}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -702,6 +708,24 @@ echo
 # Um erro aqui nao da erro: da uma mensagem constrangedora para uma familia de
 # luto, e ninguem descobre pelo log.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# APAGAR O JAZIGO PRECISA APAGAR AS FOTOS
+#
+# 281 dos 817 arquivos do balde eram de tumulos apagados: 105 MB abertos por
+# URL publica, e fora da lista que a remocao por LGPD usa. Se a lista de
+# `sureya_arquivos_do_tumulo` esquecer um campo, volta a fabricar orfao.
+# ---------------------------------------------------------------------------
+echo "ORFAOS — apagar o jazigo leva as fotos dele junto"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/arquivos_orfaos.sql 2>&1); then
+  echo "$saida" | grep -E "ORFAOS FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Lista incompleta apaga o registro e deixa o arquivo servindo."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "NOME — maiuscula arrumada sem perder palavra, e so o primeiro na mensagem"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/nome_proprio.sql 2>&1); then
   echo "$saida" | grep -E "NOME FALHOU|ERROR" | sed 's/^/  /'

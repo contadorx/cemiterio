@@ -44,6 +44,9 @@ const cadastro    = readFileSync("src/app/painel/clientes/CadastrarFamilia.tsx",
 const medidas     = readFileSync("src/app/painel/medidas.ts", "utf8");
 const uiTsx       = readFileSync("src/app/painel/ui.tsx", "utf8");
 const estiloMovel = readFileSync("src/app/painel/EstiloMobile.tsx", "utf8");
+const rotaTumulo  = readFileSync("src/app/api/tumulos/[id]/route.ts", "utf8");
+const rotaOrfaos  = readFileSync("src/app/api/manutencao/arquivos-orfaos/route.ts", "utf8");
+const rotaLgpd    = readFileSync("src/app/api/clientes/[id]/lgpd/route.ts", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -1125,5 +1128,52 @@ ok("e no layout, por onde o painel inteiro passa",
 // Tudo o que ela faz e dentro do media query: no desktop, nada muda.
 ok("e o que ela faz fica todo dentro do celular",
    /@media \(max-width: 640px\)/.test(estiloMovel));
+
+// ================== APAGAR O JAZIGO APAGA AS FOTOS (0135) ==================
+//
+// Medido em 27/08: 817 arquivos no balde, 282 orfaos (105 MB, 36%), 281 deles
+// de tumulos apagados. A rota de exclusao nunca tocou no Storage.
+
+const tumuloVisivel = semComentarios(rotaTumulo);
+
+ok("apagar o jazigo apaga as fotos dele",
+   /sureya_arquivos_do_tumulo/.test(tumuloVisivel) && /apagarArquivos/.test(tumuloVisivel));
+
+// A ORDEM E O CONSERTO. Apagar o registro primeiro e deixar o arquivo depois e
+// exatamente como se fabricaram os 281: o dono some e a foto fica sem ninguem
+// que a alcance.
+ok("e o arquivo sai ANTES do registro",
+   tumuloVisivel.indexOf("apagarArquivos") <
+   tumuloVisivel.indexOf('from("tumulos").delete()'));
+
+// Se o Storage falhar, apagar o tumulo assim mesmo criaria um orfao novo.
+ok("se o Storage falhar, o jazigo NAO e apagado",
+   /falharam\.length\) \{[\s\S]{0,400}?NÃO apaguei o jazigo/.test(rotaTumulo));
+
+// A mesma regra da remocao por LGPD, que ja fazia certo — e cuja lista deixava
+// de fora justamente o tumulo apagado.
+ok("a mesma ordem que a remocao por LGPD ja usava",
+   /apagarArquivos/.test(rotaLgpd) && /sureya_arquivos_do_cliente/.test(rotaLgpd));
+
+// O inventario nao apaga: ver antes de apagar e o ponto.
+ok("a faxina mostra antes de apagar",
+   /export async function GET/.test(rotaOrfaos) &&
+   !/storage\.from\(balde\)\.remove/.test(rotaOrfaos.split("export async function POST")[0]));
+
+// POST tambem sai de um curl, de um teste, de um script de outra pessoa.
+ok("e so apaga com a palavra escrita no corpo",
+   /confirmar !== "APAGAR"/.test(rotaOrfaos));
+
+// "Dono sumido" e sobra de exclusao, e sobre ela nao ha duvida. "Nao
+// referenciado" pode ser upload em andamento no minuto da leitura.
+ok("por padrao so mexe no que tem dono sumido",
+   /const soDonoSumido = b\?\.incluirOutros !== true/.test(rotaOrfaos));
+
+// Apagar 105 MB de foto sem rastro de quem e quando seria trocar um problema
+// por outro. E `auditar` engole excecao: alvo_id e UUID, entao um id de texto
+// faria o registro sumir em silencio.
+ok("e deixa rastro na auditoria, sem id de texto num campo uuid",
+   /"faxina_arquivos_orfaos"/.test(rotaOrfaos) &&
+   !/id: "orfaos"/.test(rotaOrfaos));
 
 process.exit(falhas ? 1 : 0);

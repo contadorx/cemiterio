@@ -69,8 +69,22 @@ acontece.**
 os arquivos com a origem de cada um, usando a **mesma** lista que a remoção usa.
 Se as duas divergirem, passa a existir arquivo que se exporta e não se apaga.
 
-**e) Cópia do Storage.** As fotos não entram no backup do banco. Hoje são 409
-arquivos sem segunda via. O Supabase não faz isso sozinho.
+**e) Cópia do Storage.** As fotos não entram no backup do banco. O Supabase não
+faz isso sozinho.
+
+Recontado em **27/08**: são **817** arquivos, 292 MB — o dobro do que estava
+escrito aqui. Precisa de um destino que só você pode escolher (outro bucket, um
+disco, uma conta de armazenamento); mandar foto de família para um serviço que
+você não escolheu não é decisão minha.
+
+> **Achado no caminho, e já consertado:** 282 desses arquivos eram **órfãos**
+> (105 MB, 36% do balde), sendo **281 de túmulos apagados** — a rota de exclusão
+> nunca tocou no Storage. Pior que desperdício: a remoção por LGPD monta a lista
+> a partir dos túmulos da família, então dava para responder "removido" com as
+> fotos do jazigo ainda abrindo por link direto. A migração 0135 fechou o
+> buraco e criou o inventário. **Os 105 MB continuam lá** — apagar é
+> irreversível e é decisão sua: `POST /api/manutencao/arquivos-orfaos` com
+> `{"confirmar":"APAGAR"}`. Ver `LEIA-ME_apagar_o_jazigo_apaga_as_fotos.md`.
 
 **f) Versão do termo aceito.** `consentimento_em` registra *quando*, não *o
 quê*. Se a política mudar, não há como saber quem aceitou qual.

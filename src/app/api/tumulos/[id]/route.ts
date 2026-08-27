@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { normalizarMMDD } from "@/lib/memoria";
+import { apagarArquivos } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -403,10 +404,45 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     );
   }
 
+  // O ARQUIVO SAI ANTES DO REGISTRO — a mesma ordem da remoção por LGPD.
+  //
+  // Isto NÃO EXISTIA, e o preço estava medido em 27/08: dos 817 arquivos do
+  // balde, 281 eram de túmulos apagados por esta rota. 105 MB, 36% do
+  // depósito, abertos por URL pública para sempre.
+  //
+  // E não é só desperdício. A remoção por LGPD monta a lista a partir dos
+  // TÚMULOS DA FAMÍLIA — um túmulo já apagado não está mais lá, e as fotos
+  // dele não entram na lista. Ou seja: dava para a família pedir remoção, o
+  // sistema responder "removido", e as fotos do jazigo dela seguirem abrindo.
+  //
+  // A ordem é deliberada, e a razão é a mesma escrita na rota de LGPD: se o
+  // Storage falhar, o túmulo NÃO é apagado. Melhor devolver "não consegui
+  // remover as fotos" do que apagar o registro e deixar o arquivo sem dono —
+  // que é exatamente como se fabricam os 281.
+  const { data: arquivos, error: eArq } = await db
+    .rpc("sureya_arquivos_do_tumulo", { p_tumulo: params.id });
+  if (eArq) {
+    return NextResponse.json(
+      { ok: false, erro: `nao consegui listar as fotos do jazigo: ${eArq.message}` },
+      { status: 500 },
+    );
+  }
+  const urls = ((arquivos || []) as any[]).map((a) => a.url).filter(Boolean);
+  if (urls.length) {
+    const { removidos, falharam } = await apagarArquivos(db, urls);
+    if (falharam.length) {
+      return NextResponse.json({
+        ok: false,
+        erro: `Removi ${removidos} de ${urls.length} fotos deste jazigo. ${falharam.length} não saíram, `
+            + `então NÃO apaguei o jazigo — está tudo como estava. Tente de novo.`,
+      }, { status: 502 });
+    }
+  }
+
   await db.from("servicos").delete().eq("tumulo_id", params.id);
   await db.from("planos").delete().eq("tumulo_id", params.id);
   await db.from("gps_leituras").delete().eq("tumulo_id", params.id);
   const { error } = await db.from("tumulos").delete().eq("id", params.id);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, fotosRemovidas: urls.length });
 }
