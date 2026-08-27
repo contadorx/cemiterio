@@ -21,6 +21,7 @@ const rotaFlores  = readFileSync("src/app/api/flores/entregas/route.ts", "utf8")
 const cardFlores  = readFileSync("src/app/painel/clientes/[id]/Flores.tsx", "utf8");
 const cron        = readFileSync("src/app/api/cron/diario/route.ts", "utf8");
 const libCamp     = readFileSync("src/lib/campanha.ts", "utf8");
+const telaCampo   = readFileSync("src/app/campo/page.tsx", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -582,5 +583,20 @@ ok("a rota leva a decisao inteira para o banco",
 // Vazio e DIFERENTE de zero: vazio quer dizer "nao corrigi nada".
 ok("campo vazio nao vira zero na hora de conferir",
    /cru === "" \|\| cru === null \|\| cru === undefined/.test(rotaConc));
+
+// CANCELAR A CAMERA NAO GUARDA UMA ORDEM PARA DEPOIS.
+// A acao pendente era lida de `pendente.current` DEPOIS do await, e so era
+// limpa no `finally`. Quem tocasse em "comecar", saisse da camera sem foto, e
+// mais tarde abrisse a camera por outro caminho, executava o "comecar" velho
+// com a foto nova. A acao passa a ser copiada para uma variavel local e o ref
+// e zerado ANTES de qualquer saida da funcao.
+const campoVisivel = semComentarios(telaCampo);
+ok("cancelar a camera limpa a acao que estava pendente",
+   /const acao = pendente\.current;\s*\n\s*pendente\.current = null;\s*\n\s*if \(!arquivo \|\| !acao\) return;/
+     .test(campoVisivel));
+
+ok("a foto executa a acao que foi pedida, nao a que sobrou no ref",
+   /if \(acao === "comecar"\) onIniciar\(foto\);/.test(campoVisivel) &&
+   !/if \(pendente\.current === "comecar"\)/.test(campoVisivel));
 
 process.exit(falhas ? 1 : 0);

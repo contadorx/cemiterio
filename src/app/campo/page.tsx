@@ -546,20 +546,26 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
   async function aoFotografar(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
     e.target.value = "";            // deixa refotografar o mesmo arquivo
-    if (!arquivo || !pendente.current) return;
+    const acao = pendente.current;
+    // CANCELOU A CÂMERA.
+    // A ação pendente morre AQUI. Antes ela ficava guardada: quem tocasse em
+    // "começar", desistisse, e depois abrisse a câmera por outro caminho podia
+    // ver o app executar o "começar" antigo com a foto nova. Quem sai da câmera
+    // sem foto não pediu nada.
+    pendente.current = null;
+    if (!arquivo || !acao) return;
 
     setPreparando(true);
     try {
       // Reduz ANTES de guardar: uma foto de 8 MB vira ~11 MB em base64 e o
       // envio morre no limite do servidor.
       const foto = await prepararFoto(arquivo);
-      if (pendente.current === "comecar") onIniciar(foto);
+      if (acao === "comecar") onIniciar(foto);
       else onFinalizar(foto);
     } catch (err) {
       setErroFoto(motivoFalha(err) || "Não consegui usar essa foto. Tente de novo.");
     } finally {
       setPreparando(false);
-      pendente.current = null;
     }
   }
 
