@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * ⚠️  ESTA TELA NÃO ESTÁ NO AR.
+ *
+ * Nenhum arquivo a importa: `campo/page.tsx` conclui a lavagem no próprio
+ * cartão, com a câmera dentro do botão. Este é o fluxo antigo, de quando
+ * finalizar abria um modal de quatro passos.
+ *
+ * Está aqui com aviso porque a auditoria (CP-10) chamou justamente isto: com
+ * três implementações do cartão no diretório, dá para consertar a errada e
+ * acreditar que mudou a produção — foi o que quase aconteceu ao ajustar a fila
+ * do Build B. A remoção está marcada no Build E do ROADMAP_UX.md; até lá, se
+ * você veio consertar alguma coisa de campo, o arquivo é `campo/page.tsx`.
+ */
+
 import { useRef, useState } from "react";
 import { capturarGps, qualidade } from "@/lib/gps";
 import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
@@ -117,7 +131,7 @@ export default function Concluir({
       }).catch(() => {});
     }
 
-    const modo = await concluirOuEnfileirar({
+    const { desfecho: modo } = await concluirOuEnfileirar({
       servicoId: item.id,
       fotoDepoisBase64: depois.b64,
       fotoAntesBase64: antes?.b64,

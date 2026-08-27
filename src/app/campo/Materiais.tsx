@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { materialOuEnfileirar } from "@/lib/offline-fila";
 
 interface Mat {
   id: string;
@@ -18,6 +19,7 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
   const [obs, setObs] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState(false);
+  const [guardado, setGuardado] = useState(false);
 
   useEffect(() => {
     fetch("/api/config/materiais")
@@ -31,15 +33,22 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
     if (outro.trim()) lista.push({ id: undefined as any, nome: outro.trim(), acabou: true });
     if (!lista.length && !obs.trim()) return;
 
+    // PEDIR MATERIAL SEM SINAL (CP-04). Acabar a água no meio da quadra é o
+    // caso comum, e é exatamente onde o sinal falta.
     setEnviando(true);
-    const r = await fetch("/api/campo/pedido-material", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itens: lista, observacao: obs }),
-    }).then((x) => x.json()).catch(() => null);
+    const { desfecho, motivo } = await materialOuEnfileirar({ itens: lista, observacao: obs });
     setEnviando(false);
-    if (r?.ok) setPronto(true);
-    else alert("Não consegui enviar agora. Tente de novo.");
+
+    if (desfecho === "perdido") {
+      alert("A memória do aparelho encheu e eu não consegui guardar o pedido.");
+      return;
+    }
+    if (desfecho === "recusado") {
+      alert(`Não consegui enviar.\n\n${motivo || "O sistema recusou."}`);
+      return;
+    }
+    setGuardado(desfecho === "offline");
+    setPronto(true);
   }
 
   if (pronto) {
@@ -47,7 +56,11 @@ export default function Materiais({ onFechar }: { onFechar: () => void }) {
       <div style={s.overlay}>
         <div style={s.caixa}>
           <div style={{ fontSize: 40, textAlign: "center" }}>✓</div>
-          <p style={s.ok}>Pedido enviado! A Sureya já foi avisada do que está faltando.</p>
+          <p style={s.ok}>
+            {guardado
+              ? "Pedido guardado! Assim que o sinal voltar ele sobe sozinho e a Sureya é avisada."
+              : "Pedido enviado! A Sureya já foi avisada do que está faltando."}
+          </p>
           <button style={s.botao} onClick={onFechar}>Fechar</button>
         </div>
       </div>

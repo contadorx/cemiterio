@@ -1250,6 +1250,98 @@ async function rodar() {
     }
   }
 
+  // ==================================================================
+  // 13. A FILA DO CAMPO — o que o tempo resolve e o que precisa de gente
+  // ==================================================================
+  //
+  // Build B / CP-06 e CP-08. A fila e IndexedDB, que nao existe aqui — mas as
+  // REGRAS foram tiradas de dentro do fetch justamente para poderem ser
+  // provadas. Sao elas que decidem se um trabalho fica esperando para sempre.
+  console.log("\n=== 13. FILA DO CAMPO (offline) ===");
+  {
+    const { classificar, contarFila, deduplicar, chaveDe } = await import("../src/lib/offline-fila");
+
+    // --- o que o TEMPO resolve: fica guardado e tenta de novo
+    for (const [status, corpo] of [[500, null], [502, null], [503, {}], [408, null], [429, null]] as any[]) {
+      checar(`HTTP ${status} e passageiro`, classificar(status, corpo).r === "tente_depois",
+             `veio ${classificar(status, corpo).r}`);
+    }
+    // 2xx com corpo ilegivel: um proxy devolvendo HTML nao pode parar trabalho bom
+    checar("200 sem corpo legivel espera, nao acusa",
+           classificar(200, null).r === "tente_depois");
+
+    // --- o que subiu
+    checar("ok:true subiu", classificar(200, { ok: true }).r === "subiu");
+    // "ja concluido" e sucesso: senao o item fica preso na fila para sempre
+    checar("'ja concluido' tambem subiu",
+           classificar(409, { ok: false, erro: "ja_concluido" }).r === "subiu");
+    checar("jaExecutado tambem subiu",
+           classificar(200, { ok: false, jaExecutado: true }).r === "subiu");
+
+    // --- o que PRECISA DE GENTE: repetir da o mesmo resultado
+    const venceu = classificar(401, { ok: false });
+    checar("401 precisa de gente", venceu.r === "precisa_de_ajuda");
+    checar("e a frase fala de entrar no app de novo",
+           /Entre no app de novo/.test(venceu.motivo || ""), venceu.motivo);
+    checar("403 precisa de gente", classificar(403, { ok: false }).r === "precisa_de_ajuda");
+    checar("404 precisa de gente", classificar(404, { ok: false }).r === "precisa_de_ajuda");
+    // O caso que mais escondia trabalho: 200 com ok:false. Antes virava item
+    // offline e tentava para sempre, mostrando "aguardando envio".
+    const recusa = classificar(200, { ok: false, mensagem: "Este servico e de outra pessoa." });
+    checar("200 com ok:false e recusa, nao espera", recusa.r === "precisa_de_ajuda");
+    checar("e leva o motivo do servidor para a tela",
+           recusa.motivo === "Este servico e de outra pessoa.", recusa.motivo);
+    checar("400 precisa de gente", classificar(400, { ok: false, erro: "sem_foto" }).r === "precisa_de_ajuda");
+
+    // --- CP-11: uma lavagem gera DOIS registros
+    const t0 = 1_700_000_000_000;
+    const fila: any[] = [
+      { id: chaveDe("s1", "iniciar"), tipo: "iniciar", servicoId: "s1", criadoEm: t0, tentativas: 0, estado: "guardado" },
+      { id: chaveDe("s1", "concluir"), tipo: "concluir", servicoId: "s1", criadoEm: t0 + 1, tentativas: 0, estado: "guardado" },
+      { id: chaveDe("s2", "concluir"), tipo: "concluir", servicoId: "s2", criadoEm: t0 + 2, tentativas: 0, estado: "guardado" },
+      { id: chaveDe("s3", "nao_feito"), tipo: "nao_feito", servicoId: "s3", criadoEm: t0 + 3, tentativas: 0, estado: "guardado" },
+    ];
+    const r = contarFila(fila);
+    // A faixa dizia "4 registros esperando" para DUAS lavagens e um recado.
+    checar("4 registros sao 2 lavagens", r.lavagens === 2, `veio ${r.lavagens}`);
+    checar("e 1 recado, contado a parte", r.recados === 1, `veio ${r.recados}`);
+    checar("nada precisa de ajuda ainda", r.precisamDeAjuda.length === 0);
+
+    const comRecusa = contarFila([...fila,
+      { id: "x", tipo: "concluir", servicoId: "s9", criadoEm: t0 + 9, tentativas: 3,
+        estado: "precisa_de_ajuda", motivoFalha: "Seu acesso venceu." } as any]);
+    checar("item recusado aparece separado", comRecusa.precisamDeAjuda.length === 1);
+    // Ele CONTINUA sendo trabalho parado: some da fila normal seria a mesma
+    // mentira de antes, com outra cor.
+    checar("e continua contado como lavagem parada", comRecusa.lavagens === 3, `veio ${comRecusa.lavagens}`);
+
+    // --- CP-08: dois toques na mesma lavagem viram um registro
+    const doisToques: any[] = [
+      { id: "uuid-velho", tipo: "concluir", servicoId: "s1", criadoEm: t0, tentativas: 0, estado: "guardado", fotoDepoisBase64: "PRIMEIRA" },
+      { id: chaveDe("s1", "concluir"), tipo: "concluir", servicoId: "s1", criadoEm: t0 + 500, tentativas: 0, estado: "guardado", fotoDepoisBase64: "SEGUNDA" },
+    ];
+    const d = deduplicar(doisToques);
+    checar("dois toques na mesma lavagem viram um item", d.fila.length === 1, `veio ${d.fila.length}`);
+    // A primeira foto e a do jazigo do jeito que ela achou.
+    checar("e fica a PRIMEIRA foto, nao a repetida",
+           d.fila[0].fotoDepoisBase64 === "PRIMEIRA", d.fila[0].fotoDepoisBase64);
+    checar("a copia e marcada para sair do aparelho",
+           d.sobrando.length === 1 && d.sobrando[0] === chaveDe("s1", "concluir"));
+
+    // Dois pedidos de material no mesmo dia sao dois pedidos de verdade.
+    const pedidos: any[] = [
+      { id: "pedido:1", tipo: "pedido_material", servicoId: "", criadoEm: t0, tentativas: 0, estado: "guardado" },
+      { id: "pedido:2", tipo: "pedido_material", servicoId: "", criadoEm: t0 + 60000, tentativas: 0, estado: "guardado" },
+    ];
+    checar("dois pedidos de material NAO colapsam", deduplicar(pedidos).fila.length === 2);
+
+    // Item gravado antes deste build nao tem `estado`. Vazio nao e zero: aqui
+    // o vazio quer dizer "nunca foi recusado".
+    const velho: any[] = [{ id: "a", tipo: "concluir", servicoId: "s5", criadoEm: t0 }];
+    checar("item da versao anterior entra como 'guardado'",
+           deduplicar(velho).fila[0].estado === "guardado");
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { naoFeitoOuEnfileirar } from "@/lib/offline-fila";
 
 /**
  * "Não deu para fazer" — sem julgamento, com o motivo.
@@ -24,17 +25,39 @@ export default function NaoDeu({ it, onFechar, onPronto }: {
     "Não estava passando bem",
   ];
 
+  /**
+   * "NÃO DEU PARA FAZER" TAMBÉM SEM SINAL (CP-04).
+   *
+   * Era um `fetch` cru: sem internet dava "Não consegui registrar agora. Tente
+   * de novo." A faixa amarela da tela promete o contrário — "pode continuar, eu
+   * guardo e mando quando o sinal voltar" — e esta é justamente a ação mais
+   * provável onde o sinal é pior: chuva, água acabada, jazigo não encontrado,
+   * acesso fechado. Ela ficava tentando de novo, de pé, no corredor.
+   */
   async function enviar() {
     const texto = (motivo === "Outro" ? outro : motivo).trim();
     if (!texto) return alert("Me conta rapidinho o que houve.");
     setEnviando(true);
-    const r = await fetch("/api/campo/nao-feito", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ servicoId: it.id, motivo: texto }),
-    }).then((x) => x.json()).catch(() => null);
+    const { desfecho, motivo: porque } = await naoFeitoOuEnfileirar({
+      servicoId: it.id,
+      motivo: texto,
+      rotulo: it.falecido || it.tumulo,
+    });
     setEnviando(false);
-    if (r?.ok) onPronto();
-    else alert("Não consegui registrar agora. Tente de novo.");
+
+    if (desfecho === "perdido") {
+      alert("A memória do aparelho encheu e eu não consegui guardar.\n\n" +
+            "Procure um lugar com sinal e abra o app.");
+      return;
+    }
+    if (desfecho === "recusado") {
+      alert(`Não consegui registrar.\n\n${porque || "O sistema recusou."}`);
+      return;
+    }
+    if (desfecho === "offline") {
+      alert("Guardado. Vai subir sozinho quando o sinal voltar — pode seguir.");
+    }
+    onPronto();
   }
 
   return (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sincronizar, quantosPendentes, migrarFilaAntiga, iniciarOuEnfileirar, concluirOuEnfileirar } from "@/lib/offline-fila";
+import { sincronizar, resumoFila, estadoLocalDosServicos, descartar, migrarFilaAntiga,
+         iniciarOuEnfileirar, concluirOuEnfileirar, type ResumoFila } from "@/lib/offline-fila";
 import { capturarGps } from "@/lib/gps";
 import { prepararFoto, motivoFalha, type FotoPronta } from "@/lib/foto";
 import InstalarApp from "../InstalarApp";
@@ -60,6 +61,36 @@ interface Item {
   iniciadoEm: string | null;
   adiadoVezes: number;
   avisos: Aviso[];
+  /** Marcadores LOCAIS: verdade do aparelho que o servidor ainda não recebeu. */
+  aguardandoEnvio?: boolean;
+  naoFeitoLocal?: boolean;
+}
+
+/**
+ * O QUE JÁ ESTÁ RESOLVIDO NO APARELHO NÃO VOLTA A SER PENDENTE (CP-05).
+ *
+ * A lista vem do servidor (ou do cache do dia) e não sabe nada da fila local.
+ * Ao concluir sem sinal, a tela marcava o jazigo como feito NO ESTADO, mas o
+ * cache continuava com ele pendente — e a conclusão estava no IndexedDB, não no
+ * servidor. Fechar e reabrir o app ainda sem sinal trazia o mesmo jazigo como
+ * "falta lavar". A Nina tiraria a foto de novo, e a fila ganharia trabalho
+ * duplicado do mesmo túmulo.
+ *
+ * O que a tela mostra passa a ser sempre a lista MAIS a fila local. Não é
+ * enfeite: é a única leitura verdadeira, porque no cemitério o aparelho sabe
+ * mais que o servidor na maior parte do dia.
+ */
+async function reconciliar(base: Item[]): Promise<Item[]> {
+  const { iniciados, concluidos, naoFeitos } = await estadoLocalDosServicos();
+  if (!iniciados.size && !concluidos.size && !naoFeitos.size) return base;
+  return base.map((x) => {
+    if (concluidos.has(x.id)) return { ...x, status: "executado", aguardandoEnvio: true };
+    if (naoFeitos.has(x.id)) return { ...x, status: "executado", naoFeitoLocal: true, aguardandoEnvio: true };
+    if (iniciados.has(x.id) && !x.iniciadoEm) {
+      return { ...x, iniciadoEm: new Date().toISOString(), aguardandoEnvio: true };
+    }
+    return x;
+  });
 }
 
 export default function Campo() {
@@ -67,7 +98,17 @@ export default function Campo() {
   const [brief, setBrief] = useState<any>(null);
   const [carregando, setCarregando] = useState(true);
   const [online, setOnline] = useState(true);
-  const [pendentes, setPendentes] = useState(0);
+  /**
+   * O QUE ESTÁ ESPERANDO, EM LAVAGEM E NÃO EM REGISTRO (CP-11).
+   *
+   * A faixa dizia "4 registros esperando". Uma lavagem gera DOIS registros —
+   * `iniciar` e `concluir` — então quatro registros podem ser duas lavagens.
+   * "Registro" é unidade de programador: ninguém no cemitério sabe quantos
+   * registros uma lavagem tem, e o número parecia o dobro do trabalho parado.
+   */
+  const [fila, setFila] = useState<ResumoFila>({ lavagens: 0, recados: 0, precisamDeAjuda: [], itens: [] });
+  /** Quantas subiram no último envio — é o "confirmado" da CP-06. */
+  const [subiramAgora, setSubiramAgora] = useState(0);
 
   const [naoDeu, setNaoDeu] = useState<Item | null>(null);
   const [pedirMaterial, setPedirMaterial] = useState(false);
@@ -104,19 +145,21 @@ export default function Campo() {
     // tela ficava vazia — a Nina no corredor, com a rota do dia na mao, vendo
     // "Tudo feito por hoje". Agora a ultima lista boa fica guardada no aparelho
     // e continua na tela ate chegar uma nova.
+    let base: Item[] | null = null;
     if (a?.ok) {
-      const nova = Array.isArray(a.lista) ? a.lista : [];
-      setLista(nova);
-      try { localStorage.setItem(CACHE_DIA, JSON.stringify({ dia: hojeLocal(), lista: nova })); } catch {}
+      base = Array.isArray(a.lista) ? a.lista : [];
+      try { localStorage.setItem(CACHE_DIA, JSON.stringify({ dia: hojeLocal(), lista: base })); } catch {}
     } else {
       try {
         const guardado = JSON.parse(localStorage.getItem(CACHE_DIA) || "null");
         // só serve se for do MESMO dia: rota de ontem é pior que tela vazia
-        if (guardado?.dia === hojeLocal() && Array.isArray(guardado.lista)) setLista(guardado.lista);
+        if (guardado?.dia === hojeLocal() && Array.isArray(guardado.lista)) base = guardado.lista;
       } catch {}
     }
+    if (base) setLista(await reconciliar(base));
+
     if (b?.ok) setBrief(b.briefing);
-    setPendentes(await quantosPendentes());
+    setFila(await resumoFila());
     setCarregando(false);
   }, []);
 
@@ -134,13 +177,28 @@ export default function Campo() {
   }, []);
 
   useEffect(() => {
-    const ligou = () => { setOnline(true); sincronizar().then(() => carregar()).catch(() => null); };
+    // AO VOLTAR O SINAL, DIZER QUANTAS SUBIRAM.
+    // Antes a faixa amarela simplesmente sumia — e sumir e dar certo pareciam a
+    // mesma coisa. O aviso verde fica alguns segundos e some sozinho: é recibo,
+    // não é estado.
+    const ligou = () => {
+      setOnline(true);
+      sincronizar()
+        .then((r) => { if (r.enviadas > 0) setSubiramAgora(r.enviadas); return carregar(); })
+        .catch(() => null);
+    };
     const caiu = () => setOnline(false);
     setOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
     window.addEventListener("online", ligou);
     window.addEventListener("offline", caiu);
     return () => { window.removeEventListener("online", ligou); window.removeEventListener("offline", caiu); };
   }, [carregar]);
+
+  useEffect(() => {
+    if (!subiramAgora) return;
+    const t = setTimeout(() => setSubiramAgora(0), 6000);
+    return () => clearTimeout(t);
+  }, [subiramAgora]);
 
   // aberto pelo QR da plaqueta: /t/TOKEN manda para cá com ?servico=ID
   useEffect(() => {
@@ -154,6 +212,24 @@ export default function Campo() {
   }, [lista]);
 
   /**
+   * MUDAR A TELA E O CACHE NO MESMO GESTO.
+   *
+   * `setLista` sozinho era metade do conserto da CP-05: a tela ficava certa até
+   * a Nina fechar o app. O cache do dia continuava com o jazigo pendente, e ao
+   * reabrir sem sinal ele voltava para a lista. Quem escreve na lista escreve
+   * no cache — separar os dois é como eles discordam.
+   */
+  const marcar = useCallback((id: string, muda: (x: Item) => Item) => {
+    setLista((atual) => {
+      const nova = atual.map((x) => (x.id === id ? muda(x) : x));
+      try {
+        localStorage.setItem(CACHE_DIA, JSON.stringify({ dia: hojeLocal(), lista: nova }));
+      } catch {}
+      return nova;
+    });
+  }, []);
+
+  /**
    * COMECAR — agora funciona sem sinal.
    *
    * Era um fetch cru: falhou, alerta "tente de novo". Como o botao de finalizar
@@ -164,14 +240,15 @@ export default function Campo() {
    */
   async function iniciar(it: Item, foto?: { b64: string; mt: string } | null) {
     setIniciando(it.id);
-    const modo = await iniciarOuEnfileirar({
+    const { desfecho, motivo } = await iniciarOuEnfileirar({
       servicoId: it.id,
+      rotulo: it.falecido || it.tumulo,
       fotoBase64: foto?.b64,
       mimetype: foto?.mt,
     });
     setIniciando(null);
 
-    if (modo === "perdido") {
+    if (desfecho === "perdido") {
       alert(
         "A memória do aparelho encheu e eu não consegui guardar.\n\n" +
         "Procure um lugar com sinal e abra o app: assim que a internet voltar, " +
@@ -179,16 +256,22 @@ export default function Campo() {
       );
       return;
     }
+    // RECUSADO NÃO É GUARDADO. O item fica na fila marcado, e ela vê na faixa
+    // vermelha o que houve — em vez de o cartão sumir como se tivesse dado
+    // certo (CP-06).
+    if (desfecho === "recusado") {
+      alert(`Não consegui começar esta limpeza.\n\n${motivo || "O sistema recusou."}`);
+      setFila(await resumoFila());
+      return;
+    }
 
     // marca em andamento AQUI, sem esperar a rede: o cartão muda para
     // "Finalizar com a foto" e ela segue trabalhando
-    setLista((atual) => atual.map((x) =>
-      x.id === it.id
-        ? { ...x, iniciadoEm: x.iniciadoEm || new Date().toISOString(),
-            fotoAntes: foto?.b64 ? `data:${foto.mt};base64,${foto.b64}` : x.fotoAntes }
-        : x));
+    marcar(it.id, (x) => ({ ...x, iniciadoEm: x.iniciadoEm || new Date().toISOString(),
+      aguardandoEnvio: desfecho === "offline" || x.aguardandoEnvio,
+      fotoAntes: foto?.b64 ? `data:${foto.mt};base64,${foto.b64}` : x.fotoAntes }));
 
-    if (modo === "offline") setPendentes(await quantosPendentes());
+    if (desfecho === "offline") setFila(await resumoFila());
     else carregar();
   }
 
@@ -208,27 +291,33 @@ export default function Campo() {
 
     capturarGpsSilencioso(it.tumuloId);
 
-    const modo = await concluirOuEnfileirar({
+    const { desfecho, motivo } = await concluirOuEnfileirar({
       servicoId: it.id,
+      rotulo: it.falecido || it.tumulo,
       fotoDepoisBase64: foto.b64,
       mimetype: foto.mt,
     });
     setIniciando(null);
 
-    if (modo === "perdido") {
+    if (desfecho === "perdido") {
       alert(
         "A memória do aparelho encheu e eu não consegui guardar esta foto.\n\n" +
         "Procure um lugar com sinal e abra o app: o que já está guardado sobe e libera espaço."
       );
       return;
     }
+    if (desfecho === "recusado") {
+      alert(`Não consegui fechar esta limpeza.\n\n${motivo || "O sistema recusou."}\n\n` +
+            "A foto está guardada. Não precisa tirar de novo.");
+      setFila(await resumoFila());
+      return;
+    }
 
     // Some da lista na hora, online ou offline: o cemitério tem sinal ruim e
     // travar a tela esperando o servidor não ajuda ninguém.
-    setLista((atual) => atual.map((x) =>
-      x.id === it.id ? { ...x, status: "executado" } : x));
+    marcar(it.id, (x) => ({ ...x, status: "executado", aguardandoEnvio: desfecho === "offline" }));
 
-    if (modo === "offline") setPendentes(await quantosPendentes());
+    if (desfecho === "offline") setFila(await resumoFila());
     else carregar();
   }
 
@@ -290,10 +379,75 @@ export default function Campo() {
 
   return (
     <main style={s.wrap}>
-      {(!online || pendentes > 0) && (
+      {/* O QUE ESTÁ ESPERANDO, NA UNIDADE DELA (CP-11).
+          "4 registros esperando" para duas lavagens fazia o trabalho parado
+          parecer o dobro do que era. E a lista de quais jazigos importa: com o
+          número sozinho, ela não sabia se o que faltava era o da manhã ou o de
+          agora. */}
+      {(!online || fila.lavagens > 0 || fila.recados > 0) && (
         <div style={s.faixaOffline}>
-          {!online && "Sem internet. Pode continuar — eu guardo e mando quando o sinal voltar."}
-          {pendentes > 0 && ` ${pendentes} ${pendentes === 1 ? "registro esperando" : "registros esperando"} para enviar.`}
+          {!online && "Sem internet. Pode continuar — eu guardo e mando quando o sinal voltar. "}
+          {fila.lavagens > 0 && (
+            <>
+              <b>{fila.lavagens} {fila.lavagens === 1 ? "lavagem" : "lavagens"}</b>
+              {" "}aguardando envio
+              {(() => {
+                const nomes = [...new Set((fila.itens || [])
+                  .filter((p) => p.tipo === "iniciar" || p.tipo === "concluir")
+                  .map((p) => p.rotulo).filter(Boolean))];
+                return nomes.length ? <> ({nomes.join(", ")})</> : null;
+              })()}.{" "}
+            </>
+          )}
+          {fila.recados > 0 && (
+            <>{fila.recados} {fila.recados === 1 ? "recado" : "recados"} guardado{fila.recados === 1 ? "" : "s"} também.</>
+          )}
+        </div>
+      )}
+
+      {/* CONFIRMADO — o quarto estado da CP-06. Sem ele, "sumiu da faixa" era a
+          única prova de que o trabalho chegou, e sumir é exatamente o que
+          acontece também quando algo dá errado. */}
+      {subiramAgora > 0 && (
+        <div style={s.faixaConfirmado}>
+          ✓ {subiramAgora} {subiramAgora === 1 ? "lavagem enviada" : "lavagens enviadas"} agora. Chegou tudo.
+        </div>
+      )}
+
+      {/* PRECISA DE AJUDA — o estado que não existia.
+          Um item recusado pelo servidor (acesso vencido, serviço apagado)
+          tentava para sempre e aparecia como "aguardando envio". O cartão já
+          tinha sumido da lista dela: ela achava que tinha terminado, e aquilo
+          podia nunca ser aceito. Esperar não resolve nenhum destes. */}
+      {fila.precisamDeAjuda.length > 0 && (
+        <div style={s.faixaAjuda}>
+          <b>Isto aqui não vai subir sozinho.</b>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {(fila.precisamDeAjuda || []).map((p) => (
+              <li key={p.id} style={{ marginBottom: 8 }}>
+                {p.rotulo || "Um registro"}
+                {p.tipo === "iniciar" && " (começar)"}
+                {p.tipo === "concluir" && " (terminar)"}
+                {p.tipo === "nao_feito" && " (não deu para fazer)"}
+                {p.tipo === "pedido_material" && " (pedido de material)"}
+                : {p.motivoFalha || "o sistema recusou."}
+                <button
+                  style={s.botaoDescartar}
+                  onClick={async () => {
+                    if (!confirm("Tirar este da fila? O trabalho não vai ser registrado.")) return;
+                    await descartar(p.id);
+                    setFila(await resumoFila());
+                  }}
+                >
+                  Tirar da fila
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p style={{ margin: "8px 0 0", fontSize: 15 }}>
+            Se disser que seu acesso venceu, saia e entre no app de novo — aí ele sobe.
+            Se não resolver, fale com a Sureya antes de tirar da fila.
+          </p>
         </div>
       )}
 
@@ -425,10 +579,19 @@ export default function Campo() {
 
       {naoDeu && (
         <NaoDeu it={naoDeu} onFechar={() => setNaoDeu(null)}
-                onPronto={() => { setNaoDeu(null); carregar(); }} />
+                onPronto={async () => {
+                  // Sai da lista NO APARELHO, com ou sem sinal — senão, sem
+                  // rede, `carregar()` traz o cache e o jazigo volta. Era o
+                  // mesmo buraco da conclusão offline (CP-05).
+                  const id = naoDeu.id;
+                  setNaoDeu(null);
+                  marcar(id, (x) => ({ ...x, status: "executado", naoFeitoLocal: true }));
+                  setFila(await resumoFila());
+                  carregar();
+                }} />
       )}
 
-      {pedirMaterial && <Materiais onFechar={() => setPedirMaterial(false)} />}
+      {pedirMaterial && <Materiais onFechar={async () => { setPedirMaterial(false); setFila(await resumoFila()); }} />}
 
       {capturarJazigo && (
         <CapturarJazigo
@@ -537,8 +700,32 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
     if (destacado) caixa.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [destacado]);
 
+  /**
+   * A TRAVA COMEÇA NO PRIMEIRO TOQUE (CP-08).
+   *
+   * O botão só se desabilitava depois que a câmera DEVOLVIA o arquivo. Num
+   * aparelho lento a câmera demora a abrir, e dois toques abriam duas vezes.
+   *
+   * O perigo de travar cedo é o inverso: se a pessoa cancelar e o navegador não
+   * disparar `change` — acontece em alguns Android —, o botão ficaria morto
+   * para sempre. Por isso a trava também se solta quando a janela volta a ter
+   * foco, que é o que acontece ao sair da câmera de qualquer jeito.
+   */
+  const [abrindo, setAbrindo] = useState(false);
+
+  useEffect(() => {
+    if (!abrindo) return;
+    // O `change` chega logo DEPOIS do foco voltar; o respiro evita soltar a
+    // trava um instante antes de o arquivo aparecer.
+    const soltar = () => setTimeout(() => setAbrindo(false), 800);
+    window.addEventListener("focus", soltar);
+    return () => window.removeEventListener("focus", soltar);
+  }, [abrindo]);
+
   function tocar(acao: "comecar" | "terminar") {
+    if (abrindo || preparando || ocupado) return;
     setErroFoto("");
+    setAbrindo(true);
     pendente.current = acao;
     camera.current?.click();
   }
@@ -546,6 +733,7 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
   async function aoFotografar(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
     e.target.value = "";            // deixa refotografar o mesmo arquivo
+    setAbrindo(false);
     const acao = pendente.current;
     // CANCELOU A CÂMERA.
     // A ação pendente morre AQUI. Antes ela ficava guardada: quem tocasse em
@@ -624,13 +812,13 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
       <div style={s.acoes}>
         {emAndamento ? (
           <button style={{ ...s.botaoPrincipal, ...s.botaoTerminar }}
-                  onClick={() => tocar("terminar")} disabled={ocupado || preparando}>
-            {preparando || ocupado ? "Salvando…" : "📷  TIRAR FOTO E TERMINAR"}
+                  onClick={() => tocar("terminar")} disabled={ocupado || preparando || abrindo}>
+            {preparando || ocupado ? "Salvando…" : abrindo ? "Abrindo a câmera…" : "📷  TIRAR FOTO E TERMINAR"}
           </button>
         ) : (
           <button style={s.botaoPrincipal}
-                  onClick={() => tocar("comecar")} disabled={ocupado || preparando}>
-            {preparando || ocupado ? "Salvando…" : "📷  TIRAR FOTO E COMEÇAR"}
+                  onClick={() => tocar("comecar")} disabled={ocupado || preparando || abrindo}>
+            {preparando || ocupado ? "Salvando…" : abrindo ? "Abrindo a câmera…" : "📷  TIRAR FOTO E COMEÇAR"}
           </button>
         )}
         {/* FAZER ESTE AGORA.
@@ -661,6 +849,13 @@ const s: Record<string, React.CSSProperties> = {
             fontFamily: "system-ui, sans-serif" },
   faixaOffline: { background: "#fef3c7", color: "#78350f", padding: 14, borderRadius: 12,
                   marginBottom: 14, fontSize: 16, lineHeight: 1.5 },
+  faixaConfirmado: { background: "#ecfdf5", color: "#065f46", padding: 14, borderRadius: 12,
+                     marginBottom: 14, fontSize: 16, lineHeight: 1.5, fontWeight: 600 },
+  faixaAjuda: { background: "#fef2f2", color: "#991b1b", border: "2px solid #fecaca",
+                padding: 14, borderRadius: 12, marginBottom: 14, fontSize: 16, lineHeight: 1.5 },
+  botaoDescartar: { display: "block", marginTop: 6, minHeight: 44, padding: "8px 14px",
+                    background: "#fff", color: "#991b1b", border: "1px solid #fecaca",
+                    borderRadius: 10, fontSize: 15, cursor: "pointer" },
   topo: { background: "#fff", borderRadius: 16, padding: 18, marginBottom: 14 },
   saudacao: { fontSize: 22, fontWeight: 700, color: NAVY },
   sair: { minHeight: 44, background: "none", border: "2px solid #e7e0cf", color: "#475569",

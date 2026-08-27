@@ -30,6 +30,9 @@ const rotaPrec    = readFileSync("src/app/api/precisa-de-voce/route.ts", "utf8")
 const pecas       = readFileSync("src/app/painel/pecas.tsx", "utf8");
 const telaAgenda2 = readFileSync("src/app/painel/agenda/page.tsx", "utf8");
 const telaLib     = readFileSync("src/app/painel/conversas/VisaoLiberacao.tsx", "utf8");
+const libFila     = readFileSync("src/lib/offline-fila.ts", "utf8");
+const telaNaoDeu  = readFileSync("src/app/campo/NaoDeu.tsx", "utf8");
+const telaMat     = readFileSync("src/app/campo/Materiais.tsx", "utf8");
 
 // O que o usuario LE e o arquivo sem comentarios. Uma checagem que proibe um
 // texto tem de olhar aqui: senao explicar num comentario por que o texto saiu
@@ -709,5 +712,79 @@ ok("'nada para conferir' nao esconde comprovante que nao deu para ler",
 
 ok("a lista de familias nao fica presa em 'Carregando'",
    /!d && !erroLista && <p/.test(semComentarios(lista)));
+
+// ===================== BUILD B: o campo nao perde trabalho =====================
+
+const campoB = semComentarios(telaCampo);
+const filaVisivel = semComentarios(libFila);
+
+// CP-11: uma lavagem gera DOIS registros. "4 registros esperando" para duas
+// lavagens fazia o trabalho parado parecer o dobro.
+ok("a faixa conta lavagem, nao registro",
+   /\{fila\.lavagens === 1 \? "lavagem" : "lavagens"\}/.test(campoB) &&
+   !/registro esperando/.test(campoB));
+
+ok("e diz QUAIS jazigos estao esperando",
+   /p\.rotulo/.test(campoB));
+
+// CP-06: os quatro estados. "guardado" e "precisa de ajuda" ficam gravados;
+// "enviando" e transitorio e "confirmado" e ter saido da fila.
+ok("a fila separa o que o tempo resolve do que precisa de gente",
+   /precisa_de_ajuda/.test(filaVisivel) && /tente_depois/.test(filaVisivel) &&
+   /subiu/.test(filaVisivel));
+
+ok("e a regra dessa separacao e pura, para dar para provar",
+   /export function classificar\(status: number, corpo: any\)/.test(libFila));
+
+// Sem isto, um item recusado pelo servidor tenta para sempre e aparece como
+// "aguardando envio" — com o cartao ja sumido da lista dela.
+ok("item recusado para de ser tentado",
+   /if \(p\.estado === "precisa_de_ajuda"\) continue;/.test(filaVisivel));
+
+ok("e a tela mostra o que precisa de ajuda, com o motivo",
+   /precisamDeAjuda \|\| \[\]\)\.map/.test(campoB) && /motivoFalha/.test(campoB));
+
+ok("o quarto estado, confirmado, tem recibo na tela",
+   /subiramAgora/.test(campoB) && /enviada|enviadas/.test(campoB));
+
+// O comentario dizia que parava no servico travado e o laco seguia direto: um
+// `iniciar` preso mandava o `concluir` assim mesmo, sem foto do antes.
+ok("conclusao nao sobe na frente do inicio que ficou preso",
+   /travados\.add\(p\.servicoId\)/.test(filaVisivel) &&
+   /if \(travados\.has\(p\.servicoId\)\) continue;/.test(filaVisivel));
+
+// CP-08: cada tentativa criava um uuid novo.
+ok("a chave da fila e determinista, entao dois toques nao viram dois",
+   /export function chaveDe/.test(libFila) &&
+   /\$\{servicoId \|\| "avulso"\}:\$\{tipo\}/.test(libFila));
+
+ok("e o botao trava no PRIMEIRO toque",
+   /if \(abrindo \|\| preparando \|\| ocupado\) return;/.test(campoB) &&
+   /setAbrindo\(true\)/.test(campoB));
+
+// Travar cedo sem soltar seria pior: em alguns Android cancelar a camera nao
+// dispara `change`, e o botao ficaria morto para sempre.
+ok("e a trava se solta quando a janela volta a ter foco",
+   /addEventListener\("focus", soltar\)/.test(campoB));
+
+// CP-05: a conclusao offline ficava no IndexedDB, o cache continuava com o
+// jazigo pendente, e reabrir sem sinal trazia o mesmo jazigo de volta.
+ok("o que ja esta feito no aparelho nao volta como pendente",
+   /async function reconciliar/.test(campoB) &&
+   /estadoLocalDosServicos/.test(campoB));
+
+ok("e quem escreve na lista escreve no cache, no mesmo gesto",
+   /const marcar = useCallback/.test(campoB) &&
+   /localStorage\.setItem\(CACHE_DIA/.test(campoB));
+
+// CP-04: sao as acoes mais provaveis onde o sinal e pior.
+ok("'nao deu para fazer' entra na fila",
+   /naoFeitoOuEnfileirar/.test(telaNaoDeu) && !/fetch\("\/api\/campo\/nao-feito"/.test(telaNaoDeu));
+
+ok("pedido de material entra na fila",
+   /materialOuEnfileirar/.test(telaMat) && !/fetch\("\/api\/campo\/pedido-material"/.test(telaMat));
+
+ok("e a tela diz que guardou, em vez de dizer que enviou",
+   /Pedido guardado/.test(telaMat) && /sinal voltar/.test(telaNaoDeu));
 
 process.exit(falhas ? 1 : 0);
