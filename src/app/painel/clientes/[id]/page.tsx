@@ -276,6 +276,7 @@ export default function Ficha() {
 function DadosDaFamilia({ fam, familiaId, aoMudar }: {
   fam: any; familiaId: string; aoMudar: () => void;
 }) {
+  const recado = useRecado();
   const [abrindo, setAbrindo] = useState(false);
   // O QUE É DA FAMÍLIA, e só isso. O valor combinado e o início da cobrança
   // desceram para o jazigo (0100): com N túmulos, cada um tem o seu.
@@ -297,7 +298,7 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
-    if (!f.nome.trim()) { alert("A família precisa de um nome."); return; }
+    if (!f.nome.trim()) { recado.aviso("A família precisa de um nome."); return; }
     setSalvando(true);
     try {
       const r = await fetch(`/api/familias/${familiaId}`, {
@@ -307,7 +308,7 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
         // traduzir aqui também criaria duas regras para a mesma pergunta.
         body: JSON.stringify(f),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
       setAbrindo(false);
       aoMudar();
     } finally { setSalvando(false); }
@@ -397,6 +398,7 @@ function DadosDaFamilia({ fam, familiaId, aoMudar }: {
 function BarraConferencia({ familiaId, fam, pendentes, aoMudar }: {
   familiaId: string; fam: any; pendentes: any[]; aoMudar: () => void;
 }) {
+  const recado = useRecado();
   const [ocupado, setOcupado] = useState(false);
 
   async function darOk(ok: boolean) {
@@ -406,7 +408,7 @@ function BarraConferencia({ familiaId, fam, pendentes, aoMudar }: {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ familiaId, ok }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "não consegui salvar"); return; }
       aoMudar();
     } finally { setOcupado(false); }
   }
@@ -418,7 +420,7 @@ function BarraConferencia({ familiaId, fam, pendentes, aoMudar }: {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ familiaId, regime }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.erro || "não consegui salvar"); return; }
+      if (!r?.ok) { recado.erro(r?.erro || "não consegui salvar"); return; }
       aoMudar();
     } finally { setOcupado(false); }
   }
@@ -1077,6 +1079,7 @@ function Portal({ tumuloId, tokenAtual }: { tumuloId: string; tokenAtual: string
  * O botão só aparece quando FALTA alguma coisa. Mês completo não pede ação.
  */
 function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [p, setP] = useState<any>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -1108,7 +1111,7 @@ function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => v
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ familiaId }),
       }).then((x) => x.json());
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui fechar."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "Não consegui fechar."); return; }
       carregar();
       aoMudar();
     } finally { setOcupado(false); }
@@ -1133,6 +1136,7 @@ function FecharMes({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => v
  * dia, ele não ocupa espaço nem convida a clicar à toa.
  */
 function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => void }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [previa, setPrevia] = useState<any>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -1173,7 +1177,7 @@ function PorNaConta({ familiaId, aoMudar }: { familiaId: string; aoMudar: () => 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ familiaId }),
       }).then((x) => x.json());
-      if (!r?.ok) { alert(r?.erro || "Não consegui lançar."); return; }
+      if (!r?.ok) { recado.erro(r?.erro || "Não consegui lançar."); return; }
       carregar();
       aoMudar();
     } finally { setOcupado(false); }
@@ -1194,6 +1198,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   familiaId: string | null; clienteId: string | null; aoMudar: () => void;
   aLancar?: { competencias: number; valor: number; desde: string | null } | null;
 }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [cobrando, setCobrando] = useState(false);
 
@@ -1218,7 +1223,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acao: "cobrar" }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || "Não consegui lançar."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || "Não consegui lançar."); return; }
       aoMudar();
     } finally { setCobrando(false); }
   }
@@ -2151,6 +2156,7 @@ function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
  * há trabalho a fazer.
  */
 function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: string }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [dados, setDados] = useState<any>(null);
   const [editando, setEditando] = useState<string | null>(null);
@@ -2269,7 +2275,7 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
         method: "DELETE",
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) { setErro(traduzirErro(r)); return; }
-      if (r.mensagem) alert(r.mensagem);
+      if (r.mensagem) recado.erro(r.mensagem);
       carregar();
     } finally { setMexendo(null); }
   }
@@ -2497,6 +2503,7 @@ function Pessoas({ familiaId, atualId }: { familiaId: string | null; atualId: st
 function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
   clienteId: string; aoPronto: () => void; aoCancelar: () => void;
 }) {
+  const recado = useRecado();
   const [porta, setPorta] = useState<"campo" | "novo">("campo");
   const [orfaos, setOrfaos] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
@@ -2537,7 +2544,7 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
       // Falha parcial ainda é sucesso parcial: mostra o que não deu, mas segue
       // com o que entrou — esconder isso faria a Sureya ligar de novo o que já
       // estava ligado.
-      if (r?.mensagem) alert(r.mensagem);
+      if (r?.mensagem) recado.aviso(r.mensagem);
       setMarcados([]);
       aoPronto();
     } finally { setSalvando(false); }
@@ -2746,6 +2753,7 @@ function AdicionarTumulo({ clienteId, aoPronto, aoCancelar }: {
  */
 function Ajustes({ clienteId, nome, familiaId, familiaNome }:
   { clienteId: string; nome: string; familiaId: string | null; familiaNome: string }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [aberto, setAberto] = useState(true);
   const [ocupado, setOcupado] = useState(false);
@@ -2761,7 +2769,7 @@ function Ajustes({ clienteId, nome, familiaId, familiaNome }:
       .then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) window.location.href = "/painel/clientes";
-    else alert(r?.mensagem || r?.erro || "Não consegui excluir.");
+    else recado.erro(r?.mensagem || r?.erro || "Não consegui excluir.");
   }
 
   return (
@@ -2807,6 +2815,7 @@ function Ajustes({ clienteId, nome, familiaId, familiaNome }:
  */
 function FundirOuExcluir({ familiaId, familiaNome }:
   { familiaId: string; familiaNome: string }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [abrindo, setAbrindo] = useState(false);
   const [busca, setBusca] = useState("");
@@ -2846,7 +2855,7 @@ function FundirOuExcluir({ familiaId, familiaNome }:
     setOcupado(false);
     if (!r?.ok) { setErro(r?.mensagem || "Não consegui fundir."); return; }
     const m = r.movido || {};
-    alert(`Pronto. Foram para "${destino.nome}": ${m.contatos || 0} contato(s), `
+    recado.erro(`Pronto. Foram para "${destino.nome}": ${m.contatos || 0} contato(s), `
         + `${m.tumulos || 0} jazigo(s), ${m.lancamentos || 0} lançamento(s).`);
     window.location.href = `/painel/clientes/${destino.id}`;
   }

@@ -144,7 +144,7 @@ export function PainelFechamento() {
           </p>
         </div>
 
-        {/* ---------- quem está em aberto ---------- */}
+        {/* ---------- de quem temos a receber ---------- */}
         <div style={painel.card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
             <strong style={{ color: cor.navy }}>Em aberto</strong>

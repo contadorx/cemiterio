@@ -17,6 +17,7 @@ import { useConfirmar, useRecado, type Pedido } from "@/components/Dialogos";
  *  · quem a Sureya QUER abordar (prospecção, com o contexto que ela conhece)
  */
 export default function VisaoLeads() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [lista, setLista] = useState<any[]>([]);
   const [f, setF] = useState({ status: "", origem: "", ocultos: false });
@@ -62,9 +63,9 @@ export default function VisaoLeads() {
     }).then((x) => x.json()).catch(() => null);
     setEmMassa(false);
     if (r?.ok) {
-      if (acao === "converter" && r.falhas) alert(`${r.criados} convertido(s). ${r.falhas} não deu (ex.: telefone já é cliente).`);
+      if (acao === "converter" && r.falhas) recado.aviso(`${r.criados} convertido(s). ${r.falhas} não deu (ex.: telefone já é cliente).`);
       setSel(new Set()); carregar();
-    } else alert("Falhou: " + (r?.erro || "erro"));
+    } else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   return (
@@ -172,6 +173,7 @@ export default function VisaoLeads() {
 }
 
 function NovoLead({ onPronto }: { onPronto: () => void }) {
+  const recado = useRecado();
   const [f, setF] = useState({ nome: "", telefone: "", contexto: "", jazigoRef: "", proximoPasso: "" });
   const [salvando, setSalvando] = useState(false);
 
@@ -182,7 +184,7 @@ function NovoLead({ onPronto }: { onPronto: () => void }) {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (r?.ok) onPronto();
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   return (
@@ -246,7 +248,7 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok && r.clienteId) location.href = `/painel/clientes/${r.clienteId}`;
-    else alert("Não consegui converter: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui converter: " + (r?.erro || "erro"));
   }
 
   async function sugerir() {
@@ -255,7 +257,7 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
       .then((x) => x.json()).catch(() => null);
     setPensando(false);
     if (r?.ok) setSugestao(r.texto);
-    else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
+    else recado.erro(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
   }
 
   async function mudarStatus(status: string) {
@@ -263,7 +265,7 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) onMudou(); else alert("Não consegui atualizar.");
+    if (r?.ok) onMudou(); else recado.erro("Não consegui atualizar.");
   }
 
   /** Não é cliente e não vai ser: some da lista e não volta nem escrevendo de novo. */
@@ -280,7 +282,7 @@ function Lead({ l, onMudou, marcado, onMarcar }: {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ignorado: true, motivoIgnorado: motivo || null }),
     }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) onMudou(); else alert("Não consegui marcar.");
+    if (r?.ok) onMudou(); else recado.erro("Não consegui marcar.");
   }
 
   async function voltarASerLead() {

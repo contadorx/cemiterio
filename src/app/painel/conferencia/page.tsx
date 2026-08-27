@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Cartao, Botao, Selo } from "../pecas";
 import VisaoRelatorio from "./VisaoRelatorio";
+import { useRecado } from "@/components/Dialogos";
 
 /**
  * A DUPLA CONFERÊNCIA DO CADASTRO.
@@ -59,6 +60,7 @@ const ROTULO_REGIME: Record<string, string> = {
 };
 
 export default function Conferencia() {
+  const recado = useRecado();
   // DUAS ABAS. Conferir o CADASTRO (falta telefone? falta quadra?) e conferir
   // os EVENTOS (o que foi lançado, em que competência, por qual porta) são o
   // mesmo trabalho em dois tempos — e quem faz o segundo é quem acabou de
@@ -113,7 +115,7 @@ export default function Conferencia() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ familiaId: f.familia_id, ok }),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "não consegui salvar"); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "não consegui salvar"); return; }
       await carregar();
     } finally { setOcupado(null); }
   }

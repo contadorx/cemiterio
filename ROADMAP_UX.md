@@ -10,9 +10,9 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 19 |
+| Aplicado | 22 |
 | Aplicado pela metade | 0 |
-| Não aplicado | 6 |
+| Não aplicado | 3 |
 | Não dá para provar lendo código | 1 |
 
 Três de vinte e seis é pouco, mas as duas auditorias são de antes de boa parte
@@ -29,14 +29,14 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-04 | Famílias é uma lista simples | **sim (Build D)** | busca + três atalhos; filtros em "Mais filtros", que abre sozinho quando algum está em uso |
 | CA-05 | Cadastrar família é uma tarefa só | **não** | formulário único, sem etapas nem resumo final |
 | CA-06 | A agenda mostra trabalho, não engenharia | **sim (Build D), à sua maneira** | o trabalho vem antes da máquina que o fabrica, na MESMA tela — sem segunda tela, por correção sua |
-| CA-07 | Ação destrutiva é consistente e segura | **sim (Build C)** | 66 `confirm`/`prompt` do painel e os 18 do campo viraram uma peça só; 99 `alert` de desfecho ainda por converter |
+| CA-07 | Ação destrutiva é consistente e segura | **sim (Build C+E)** | os 193 diálogos do navegador viraram duas peças. Painel e campo em zero |
 | CA-08 | Liberação deixa revisar com segurança | **sim (Build C)** | descarte confirmado, "limpo em 14/08 às 09:30" no cartão, fotos rotuladas, desfazer |
-| CA-09 | Financeiro tem uma porta só | **não** | continua abas dentro de abas; não é funil |
+| CA-09 | Financeiro tem uma porta só | **sim (Build E)** | abre no funil: a identificar → a conferir → a receber → fechar o mês |
 | CA-10 | Configuração é fácil de achar | **sim** | `config/page.tsx` tem `GRUPOS` com quatro domínios e diagnóstico por último |
 | CA-11 | O painel é visualmente consistente | **não** | 3 telas com estilo em objeto inline, 14 com classe — dois vocabulários visuais |
 | CA-12 | O mobile administrativo é simples | **não dá para provar** | responsividade se prova em aparelho, com teclado aberto e voltando do navegador |
 | CA-13 | O sistema separa vazio de falha | **sim nas cinco telas caras** | O mês, Liberação, Agenda, Financeiro e Famílias têm os quatro estados; telas de segunda ordem vão no Build C |
-| CA-14 | Termo igual quer dizer coisa igual | **não** | "em aberto" 39×, "saldo" 57×, "recebido" 22×, "falta pagar" 4×, "a receber" 2×; "a identificar" e "conciliado" 0× |
+| CA-14 | Termo igual quer dizer coisa igual | **sim (Build E)** | cinco palavras em `src/lib/vocabulario.ts`; escolhi `conferido` em vez de `conciliado` — ver o LEIA-ME |
 
 ## Campo
 
@@ -51,7 +51,7 @@ de regra — não de tela. O que segue é a lista honesta.
 | CP-07 | Cancelar a câmera não muda o fluxo | **sim, hoje** | consertado nesta entrega — ver abaixo |
 | CP-08 | Toque duplo não duplica | **sim (Build B)** | chave `servicoId:tipo` na fila e trava no primeiro toque, solta no foco |
 | CP-09 | As fotos simplificam o cartão | **sim (Build D)** | uma foto grande + "ver mais"; a principal muda: "onde fica" antes, "antes (hoje)" depois de começar |
-| CP-10 | Existe uma implementação do cartão | **não** | **710 linhas mortas**: `CardTumulo.tsx` 167, `Concluir.tsx` 276, `ConfirmarJazigo.tsx` 189, `DistanciaAoVivo.tsx` 78 — nenhuma importada pela tela viva |
+| CP-10 | Existe uma implementação do cartão | **sim (Build E)** | 724 linhas apagadas; guarda estática reprova se voltarem |
 | CP-11 | Ela sabe o que já foi enviado | **sim (Build B)** | conta lavagens e diz quais jazigos; recados contados à parte |
 | CP-12 | Encerrar o dia é simples e seguro | **sim (Build C)** | uma folha com o resumo: feitas, o que fica para depois, o que ainda não subiu |
 
@@ -155,8 +155,14 @@ recolhido.
 dá para fingir offline (o resto do fluxo precisa do id que o servidor devolve).
 Se você cadastra em lugar sem sinal, isso vira um item próprio; me diga.
 
-### Build E — vocabulário e casa arrumada
-**CA-14, CA-09, CA-05, CA-11, CP-10, CA-12**
+### Build E — vocabulário e casa arrumada ✅ ENTREGUE em parte
+**CA-14, CA-09, CP-10 + os 99 `alert`** — ver `LEIA-ME_as_cinco_palavras.md`
+
+**Ficaram de fora, e viram o Build F:** CA-05 (cadastro em etapas) e CA-11
+(unificação visual). Os dois são reescritas de superfície grande — o formulário
+inteiro de cadastro, e a migração de três telas de estilo em objeto para o
+vocabulário visual das outras catorze. Fazer no fim de um build que já mexeu em
+40 arquivos seria empilhar risco sem necessidade.
 
 CA-14 precisa de você antes de mim: são cinco palavras a fixar — `a receber`,
 `recebido`, `a identificar`, `conciliado`, `saldo da família`. Depois disso o
@@ -198,10 +204,19 @@ Duas coisas separadas, as duas esperando decisão sua:
 
 ## Onde estamos
 
-Builds A, B, C e D entregues. Sobrou o E — e ele começa com uma pergunta sua,
-não com código: fixar as cinco palavras (`a receber`, `recebido`,
-`a identificar`, `conciliado`, `saldo da família`). O Financeiro como funil é
-essas palavras em ordem.
+**22 das 26 contraprovas aplicadas.** Builds A a E entregues.
+
+O que resta:
+
+| | |
+|---|---|
+| **Build F** | CA-05 (cadastro em etapas) e CA-11 (unificação visual) |
+| **CA-12** | não é código: teste em aparelho de verdade, com a Sureya |
+| **CP-03** | nunca foi conserto — a câmera do celular pede confirmação e isso não está na nossa mão. Vira métrica |
+
+E as duas decisões guardadas acima, esperando você: o **"Fazer este agora"** que
+não é prioridade e parece que é, e a **régua de prioridade** (hoje só levanta
+prioridade o que a Nina adiou).
 
 Sobrou do C: 99 `alert` de desfecho no painel. Não converti em massa porque
 distinguir sucesso de falha mecanicamente arrisca marcar um erro como recibo

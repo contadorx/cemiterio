@@ -151,7 +151,7 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
   async function identificar(clienteId: string, nome: string) {
     if (!await perguntar({
       oQue: `Esta entrada de ${money(e.valor)} é da família ${nome}?`,
-      efeito: "O valor entra na conta dela e abate o que estiver em aberto.",
+      efeito: "O valor entra na conta dela e abate o que houver a receber.",
       confirmar: "É dessa família",
     })) return;
     const r = await fetch("/api/financeiro/entradas", {
@@ -260,6 +260,7 @@ function Entrada({ e, ocupado, onMudou, onDesfazer, onApagar }: any) {
 }
 
 function NovaEntrada({ onPronto }: { onPronto: () => void }) {
+  const recado = useRecado();
   const [f, setF] = useState({
     valor: "", data: diaOperacao(),
     remetente: "", identificador: "", observacao: "",
@@ -299,7 +300,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
 
   async function salvar() {
     const v = Number(String(f.valor).replace(",", "."));
-    if (!v || v <= 0) return alert("Informe o valor que entrou.");
+    if (!v || v <= 0) return recado.aviso("Informe o valor que entrou.");
     setSalvando(true);
     const marcados = debitos.filter((d) => escolhidos[d.lancamento_id]).map((d) => d.lancamento_id);
     const r = await fetch("/api/financeiro/entradas", {
@@ -311,12 +312,12 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
       }),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (!r?.ok) return alert("Falhou: " + (r?.erro || "erro"));
+    if (!r?.ok) return recado.erro("Falhou: " + (r?.erro || "erro"));
 
     if (cliente && r.sobrou > 0) {
-      alert(`Lançado. ${r.quitados} lavagem(ns) quitada(s) e ${money(r.sobrou)} ficaram como crédito da família.`);
+      recado.ok(`Lançado. ${r.quitados} lavagem(ns) quitada(s) e ${money(r.sobrou)} ficaram como crédito da família.`);
     } else if (cliente) {
-      alert(`Lançado e creditado para ${cliente.nome}. ${r.quitados} lavagem(ns) quitada(s).`);
+      recado.ok(`Lançado e creditado para ${cliente.nome}. ${r.quitados} lavagem(ns) quitada(s).`);
     }
     onPronto();
   }
@@ -434,7 +435,7 @@ function NovaEntrada({ onPronto }: { onPronto: () => void }) {
 
       {cliente && debitos.length === 0 && (
         <p style={{ color: cor.cinza, fontSize: 15, marginTop: 12 }}>
-          Esta família não tem nada em aberto — o valor entra como crédito para as próximas.
+          Esta família não tem nada a receber — o valor entra a favor dela, para as próximas.
         </p>
       )}
 

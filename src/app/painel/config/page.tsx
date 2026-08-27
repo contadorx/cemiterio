@@ -5,7 +5,7 @@ import { PainelNav, painel, cor } from "../ui";
 import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
 import Extras from "./Extras";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -176,6 +176,7 @@ function Abas({ atual, aoTrocar }: { atual: Aba; aoTrocar: (a: Aba) => void }) {
 
 // Chave mestra dos disparos automáticos. Fica no topo da Config, sempre visível.
 function ChaveDisparos() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [ativo, setAtivo] = useState<boolean | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -204,7 +205,7 @@ function ChaveDisparos() {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (r?.ok) setAtivo(!!r.ativo);
-    else alert("Não consegui salvar: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui salvar: " + (r?.erro || "erro"));
   }
 
   const ligado = ativo === true;
@@ -241,6 +242,7 @@ function ChaveDisparos() {
 }
 
 function Equipe() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [membros, setMembros] = useState<any[]>([]);
   const [form, setForm] = useState(false);
@@ -283,7 +285,7 @@ function Equipe() {
     })) return;
     const r = await fetch(`/api/membros/${userId}`, { method: "DELETE" }).then((x) => x.json());
     if (r?.ok) carregar();
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   async function atualizar(userId: string, patch: Record<string, any>) {
@@ -714,6 +716,7 @@ function Campanhas() {
  * foi. Você escolhe o jeito depois de ver na prática qual funciona.
  */
 function Cemiterios() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState("");
@@ -735,11 +738,11 @@ function Cemiterios() {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (r?.ok) carregar();
-    else alert(r?.erro || "não consegui salvar");
+    else recado.erro(r?.erro || "não consegui salvar");
   }
 
   async function criar() {
-    if (!novo.nome.trim()) return alert("Diga o nome do cemitério.");
+    if (!novo.nome.trim()) return recado.aviso("Diga o nome do cemitério.");
     setSalvando(true);
     const r = await fetch("/api/cemiterios", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -747,7 +750,7 @@ function Cemiterios() {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (r?.ok) { setNovo({ nome: "", endereco: "" }); carregar(); }
-    else alert(r?.erro || "não consegui criar");
+    else recado.erro(r?.erro || "não consegui criar");
   }
 
   if (erro) {
@@ -870,6 +873,7 @@ function Cemiterios() {
 }
 
 function Casa() {
+  const recado = useRecado();
   const [f, setF] = useState<any>(null);
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState(false);
@@ -889,7 +893,7 @@ function Casa() {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (r?.ok) { setOk(true); setTimeout(() => setOk(false), 2000); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   if (!f) return <p style={{ color: cor.cinza }}>Carregando…</p>;
@@ -1004,6 +1008,7 @@ function Casa() {
 
 
 function Materiais() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [itens, setItens] = useState<any[]>([]);
   const [novo, setNovo] = useState({ nome: "", unidade: "un", estoque: 0, alertaMinimo: 1 });
@@ -1021,7 +1026,7 @@ function Materiais() {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(novo),
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) { setNovo({ nome: "", unidade: "un", estoque: 0, alertaMinimo: 1 }); setCriando(false); carregar(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   async function atualizar(id: string, patch: any) {
@@ -1053,7 +1058,7 @@ function Materiais() {
     if (r?.ok) {
       carregar();
       if (r.consumoSugerido != null && r.limpezas > 0) setSugestao({ ...r, material: m });
-    } else alert("Falhou ao registrar a compra.");
+    } else recado.erro("Falhou ao registrar a compra.");
   }
 
   async function aprovarSugestao() {
@@ -1185,6 +1190,7 @@ function Materiais() {
 
 
 function Jornada() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [j, setJ] = useState<any>(null);
   const [bloq, setBloq] = useState<any[]>([]);
@@ -1207,7 +1213,7 @@ function Jornada() {
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
     if (!r?.ok) {
-      alert("Falhou: " + (r?.erro === "escolha_ao_menos_um_dia" ? "Escolha pelo menos um dia." : r?.erro));
+      recado.erro("Falhou: " + (r?.erro === "escolha_ao_menos_um_dia" ? "Escolha pelo menos um dia." : r?.erro));
       return;
     }
     setOk(true); setTimeout(() => setOk(false), 2000); carregar();
@@ -1225,7 +1231,7 @@ function Jornada() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ diasAFrente: 120 }),
         }).then((x) => x.json()).catch(() => null);
-        alert(rr?.ok
+        recado.aviso(rr?.ok
           ? `${rr.movidos} lavagem(ns) movida(s) e redistribuída(s).`
           : "Não consegui reorganizar. Use o botão na tela de Agenda.");
       }
@@ -1350,6 +1356,7 @@ function Jornada() {
 
 function CompraMaterial({ m, onFechar, onConfirmar }:
   { m: any; onFechar: () => void; onConfirmar: (q: number, v: number) => void }) {
+  const recado = useRecado();
   const [qtd, setQtd] = useState("");
   const [valor, setValor] = useState("");
 
@@ -1370,7 +1377,7 @@ function CompraMaterial({ m, onFechar, onConfirmar }:
         <button style={painel.botao}
                 onClick={() => {
                   const q = Number(qtd), v = Number(valor);
-                  if (!q) return alert("Informe a quantidade.");
+                  if (!q) return recado.aviso("Informe a quantidade.");
                   onConfirmar(q, v);
                 }}>
           Registrar
@@ -1398,6 +1405,7 @@ function CompraMaterial({ m, onFechar, onConfirmar }:
  * pediu para receber — por isso a contagem de exceções aparece junto.
  */
 function Mensagens() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [ativo, setAtivo] = useState<boolean | null>(null);
   const [excecoes, setExcecoes] = useState<{ desligadas: number; ligadas: number }>({ desligadas: 0, ligadas: 0 });
@@ -1443,7 +1451,7 @@ function Mensagens() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) carregarChave();
-    else alert("Não consegui salvar: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui salvar: " + (r?.erro || "erro"));
   }
 
   async function salvarDias() {
@@ -1454,7 +1462,7 @@ function Mensagens() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) carregarChave();
-    else alert(r?.erro === "dias_invalidos"
+    else recado.erro(r?.erro === "dias_invalidos"
       ? "Escreva um número de dias entre 0 e 3650. Zero desliga o aviso."
       : "Não consegui salvar: " + (r?.erro || "erro"));
   }
@@ -1468,7 +1476,7 @@ function Mensagens() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (!r?.ok) {
-      alert(r?.erro === "ultimo_ativo"
+      recado.erro(r?.erro === "ultimo_ativo"
         ? "Este é o único texto ligado deste tipo. Sem nenhum, o sistema volta a mandar a frase curta de reserva — cadastre outro antes de desligar este."
         : r?.erro === "texto_vazio" ? "O texto não pode ficar vazio."
         : "Não consegui salvar: " + (r?.erro || "erro"));

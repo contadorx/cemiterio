@@ -5,7 +5,7 @@ import { MessageCircle, Phone, Check, X, Clock, AlertTriangle, Send, ArrowLeft, 
 import { Cartao, Botao, Selo, Campo, Entrada } from "../pecas";
 import { diasDesde, faz } from "@/lib/datas";
 import { primeiroNome } from "@/lib/mensagens";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * CONTATOS — quem escreveu pelo site e ainda espera resposta.
@@ -81,6 +81,7 @@ function telBonito(t: string) {
 }
 
 export default function VisaoSite() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [pendentes, setPendentes] = useState<Contato[]>([]);
   const [feitos, setFeitos] = useState<any[]>([]);
@@ -149,7 +150,7 @@ export default function VisaoSite() {
       if (!r?.ok) {
         // A recusa por telefone repetido diz ONDE a pessoa já está — é a
         // resposta útil, e vale mais que "erro ao salvar".
-        alert(r?.mensagem || r?.erro || "Não consegui converter.");
+        recado.erro(r?.mensagem || r?.erro || "Não consegui converter.");
         return;
       }
       setFeito({ id, familiaId: r.familiaId, conversaId: r.conversaId, familiaCriada: r.familiaCriada });
@@ -176,7 +177,7 @@ export default function VisaoSite() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, acao, ...extra }),
       }).then((x) => x.json());
-      if (!r?.ok) { alert(r?.erro || "Não consegui salvar."); return; }
+      if (!r?.ok) { recado.erro(r?.erro || "Não consegui salvar."); return; }
       await carregar();
     } finally { setOcupado(null); }
   }

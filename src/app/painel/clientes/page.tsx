@@ -7,7 +7,7 @@ import { Falhou } from "../pecas";
 import { ATALHOS_FREQUENCIA } from "@/lib/frequencia";
 import VisaoJazigos from "./VisaoJazigos";
 import VincularLote from "./VincularLote";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * CARTEIRA — familia, jazigo e servico na MESMA tela.
@@ -106,10 +106,26 @@ interface Cli {
 }
 
 function VisaoFamilias() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [f, setF] = useState({ busca: "", quadra: "", rua: "", cadencia: "", situacao: "",
                                regua: "", venceEm: "", ordem: "nome", teste: false, etapa: "" });
+
+  /**
+   * O ATALHO CHEGA PELO ENDEREÇO.
+   *
+   * O funil do Financeiro tem uma etapa — "a receber" — que não se resolve lá:
+   * resolve-se aqui, família por família. Sem isto, o clique traria a lista
+   * inteira e a pessoa teria de refazer o filtro à mão, que é exatamente o que
+   * o funil existe para evitar.
+   */
+  useEffect(() => {
+    const a = new URLSearchParams(window.location.search).get("atalho");
+    if (a === "em_aberto") setF((x) => ({ ...x, situacao: "atrasados", ordem: "saldo" }));
+    if (a === "incompleto") setF((x) => ({ ...x, etapa: "sem_tumulo" }));
+    if (a === "proxima_lavagem") setF((x) => ({ ...x, ordem: "lavagem" }));
+  }, []);
   const [quadras, setQuadras] = useState<any[]>([]);
   const [abrindo, setAbrindo] = useState(false);
   /** As famílias marcadas para a ação em lote. Guarda o id da FAMÍLIA. */
@@ -156,7 +172,7 @@ function VisaoFamilias() {
 
     setMarcadas(new Set());
     await carregar();
-    alert(
+    recado.ok(
       `${saíram} ${saíram === 1 ? "família excluída" : "famílias excluídas"}.`
       + (recusadas.length
           ? `\n\nNão saíram (${recusadas.length}):\n` + recusadas.slice(0, 10).join("\n")
@@ -276,7 +292,7 @@ function VisaoFamilias() {
             <select style={{ ...painel.input, width: "auto" }} value={f.situacao}
                     onChange={(e) => setF({ ...f, situacao: e.target.value })}>
               <option value="">Todas as situações</option>
-              <option value="atrasados">Em aberto (devendo)</option>
+              <option value="atrasados">A receber</option>
               <option value="em_dia">Em dia</option>
               <option value="adiantados">Adiantados</option>
               <option value="automatico">IA no automático</option>
@@ -338,7 +354,7 @@ function VisaoFamilias() {
             <span><b style={{ color: cor.navy }}>{d.totais.quantidade}</b> famílias</span>
             <span><b style={{ color: cor.navy }}>{money(d.totais.mensal)}</b> por mês</span>
             <span><b style={{ color: d.totais.atrasados ? "rgb(var(--zm-perigo))" : cor.teal }}>
-              {d.totais.atrasados}</b> em aberto ({money(d.totais.emAberto)})</span>
+              {d.totais.atrasados}</b> a receber ({money(d.totais.emAberto)})</span>
             {d.totais.faltaData > 0 && (
               <span style={{ color: "rgb(var(--zm-aviso))" }}>
                 <b>{d.totais.faltaData}</b> sem data de lavagem ou cobrança
@@ -481,7 +497,7 @@ function VisaoFamilias() {
                     {Math.abs(c.vencido) < 0.005 ? "em dia" : money(Math.abs(c.vencido))}
                   </b>
                   <div style={{ fontSize: 14, color: cor.cinza }}>
-                    {c.atrasado ? "em aberto" : c.vencido > 0 ? "de crédito" : ""}
+                    {c.atrasado ? "a receber" : c.vencido > 0 ? "a favor dela" : ""}
                   </div>
                   {/* Prestado e ainda nao vencido: nem divida, nem invisivel. */}
                   {c.aVencer > 0.005 && (
@@ -501,6 +517,7 @@ function VisaoFamilias() {
 
 
 function Importar({ onPronto }: { onPronto: () => void }) {
+  const recado = useRecado();
   const [modo, setModo] = useState<"nova" | "csv">("nova");
   const [f, setF] = useState({
     nome: "", telefone: "", tratamento: "a senhora", consentimento: false,
@@ -527,8 +544,8 @@ function Importar({ onPronto }: { onPronto: () => void }) {
   }, []);
 
   async function criar() {
-    if (!f.nome.trim() || !f.telefone.trim()) return alert("Nome e telefone são obrigatórios.");
-    if (f.jazigoModo === "vincular" && !f.vincularTumuloId) return alert("Escolha o jazigo já cadastrado ou troque para “novo”.");
+    if (!f.nome.trim() || !f.telefone.trim()) return recado.aviso("Nome e telefone são obrigatórios.");
+    if (f.jazigoModo === "vincular" && !f.vincularTumuloId) return recado.aviso("Escolha o jazigo já cadastrado ou troque para “novo”.");
 
 
     const at = ATALHOS_FREQUENCIA[f.atalho];
@@ -537,7 +554,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     // preco errado no banco (antes o padrao 40 entrava calado como honorario).
     const mensal = numeroBR(f.valorMensal);
     if (temJazigo && at.cadencia !== "avulso" && (!isFinite(mensal) || mensal <= 0)) {
-      return alert("Digite o valor de UMA limpeza como 40 ou 40,50 (sem R$ e sem separador de milhar).");
+      return recado.aviso("Digite o valor de UMA limpeza como 40 ou 40,50 (sem R$ e sem separador de milhar).");
     }
 
     setOcupado(true);
@@ -555,10 +572,10 @@ function Importar({ onPronto }: { onPronto: () => void }) {
       }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (!r?.ok) return alert("Falhou: " + (r?.erro || "erro"));
+    if (!r?.ok) return recado.erro("Falhou: " + (r?.erro || "erro"));
     // a familia e criada mesmo se o jazigo/plano falhar — antes isso era mudo.
-    if (r.avisoJazigo) alert("Familia cadastrada, mas o jazigo NAO entrou:\n\n" + r.avisoJazigo);
-    else if (r.avisoPlano) alert("Familia e jazigo cadastrados, mas o plano nao foi criado:\n\n" + r.avisoPlano);
+    if (r.avisoJazigo) recado.erro("Familia cadastrada, mas o jazigo NAO entrou:\n\n" + r.avisoJazigo);
+    else if (r.avisoPlano) recado.aviso("Familia e jazigo cadastrados, mas o plano nao foi criado:\n\n" + r.avisoPlano);
     onPronto();
   }
 
@@ -569,7 +586,7 @@ function Importar({ onPronto }: { onPronto: () => void }) {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (!r?.ok) { alert("Falhou: " + (r?.erro || "erro")); return; }
+    if (!r?.ok) { recado.erro("Falhou: " + (r?.erro || "erro")); return; }
     // r.criados e um objeto {clientes, tumulos, planos} — o alert antigo escrevia
     // "[object Object] linha(s)". E r.erros, que e onde moram TODAS as linhas
     // recusadas (valor ilegivel, jazigo de outra familia, duplicata), nao
@@ -585,12 +602,12 @@ function Importar({ onPronto }: { onPronto: () => void }) {
     if (erros.length) {
       const lista = erros.slice(0, 20).map((e) => `linha ${e.linha}: ${e.motivo}`).join("\n");
       const resto = erros.length > 20 ? `\n… e mais ${erros.length - 20} linha(s).` : "";
-      alert(
+      recado.ok(
         `Importado: ${partes}.\n\n${erros.length} linha(s) NAO entraram:\n\n${lista}${resto}` +
         "\n\nCorrija essas linhas na planilha e importe so elas de novo."
       );
     } else {
-      alert(`Importado: ${partes}.`);
+      recado.ok(`Importado: ${partes}.`);
     }
     onPronto();
   }

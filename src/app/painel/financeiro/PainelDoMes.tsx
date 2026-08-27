@@ -139,7 +139,7 @@ export default function PainelDoMes() {
       {Number(ina.em_aberto) === 0 ? (
         <div style={painel.card}>
           <p style={{ margin: 0, fontSize: 15, color: cor.cinza }}>
-            Ninguém em aberto neste mês.
+            Nada a receber neste mês.
             {Number(fut.valor) > 0 && ` ${brl(fut.valor)} a vencer não é atraso.`}
           </p>
         </div>
@@ -156,7 +156,7 @@ export default function PainelDoMes() {
           </div>
 
           <p style={nota}>
-            A idade da dívida conta da <b>competência em aberto mais antiga</b>, não do
+            A idade conta da <b>competência a receber mais antiga</b>, não do
             último lançamento: quem deve desde março e pagou parte em agosto continua
             sendo uma dívida de março.
           </p>

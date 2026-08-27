@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pecas";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * O COMBINADO DE FLORES — mora no JAZIGO, não na família.
@@ -40,6 +40,7 @@ export default function Flores({ familiaId, tumulos }: {
   familiaId: string | null;
   tumulos: any[];
 }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [d, setD] = useState<any>(null);
   const [abrindo, setAbrindo] = useState(false);
@@ -93,7 +94,7 @@ export default function Flores({ familiaId, tumulos }: {
     })) return;
     const r = await fetch(`/api/flores/assinaturas?id=${id}`, { method: "DELETE" })
       .then((x) => x.json());
-    if (r?.mensagem) alert(r.mensagem);
+    if (r?.mensagem) recado.aviso(r.mensagem);
     carregar();
   }
 

@@ -37,6 +37,9 @@ const dialogos    = readFileSync("src/components/Dialogos.tsx", "utf8");
 const layPainel   = readFileSync("src/app/painel/layout.tsx", "utf8");
 const layCampo    = readFileSync("src/app/campo/layout.tsx", "utf8");
 const assistente  = readFileSync("src/app/campo/Assistente.tsx", "utf8");
+const vocab       = readFileSync("src/lib/vocabulario.ts", "utf8");
+const funilTela   = readFileSync("src/app/painel/financeiro/Funil.tsx", "utf8");
+const funilRota   = readFileSync("src/app/api/financeiro/funil/route.ts", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -585,8 +588,13 @@ ok("a lista de comprovantes traz o contexto da decisao",
 ok("a tela mostra a familia, e nao so quem mandou",
    /c\.familia \|\| c\.cliente/.test(telaFin) && /mandado por/.test(telaFin));
 
+// ESTA GUARDA FALHOU NO BUILD E, E ESTAVA CERTA EM FALHAR.
+// Ela esperava as palavras "em aberto" e "saldo a favor dela". O Build E fixou
+// o vocabulario do dinheiro (src/lib/vocabulario.ts) e as duas viraram "a
+// receber" e "a favor dela". A expectativa mudou porque a TELA mudou de
+// proposito — nao para a guarda parar de reclamar.
 ok("e diz quanto essa familia deve",
-   /em aberto:/.test(telaFin) && /saldo a favor dela/.test(telaFin));
+   /a receber:/.test(telaFin) && /a favor dela/.test(telaFin));
 
 // A leitura da IA e palpite bom, nao fato: quem tem o extrato do banco e ela.
 ok("o valor e a data sao corrigiveis na conferencia",
@@ -948,5 +956,84 @@ ok("mas a saude do roteiro continua em cima de tudo",
 // Texto que aponta para onde a coisa NAO esta e pior do que texto nenhum.
 ok("e o vazio aponta para onde o botao foi parar",
    /Gere as limpezas no fim desta tela/.test(telaAgenda2));
+
+// ===================== BUILD E: vocabulario e casa arrumada =====================
+//
+// Sete palavras para tres ideias, sem lugar nenhum dizendo qual e qual: "em
+// aberto" 41x, "saldo" 61x, "recebido" 22x, "devendo" 21x, "atrasado" 27x,
+// "falta pagar" 5x, "a receber" 2x. Ler "saldo R$ 2.315" e entender "temos isso
+// no caixa" quando e "isso esta na rua" e decisao errada com dinheiro na mesa.
+
+ok("as cinco palavras vivem num lugar so",
+   /aReceber: "a receber"/.test(vocab) && /recebido: "recebido"/.test(vocab) &&
+   /aIdentificar: "a identificar"/.test(vocab) && /conferido: "conferido"/.test(vocab) &&
+   /saldoDaFamilia: "saldo da família"/.test(vocab));
+
+// A auditoria propunha "conciliado". Escolhi "conferido" porque o BANCO ja fala
+// assim (comprovantes.status = 'a_conferir', conta_corrente.conferido_em) e a
+// tela tambem (52 "conferir" contra 4 "conciliar"). Trocar custaria renomear um
+// enum em producao para piorar a palavra.
+ok("e a palavra escolhida e a que o banco ja fala",
+   /conferido/.test(vocab) && !/conciliado:/.test(vocab));
+
+// O sinal do saldo ja foi invertido por engano em tres rotas (0105, 0106, 0122).
+ok("o saldo tem uma boca so para ser dito",
+   /export function frasedoSaldo/.test(vocab) && /a favor dela/.test(vocab));
+
+// CA-09: a tela abria em "Fechar o mes" - resposta antes da pergunta. Da para
+// fechar o mes com dinheiro do banco ainda sem dono.
+const finVisivel = semComentarios(telaFin);
+ok("o Financeiro abre no funil, antes das abas",
+   finVisivel.indexOf("<Funil") < finVisivel.indexOf("ABAS_FIN.map"));
+
+ok("e o funil tem as quatro etapas em ordem",
+   /A identificar/.test(funilTela) && /A conferir/.test(funilTela) &&
+   /A receber/.test(funilTela) && /Fechar o mês/.test(funilTela));
+
+// De novo a licao de sempre: duas contas sobre o mesmo fato terminam
+// discordando (0092, 0105, 0106).
+ok("'a receber' vem da MESMA funcao da ficha da familia",
+   /calcularSaldosPorFamilia/.test(funilRota));
+
+ok("e 'fechar' vem da MESMA previa da tela de fechamento",
+   /previewCompetencia/.test(funilRota));
+
+// Vazio nao e zero, tambem aqui: etapa que nao deu para ler mostra "?" e nao um
+// zero tranquilizador.
+ok("etapa que nao deu para ler mostra '?', nao zero",
+   /e\.numero === null \? "\?" : e\.numero/.test(funilTela));
+
+// O funil e uma sequencia: sumir uma etapa vazia faria a sequencia ter buraco.
+// Aqui, ao contrario do "Precisa de voce", "0 a identificar" e boa noticia.
+ok("mas a etapa vazia FICA na tela, em cinza",
+   !/if \(!e\.numero\) return null/.test(funilTela));
+
+// A etapa "a receber" nao se resolve no Financeiro: resolve-se familia por
+// familia. Sem o atalho, o clique traria a lista inteira.
+ok("'a receber' leva para a lista de familias ja filtrada",
+   /atalho=em_aberto/.test(funilTela) &&
+   /a === "em_aberto"\) setF/.test(semComentarios(lista)));
+
+// CA-14 nas telas: as palavras trocadas onde o dinheiro aparece.
+ok("a tela inicial fala 'a receber', nao 'falta pagar'",
+   /a receber/.test(homeVisivel) && !/falta pagar<\/p>/.test(homeVisivel));
+
+// CP-10: 724 linhas que ninguem importava, num diretorio com tres
+// implementacoes do mesmo cartao. Eu mesmo quase consertei a errada no Build B.
+{
+  const mortos = ["src/app/campo/CardTumulo.tsx", "src/app/campo/Concluir.tsx",
+                  "src/app/campo/ConfirmarJazigo.tsx", "src/app/campo/DistanciaAoVivo.tsx"];
+  ok("o cartao do campo tem UMA implementacao",
+     mortos.every((f) => !existsSync(f)), mortos.filter((f) => existsSync(f)).join(", "));
+}
+
+// Os 109 alert eram desfecho usando a ferramenta de pergunta.
+{
+  const arquivos = varrer("src/app/painel");
+  const sobrando = arquivos.filter((f) =>
+    /(^|[^.\w])alert\s*\(/.test(semComentarios(readFileSync(f, "utf8"))));
+  ok(`nenhum alert do navegador no painel (${arquivos.length} arquivos)`,
+     sobrando.length === 0, sobrando.join(", "));
+}
 
 process.exit(falhas ? 1 : 0);

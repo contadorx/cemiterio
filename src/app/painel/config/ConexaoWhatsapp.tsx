@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { painel, cor } from "../ui";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * A CONEXAO DO WHATSAPP — agora dentro de Configuracoes.
@@ -21,6 +21,7 @@ import { useConfirmar } from "@/components/Dialogos";
 type Estado = "conectado" | "conectando" | "desconectado" | "inexistente" | "erro" | "carregando";
 
 export default function ConexaoWhatsapp() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [estado, setEstado] = useState<Estado>("carregando");
   const [detalhe, setDetalhe] = useState<string>("");
@@ -65,7 +66,7 @@ export default function ConexaoWhatsapp() {
       body: JSON.stringify({ acao: "conectar" }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (!r) return alert("Falha ao falar com o servidor.");
+    if (!r) return recado.erro("Falha ao falar com o servidor.");
     if (r.estado === "conectado") {
       setEstado("conectado");
       return;
@@ -96,7 +97,7 @@ export default function ConexaoWhatsapp() {
     setOcupado(false);
     setQr(null);
     if (r?.ok) setEstado("desconectado");
-    else alert("Não consegui desconectar: " + (r?.detalhe || "erro"));
+    else recado.erro("Não consegui desconectar: " + (r?.detalhe || "erro"));
   }
 
   async function configurarWebhook() {

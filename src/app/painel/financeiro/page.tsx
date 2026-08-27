@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../ui";
 import { Falhou } from "../pecas";
-import { useConfirmar } from "@/components/Dialogos";
+import Funil from "./Funil";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 import { PainelFechamento } from "../fechamento/Fechamento";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
@@ -96,6 +97,14 @@ export default function Financeiro() {
       <PainelNav atual="/painel/financeiro" />
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Financeiro</h1>
+
+        {/* O FUNIL VEM ANTES DAS ABAS (CA-09).
+            A tela abria direto em "Fechar o mês" — uma resposta antes da
+            pergunta. Dá para fechar o mês com dinheiro do banco ainda sem dono,
+            e nada na tela dizia isso. O funil diz, em quatro números, onde o
+            dinheiro está parado, e cada um leva para onde se resolve. */}
+        <Funil aoIr={(a) => trocar((a || ABA_PADRAO) as AbaFin)} />
+
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {ABAS_FIN.map(([v, rot]) => (
             <button key={v} style={aba === v ? painel.botao : painel.botaoSec}
@@ -288,8 +297,8 @@ function Comprovantes() {
           {/* O QUE ELA DEVE. Sem este número, "confirmar" é um sim no escuro. */}
           <div style={{ fontSize: 14, color: cor.cinza, marginBottom: 8 }}>
             {c.devendo === null ? "sem família ligada a este contato"
-              : c.devendo > 0.005 ? <>em aberto: <b style={{ color: "rgb(var(--zm-perigo))" }}>{dinheiroBR(c.devendo)}</b></>
-              : c.devendo < -0.005 ? <>saldo a favor dela: <b>{dinheiroBR(-c.devendo)}</b></>
+              : c.devendo > 0.005 ? <>a receber: <b style={{ color: "rgb(var(--zm-perigo))" }}>{dinheiroBR(c.devendo)}</b></>
+              : c.devendo < -0.005 ? <>a favor dela: <b>{dinheiroBR(-c.devendo)}</b></>
               : "conta zerada"}
             {c.idTransacao ? ` · ${c.idTransacao}` : ""}
           </div>
@@ -361,7 +370,7 @@ function Comprovantes() {
             <label style={painel.rotulo}>A que se refere</label>
             {(c.competencias || []).length === 0 ? (
               <p style={{ fontSize: 14, color: cor.cinza, margin: 0 }}>
-                Não há mensalidade em aberto para apontar. Entra como pagamento sem
+                Não há mensalidade a receber para apontar. Entra como pagamento sem
                 destino — o saldo dela sobe e o abate acontece quando houver cobrança.
               </p>
             ) : (
@@ -405,6 +414,7 @@ const linha: React.CSSProperties = {
 
 
 function Gestao() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [mes, setMes] = useState(mesOperacao());
   const [d, setD] = useState<any>(null);
@@ -425,7 +435,7 @@ function Gestao() {
 
   async function lancar() {
     const v = Number(String(novo.valor).replace(",", "."));
-    if (!v || v <= 0) return alert("Informe o valor.");
+    if (!v || v <= 0) return recado.aviso("Informe o valor.");
     setLancando(true);
     const r = await fetch("/api/financeiro/gestao", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -433,7 +443,7 @@ function Gestao() {
     }).then((x) => x.json()).catch(() => null);
     setLancando(false);
     if (r?.ok) { setNovo({ ...novo, valor: "", descricao: "" }); carregar(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   async function excluir(id: string) {
@@ -602,7 +612,7 @@ function Gestao() {
 
             <div style={{ marginTop: 4 }}>
               <strong style={{ color: cor.navy, fontSize: 15 }}>Em aberto (a cobrar)</strong>
-              {(rel.emAberto || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Ninguém em aberto. 🎉</p>}
+              {(rel.emAberto || []).length === 0 && <p style={{ color: cor.cinza, margin: "8px 0 0" }}>Nada a receber. 🎉</p>}
               {(rel.emAberto || []).map((x: any, i: number) => (
                 <div key={i} style={linha}>
                   <span>{x.cliente}</span>

@@ -41,7 +41,7 @@ export default function Equipe() {
 
   async function registrar() {
     const v = Number(String(f.valor).replace(",", "."));
-    if (!f.membroId || !f.materialId || !v) return alert("Preencha quem comprou, o quê e quanto.");
+    if (!f.membroId || !f.materialId || !v) return recado.aviso("Preencha quem comprou, o quê e quanto.");
     setOcupado(true);
     const r = await fetch("/api/equipe/conta", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ export default function Equipe() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) { setF({ ...f, materialId: "", quantidade: "1", valor: "" }); setNovo(false); carregar(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   async function pagar(membroId: string, nome: string, total: number) {
@@ -71,9 +71,9 @@ export default function Equipe() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) {
-      alert(`Pago R$ ${Number(r.pago).toFixed(2)} — lançado no caixa como saída.`);
+      recado.ok(`Pago R$ ${Number(r.pago).toFixed(2)} — lançado no caixa como saída.`);
       carregar();
-    } else alert(r?.erro || "Não consegui registrar o pagamento.");
+    } else recado.erro(r?.erro || "Não consegui registrar o pagamento.");
   }
 
   async function remover(id: string) {

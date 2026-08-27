@@ -284,11 +284,11 @@ export default function AgendaPage() {
         body: JSON.stringify({ ids: [...marcados], executoraId: emAberto ? null : quem }),
       }).then((x) => x.json()).catch(() => null);
 
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
       // Dizer quantos ficaram de fora evita o silêncio de marcar vinte e mudar
       // dezoito sem ninguém saber quais dois.
       if (r.ignorados > 0) {
-        alert(`${r.mexidos} alteradas. ${r.ignorados} ficaram como estavam — já foram executadas.`);
+        recado.ok(`${r.mexidos} alteradas. ${r.ignorados} ficaram como estavam — já foram executadas.`);
       }
       setMarcados(new Set());
       await carregar();
@@ -308,7 +308,7 @@ export default function AgendaPage() {
     setMovendo(id);
     const erro = await reordenarDia(dia, lista);
     setMovendo(null);
-    if (erro) { alert(erro); return; }
+    if (erro) { recado.erro(erro); return; }
     // Recarrega em vez de reordenar na tela: a ordem verdadeira é a do banco.
     await carregar();
   }
@@ -320,7 +320,7 @@ export default function AgendaPage() {
       body: JSON.stringify({ diasAFrente: 120 }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    if (!r?.ok) { alert(r?.erro || "Não consegui reorganizar."); return; }
+    if (!r?.ok) { recado.erro(r?.erro || "Não consegui reorganizar."); return; }
 
     // Contar POR CAUSA: "5 movidas" não diz se o problema era atraso, repetição
     // ou jornada — e são três conversas diferentes com quem vai ao campo.
@@ -330,7 +330,7 @@ export default function AgendaPage() {
       r.porDiaRuim > 0 && `${r.porDiaRuim} em dia que não se trabalha`,
     ].filter(Boolean).join(", ");
 
-    alert(
+    recado.ok(
       r.movidos === 0
         ? "Nada fora do lugar — a agenda já está como deveria."
         : `${r.movidos} lavagem(ns) devolvida(s) para a fila (${causas}).\n` +
@@ -347,7 +347,7 @@ export default function AgendaPage() {
       body: JSON.stringify({ horizonteDias: n }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    if (!r?.ok) { alert("Falhou ao gerar."); return; }
+    if (!r?.ok) { recado.erro("Falhou ao gerar."); return; }
     setDiag({ ...r.geracao, ...r.alocacao, horizonte: n });
     // Gerou três dias e a tela está mostrando trinta: o resultado aparece
     // diluído e parece que nada aconteceu. A janela acompanha o que foi gerado.
@@ -363,7 +363,7 @@ export default function AgendaPage() {
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
     if (r?.ok) { setDiag(r); carregar(); }
-    else alert("Falhou ao gerar o mês.");
+    else recado.erro("Falhou ao gerar o mês.");
   }
 
   /**
@@ -389,7 +389,7 @@ export default function AgendaPage() {
     });
     if (!r0) return;
     const motivo = r0 === true ? "" : r0.motivo;
-    if (!motivo.trim()) return alert("Preciso do motivo — ele fica no extrato da família.");
+    if (!motivo.trim()) return recado.aviso("Preciso do motivo — ele fica no extrato da família.");
 
     const r = await fetch(`/api/servico/${id}/estornar`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -397,18 +397,18 @@ export default function AgendaPage() {
     }).then((x) => x.json()).catch(() => null);
 
     if (r?.ok) {
-      alert(r.valorEstornado > 0
+      recado.ok(r.valorEstornado > 0
         ? `Estornada. ${dinheiro(Number(r.valorEstornado))} devolvidos para a família.`
         : "Estornada. Não havia cobrança lançada.");
       carregar();
-    } else alert(r?.erro || "Não consegui estornar.");
+    } else recado.erro(r?.erro || "Não consegui estornar.");
   }
 
   async function excluir(id: string) {
     const r = await fetch(`/api/servico/${id}`, { method: "DELETE" })
       .then((x) => x.json()).catch(() => null);
     if (r?.ok) carregar();
-    else alert(r?.erro || "Não consegui excluir.");
+    else recado.erro(r?.erro || "Não consegui excluir.");
   }
 
   /**
@@ -424,7 +424,7 @@ export default function AgendaPage() {
    */
   async function moverDia(d: string, passo: number) {
     const naoFeitas = (dias[d] || []).filter((x: Item) => x.status !== "executado");
-    if (!naoFeitas.length) { alert("Não há limpeza para mover neste dia."); return; }
+    if (!naoFeitas.length) { recado.aviso("Não há limpeza para mover neste dia."); return; }
 
     const destino = somaDias(d, passo);
     if (!await perguntar({
@@ -441,7 +441,7 @@ export default function AgendaPage() {
         body: JSON.stringify({ de: d, dias: passo }),
       }).then((x) => x.json()).catch(() => null);
 
-      if (!r?.ok) { alert(r?.mensagem || r?.erro || "Não consegui mover o dia."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || r?.erro || "Não consegui mover o dia."); return; }
 
       // O AVISO SAI DEPOIS, E NÃO TRAVA ANTES. Destino sem dia de trabalho ou
       // acima da capacidade não é motivo para recusar — ela sabe o que está
@@ -453,7 +453,7 @@ export default function AgendaPage() {
         r.falhas?.length ? `${r.falhas.length} não conseguiram mover.` : null,
       ].filter(Boolean);
       if (avisos.length) {
-        alert(`${r.movidos} movida(s) para ${dataBonita(r.para)}.\n\n` + avisos.join("\n"));
+        recado.ok(`${r.movidos} movida(s) para ${dataBonita(r.para)}.\n\n` + avisos.join("\n"));
       }
       carregar();
     } finally { setMovendoDia(null); }
@@ -486,8 +486,8 @@ export default function AgendaPage() {
       const r = await fetch("/api/agenda/refazer", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.erro || "Não consegui refazer o roteiro."); return; }
-      alert(
+      if (!r?.ok) { recado.erro(r?.erro || "Não consegui refazer o roteiro."); return; }
+      recado.erro(
         `Roteiro refeito a partir de ${dataBonita(r.de)}.\n\n` +
         `${r.soltos} voltaram para a fila e ${r.agendados} foram distribuídas em ${r.dias} dia(s).`
       );
@@ -503,10 +503,10 @@ export default function AgendaPage() {
     }).then((x) => x.json()).catch(() => null);
 
     if (!r?.ok) {
-      alert(r?.erro || "Não consegui fazer isso agora.");
+      recado.erro(r?.erro || "Não consegui fazer isso agora.");
     } else if (corpo.acao === "remarcar" && r.seguintesMovidas > 0) {
       // conta o que aconteceu: mover uma lavagem mexe na régua do jazigo
-      alert(
+      recado.ok(
         `Remarcada para ${new Date(r.novaData + "T12:00:00").toLocaleDateString("pt-BR")}.\n\n` +
         `${r.seguintesMovidas} lavagem(ns) seguinte(s) deste jazigo também andaram, ` +
         `para manter o intervalo combinado.`
@@ -1285,6 +1285,7 @@ export default function AgendaPage() {
 }
 
 function Avaliar({ servicoId }: { servicoId: string }) {
+  const recado = useRecado();
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -1296,7 +1297,7 @@ function Avaliar({ servicoId }: { servicoId: string }) {
       .catch(() => null);
     setBusy(false);
     if (r?.ok) setLink(`${window.location.origin}/avaliar/${r.token}`);
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   function copiar() {

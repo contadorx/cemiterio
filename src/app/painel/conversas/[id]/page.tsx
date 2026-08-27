@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
 import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 export default function Thread() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const params = useParams();
   const id = params?.id as string;
@@ -48,7 +49,7 @@ export default function Thread() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { alert(r?.mensagem || "Não consegui sugerir agora. Escreva à mão."); return; }
+      if (!r?.ok) { recado.erro(r?.mensagem || "Não consegui sugerir agora. Escreva à mão."); return; }
       setTexto(r.texto);
       setLeu(Number(r.mensagensLidas) || 0);
     } finally { setSugerindo(false); }
@@ -234,6 +235,7 @@ export default function Thread() {
  * caminhos diferentes. Escolhe um, ajusta e manda. Nada sai sozinho.
  */
 function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (t: string) => void }) {
+  const recado = useRecado();
   const [aberto, setAberto] = useState(false);
   const [contexto, setContexto] = useState("");
   const [tom, setTom] = useState("acolhedor");
@@ -260,7 +262,7 @@ function MeAjuda({ conversaId, onEscolher }: { conversaId: string; onEscolher: (
       // guarda o texto como veio, para o "desfazer edição"
       setOpcoes((r.opcoes || []).map((o: any) => ({ ...o, original: o.texto })));
     }
-    else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
+    else recado.erro(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
   }
 
   if (!aberto) {

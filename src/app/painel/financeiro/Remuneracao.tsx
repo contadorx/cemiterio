@@ -28,6 +28,7 @@ function nomeDoMes(m: string) {
 }
 
 export default function Remuneracao() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [mes, setMes] = useState(mesAtual());
   const [d, setD] = useState<any>(null);
@@ -55,8 +56,8 @@ export default function Remuneracao() {
       body: JSON.stringify({ acao: "recalcular" }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) { alert(`${r.recalculados} de ${r.total} serviços atualizados.`); carregar(); }
-    else alert(r?.erro || "falhou");
+    if (r?.ok) { recado.ok(`${r.recalculados} de ${r.total} serviços atualizados.`); carregar(); }
+    else recado.erro(r?.erro || "falhou");
   }
 
   /**
@@ -91,10 +92,10 @@ export default function Remuneracao() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) {
-      alert(`Pago ${money(r.pago)}.` + (r.avisoCaixa ? `\n\n⚠ ${r.avisoCaixa}` : "\nLançado no caixa como saída."));
+      recado.ok(`Pago ${money(r.pago)}.` + (r.avisoCaixa ? `\n\n⚠ ${r.avisoCaixa}` : "\nLançado no caixa como saída."));
       carregar();
     } else {
-      alert(r?.mensagem || r?.erro || "falhou");
+      recado.erro(r?.mensagem || r?.erro || "falhou");
       if (r?.erro === "fixo_ja_pago") carregar();
     }
   }
@@ -297,6 +298,7 @@ function FormRegra({ titulo, ajuda, regra, membroId, onSalvo, onCancelar }: {
   titulo: string; ajuda: string; regra: any; membroId: string | null;
   onSalvo: () => void; onCancelar: () => void;
 }) {
+  const recado = useRecado();
   const [f, setF] = useState({
     modo: regra?.modo || "mensal",
     valorMensal: String(regra?.valor_mensal ?? ""),
@@ -324,7 +326,7 @@ function FormRegra({ titulo, ajuda, regra, membroId, onSalvo, onCancelar }: {
       }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) onSalvo(); else alert(r?.erro || "não consegui salvar");
+    if (r?.ok) onSalvo(); else recado.erro(r?.erro || "não consegui salvar");
   }
 
   const temJazigo = f.modo !== "mensal";

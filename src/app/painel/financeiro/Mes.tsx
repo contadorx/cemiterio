@@ -196,7 +196,7 @@ export default function Mes() {
             </div>
             <p style={{ margin: "4px 0 10px", color: cor.cinza, fontSize: 14, lineHeight: 1.5 }}>
               Esta é a foto de <b>{dataBR(d.fim)}</b> — não a de hoje. Quem pagou depois aparece aqui
-              do mesmo jeito, porque naquele dia estava em aberto.
+              do mesmo jeito, porque naquele dia havia a receber.
             </p>
 
             {d.familias.devendo.length === 0 ? (

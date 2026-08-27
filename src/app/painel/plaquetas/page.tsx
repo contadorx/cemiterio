@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { PainelNav, painel, cor } from "../ui";
 import { MARCA } from "@/lib/marca";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 export default function Plaquetas() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [itens, setItens] = useState<any[]>([]);
   const [semPortal, setSemPortal] = useState(0);
@@ -47,8 +48,8 @@ export default function Plaquetas() {
       body: JSON.stringify({ escopo, quadraId: f.quadra || undefined }),
     }).then((x) => x.json()).catch(() => null);
     setGerando(false);
-    if (r?.ok) { alert(`${r.gerados} portal(is) gerado(s).`); carregar(); }
-    else alert("Falhou ao gerar.");
+    if (r?.ok) { recado.ok(`${r.gerados} portal(is) gerado(s).`); carregar(); }
+    else recado.erro("Falhou ao gerar.");
   }
 
   const ruas = [...new Set(itens.map((i) => i.rua).filter(Boolean))].sort();

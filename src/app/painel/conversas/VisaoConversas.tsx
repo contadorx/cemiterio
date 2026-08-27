@@ -10,7 +10,7 @@ import Link from "next/link";
 import { painel, cor } from "../ui";
 import Notificacoes from "../../_pwa/Notificacoes";
 import InstalarApp, { avisar } from "../../InstalarApp";
-import { useConfirmar, type Pedido } from "@/components/Dialogos";
+import { useConfirmar, type Pedido, useRecado } from "@/components/Dialogos";
 
 interface Conversa {
   id: string;
@@ -46,6 +46,7 @@ const ASSUNTOS: Record<string, string> = {
 };
 
 export default function VisaoConversas() {
+  const recado = useRecado();
   const [lista, setLista] = useState<Conversa[]>([]);
   const [cont, setCont] = useState({ pendentes: 0, escaladas: 0, aguardando: 0, arquivadas: 0 });
   const [ultimoAviso, setUltimoAviso] = useState<string>("");
@@ -145,7 +146,7 @@ export default function VisaoConversas() {
       body: JSON.stringify({ acao }),
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) carregar();
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   // conversas que podem entrar na seleção (recados de equipe ficam de fora,
@@ -178,7 +179,7 @@ export default function VisaoConversas() {
     }).then((x) => x.json()).catch(() => null);
     setEmMassa(false);
     if (r?.ok) { setSel(new Set()); carregar(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   const abas: [string, string, number | null][] = [

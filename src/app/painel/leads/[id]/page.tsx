@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PainelNav, painel, cor } from "../../ui";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 interface MsgLead { t?: string; texto: string; de?: "nos"; via?: "celular" }
 interface ClienteBusca { id: string; nome: string; telefone: string | null }
 
 export default function LeadThread() {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const params = useParams();
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function LeadThread() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) { setTexto(""); carregar(); }
-    else alert(r?.erro === "falha_envio"
+    else recado.erro(r?.erro === "falha_envio"
       ? "Não consegui enviar pelo WhatsApp: " + (r?.detalhe || "")
       : "Não consegui enviar: " + (r?.erro || "erro"));
   }
@@ -54,7 +55,7 @@ export default function LeadThread() {
       .then((x) => x.json()).catch(() => null);
     setPensando(false);
     if (r?.ok) setTexto(r.texto);
-    else alert(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
+    else recado.erro(r?.erro === "teto_ia_atingido" ? "Teto de IA do dia atingido." : "Não consegui sugerir agora.");
   }
 
   async function converter() {
@@ -70,7 +71,7 @@ export default function LeadThread() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok && r.clienteId) router.push(`/painel/clientes/${r.clienteId}`);
-    else alert("Não consegui converter: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui converter: " + (r?.erro || "erro"));
   }
 
   // busca de família com debounce — não dispara a cada tecla
@@ -104,7 +105,7 @@ export default function LeadThread() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok && r.clienteId) router.push(`/painel/clientes/${r.clienteId}`);
-    else alert("Não consegui vincular: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui vincular: " + (r?.erro || "erro"));
   }
 
   async function patch(corpo: Record<string, any>, sair?: boolean) {
@@ -115,7 +116,7 @@ export default function LeadThread() {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) { sair ? router.push("/painel/conversas?aba=leads") : carregar(); }
-    else alert("Não consegui atualizar: " + (r?.erro || "erro"));
+    else recado.erro("Não consegui atualizar: " + (r?.erro || "erro"));
   }
 
   async function descartar() {

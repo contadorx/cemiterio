@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { painel, cor, numeroBR, dinheiroBR } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
+import { useRecado } from "@/components/Dialogos";
 
 const MESES: Record<string, number> = {
   mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12, avulso: 0,
@@ -272,6 +273,7 @@ export default function VisaoJazigos() {
 
 function Linha({ p, aberto, onAbrir, onSalvo }:
   { p: any; aberto: boolean; onAbrir: () => void; onSalvo: () => void }) {
+  const recado = useRecado();
   const doServidor = () => ({
     cadencia: p.cadencia,
     valor_mensal: p.valorMensal == null ? "" : dinheiroBR(p.valorMensal),
@@ -356,7 +358,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
     if ("valor_mensal" in corpo) {
       const n = numeroBR(corpo.valor_mensal);
       if (String(corpo.valor_mensal).trim() === "" || !Number.isFinite(n) || n < 0) {
-        alert("Informe o valor de uma limpeza (ou feche sem salvar).");
+        recado.aviso("Informe o valor de uma limpeza (ou feche sem salvar).");
         return;
       }
       corpo.valor_mensal = n;
@@ -372,7 +374,7 @@ function Linha({ p, aberto, onAbrir, onSalvo }:
       body: JSON.stringify(corpo),
     }).then((x) => x.json()).catch(() => null);
     setSalvando(false);
-    if (r?.ok) onSalvo(); else alert("Falhou: " + (r?.erro || "erro"));
+    if (r?.ok) onSalvo(); else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   return (

@@ -75,7 +75,7 @@ const GRUPOS: Grupo[] = [
     descricao: "a cobrança de rotina — a família ainda não está devendo",
     pega: (i) => i.tipo === "cobranca" && !(Number(i.saldoDevedor) > 0.005) },
   { id: "inadimplente", rotulo: "Inadimplente",
-    descricao: "cobrança de quem JÁ tem saldo em aberto — leia antes de liberar",
+    descricao: "cobrança de quem JÁ tem valor a receber — leia antes de liberar",
     pega: (i) => i.tipo === "cobranca" && Number(i.saldoDevedor) > 0.005 },
   { id: "acoes", rotulo: "Ações",
     descricao: "oferta de serviço e datas comemorativas",

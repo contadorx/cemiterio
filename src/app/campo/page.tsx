@@ -615,10 +615,13 @@ export default function Campo() {
         </div>
       </details>
 
-      {/* As telas ConfirmarJazigo e Concluir saíram do caminho: a câmera agora
-          vive dentro dos dois botões do cartão. Os arquivos continuam no
-          repositório — se um dia a confirmação por QR fizer falta, é só voltar
-          a chamá-los aqui. */}
+      {/* As telas ConfirmarJazigo e Concluir saíram do caminho quando a câmera
+          passou a viver dentro dos dois botões do cartão. Os arquivos ficaram
+          no repositório "por via das dúvidas" — e viraram o CP-10 da auditoria:
+          724 linhas que ninguém importava, num diretório com três
+          implementações do mesmo cartão. Eu mesmo quase consertei a errada ao
+          mexer na fila do Build B. Foram apagadas no Build E; o histórico do
+          git guarda o que fizeram, e é lá que se procura. */}
 
       {naoDeu && (
         <NaoDeu it={naoDeu} onFechar={() => setNaoDeu(null)}

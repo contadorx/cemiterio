@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { painel, cor } from "../ui";
 import { prepararFoto, motivoFalha } from "@/lib/foto";
+import { useRecado } from "@/components/Dialogos";
 
 /**
  * Concluir uma lavagem pelo painel — quando a Nina mandou a foto por WhatsApp,
@@ -25,6 +26,7 @@ function explicarEnvio(motivo?: string): string {
 export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
   servico: any; onFechar: () => void; onPronto: () => void;
 }) {
+  const recado = useRecado();
   const [depois, setDepois] = useState<{ b64: string; mt: string; previa: string } | null>(null);
   const [antes, setAntes] = useState<{ b64: string; mt: string; previa: string } | null>(null);
   const [duracao, setDuracao] = useState("");
@@ -51,7 +53,7 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
   }
 
   async function concluir() {
-    if (!depois) return alert("A foto do depois é obrigatória — é ela que a família recebe.");
+    if (!depois) return recado.aviso("A foto do depois é obrigatória — é ela que a família recebe.");
     setEnviando(true);
     const r = await fetch("/api/servico/concluir-admin", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -66,7 +68,7 @@ export default function ConcluirAdmin({ servico, onFechar, onPronto }: {
     }).then((x) => x.json()).catch(() => null);
     setEnviando(false);
     if (r?.ok) setResultado(r);
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   if (resultado) {

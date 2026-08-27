@@ -110,7 +110,7 @@ export default function Painel() {
       <PainelDoMes />
 
       <h2 className="mb-3 mt-6 text-[15px] font-bold tracking-[0.2px] text-ink">
-        Quem falta limpar e quem falta pagar
+        Quem falta limpar e de quem temos a receber
       </h2>
 
       {/* Três números e nada mais no topo: o que falta fazer, o que falta
@@ -129,11 +129,11 @@ export default function Painel() {
             </div>
             <div>
               <p className="text-[26px] font-semibold leading-tight">{r.faltaPagar}</p>
-              <p className="text-[12px] opacity-75">falta pagar</p>
+              <p className="text-[12px] opacity-75">a receber</p>
             </div>
             <Link href="/painel/financeiro" className="block">
               <p className="text-[26px] font-semibold leading-tight">{dinheiro(r.emAberto)}</p>
-              <p className="text-[12px] opacity-75">em aberto →</p>
+              <p className="text-[12px] opacity-75">a receber →</p>
             </Link>
           </div>
           {dados?.saldoEm && (

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../../ui";
-import { useConfirmar } from "@/components/Dialogos";
+import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
  * SERVIÇOS EXTRAS
@@ -19,6 +19,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
   tumulos: any[];
   onMudou: () => void;
 }) {
+  const recado = useRecado();
   const perguntar = useConfirmar();
   const [catalogo, setCatalogo] = useState<any[]>([]);
   const [pedidos, setPedidos] = useState<any[]>([]);
@@ -61,7 +62,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
     if (r?.ok) { setEscolhido(null); setObs(""); setAberto(false); carregar(); onMudou(); }
-    else alert("Falhou: " + (r?.erro || "erro"));
+    else recado.erro("Falhou: " + (r?.erro || "erro"));
   }
 
   async function agir(pedidoId: string, acao: "entregar" | "cancelar") {
@@ -81,7 +82,7 @@ export default function Extras({ clienteId, tumulos, onMudou }: {
       body: JSON.stringify({ pedidoId, acao }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(false);
-    if (r?.ok) { carregar(); onMudou(); } else alert("Falhou.");
+    if (r?.ok) { carregar(); onMudou(); } else recado.erro("Falhou.");
   }
 
   const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
