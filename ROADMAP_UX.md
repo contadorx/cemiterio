@@ -10,9 +10,9 @@ Cada linha abaixo tem onde eu olhei. Onde escrevi um número, contei.
 
 | | quantas |
 |---|---|
-| Aplicado | 14 |
+| Aplicado | 19 |
 | Aplicado pela metade | 0 |
-| Não aplicado | 11 |
+| Não aplicado | 6 |
 | Não dá para provar lendo código | 1 |
 
 Três de vinte e seis é pouco, mas as duas auditorias são de antes de boa parte
@@ -26,9 +26,9 @@ de regra — não de tela. O que segue é a lista honesta.
 | CA-01 | A home mostra tudo que precisa de atenção | **sim (Build A)** | bloco "Precisa de você" com as quatro filas, cada número pela regra da tela que ele aponta |
 | CA-02 | O mês é a fotografia da competência | **sim** | `src/app/api/mes/route.ts:75` corta em `{ ate: ultimoDia }` |
 | CA-03 | Se a home não carregar, ela sabe | **sim (Build A)** | `useBusca` + `Falhou` com hora da última atualização |
-| CA-04 | Famílias é uma lista simples | **não** | 701 linhas, nenhum agrupamento de filtro avançado |
+| CA-04 | Famílias é uma lista simples | **sim (Build D)** | busca + três atalhos; filtros em "Mais filtros", que abre sozinho quando algum está em uso |
 | CA-05 | Cadastrar família é uma tarefa só | **não** | formulário único, sem etapas nem resumo final |
-| CA-06 | A agenda mostra trabalho, não engenharia | **não** | "Gerar limpezas" continua na tela principal (`agenda/page.tsx:675`) |
+| CA-06 | A agenda mostra trabalho, não engenharia | **sim (Build D), à sua maneira** | o trabalho vem antes da máquina que o fabrica, na MESMA tela — sem segunda tela, por correção sua |
 | CA-07 | Ação destrutiva é consistente e segura | **sim (Build C)** | 66 `confirm`/`prompt` do painel e os 18 do campo viraram uma peça só; 99 `alert` de desfecho ainda por converter |
 | CA-08 | Liberação deixa revisar com segurança | **sim (Build C)** | descarte confirmado, "limpo em 14/08 às 09:30" no cartão, fotos rotuladas, desfazer |
 | CA-09 | Financeiro tem uma porta só | **não** | continua abas dentro de abas; não é funil |
@@ -42,15 +42,15 @@ de regra — não de tela. O que segue é a lista honesta.
 
 | # | Promessa | Situação | Onde eu vi |
 |---|---|---|---|
-| CP-01 | A tela leva direto ao trabalho | **não** | antes do primeiro cartão: instalar app, assistente, materiais, cadastrar jazigo |
-| CP-02 | Uma escolha por vez | **não** | `campo/page.tsx:641` — "Não deu para fazer" no mesmo bloco da ação principal |
+| CP-01 | A tela leva direto ao trabalho | **sim (Build D)** | instalar app, material e assistente em "Mais opções". Cadastrar jazigo FICOU, por correção sua |
+| CP-02 | Uma escolha por vez | **sim (Build D)** | "Não deu" virou link discreto, longe do botão da foto |
 | CP-03 | Dois toques concluem | **não é conserto** | a câmera do celular pede confirmação e isso não está na nossa mão. Vira métrica: medir tempo e erro, não toque |
 | CP-04 | Sem internet dá para continuar | **sim (Build B)** | "não deu" e pedido de material entraram na fila. Cadastrar jazigo ainda não — ver Build D |
 | CP-05 | O que ficou guardado não reaparece | **sim (Build B)** | a lista é sempre servidor + fila local, e quem escreve na lista escreve no cache |
 | CP-06 | "Guardado" quer dizer terminado | **sim (Build B)** | `guardado` / `precisa de ajuda` gravados, `enviando` transitório, `confirmado` com recibo na tela |
 | CP-07 | Cancelar a câmera não muda o fluxo | **sim, hoje** | consertado nesta entrega — ver abaixo |
 | CP-08 | Toque duplo não duplica | **sim (Build B)** | chave `servicoId:tipo` na fila e trava no primeiro toque, solta no foco |
-| CP-09 | As fotos simplificam o cartão | **não** | carrossel de miniaturas em `Fotos` (`campo/page.tsx:473`), empurra a ação para baixo |
+| CP-09 | As fotos simplificam o cartão | **sim (Build D)** | uma foto grande + "ver mais"; a principal muda: "onde fica" antes, "antes (hoje)" depois de começar |
 | CP-10 | Existe uma implementação do cartão | **não** | **710 linhas mortas**: `CardTumulo.tsx` 167, `Concluir.tsx` 276, `ConfirmarJazigo.tsx` 189, `DistanciaAoVivo.tsx` 78 — nenhuma importada pela tela viva |
 | CP-11 | Ela sabe o que já foi enviado | **sim (Build B)** | conta lavagens e diz quais jazigos; recados contados à parte |
 | CP-12 | Encerrar o dia é simples e seguro | **sim (Build C)** | uma folha com o resumo: feitas, o que fica para depois, o que ainda não subiu |
@@ -118,8 +118,8 @@ com o resumo — feitos, esperando envio, não feitos — e um botão que diz o 
 faz. Liberação ganha data e hora da lavagem no cartão e confirmação no
 descarte.
 
-### Build D — a tela começa no trabalho
-**CP-01, CP-02, CP-09, CA-04, CA-06**
+### Build D — a tela começa no trabalho ✅ ENTREGUE
+**CP-01, CP-02, CP-09, CA-04, CA-06** — ver `LEIA-ME_a_tela_comeca_no_trabalho.md`
 
 **Duas correções suas, de 27/08, que mudam o que a auditoria pedia. Elas valem
 mais que a auditoria — quem usa é você.**
@@ -198,8 +198,10 @@ Duas coisas separadas, as duas esperando decisão sua:
 
 ## Onde estamos
 
-Builds A, B e C entregues. O próximo é o D — e ele já vem com as suas duas
-correções escritas acima.
+Builds A, B, C e D entregues. Sobrou o E — e ele começa com uma pergunta sua,
+não com código: fixar as cinco palavras (`a receber`, `recebido`,
+`a identificar`, `conciliado`, `saldo da família`). O Financeiro como funil é
+essas palavras em ordem.
 
 Sobrou do C: 99 `alert` de desfecho no painel. Não converti em massa porque
 distinguir sucesso de falha mecanicamente arrisca marcar um erro como recibo

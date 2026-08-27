@@ -885,4 +885,68 @@ ok("e o cartao diz quando o jazigo foi limpo, com hora",
 ok("e rotula as fotos de antes e depois",
    /f\.etapa === "antes" \? "antes"/.test(telaLib));
 
+// ===================== BUILD D: a tela comeca no trabalho =====================
+
+// CP-01: antes do primeiro cartao havia cinco areas para rolar, de pe.
+ok("no campo, a rota vem antes das ferramentas",
+   campoB.indexOf("grupos.entries()") < campoB.indexOf("Mais opções"));
+
+// CORRECAO DO LEANDRO, 27/08: "no aplicativo de campo eu uso cadastrar
+// jazigos". A auditoria mandava para "Mais opcoes"; ferramenta que se usa todo
+// dia nao e ferramenta ocasional. Fica ANTES da lista.
+ok("e cadastrar jazigo NAO foi para Mais opcoes",
+   campoB.indexOf("Cadastrar jazigo") < campoB.indexOf("Mais opções"));
+
+ok("instalar o app e o pedido de material desceram",
+   campoB.indexOf("Mais opções") < campoB.indexOf("Pedir material") &&
+   campoB.indexOf("Mais opções") < campoB.indexOf("<InstalarApp"));
+
+// O que estava faltando ela precisa saber ANTES de andar ate a quadra.
+ok("mas o que esta faltando continua no topo",
+   /Está faltando: \{\(brief\.materiais/.test(campoB));
+
+// CP-02: a saida de excecao roubava largura da acao principal.
+ok("'nao deu para fazer' saiu de perto do botao da foto",
+   /style=\{s\.linkNaoDeu\}/.test(campoB) &&
+   campoB.indexOf("</div>\n\n      <button style={s.linkNaoDeu}") > -1 ||
+   /s\.linkNaoDeu/.test(campoB));
+
+// CP-09: tres miniaturas de 104px em carrossel nao servem para reconhecer
+// lapide no sol, e empurravam a acao para baixo.
+ok("uma foto grande, o resto em 'ver mais'",
+   /s\.fotoGrande\b/.test(campoB) && /ver \{outras\.length === 1/.test(campoB));
+
+// O ganho da CP-09 esta aqui: a foto principal muda com o momento.
+ok("e a foto principal muda depois de comecar",
+   /emAndamento\s*\n?\s*\? \(tem\.find\(\(f\) => f\.rotulo === "antes \(hoje\)"\)/.test(campoB));
+
+// CA-04: a consulta cotidiana atravessava uma central de filtros.
+const listaVisivel = semComentarios(lista);
+ok("Familias tem busca e tres atalhos",
+   /"Em aberto"/.test(listaVisivel) && /"Cadastro incompleto"/.test(listaVisivel) &&
+   /"Próxima lavagem"/.test(listaVisivel));
+
+ok("e os filtros avancados recolhem",
+   /<details open=\{temFiltroAvancado\}/.test(listaVisivel));
+
+// Filtro escondido E ativo e a lista curta sem explicacao.
+ok("mas abrem sozinhos quando algum esta em uso",
+   /const temFiltroAvancado =/.test(listaVisivel) && /em uso/.test(listaVisivel));
+
+// CA-06 COM A CORRECAO DO LEANDRO: as decisoes de agenda NAO viram tela
+// separada. O conserto e de ordem — gerar o mes vivia ENTRE o resumo e a lista.
+ok("a agenda mostra o trabalho antes da maquina que o fabrica",
+   agenda2Visivel.indexOf("{carregando &&") < agenda2Visivel.indexOf(">Gerar limpezas<"));
+
+ok("e a maquina continua na mesma tela, aberta",
+   /Gerar limpezas/.test(agenda2Visivel) && !/<details[^>]*>\s*<summary[^>]*>Planejar/.test(agenda2Visivel));
+
+// O aviso de roteiro velho diz que o que esta na tela abaixo ja nao vale.
+ok("mas a saude do roteiro continua em cima de tudo",
+   agenda2Visivel.indexOf("Refazer o roteiro") < agenda2Visivel.indexOf("{carregando &&"));
+
+// Texto que aponta para onde a coisa NAO esta e pior do que texto nenhum.
+ok("e o vazio aponta para onde o botao foi parar",
+   /Gere as limpezas no fim desta tela/.test(telaAgenda2));
+
 process.exit(falhas ? 1 : 0);

@@ -194,6 +194,11 @@ function VisaoFamilias() {
     fetch("/api/quadras").then((x) => x.json()).then((r) => r.ok && setQuadras(r.quadras)).catch(() => {});
   }, []);
 
+  // ABRE SOZINHO QUANDO ALGUM ESTÁ EM USO. Filtro escondido e ativo é a
+  // lista curta sem explicação — e a pessoa procurando a família que "sumiu".
+  const temFiltroAvancado = !!(f.quadra || f.rua || f.cadencia || f.venceEm || f.teste
+    || f.regua || (f.ordem && f.ordem !== "nome") || f.situacao || f.etapa);
+
   const ruas = d ? [...new Set(d.clientes.flatMap((c: any) => c.ruas))].sort() : [];
   const money = (n: number) => `R$ ${Number(n || 0).toFixed(2)}`;
 
@@ -228,10 +233,46 @@ function VisaoFamilias() {
             </div>
           )}
 
-          <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <input style={{ ...painel.input, flex: 1, minWidth: 180 }} value={f.busca}
+          {/* A CONSULTA DO DIA A DIA, E SÓ ELA (CA-04).
+              Antes da lista havia três abas, cinco etapas, busca, situação,
+              quadra, rua, periodicidade, vencimento, ordenação, teste e limpar
+              — uma central de filtros para atravessar toda vez que a pergunta
+              era "quem está devendo?". No celular os selects viravam carrossel
+              horizontal e metade ficava fora da vista.
+
+              Os filtros NÃO SAÍRAM: eles servem, e quem monta uma cobrança por
+              quadra precisa deles. Só desceram para "Mais filtros", que fica
+              aberto sozinho quando algum está em uso — senão a pessoa filtra,
+              recolhe, e depois não entende por que a lista está curta. */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+            <input style={{ ...painel.input, flex: 1, minWidth: 200 }} value={f.busca}
                    onChange={(e) => setF({ ...f, busca: e.target.value })}
                    placeholder="Buscar por nome, telefone ou jazigo…" />
+            {([
+              ["Em aberto", { situacao: "atrasados", ordem: "saldo" }],
+              ["Cadastro incompleto", { etapa: "sem_tumulo", situacao: "" }],
+              ["Próxima lavagem", { situacao: "", ordem: "lavagem" }],
+            ] as [string, any][]).map(([rot, alvo]) => {
+              const ligado = Object.entries(alvo).every(([k, v]) => (f as any)[k] === v);
+              return (
+                <button
+                  key={rot}
+                  style={ligado ? painel.botaoMini : painel.botaoMiniSec}
+                  onClick={() => setF(ligado
+                    ? { ...f, situacao: "", etapa: "", ordem: "nome" }
+                    : { ...f, situacao: "", etapa: "", ordem: "nome", ...alvo })}
+                >
+                  {rot}
+                </button>
+              );
+            })}
+          </div>
+
+          <details open={temFiltroAvancado} style={{ marginBottom: 4 }}>
+            <summary style={{ cursor: "pointer", fontSize: 14, color: cor.cinza, padding: "6px 0" }}>
+              Mais filtros{temFiltroAvancado ? " (em uso)" : ""}
+            </summary>
+          <div data-filtros style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingTop: 8 }}>
             <select style={{ ...painel.input, width: "auto" }} value={f.situacao}
                     onChange={(e) => setF({ ...f, situacao: e.target.value })}>
               <option value="">Todas as situações</option>
@@ -289,6 +330,7 @@ function VisaoFamilias() {
               Limpar
             </button>
           </div>
+          </details>
         </div>
 
         {d && (

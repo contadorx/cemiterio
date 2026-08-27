@@ -494,6 +494,14 @@ export default function Campo() {
             : <>São <b>{pendentesLista.length}</b> {pendentesLista.length === 1 ? "jazigo" : "jazigos"}.</>}
         </div>
 
+        {/* O QUE ESTÁ FALTANDO — uma linha, no portão.
+            Vinha dentro do Assistente, que agora desceu para "Mais opções".
+            Saber que acabou a água antes de andar até a quadra é diferente de
+            descobrir lá. */}
+        {(brief?.materiais?.length ?? 0) > 0 && (
+          <div style={s.atencao}>🧴 Está faltando: {(brief.materiais || []).join(", ")}</div>
+        )}
+
         {brief?.precisamAtencao > 0 && (
           <div style={s.atencao}>
             {brief.precisamAtencao === 1
@@ -512,13 +520,18 @@ export default function Campo() {
         )}
       </div>
 
-      <InstalarApp contexto="campo" />
-      <Assistente onMudou={carregar} feitos={feitos} faltam={pendentesLista.length} />
+      {/* A ROTA COMEÇA AQUI (CP-01).
+          Antes do primeiro cartão havia cinco áreas: convite de instalação,
+          briefing com três ações, pedido de material e cadastro de jazigo. Ela
+          rolava por tudo isso, de pé, para chegar ao trabalho.
 
-      <button style={s.botaoMaterial} onClick={() => setPedirMaterial(true)}>
-        🧴 Pedir material que está faltando
-      </button>
-
+          CADASTRAR JAZIGO FICA, e fica ANTES da lista. A auditoria mandava
+          para "Mais opções" junto com o resto; o Leandro corrigiu em 27/08:
+          "no aplicativo de campo eu uso cadastrar jazigos". Ferramenta que se
+          usa todo dia não é ferramenta ocasional. Desceram só o convite de
+          instalar o app e o pedido de material — este último some do caminho
+          mas ganha atalho no topo quando o briefing diz que falta alguma
+          coisa. */}
       <button style={s.botaoCadastrar} onClick={() => setCapturarJazigo(true)}>
         ➕ Cadastrar jazigo (GPS e fotos)
       </button>
@@ -584,6 +597,24 @@ export default function Campo() {
         </div>
       )}
 
+      {/* ================================================= MAIS OPÇÕES
+          O que não é a rota do dia. Encerrar o dia é a última coisa que ela
+          faz, então mora depois da lista e não antes dela; falar com o apoio e
+          puxar mais só acontecem quando o dia sai do roteiro; pedir material é
+          eventual, e quando é urgente o topo já avisa o que está faltando. */}
+      <details style={s.mais}>
+        <summary style={s.maisTitulo}>⋯ Mais opções</summary>
+        <div style={{ padding: "4px 0 8px" }}>
+          <Assistente onMudou={carregar} feitos={feitos} faltam={pendentesLista.length} />
+
+          <button style={s.botaoMaterial} onClick={() => setPedirMaterial(true)}>
+            🧴 Pedir material que está faltando
+          </button>
+
+          <InstalarApp contexto="campo" />
+        </div>
+      </details>
+
       {/* As telas ConfirmarJazigo e Concluir saíram do caminho: a câmera agora
           vive dentro dos dois botões do cartão. Os arquivos continuam no
           repositório — se um dia a confirmação por QR fizer falta, é só voltar
@@ -645,7 +676,7 @@ export default function Campo() {
  *   "antes"      = a foto tirada hoje ao comecar, para ela comparar no fim
  * Tocar abre em tamanho cheio.
  */
-function Fotos({ it }: { it: Item }) {
+function Fotos({ it, emAndamento }: { it: Item; emAndamento: boolean }) {
   const tem: Array<{ url: string; rotulo: string }> = [];
   if (it.fotoEnquadramento) tem.push({ url: it.fotoEnquadramento, rotulo: "onde fica" });
   if (it.fotoReferencia) tem.push({ url: it.fotoReferencia, rotulo: "o jazigo" });
@@ -659,15 +690,51 @@ function Fotos({ it }: { it: Item }) {
     );
   }
 
+  /**
+   * UMA FOTO GRANDE, O RESTO EM "VER MAIS" (CP-09).
+   *
+   * Eram três miniaturas em carrossel horizontal, com rótulo cada uma. Ajudavam
+   * a reconhecer o jazigo — e por isso ficam —, mas empurravam a ação para
+   * baixo: numa rota longa, o próximo cartão ficava sempre a uma rolagem de
+   * distância. Miniatura de 104px também não serve para reconhecer lápide no
+   * sol.
+   *
+   * A ESCOLHA DA PRINCIPAL MUDA COM O MOMENTO, e é aí que está o ganho:
+   *
+   *   antes de começar   "onde fica" — a foto de longe, com os vizinhos. É a
+   *                      que serve para achar o túmulo no corredor.
+   *   depois de começar  "antes (hoje)" — ela já achou o jazigo; o que importa
+   *                      agora é comparar com o que está vendo.
+   */
+  const principal = emAndamento
+    ? (tem.find((f) => f.rotulo === "antes (hoje)") || tem[0])
+    : tem[0];
+  const outras = tem.filter((f) => f !== principal);
+
   return (
-    <div style={s.tiras}>
-      {tem.map((f) => (
-        <a key={f.rotulo} href={f.url} target="_blank" rel="noreferrer" style={s.tira}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={f.url} alt={f.rotulo} style={s.tiraFoto} />
-          <span style={s.tiraRotulo}>{f.rotulo}</span>
-        </a>
-      ))}
+    <div>
+      <a href={principal.url} target="_blank" rel="noreferrer" style={s.fotoGrandeCaixa}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={principal.url} alt={principal.rotulo} style={s.fotoGrande} />
+        <span style={s.fotoGrandeRotulo}>{principal.rotulo}</span>
+      </a>
+
+      {outras.length > 0 && (
+        <details style={s.verMais}>
+          <summary style={s.verMaisTitulo}>
+            ver {outras.length === 1 ? "a outra foto" : `as outras ${outras.length} fotos`}
+          </summary>
+          <div style={s.tiras}>
+            {outras.map((f) => (
+              <a key={f.rotulo} href={f.url} target="_blank" rel="noreferrer" style={s.tira}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f.url} alt={f.rotulo} style={s.tiraFoto} />
+                <span style={s.tiraRotulo}>{f.rotulo}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -792,7 +859,7 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
       <div style={s.nome}>{it.falecido || it.tumulo}</div>
       {it.falecido && <div style={s.jazigo}>{it.tumulo}</div>}
 
-      <Fotos it={it} />
+      <Fotos it={it} emAndamento={emAndamento} />
 
       {(it.avisos || []).map((a, i) => (
         <div key={i} style={{ ...s.aviso, ...(a.tipo === "adiado" ? s.avisoUrgente : {}) }}>
@@ -844,8 +911,15 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
         {!primeiro && !it.iniciadoEm && (
           <button style={s.botaoAgora} onClick={onAgora}>⬆ Fazer este agora</button>
         )}
-        <button style={s.botaoNaoDeu} onClick={onNaoDeu}>Não deu para fazer</button>
       </div>
+
+      {/* "NÃO DEU PARA FAZER" É EXCEÇÃO, E EXCEÇÃO NÃO SE PARECE COM A REGRA
+          (CP-02).
+          Ficava dentro do mesmo bloco da ação principal, com a mesma largura e
+          o mesmo peso — três caminhos visíveis, e a saída de exceção roubando
+          espaço de quem só quer lavar o jazigo. Agora é um link discreto, longe
+          do polegar que vai na foto. */}
+      <button style={s.linkNaoDeu} onClick={onNaoDeu}>Não deu para fazer</button>
     </div>
   );
 }
@@ -861,6 +935,9 @@ const s: Record<string, React.CSSProperties> = {
             fontFamily: "system-ui, sans-serif" },
   faixaOffline: { background: "#fef3c7", color: "#78350f", padding: 14, borderRadius: 12,
                   marginBottom: 14, fontSize: 16, lineHeight: 1.5 },
+  mais: { marginTop: 18, background: "#fff", borderRadius: 16, padding: "4px 16px" },
+  maisTitulo: { fontSize: 17, fontWeight: 600, color: "#475569", padding: "14px 0",
+                cursor: "pointer", listStyle: "none", minHeight: 44 },
   faixaConfirmado: { background: "#ecfdf5", color: "#065f46", padding: 14, borderRadius: 12,
                      marginBottom: 14, fontSize: 16, lineHeight: 1.5, fontWeight: 600 },
   faixaAjuda: { background: "#fef2f2", color: "#991b1b", border: "2px solid #fecaca",
@@ -904,6 +981,14 @@ const s: Record<string, React.CSSProperties> = {
   jazigo: { fontSize: 16, color: "#475569" },
   tiras: { display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 2 },
   tira: { flex: "0 0 auto", width: 104, textDecoration: "none", color: "#475569" },
+  fotoGrandeCaixa: { display: "block", position: "relative", borderRadius: 12,
+                     overflow: "hidden", marginBottom: 4, textDecoration: "none" },
+  fotoGrande: { width: "100%", height: 190, objectFit: "cover", display: "block" },
+  fotoGrandeRotulo: { position: "absolute", left: 8, bottom: 8, background: "rgba(15,23,42,.75)",
+                      color: "#fff", fontSize: 13, padding: "3px 8px", borderRadius: 8 },
+  verMais: { marginBottom: 4 },
+  verMaisTitulo: { fontSize: 15, color: "#64748b", padding: "10px 0", cursor: "pointer",
+                   listStyle: "none", minHeight: 44 },
   tiraFoto: { width: 104, height: 78, objectFit: "cover", borderRadius: 10,
               border: "1px solid #e7e0cf", display: "block", background: "#f1f5f9" },
   tiraRotulo: { display: "block", fontSize: 13, marginTop: 4, textAlign: "center" },
@@ -930,6 +1015,9 @@ const s: Record<string, React.CSSProperties> = {
     background: "#fff", color: "#12284b", border: "2px solid #12284b",
     borderRadius: 12, fontSize: 17, fontWeight: 700, cursor: "pointer",
   },
+  linkNaoDeu: { display: "block", width: "100%", minHeight: 44, marginTop: 14,
+                background: "none", border: "none", color: "#64748b", fontSize: 15,
+                textDecoration: "underline", cursor: "pointer", padding: "10px 0" },
   botaoNaoDeu: { minHeight: 64, padding: "18px 22px", background: "#fff", color: "#475569",
                  border: "2px solid #e7e0cf", borderRadius: 14, fontSize: 16, cursor: "pointer" },
   feitosBox: { background: "#f0fdf4", color: "#166534", padding: 18, borderRadius: 14,

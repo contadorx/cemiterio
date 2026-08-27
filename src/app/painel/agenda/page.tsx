@@ -700,89 +700,6 @@ export default function AgendaPage() {
           </div>
         )}
 
-        {/* ================================================= GERAR LIMPEZAS */}
-        <div style={painel.card}>
-          <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
-          <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
-            Cria o que os planos devem e distribui pelos dias de trabalho. Pode clicar à
-            vontade: nunca duplica.
-          </p>
-
-          {/* PERÍODOS CURTOS.
-              Existiam só 30, 60 e 90 dias. Para conferir se a régua de um
-              jazigo está certa, era preciso despejar um trimestre inteiro na
-              agenda e limpar depois na mão. Três dias respondem a mesma
-              pergunta e cabem numa tela. */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92 }}>Para conferir:</span>
-            {[3, 7, 14].map((n) => (
-              <button key={n} style={{ ...painel.botaoMiniSec, minHeight: 38 }}
-                      disabled={gerando} onClick={() => gerarDias(n)}>
-                {n} dias
-              </button>
-            ))}
-            <span style={{ fontSize: 13, color: cor.cinza }}>
-              gera pouco e já mostra o resultado na tela
-            </span>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
-                        marginTop: 10, paddingTop: 10, borderTop: `1px solid ${cor.linha}` }}>
-            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92, alignSelf: "center" }}>
-              Operação:
-            </span>
-            {[30, 60, 90].map((n) => (
-              <button key={n} style={painel.botaoSec} disabled={gerando} onClick={() => gerarDias(n)}>
-                Próximos {n} dias
-              </button>
-            ))}
-            <div style={{ width: 1, height: 34, background: cor.linha, margin: "0 4px" }} />
-            <div>
-              <label style={painel.rotulo}>Mês inteiro</label>
-              <input type="month" style={{ ...painel.input, width: 150 }} value={mesAlvo}
-                     onChange={(e) => setMesAlvo(e.target.value)} />
-            </div>
-            <button style={painel.botao} disabled={gerando} onClick={gerarMes}>
-              {gerando ? "…" : "Gerar o mês"}
-            </button>
-          </div>
-
-          {/* A CAIXA "INCLUIR OS AVULSOS NESTE MÊS" SAIU (0128).
-              Ela criava, de uma vez, uma lavagem para todo mundo — e chamava
-              isso de avulso. Era a única máquina do sistema que fabricava
-              avulso sem ninguém pedir, justamente o contrário da regra: avulso
-              é o que a família solicita.
-
-              Também usava uma QUARTA definição de avulso (plano com cadência
-              não recorrente) e, com um único plano vivo e mensal, não fazia
-              nada havia meses.
-
-              O Finados continua atendido, e melhor: cada família que pede ganha
-              o seu pedido, com a data dela e o preço dela. */}
-
-          {diag && (
-            <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
-                          background: diag.criados > 0 ? "#f0fdf4" : "rgb(var(--zm-fundo))",
-                          border: `1px solid ${diag.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
-              <strong style={{ color: cor.navy }}>
-                {diag.criados > 0 ? `${diag.criados} limpeza(s) criada(s)` : "Nada novo a criar"}
-              </strong>
-              <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
-                {diag.planosAtivos != null && `${diag.planosAtivos} planos ativos · `}
-                {diag.jaExistiam > 0 && `${diag.jaExistiam} já existiam · `}
-                {diag.foraDoHorizonte > 0 && `${diag.foraDoHorizonte} fora do período · `}
-                {diag.agendados} distribuída(s) em {diag.dias} dia(s)
-              </div>
-              {diag.proximaData && diag.criados === 0 && (
-                <div style={{ fontSize: 15, color: cor.navy, marginTop: 6 }}>
-                  A próxima ida é em {new Date(diag.proximaData + "T12:00:00").toLocaleDateString("pt-BR")} —
-                  aumente o período para alcançá-la.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         {carregando && <p style={{ color: cor.cinza }}>Carregando...</p>}
 
         {/* O ERRO VEM ANTES DO VAZIO, e o vazio so aparece se nao houve erro:
@@ -795,7 +712,7 @@ export default function AgendaPage() {
             <p style={{ color: cor.cinza, margin: 0 }}>
               {filtrando
                 ? "Nada bate com o filtro neste período."
-                : "Nada agendado no período. Gere as limpezas aqui em cima — comece com 7 dias."}
+                : "Nada agendado no período. Gere as limpezas no fim desta tela — comece com 7 dias."}
             </p>
           </section>
         )}
@@ -1259,6 +1176,109 @@ export default function AgendaPage() {
             </section>
           );
         })}
+
+        {/* ================================================ PLANEJAR A AGENDA
+            DESCEU, MAS NÃO SAIU DA TELA (CA-06).
+
+            A auditoria pedia uma segunda tela — "Planejar agenda" — com gerar,
+            reorganizar e diagnosticar atrás de uma ação secundária. O Leandro
+            corrigiu em 27/08: "tem decisões importantes no admin com relação a
+            agenda de limpeza, considere elas". São decisões que ele toma
+            olhando o trabalho, e um segundo clique entre a pergunta e a
+            resposta é pior do que a rolagem.
+
+            Então o conserto é de ORDEM, não de porta: gerar o mês vivia ENTRE
+            o resumo e a lista dos dias, e para ver o que seria lavado amanhã
+            era preciso atravessar a máquina que fabrica a agenda. Agora o
+            trabalho vem primeiro e a máquina fica aqui embaixo, inteira e
+            aberta, no lugar em que ela é usada: depois de olhar o que existe.
+
+            O que continua em cima, e por quê: a SAÚDE do roteiro. Ela não é
+            planejamento — é um aviso de que o que está na tela abaixo já não
+            vale, e isso precisa ser lido antes, não depois. */}
+        {/* ================================================= GERAR LIMPEZAS */}
+        <div style={painel.card}>
+          <strong style={{ color: cor.navy }}>Gerar limpezas</strong>
+          <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 12px" }}>
+            Cria o que os planos devem e distribui pelos dias de trabalho. Pode clicar à
+            vontade: nunca duplica.
+          </p>
+
+          {/* PERÍODOS CURTOS.
+              Existiam só 30, 60 e 90 dias. Para conferir se a régua de um
+              jazigo está certa, era preciso despejar um trimestre inteiro na
+              agenda e limpar depois na mão. Três dias respondem a mesma
+              pergunta e cabem numa tela. */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92 }}>Para conferir:</span>
+            {[3, 7, 14].map((n) => (
+              <button key={n} style={{ ...painel.botaoMiniSec, minHeight: 38 }}
+                      disabled={gerando} onClick={() => gerarDias(n)}>
+                {n} dias
+              </button>
+            ))}
+            <span style={{ fontSize: 13, color: cor.cinza }}>
+              gera pouco e já mostra o resultado na tela
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end",
+                        marginTop: 10, paddingTop: 10, borderTop: `1px solid ${cor.linha}` }}>
+            <span style={{ fontSize: 14, color: cor.cinza, minWidth: 92, alignSelf: "center" }}>
+              Operação:
+            </span>
+            {[30, 60, 90].map((n) => (
+              <button key={n} style={painel.botaoSec} disabled={gerando} onClick={() => gerarDias(n)}>
+                Próximos {n} dias
+              </button>
+            ))}
+            <div style={{ width: 1, height: 34, background: cor.linha, margin: "0 4px" }} />
+            <div>
+              <label style={painel.rotulo}>Mês inteiro</label>
+              <input type="month" style={{ ...painel.input, width: 150 }} value={mesAlvo}
+                     onChange={(e) => setMesAlvo(e.target.value)} />
+            </div>
+            <button style={painel.botao} disabled={gerando} onClick={gerarMes}>
+              {gerando ? "…" : "Gerar o mês"}
+            </button>
+          </div>
+
+          {/* A CAIXA "INCLUIR OS AVULSOS NESTE MÊS" SAIU (0128).
+              Ela criava, de uma vez, uma lavagem para todo mundo — e chamava
+              isso de avulso. Era a única máquina do sistema que fabricava
+              avulso sem ninguém pedir, justamente o contrário da regra: avulso
+              é o que a família solicita.
+
+              Também usava uma QUARTA definição de avulso (plano com cadência
+              não recorrente) e, com um único plano vivo e mensal, não fazia
+              nada havia meses.
+
+              O Finados continua atendido, e melhor: cada família que pede ganha
+              o seu pedido, com a data dela e o preço dela. */}
+
+          {diag && (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 8,
+                          background: diag.criados > 0 ? "#f0fdf4" : "rgb(var(--zm-fundo))",
+                          border: `1px solid ${diag.criados > 0 ? "#bbf7d0" : cor.linha}` }}>
+              <strong style={{ color: cor.navy }}>
+                {diag.criados > 0 ? `${diag.criados} limpeza(s) criada(s)` : "Nada novo a criar"}
+              </strong>
+              <div style={{ fontSize: 15, color: cor.cinza, marginTop: 4 }}>
+                {diag.planosAtivos != null && `${diag.planosAtivos} planos ativos · `}
+                {diag.jaExistiam > 0 && `${diag.jaExistiam} já existiam · `}
+                {diag.foraDoHorizonte > 0 && `${diag.foraDoHorizonte} fora do período · `}
+                {diag.agendados} distribuída(s) em {diag.dias} dia(s)
+              </div>
+              {diag.proximaData && diag.criados === 0 && (
+                <div style={{ fontSize: 15, color: cor.navy, marginTop: 6 }}>
+                  A próxima ida é em {new Date(diag.proximaData + "T12:00:00").toLocaleDateString("pt-BR")} —
+                  aumente o período para alcançá-la.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   );
