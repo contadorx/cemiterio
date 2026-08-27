@@ -498,6 +498,38 @@ export async function alocarAgenda(
     .maybeSingle();
   const capacidadePadrao = Number((orgRow as any)?.limpezas_por_dia) || 20;
 
+  /**
+   * A RÉGUA DE PRIORIDADE (0136).
+   *
+   * `servicos.prioridade` continua existindo e continua valendo — é o número
+   * que o "não deu para fazer" escreve. O que muda é que ele deixou de ser o
+   * ÚNICO: agora soma com os critérios da régua, que a Sureya ajusta em
+   * Configurações.
+   *
+   * Somar em vez de substituir é deliberado. A coluna guarda história (quantas
+   * vezes aquele jazigo já foi adiado); a régua responde ao mundo de hoje
+   * (memória chegando, nunca lavado, atrasado). Trocar uma pela outra perderia
+   * metade da verdade.
+   *
+   * UMA CONSULTA SÓ, e não uma por serviço: o alocador roda sobre 266 jazigos
+   * e é chamado pelo cron diário.
+   *
+   * FALHA AQUI NÃO PARA A GERAÇÃO. Sem a régua a agenda ainda é melhor que
+   * agenda nenhuma — cai para a prioridade da coluna, que é o comportamento de
+   * antes da 0136, e o erro vai para o log em vez de virar um zero tranquilo.
+   */
+  const pontosDaRegua = new Map<string, number>();
+  {
+    const { data: pr, error: ePr } = await db.rpc("sureya_prioridade_calculada", { p_org: org });
+    if (ePr) {
+      await registrarErro("agenda: nao consegui ler a regua de prioridade", ePr.message, {});
+    } else {
+      for (const linha of (pr as any[]) || []) {
+        pontosDaRegua.set(linha.servico_id, Number(linha.pontos) || 0);
+      }
+    }
+  }
+
   // ==========================================================================
   // MULTI-CEMITÉRIO (0044)
   //
@@ -786,8 +818,10 @@ export async function alocarAgenda(
     };
 
     const ordemPadrao = (a: ServicoPend, b: ServicoPend) => {
-      const pa = a.prioridade || 0;
-      const pb = b.prioridade || 0;
+      // A coluna (história) MAIS a régua (o mundo de hoje). Ver o comentário
+      // em `pontosDaRegua`, acima.
+      const pa = (a.prioridade || 0) + (pontosDaRegua.get(a.id) || 0);
+      const pb = (b.prioridade || 0) + (pontosDaRegua.get(b.id) || 0);
       if (pa !== pb) return pb - pa;
       const da = a.data_prevista || "9999-99-99";
       const db_ = b.data_prevista || "9999-99-99";

@@ -142,7 +142,7 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0127  +1  servicos_arquivados — o Leandro mandou apagar 257 lavagens da
 #             tela de Avulsos. A copia vem antes do delete: o que sai do lugar
 #             vivo muda de sala, nao evapora.
-TABELAS_DELTA=${TABELAS_DELTA:-11}
+TABELAS_DELTA=${TABELAS_DELTA:-12}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -165,8 +165,8 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #   0131  +2  tg_nome_proprio_cliente e tg_nome_proprio_familia — sao cinco
 #             portas que escrevem nome; consertar numa e deixar quatro
 #             escrevendo torto e o defeito de forma de sempre.
-GATILHOS_DELTA=${GATILHOS_DELTA:-11}
-ESPERADO_POLICIES=${ESPERADO_POLICIES:-62}
+GATILHOS_DELTA=${GATILHOS_DELTA:-12}
+ESPERADO_POLICIES=${ESPERADO_POLICIES:-67}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
 #
@@ -314,7 +314,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-89}
 #             Pior que desperdicio — a remocao por LGPD monta a lista a partir
 #             dos TUMULOS DA FAMILIA, e tumulo apagado nao esta mais la, entao
 #             dava para responder "removido" com a foto ainda abrindo.
-FUNCOES_DELTA=${FUNCOES_DELTA:-75}
+FUNCOES_DELTA=${FUNCOES_DELTA:-78}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -715,6 +715,24 @@ echo
 # URL publica, e fora da lista que a remocao por LGPD usa. Se a lista de
 # `sureya_arquivos_do_tumulo` esquecer um campo, volta a fabricar orfao.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# A REGUA DE PRIORIDADE
+#
+# Um peso que nao entra na soma, ou um criterio que pega todo mundo, muda a
+# ordem da rota da Nina sem dar erro nenhum. Ela lava na ordem errada durante
+# semanas e ninguem descobre pelo log.
+# ---------------------------------------------------------------------------
+echo "PRIORIDADE — os pesos somam, e mexer neles muda a ordem"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/regua_prioridade.sql 2>&1); then
+  echo "$saida" | grep -E "PRIORIDADE FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "A ordem da rota muda em silencio quando a regua erra."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "ORFAOS — apagar o jazigo leva as fotos dele junto"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/arquivos_orfaos.sql 2>&1); then
   echo "$saida" | grep -E "ORFAOS FALHOU|ERROR" | sed 's/^/  /'

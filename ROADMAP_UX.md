@@ -198,10 +198,10 @@ Duas coisas separadas, as duas esperando decisão sua:
 1. ~~**A confusão de tela**~~ — **feito no Build F**: o botão virou link
    discreto e o cartão ganhou selo próprio (`⚠ PRIORIDADE — ficou para depois
    3×`) só quando o jazigo é prioridade de verdade.
-2. **A régua de prioridade** — hoje só levanta prioridade o que a Nina adiou.
-   Família que ligou pedindo, data de memória chegando, atrasado do mês
-   passado: nada disso levanta. Se deve levantar, e quais casos, é decisão do
-   Leandro — não é ajuste de tela.
+2. ~~**A régua de prioridade**~~ — **feita em 27/08 (0136).** Seis critérios
+   com peso ajustável em Configurações › O dinheiro › Régua de prioridade, e a
+   tela mostra quantas lavagens cada um alcança hoje. Ver
+   `LEIA-ME_a_regua_de_prioridade.md`.
 
 ## Onde estamos
 

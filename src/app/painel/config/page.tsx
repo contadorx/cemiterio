@@ -6,10 +6,11 @@ import ConexaoWhatsapp from "./ConexaoWhatsapp";
 import Regua from "./Regua";
 import Extras from "./Extras";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
+import Prioridade from "./Prioridade";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
-  | "regua" | "extras"
+  | "regua" | "prioridade" | "extras"
   | "whatsapp" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes"
   | "privacidade" | "auditoria" | "erros";
 
@@ -40,6 +41,7 @@ export default function Config() {
         {aba === "mensagens" && <Mensagens />}
         {aba === "whatsapp" && <ConexaoWhatsapp />}
         {aba === "regua" && <Regua />}
+        {aba === "prioridade" && <Prioridade />}
         {aba === "extras" && <Extras />}
         {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
             Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
@@ -91,6 +93,11 @@ const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
   { titulo: "O dinheiro", itens: [
     // A régua de cobrança: os degraus vivem no banco desde a 0110.
     ["regua", "Régua de cobrança"],
+    // A RÉGUA DE PRIORIDADE mora em "O dinheiro" e não em "A casa" porque é
+    // sobre o que a Nina faz PRIMEIRO — e o que ela faz primeiro é o que a
+    // família paga primeiro. Fica ao lado da régua de cobrança de propósito:
+    // são as duas réguas do sistema, e quem procura uma procura a outra.
+    ["prioridade", "Régua de prioridade"],
     // O CATÁLOGO DE FLORES E EXTRAS (0117). É preço da CASA — vale para todo
     // mundo e muda quando o fornecedor muda —, por isso mora aqui e não na
     // ficha de uma família.

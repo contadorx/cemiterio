@@ -50,6 +50,9 @@ const rotaLgpd    = readFileSync("src/app/api/clientes/[id]/lgpd/route.ts", "utf
 const atendimento = readFileSync("src/lib/atendimento.ts", "utf8");
 const telaThread  = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
 const rotaThread  = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
+const telaPrio    = readFileSync("src/app/painel/config/Prioridade.tsx", "utf8");
+const rotaPrio    = readFileSync("src/app/api/config/prioridade/route.ts", "utf8");
+const libAgenda2  = readFileSync("src/lib/agenda.ts", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -1226,5 +1229,65 @@ ok("e a tela mostra a imagem",
 ok("o balde novo entra na conta da remocao",
    /BUCKET_CONVERSAS/.test(readFileSync("src/lib/storage.ts", "utf8")) &&
    /BUCKET_SERVICOS, BUCKET_COMPROVANTES, BUCKET_CONVERSAS/.test(readFileSync("src/lib/storage.ts", "utf8")));
+
+// ============ A REGUA DE PRIORIDADE E CONFIGURAVEL (0136) ============
+//
+// Antes: um numero so (servicos.prioridade, +15 por adiamento). Nada mais
+// levantava prioridade, e ele era MUDO — "este veio na frente" sem dizer por
+// que. Medido em 27/08, antes de escolher os pesos: nunca lavado alcancava 80
+// jazigos, e os outros CINCO criterios alcancavam zero.
+
+const prioVisivel = semComentarios(telaPrio);
+const agendaVisivel = semComentarios(libAgenda2);
+
+// SOMAR e nao substituir: a coluna guarda historia (quantas vezes ja foi
+// adiado), a regua responde ao mundo de hoje. Trocar uma pela outra perderia
+// metade da verdade.
+ok("o alocador soma a regua a prioridade que ja existia",
+   /pontosDaRegua/.test(agendaVisivel) &&
+   /\(a\.prioridade \|\| 0\) \+ \(pontosDaRegua\.get\(a\.id\) \|\| 0\)/.test(agendaVisivel));
+
+// Sem a regua a agenda ainda e melhor que agenda nenhuma.
+ok("e se a regua nao carregar, a geracao nao para",
+   /nao consegui ler a regua de prioridade/.test(libAgenda2));
+
+// O alocador roda no cron, e current_org_id() e nulo fora de sessao (0103).
+ok("a funcao recebe p_org, porque o cron nao tem sessao",
+   /sureya_prioridade_calculada", \{ p_org: org \}/.test(libAgenda2));
+
+// A prioridade era um numero mudo.
+ok("a prioridade passou a dizer por que",
+   /motivos/.test(libAgenda2) || /motivos text\[\]/.test(readFileSync("migrations/0136_a_regua_de_prioridade_e_ajustavel.sql", "utf8")));
+
+// O ALCANCE AO LADO DO PESO e o ponto da tela: cinco dos seis criterios
+// alcancavam zero no dia em que ela nasceu. Sem o numero, quem mexesse num
+// peso nao veria efeito e concluiria que a tela esta quebrada.
+ok("a tela mostra quantos cada criterio alcanca hoje",
+   /alcança hoje/.test(prioVisivel) && /c\.alcanca/.test(prioVisivel));
+
+// Vazio nao e zero: contagem que falhou nao pode passar por "nenhum caso".
+ok("e contagem que falhou vira '?', nao zero",
+   /c\.alcanca === null \? "\?"/.test(prioVisivel) && /alcance\.error \? null/.test(rotaPrio));
+
+// Campo em branco virando 0 desligaria o criterio em silencio.
+ok("peso em branco nao vira zero",
+   /String\(b\.peso\)\.trim\(\) !== ""/.test(rotaPrio));
+
+ok("e peso fora da faixa e recusado com explicacao",
+   /peso_fora_da_faixa/.test(rotaPrio) && /-200 a 200/.test(rotaPrio));
+
+// Peso negativo REBAIXA de proposito — manda para o fim sem desligar.
+ok("peso negativo e um caminho, nao um erro",
+   /negativo/.test(prioVisivel) && /-200/.test(rotaPrio));
+
+// A ordem da rota da Nina mudou por decisao de alguem.
+ok("mexer na regua fica na auditoria",
+   /"mudou_regua_prioridade"/.test(rotaPrio));
+
+// ACHADO PELO TESTE: uma org nova nascia com a tabela VAZIA, e a regua nao
+// fazia nada em silencio — nao da erro, nao aparece em log, e a agenda
+// continua saindo ordenada so por quadra e rua.
+ok("uma org nova nasce com a regua, e nao vazia",
+   /tg_semear_regua_prioridade/.test(readFileSync("migrations/0136_a_regua_de_prioridade_e_ajustavel.sql", "utf8")));
 
 process.exit(falhas ? 1 : 0);
