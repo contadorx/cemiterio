@@ -141,6 +141,20 @@ export default function Thread() {
                   🎤 áudio transcrito
                 </span>
               )}
+              {/* A IMAGEM QUE A FAMÍLIA MANDOU.
+                  Ela era baixada, lida pelo leitor de comprovante e descartada
+                  quando ele não a reconhecia — justamente quando alguém precisa
+                  olhar. A Sureya lia "não parece um comprovante" e não tinha
+                  como saber se era a foto do túmulo, um print de outro banco ou
+                  uma dúvida escrita à mão. Tocar abre em tamanho cheio. */}
+              {m.midia_url && (
+                <a href={m.midia_url} target="_blank" rel="noreferrer"
+                   style={{ display: "block", marginBottom: 6 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.midia_url} alt="imagem enviada pela família"
+                       style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 10, display: "block" }} />
+                </a>
+              )}
               {m.texto}
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
                   {m.pelo_celular ? "você · pelo celular" : m.autor}

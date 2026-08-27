@@ -14,6 +14,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const BUCKET_SERVICOS = "servicos";
 export const BUCKET_COMPROVANTES = "comprovantes";
+/**
+ * O QUE A FAMÍLIA MANDA NA CONVERSA.
+ *
+ * Separado de `comprovantes` de propósito: ali só entra o que o leitor
+ * reconheceu como Pix, e é a fila de conferência de dinheiro. Aqui entra o
+ * resto — a foto do túmulo, o print de outro banco que o leitor não entendeu,
+ * a dúvida escrita à mão. Misturar os dois encheria a tela de conferir com
+ * coisa que não é dinheiro.
+ */
+export const BUCKET_CONVERSAS = "conversas";
 
 // 25 MB: a foto ja sobe reduzida (~300 KB); o teto so evita abuso.
 const LIMITE_BYTES = 25 * 1024 * 1024;
@@ -91,7 +101,7 @@ export function caminhoDaUrl(url: string, bucket: string): string | null {
 
 /** Em qual balde esta URL está? `null` se não for de nenhum dos nossos. */
 export function baldeDaUrl(url: string): string | null {
-  for (const b of [BUCKET_SERVICOS, BUCKET_COMPROVANTES]) {
+  for (const b of [BUCKET_SERVICOS, BUCKET_COMPROVANTES, BUCKET_CONVERSAS]) {
     if (caminhoDaUrl(url, b)) return b;
   }
   return null;

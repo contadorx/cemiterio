@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
 import { supabaseAdmin } from "./supabase-admin";
 import { baixarMidiaBase64 } from "./evolution";
+import { subirArquivo, BUCKET_CONVERSAS } from "./storage";
 import { enviarTextoComRetry } from "./envio";
 import { disparosAtivos } from "./disparos";
 import { extrairComprovante, decidirLeitura } from "./comprovante";
@@ -70,6 +71,34 @@ export async function garantirConversa(
     .select("id")
     .single();
   return { id: (nova as any).id, escalada: false, ultimaEntrada: null };
+}
+
+/**
+ * Guarda a imagem que a família mandou e devolve a URL.
+ *
+ * NUNCA LANÇA. Se o depósito falhar, a mensagem tem de entrar assim mesmo —
+ * perder a mensagem inteira porque a foto não subiu seria trocar um problema
+ * pequeno por um grande. Devolve `null` e a nota na conversa diz que não
+ * consegui guardar, para a Sureya saber que houve uma imagem.
+ */
+async function guardarMidiaDaConversa(
+  clienteId: string,
+  midia: { base64: string; mimetype: string },
+): Promise<string | null> {
+  try {
+    const bytes = Buffer.from(midia.base64, "base64");
+    const ext = (midia.mimetype.split("/")[1] || "jpg").split(";")[0].replace(/[^a-z0-9]/gi, "");
+    const caminho = `${env.orgId()}/clientes/${clienteId}/${Date.now()}.${ext}`;
+    const r = await subirArquivo(supabaseAdmin(), BUCKET_CONVERSAS, caminho, bytes, midia.mimetype);
+    if (!r.ok) {
+      await registrarErro("conversa: nao consegui guardar a imagem", r.erro, { clienteId });
+      return null;
+    }
+    return r.url;
+  } catch (e: any) {
+    await registrarErro("conversa: nao consegui guardar a imagem", e?.message || String(e), { clienteId });
+    return null;
+  }
 }
 
 async function gravarMensagem(
@@ -211,6 +240,25 @@ export async function registrarEntrada(params: {
 
   let nota = "";
   let escalarDireto = false;
+  /**
+   * A IMAGEM QUE A FAMÍLIA MANDOU FICA GUARDADA — SEMPRE.
+   *
+   * O que acontecia: a imagem era baixada, passava pelo leitor de comprovante,
+   * e só sobrevivia se ele a reconhecesse como Pix. Quando não reconhecia, o
+   * sistema escrevia "[cliente enviou uma imagem que não parece um
+   * comprovante]" e JOGAVA A IMAGEM FORA.
+   *
+   * Ou seja: ela era descartada exatamente no caso em que a leitura falhou —
+   * que é justamente quando um humano precisa olhar. A Sureya lia a frase e
+   * não tinha como saber o que era: a foto do túmulo, um print de outro banco,
+   * uma dúvida escrita à mão.
+   *
+   * Medido em 27/08: 39 mensagens no sistema, ZERO com mídia. E a Kátia mandou
+   * imagem duas vezes no mesmo dia (10:24 e 13:06), as duas descartadas.
+   *
+   * `gravarMensagem` já aceitava `midiaUrl` desde sempre. Ninguém passava.
+   */
+  let midiaUrl: string | null = null;
 
   if (temAudio) {
     // ÁUDIO JÁ TRANSCRITO NÃO SE TRANSCREVE DE NOVO.
@@ -238,6 +286,13 @@ export async function registrarEntrada(params: {
       nota = "[cliente enviou uma mídia que não consegui baixar]";
       escalarDireto = true;
     } else {
+      // GUARDA PRIMEIRO, LÊ DEPOIS.
+      //
+      // Nesta ordem de propósito: se o leitor de comprovante estourar, a
+      // imagem já está salva. Guardar depois da leitura faria a falha do
+      // leitor levar a imagem junto — que é a forma antiga do mesmo defeito.
+      midiaUrl = await guardarMidiaDaConversa(cliente.id, midia);
+
       const dados = await extrairComprovante(midia);
       // MESMA REGRA DA PORTA DA MÃO (`/api/comprovantes/ler`). Era escrita
       // aqui e lá, com as mesmas palavras — e duas cópias de uma regra sempre
@@ -248,14 +303,19 @@ export async function registrarEntrada(params: {
         const d = dados.data || "data não identificada";
         nota = `[comprovante de Pix recebido: ${v}, ${d} — registrado, aguardando conferência de uma pessoa]`;
       } else {
-        nota = "[cliente enviou uma imagem que não parece um comprovante]";
+        // A frase muda: antes ela era um beco sem saída ("não parece um
+        // comprovante" e ponto). Agora ela diz que a imagem está ali.
+        nota = midiaUrl
+          ? "[a família mandou uma imagem — está aqui na conversa]"
+          : "[cliente enviou uma imagem que não consegui guardar]";
         escalarDireto = true;
       }
     }
   }
 
   const entrada = [texto, nota].filter(Boolean).join("\n");
-  await gravarMensagem(conv.id, cliente.id, "entrada", "cliente", entrada, { processada: false, transcrita: !!transcrito });
+  await gravarMensagem(conv.id, cliente.id, "entrada", "cliente", entrada,
+                       { processada: false, transcrita: !!transcrito, midiaUrl });
   await db
     .from("conversas")
     .update({ ultima_entrada_at: new Date().toISOString() })

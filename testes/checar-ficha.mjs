@@ -47,6 +47,9 @@ const estiloMovel = readFileSync("src/app/painel/EstiloMobile.tsx", "utf8");
 const rotaTumulo  = readFileSync("src/app/api/tumulos/[id]/route.ts", "utf8");
 const rotaOrfaos  = readFileSync("src/app/api/manutencao/arquivos-orfaos/route.ts", "utf8");
 const rotaLgpd    = readFileSync("src/app/api/clientes/[id]/lgpd/route.ts", "utf8");
+const atendimento = readFileSync("src/lib/atendimento.ts", "utf8");
+const telaThread  = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const rotaThread  = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
 const { readdirSync, statSync } = await import("node:fs");
 const { join } = await import("node:path");
 function varrer(dir, achados = []) {
@@ -1175,5 +1178,53 @@ ok("por padrao so mexe no que tem dono sumido",
 ok("e deixa rastro na auditoria, sem id de texto num campo uuid",
    /"faxina_arquivos_orfaos"/.test(rotaOrfaos) &&
    !/id: "orfaos"/.test(rotaOrfaos));
+
+// ============ A IMAGEM DA FAMILIA NAO PODE SER JOGADA FORA ============
+//
+// Medido em 27/08: 39 mensagens no sistema, ZERO com midia. A imagem era
+// baixada, passava pelo leitor de comprovante, e so sobrevivia se ele a
+// reconhecesse como Pix. Quando NAO reconhecia, escrevia "[cliente enviou uma
+// imagem que nao parece um comprovante]" e descartava — ou seja, a imagem
+// morria exatamente no caso em que um humano precisa olhar. A Katia mandou
+// duas no mesmo dia (10:24 e 13:06), as duas perdidas.
+
+const atendVisivel = semComentarios(atendimento);
+
+ok("a imagem da conversa e guardada, comprovante ou nao",
+   /guardarMidiaDaConversa/.test(atendVisivel) && /BUCKET_CONVERSAS/.test(atendVisivel));
+
+// A ORDEM E O CONSERTO: se o leitor estourar, a imagem ja esta salva. Guardar
+// DEPOIS da leitura faria a falha do leitor levar a imagem junto — a forma
+// antiga do mesmo defeito.
+ok("e guardada ANTES de o leitor tentar entender",
+   atendVisivel.indexOf("guardarMidiaDaConversa(cliente.id, midia)") <
+   atendVisivel.indexOf("extrairComprovante(midia)"));
+
+// `gravarMensagem` ja aceitava midiaUrl desde sempre. Ninguem passava.
+ok("e a url chega mesmo na mensagem",
+   /transcrita: !!transcrito, midiaUrl/.test(atendVisivel));
+
+// Perder a mensagem inteira porque a foto nao subiu seria trocar um problema
+// pequeno por um grande.
+ok("falha ao guardar nao derruba a mensagem",
+   /async function guardarMidiaDaConversa[\s\S]{0,900}?return null;[\s\S]{0,300}?catch/.test(atendimento));
+
+// Sem isto a Sureya le "nao parece um comprovante" e nao sabe o que era.
+ok("a frase avisa que a imagem esta na conversa",
+   /está aqui na conversa/.test(atendimento));
+
+// A coluna existia e a rota nao a trazia: a tela nao teria o que mostrar.
+ok("a rota da conversa devolve a midia",
+   /midia_url/.test(rotaThread));
+
+ok("e a tela mostra a imagem",
+   /m\.midia_url && \(/.test(telaThread) && /<img src=\{m\.midia_url\}/.test(telaThread));
+
+// A remocao por LGPD ja listava mensagens.midia_url — mas o balde novo
+// precisa ser reconhecido, senao `apagarArquivos` nao acha o caminho e a foto
+// fica servindo depois de "removida" (o mesmo buraco da 0135).
+ok("o balde novo entra na conta da remocao",
+   /BUCKET_CONVERSAS/.test(readFileSync("src/lib/storage.ts", "utf8")) &&
+   /BUCKET_SERVICOS, BUCKET_COMPROVANTES, BUCKET_CONVERSAS/.test(readFileSync("src/lib/storage.ts", "utf8")));
 
 process.exit(falhas ? 1 : 0);

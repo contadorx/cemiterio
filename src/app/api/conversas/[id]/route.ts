@@ -23,13 +23,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   async function carregarMensagens() {
     const r = await db
       .from("mensagens")
-      .select("autor,direcao,texto,transcrita,pelo_celular,created_at")
+      .select("autor,direcao,texto,transcrita,pelo_celular,midia_url,created_at")
       .eq("conversa_id", id)
       .order("created_at", { ascending: true });
     if (!r.error) return r.data;
     const r2 = await db
       .from("mensagens")
-      .select("autor,direcao,texto,transcrita,created_at")
+      .select("autor,direcao,texto,transcrita,midia_url,created_at")
       .eq("conversa_id", id)
       .order("created_at", { ascending: true });
     return r2.data;
