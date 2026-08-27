@@ -84,7 +84,14 @@ export default function PrecisaDeVoce() {
   const naoSoube = filas.filter((f) => f.n === null);
   const semJazigo = dados.quandoDer?.semJazigo ?? 0;
 
-  if (!comTrabalho.length && !naoSoube.length && !semJazigo && fase !== "erro") return null;
+  // TRABALHO FEITO PELA METADE. Vem da mesma função da tela de manutenção.
+  // `null` = não consegui ler; aí o bloco não some, ele diz que não soube.
+  const lav = dados.quandoDer?.lavagens;
+  const incompletas = lav ? Number(lav.incompletas) || 0 : 0;
+  const semRegraEquipe = !!lav?.semRegraEquipe;
+
+  if (!comTrabalho.length && !naoSoube.length && !semJazigo
+      && !incompletas && !semRegraEquipe && fase !== "erro") return null;
 
   return (
     <section className="mb-4 rounded-xl2 border border-line bg-card p-4">
@@ -129,6 +136,35 @@ export default function PrecisaDeVoce() {
           Não consegui ler {naoSoube.length === 1 ? "uma destas filas" : `${naoSoube.length} destas filas`}
           {" "}({naoSoube.map((f) => f.chave).join(", ")}). Pode ter trabalho ali que não estou mostrando.
         </p>
+      )}
+
+      {/* LAVAGEM FEITA QUE NÃO DEIXOU MARCA (0137).
+          Fica no "quando der" porque o trabalho JÁ foi entregue: ninguém está
+          esperando do outro lado. Mas é dinheiro e estoque fora do lugar, e
+          por isso vem antes do cadastro incompleto. */}
+      {incompletas > 0 && (
+        <Link
+          href="/painel/config?aba=manutencao"
+          className="mt-3 block border-t border-line pt-3 text-[13px] text-ink-soft hover:text-ink"
+        >
+          Quando der: {incompletas} {incompletas === 1 ? "limpeza feita" : "limpezas feitas"}
+          {" "}não {incompletas === 1 ? "deixou" : "deixaram"} marca — sem preço, sem baixa
+          de material ou sem o pagamento da equipe. →
+        </Link>
+      )}
+
+      {/* NÃO É UMA LAVAGEM COM DEFEITO: É UMA CONFIGURAÇÃO QUE FALTA.
+          Enquanto não houver regra de pagamento nenhuma, nenhuma lavagem é
+          acusada de "pagamento não calculado" — não há com o que calcular. Um
+          recado só, no lugar de um alarme por limpeza. */}
+      {semRegraEquipe && (
+        <Link
+          href="/painel/financeiro?aba=pagamento"
+          className="mt-3 block border-t border-line pt-3 text-[13px] text-ink-soft hover:text-ink"
+        >
+          Quando der: não há regra de pagamento cadastrada. As limpezas já feitas
+          ficam sem o valor da equipe até você definir quanto se paga por jazigo. →
+        </Link>
       )}
 
       {/* QUANDO DER — trabalho de verdade, sem relógio correndo. Fica embaixo e

@@ -251,10 +251,49 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ==========================================================================
+  // NASCEU EXECUTADA: PASSA PELA MESMA TRANSAÇÃO DAS OUTRAS TRÊS (0137)
+  // ==========================================================================
+  //
+  // Esta rota é a QUARTA porta que marca uma limpeza como feita. As outras três
+  // — concluir, concluir-admin, registrar-feito — chamam
+  // `sureya_concluir_lavagem`. Esta escrevia à mão, e por isso a limpeza
+  // nascia sem quatro coisas que a transação faz:
+  //
+  //   o preço          a cascata serviço → jazigo → referência da casa. Sem
+  //                    ela, `valor` em branco no formulário virava uma limpeza
+  //                    feita SEM PREÇO NENHUM. Duas assim em produção.
+  //   o material       a baixa no estoque.
+  //   o pagamento      quanto a executora ganhou por este trabalho.
+  //   a fila da foto   quando há foto.
+  //
+  // É o defeito de forma de sempre: duas implementações da mesma regra que
+  // começam iguais e terminam discordando. Agora há uma só.
+  //
+  // NÃO DUPLICA COBRANÇA. Desde a 0104 a transação não cria débito nem
+  // lançamento — quem gera a dívida é a competência. O espelho no extrato,
+  // logo acima, continua sendo o único.
+  //
+  // Falha aqui não derruba a limpeza: o trabalho está gravado em `servicos`,
+  // que é a prova. O que ficar pela metade aparece em
+  // /api/manutencao/lavagens-incompletas, com o conserto a um toque.
+  let marcasIncompletas = false;
+  if (jaFeita && (srv as any)?.id) {
+    const { error: eConc } = await db.rpc("sureya_concluir_lavagem", {
+      p_servico: (srv as any).id,
+      p_foto_depois: null,
+    });
+    if (eConc) {
+      marcasIncompletas = true;
+      console.error("[servico] ja feita: transacao de conclusao falhou:", eConc.message);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     servicoId: (srv as any)?.id,
     jaFeita,
+    marcasIncompletas,
     dataPrevista: data,
     momentoCobranca: momento || "depois",
     cobrancaCriada,

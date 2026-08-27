@@ -7,12 +7,13 @@ import Regua from "./Regua";
 import Extras from "./Extras";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 import Prioridade from "./Prioridade";
+import Manutencao from "./Manutencao";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
   | "regua" | "prioridade" | "extras"
   | "whatsapp" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes"
-  | "privacidade" | "auditoria" | "erros";
+  | "privacidade" | "auditoria" | "erros" | "manutencao";
 
 export default function Config() {
   const [aba, setAba] = useState<Aba>("casa");
@@ -43,6 +44,7 @@ export default function Config() {
         {aba === "regua" && <Regua />}
         {aba === "prioridade" && <Prioridade />}
         {aba === "extras" && <Extras />}
+        {aba === "manutencao" && <Manutencao />}
         {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
             Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
             LEMBRAR de se excluir daqui, e a Régua de cobrança não lembrou —
@@ -117,6 +119,11 @@ const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
     ["privacidade", "Privacidade (LGPD)"],
     ["auditoria", "Auditoria"],
     ["erros", "Diagnóstico"],
+    // MANUTENÇÃO mora em "O sistema" e não em "O dinheiro" porque o que ela
+    // conserta é REGISTRO, não cobrança: preço congelado, baixa de estoque,
+    // valor da equipe. A dívida da família vem da competência e não passa por
+    // aqui. Quem abre esta aba está perguntando "está tudo consistente?".
+    ["manutencao", "Manutenção"],
   ]},
 ];
 

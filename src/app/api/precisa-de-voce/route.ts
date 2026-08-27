@@ -39,6 +39,11 @@ export const dynamic = "force-dynamic";
  * moldura ninguém lê. Por isso ele vem separado, e a tela o trata como recado,
  * não como alarme.
  */
+/** RPC que devolve uma linha só chega ora como objeto, ora como array de um. */
+function linhaUnica(d: any): any {
+  return (Array.isArray(d) ? d[0] : d) || null;
+}
+
 function contarSemJazigo(linhas: any[] | null | undefined): number | null {
   const l = linhas || [];
   if (!l.length) return 0;
@@ -55,7 +60,7 @@ export async function GET() {
 
   const hoje = new Date().toISOString().slice(0, 10);
 
-  const [conv, fila, comp, contatos, semJazigo] = await Promise.all([
+  const [conv, fila, comp, contatos, semJazigo, lavagens] = await Promise.all([
     db.rpc("sureya_contadores_conversas"),
 
     db.from("fila_liberacao").select("id", { count: "exact", head: true })
@@ -74,6 +79,10 @@ export async function GET() {
     // seria uma segunda conta sobre o mesmo fato, e é assim que os números
     // começam iguais e terminam discordando.
     db.from("familias").select("id,tumulos(id)").eq("org_id", org).limit(2000),
+
+    // TRABALHO FEITO QUE NÃO DEIXOU MARCA (0137). Mesma função da tela de
+    // manutenção — não é uma segunda contagem.
+    db.rpc("sureya_lavagens_incompletas_resumo", { p_org: org }),
   ]);
 
   // UMA FILA QUE NÃO RESPONDEU NÃO VALE ZERO.
@@ -84,7 +93,7 @@ export async function GET() {
   // e a tela diz que não soube.
   const n = (r: any) => (r?.error ? null : (r?.count ?? 0));
 
-  const contadores = (Array.isArray(conv?.data) ? conv.data[0] : conv?.data) || null;
+  const contadores = linhaUnica(conv?.data);
 
   return NextResponse.json({
     ok: true,
@@ -105,6 +114,20 @@ export async function GET() {
       // todas as 363 apareceriam como cadastro pela metade — número errado com
       // cara de medição. Se NENHUMA linha trouxe a chave, eu não sei: `null`.
       semJazigo: semJazigo?.error ? null : contarSemJazigo(semJazigo?.data),
+
+      // LAVAGEM FEITA PELA METADE — sem preço, sem material, sem o pagamento
+      // da equipe. É trabalho já entregue, então não tem relógio correndo: fica
+      // aqui embaixo, junto com o cadastro incompleto.
+      //
+      // `semRegraEquipe` é OUTRA coisa, e por isso vem separado: não é uma
+      // lavagem defeituosa, é uma configuração que falta. Enquanto a casa não
+      // tiver regra de pagamento nenhuma, nenhuma lavagem é acusada de
+      // "pagamento não calculado" — não há com o que calcular.
+      lavagens: lavagens?.error ? null : {
+        incompletas: (linhaUnica(lavagens?.data) as any)?.quantas ?? 0,
+        semPreco: (linhaUnica(lavagens?.data) as any)?.sem_preco ?? 0,
+        semRegraEquipe: !!(linhaUnica(lavagens?.data) as any)?.sem_regra_equipe,
+      },
     },
   });
 }

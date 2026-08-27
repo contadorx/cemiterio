@@ -722,8 +722,22 @@ ok("e a tela avisa quais filas ela nao conseguiu ler",
 
 // Bloco com quatro zeros todo dia vira moldura, e moldura ninguem le. Mas
 // falhar em silencio e o defeito inteiro da CA-13.
+//
+// A CONDICAO CRESCEU NA 0137, e a guarda foi atualizada porque a TELA mudou de
+// proposito — nao porque era mais facil mexer aqui. O bloco passou a mostrar
+// tambem as lavagens feitas pela metade e a falta de regra de pagamento, e um
+// bloco que some com trabalho para mostrar e pior que um que fica.
+//
+// Por isso a guarda deixou de cobrar a frase literal e passou a cobrar o que
+// ela protege: TODO motivo de aparecer entra na condicao, e `fase !== "erro"`
+// continua nela — e esse ultimo e o ponto inteiro da CA-13.
+const somem = /if \(!comTrabalho\.length[\s\S]{0,220}?fase !== "erro"\) return null;/.exec(precVisivel);
 ok("o bloco some quando esta tudo em dia, mas nao quando falhou",
-   /!comTrabalho\.length && !naoSoube\.length && !semJazigo && fase !== "erro"/.test(precVisivel));
+   !!somem
+   && /!naoSoube\.length/.test(somem[0])
+   && /!semJazigo/.test(somem[0])
+   && /!incompletas/.test(somem[0])
+   && /!semRegraEquipe/.test(somem[0]));
 
 // As quatro afirmacoes que so podem ser feitas depois de ter conseguido
 // perguntar. Cada uma delas era dita, antes, tambem quando a rota caia.
@@ -1289,5 +1303,61 @@ ok("mexer na regua fica na auditoria",
 // continua saindo ordenada so por quadra e rua.
 ok("uma org nova nasce com a regua, e nao vazia",
    /tg_semear_regua_prioridade/.test(readFileSync("migrations/0136_a_regua_de_prioridade_e_ajustavel.sql", "utf8")));
+
+// ===========================================================================
+// TODA LAVAGEM FEITA DEIXA MARCA (0137)
+//
+// Havia QUATRO portas que marcam uma limpeza como feita. Tres chamavam
+// `sureya_concluir_lavagem`; a quarta — `POST /api/servico` com
+// `dataExecutada` — escrevia a mao, e a limpeza nascia sem preco, sem baixa de
+// material, sem o pagamento da equipe e sem a fila da foto. Duas assim em
+// producao, com `valor` NULO: trabalho feito sem preco nenhum no historico.
+//
+// E o defeito de forma que este projeto mais repete (0092, 0105, 0106, 0115):
+// duas implementacoes da mesma regra que comecam iguais e terminam
+// discordando. A guarda existe porque a porta fechada nao faz barulho ao
+// reabrir — ninguem ve, e a lavagem so aparece quebrada semanas depois.
+// ===========================================================================
+// `rotaServico` ja foi lida acima.
+const rotaLav = readFileSync("src/app/api/manutencao/lavagens-incompletas/route.ts", "utf8");
+const telaManut = readFileSync("src/app/painel/config/Manutencao.tsx", "utf8");
+const mig37 = readFileSync("migrations/0137_toda_lavagem_feita_deixa_marca.sql", "utf8");
+
+ok("limpeza que nasce executada passa pela transacao de conclusao",
+   /jaFeita && \(srv as any\)\?\.id/.test(rotaServico)
+   && /rpc\("sureya_concluir_lavagem"/.test(rotaServico));
+
+// A quinta implementacao entraria aqui: uma conta propria de valor ou de
+// remuneracao na rota de manutencao seria de novo dois numeros sobre o mesmo
+// fato. O conserto chama a MESMA transacao.
+ok("o conserto chama a transacao, nao recalcula por fora",
+   /rpc\("sureya_concluir_lavagem"/.test(rotaLav)
+   && !/valor_executora:/.test(semComentarios(rotaLav)));
+
+// Consertar numero nao pode mexer no que vai ser dito a familia: uma foto de
+// tres semanas atras entrando na fila hoje e decisao da Sureya.
+ok("consertar nao poe foto antiga na fila",
+   /p_foto_depois: null/.test(rotaLav));
+
+// Vazio nao e zero, agora do lado do alarme: lavagem registrada a mao nao tem
+// foto, e cobrar dela uma linha na fila seria inventar uma falta.
+ok("so cobra a fila quando a foto existe",
+   /coalesce\(s\.foto_depois_url, ''\) <> ''/.test(mig37));
+
+// Alarme que sempre grita ensina a ignorar alarme: sem regra de pagamento
+// cadastrada, nenhuma lavagem e acusada — vira um recado so.
+ok("sem regra de pagamento, o recado e um, nao um por lavagem",
+   /sem_regra_equipe/.test(mig37) && /sem_regra_equipe/.test(telaManut));
+
+// SECURITY DEFINER ignora RLS e o Supabase concede EXECUTE a anon por padrao
+// em `public`. Estas duas devolvem nome de familia e codigo de jazigo.
+ok("as funcoes do 0137 nao ficam abertas para anon",
+   /revoke execute on function sureya_lavagens_incompletas\(uuid\)\s+from public, anon/.test(mig37)
+   && /revoke execute on function sureya_lavagens_incompletas_resumo\(uuid\)\s+from public, anon/.test(mig37));
+
+// Dizer "2 completadas" calando que 2 continuam na lista seria anunciar um
+// resultado que nao aconteceu.
+ok("o conserto conta o que sobrou, e diz",
+   /aindaIncompletas/.test(rotaLav) && /aindaIncompletas/.test(telaManut));
 
 process.exit(falhas ? 1 : 0);

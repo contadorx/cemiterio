@@ -314,7 +314,13 @@ POLICIES_DELTA=${POLICIES_DELTA:-89}
 #             Pior que desperdicio — a remocao por LGPD monta a lista a partir
 #             dos TUMULOS DA FAMILIA, e tumulo apagado nao esta mais la, entao
 #             dava para responder "removido" com a foto ainda abrindo.
-FUNCOES_DELTA=${FUNCOES_DELTA:-78}
+#   0136  +3  sureya_semear_regua_prioridade, sureya_prioridade_calculada e
+#             sureya_prioridade_alcance — a regua de prioridade.
+#   0137  +2  sureya_lavagens_incompletas e o resumo dela. Em 27/08, das cinco
+#             lavagens executadas, DUAS nao tinham preco nenhum: `POST
+#             /api/servico` criava a limpeza ja executada sem passar pela
+#             transacao de conclusao — a quarta implementacao do mesmo ato.
+FUNCOES_DELTA=${FUNCOES_DELTA:-80}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -738,6 +744,25 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/arquivos_orfaos.sql 2>&1
   echo "$saida" | grep -E "ORFAOS FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Lista incompleta apaga o registro e deixa o arquivo servindo."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# LAVAGEM FEITA QUE NAO DEIXOU MARCA
+#
+# A lista erra em silencio nos dois sentidos: ver de menos faz a tela dizer
+# "esta tudo certo" em cima de trabalho nao contado; ver demais acusa toda
+# lavagem por uma configuracao que falta, e alarme que sempre grita ensina a
+# ignorar alarme.
+# ---------------------------------------------------------------------------
+echo "MARCAS — toda limpeza feita deixa preco, material, pagamento e fila"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/lavagens_incompletas.sql 2>&1); then
+  echo "$saida" | grep -E "LAVAGEM INCOMPLETA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Trabalho feito que ninguem conta nao aparece em lugar nenhum."
   echo "============================================================"
   exit 1
 fi
