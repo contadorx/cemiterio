@@ -52,11 +52,47 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }, { status: 502 });
     }
 
-    const { error } = await db.rpc("sureya_anonimizar_cliente", { p_cliente: params.id });
+    const { data: sobrou, error } =
+      await db.rpc("sureya_anonimizar_cliente", { p_cliente: params.id });
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+    // ======================================================================
+    // A REMOÇÃO SE PROVA (0140)
+    // ======================================================================
+    //
+    // A função devolve onde o nome e o telefone da pessoa ainda aparecem no
+    // banco inteiro. Isto não é zelo: o caminho existia desde a 0010 e NUNCA
+    // tinha rodado, e quando eu o exercitei em produção (num bloco desfeito)
+    // ele deixava seis coisas para trás — inclusive um `update` nos leads que
+    // casava zero linhas por um erro de ordem, invisível na leitura.
+    //
+    // O TELEFONE É INEQUÍVOCO: se aparece, sobrou dado dela, e isso é falha.
+    // O nome não — "Kátia" também é o começo de "Kátia C. Lima", que é outra
+    // pessoa e não pediu nada. Misturar os dois faria o aviso gritar sempre, e
+    // aviso que sempre grita ensina a ignorar aviso.
+    const linhas = ((sobrou || []) as any[]);
+    const porTelefone = linhas.filter((l) => l.pelo_telefone);
+    const mencoes = linhas.filter((l) => !l.pelo_telefone);
+
     const org = await orgAtual(db);
-    if (org) await auditar(db, org, auth.userId, "anonimizou_cliente", { tipo: "cliente", id: params.id });
-    return NextResponse.json({ ok: true });
+    if (org) {
+      await auditar(db, org, auth.userId, "anonimizou_cliente",
+        { tipo: "cliente", id: params.id },
+        {
+          // O QUE SOBROU FICA NO REGISTRO, não só na tela que alguém fechou.
+          // É o que permite responder, meses depois, "a remoção foi completa?"
+          completa: porTelefone.length === 0,
+          sobrou_por_telefone: porTelefone.map((l) => `${l.onde}:${l.quantos}`),
+          mencoes_ao_nome: mencoes.map((l) => `${l.onde}:${l.quantos}`),
+        });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      completa: porTelefone.length === 0,
+      sobrouPorTelefone: porTelefone,
+      mencoesAoNome: mencoes,
+    });
   }
 
   if (acao === "consentimento") {

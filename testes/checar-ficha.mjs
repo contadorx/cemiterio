@@ -75,6 +75,22 @@ function varrer(dir, achados = []) {
 // aqui. Numa positiva, achar no comentario e inofensivo.
 const semComentarios = (t) =>
   t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+/**
+ * O MESMO, PARA SQL.
+ *
+ * `semComentarios` tira comentario de JavaScript (`//` e a barra-asterisco) e
+ * NAO tira o `--` do SQL. A guarda da 0140 pegou isso na hora: ela procura, no
+ * corpo da migration, que o `where telefone in (select telefone from clientes)`
+ * NAO esteja mais la — e o cabecalho da migration CITA essa linha, para
+ * explicar o bug que ela conserta. A busca negativa achava a citacao e reprovava
+ * um conserto correto, que e exatamente o defeito que `semComentarios` existe
+ * para evitar.
+ *
+ * So linhas inteiras de comentario: `--` no meio de uma linha pode estar dentro
+ * de um literal de texto, e apagar dali mutilaria o SQL que se quer conferir.
+ */
+const semComentariosSql = (t) => t.replace(/^\s*--.*$/gm, "");
 const fichaVisivel = semComentarios(ficha);
 
 let falhas = 0;
@@ -1490,5 +1506,77 @@ ok("e imagem da conversa que nao abriu tambem",
 ok("a migration diz por que servicos continua aberto",
    /NAO\*\* FAZ: fechar `servicos`|NAO. FAZ: fechar .servicos./.test(mig39)
    && /Evolution BAIXA a URL/.test(mig39));
+
+// ===========================================================================
+// A REMOCAO A PEDIDO ALCANCA O QUE FICOU, E SE PROVA (0140)
+//
+// O caminho existia desde a 0010 e NUNCA tinha rodado — nem dava, porque nao
+// havia botao nenhum no painel. Exercitado em producao num bloco desfeito, ele
+// deixava SEIS coisas para tras, entre elas um `update leads` que casava ZERO
+// linhas por erro de ordem.
+//
+// Esse tipo de defeito e invisivel: a linha esta la, parece certa, e nenhuma
+// tela muda. Por isso o conserto nao foi so alcancar o que faltava — foi fazer
+// a remocao DEVOLVER o que sobrou. Estas guardas protegem as duas coisas.
+// ===========================================================================
+const mig40 = readFileSync("migrations/0140_a_remocao_alcanca_o_que_ficou.sql", "utf8");
+const rLgpd = readFileSync("src/app/api/clientes/[id]/lgpd/route.ts", "utf8");
+const telaFicha40 = readFileSync("src/app/painel/clientes/[id]/page.tsx", "utf8");
+
+// O BUG DE ORDEM. Os numeros tem de ser lidos ANTES de a coluna ser
+// embaralhada; procurar o lead por `(select telefone from clientes ...)` depois
+// do update casa zero linhas.
+ok("os telefones sao capturados antes de qualquer escrita",
+   /select coalesce\(array_agg\(t\.telefone\), '\{\}'\) into v_tels/.test(mig40)
+   && /telefone = any\(v_tels\)/.test(mig40)
+   && !/where telefone in \(select telefone from clientes/.test(semComentariosSql(mig40)));
+
+// As quatro tabelas que o ensaio pegou sobrando.
+ok("o rascunho da IA, o log do webhook e o lead entram na limpeza",
+   /update interacoes_ia/.test(mig40)
+   && /update eventos_webhook set telefone = null/.test(mig40)
+   && /update leads/.test(mig40));
+
+// `leads.telefone` e NOT NULL: nulo daria erro, entao leva o mesmo
+// embaralhamento de `clientes.telefone`. Achado no SEGUNDO ensaio.
+ok("o lead tambem perde o proprio numero",
+   /update leads[\s\S]{0,320}telefone = 'anon:' \|\| left\(md5/.test(mig40));
+
+// A familia batizada com o nome dela deixa de carrega-lo — mas continua
+// achavel pelo jazigo, senao a Sureya perde de quem e o que ela lava.
+ok("a familia perde o nome dela e ganha o codigo do jazigo",
+   /Família do jazigo/.test(mig40));
+
+// A remocao NAO apaga o contrato: a familia pode ter outras pessoas.
+ok("a remocao nao apaga a familia nem o jazigo",
+   !/delete from familias/.test(semComentariosSql(mig40))
+   && !/delete from tumulos/.test(semComentariosSql(mig40)));
+
+// A PARTE QUE IMPORTA MAIS QUE O CONSERTO: ela se prova.
+ok("a remocao devolve o laudo do que sobrou",
+   /return query select \* from sureya_sobrou_da_remocao/.test(mig40)
+   && /sobrouPorTelefone/.test(rLgpd));
+
+// Telefone e inequivoco; nome pode ser mencao de terceiro. Misturar faria o
+// aviso gritar sempre, e aviso que sempre grita ensina a ignorar aviso.
+ok("o laudo separa telefone de mencao ao nome",
+   /pelo_telefone/.test(mig40) && /mencoesAoNome/.test(rLgpd)
+   && /mencoesAoNome/.test(telaFicha40));
+
+// "Apertei o botao e ficou verde" nao e prova de nada, meses depois.
+ok("o que sobrou fica na auditoria, nao so na tela",
+   /completa: porTelefone\.length === 0/.test(rLgpd)
+   && /sobrou_por_telefone/.test(rLgpd));
+
+// A REMOCAO NAO TINHA BOTAO — era por isso que nunca tinha rodado.
+ok("existe onde apertar, e e diferente de excluir a ficha",
+   /removerDados/.test(telaFicha40)
+   && /Remover os dados a pedido da família/.test(telaFicha40)
+   && /Excluir ficha/.test(telaFicha40));
+
+// A deriva achada de raspao: producao tinha a coluna, a trilha nao a criava, e
+// a 0120 ja a lia dentro de uma funcao — que o Postgres nao valida na criacao.
+ok("a coluna que so existia em producao entrou na trilha",
+   /alter table interacoes_ia add column if not exists motivo_retencao text/.test(mig40));
 
 process.exit(falhas ? 1 : 0);

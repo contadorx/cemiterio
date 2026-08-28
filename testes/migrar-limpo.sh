@@ -336,7 +336,7 @@ POLICIES_DELTA=${POLICIES_DELTA:-99}
 #             0010, e foi reescrita — passou a gravar o evento com a versao.
 #             Em 27/08: 62 contatos marcados como tendo autorizado o contato e
 #             ZERO caracteres em orgs.aviso_privacidade — nunca houve texto.
-FUNCOES_DELTA=${FUNCOES_DELTA:-85}
+FUNCOES_DELTA=${FUNCOES_DELTA:-86}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -788,6 +788,24 @@ echo
 # Balde que volta a ser publico nao muda tela nenhuma, nao aparece em log e nao
 # quebra nada: as imagens continuam abrindo, so que para mais gente.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# A REMOCAO A PEDIDO
+#
+# O defeito aqui e invisivel na leitura: um `update` que casa zero linhas por
+# erro de ordem esta escrito de um jeito que parece certo, e nenhuma tela muda.
+# So varrendo o banco depois da remocao da para saber o que ficou.
+# ---------------------------------------------------------------------------
+echo "REMOCAO — o que a familia pediu para tirar nao fica em canto nenhum"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/remocao_a_pedido.sql 2>&1); then
+  echo "$saida" | grep -E "REMOCAO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Remocao incompleta com comprovante de remocao e pior que nao remover."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "BALDES — o comprovante e a conversa nao abrem para quem tem o link"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/baldes_fechados.sql 2>&1); then
   echo "$saida" | grep -E "BALDES FALHOU|ERROR" | sed 's/^/  /'

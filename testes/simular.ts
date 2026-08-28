@@ -17,9 +17,26 @@ process.env.SUREYA_ORG_ID = "org-1";
 process.env.SUREYA_WEBHOOK_SECRET = "fake";
 
 const ORG = "org-1";
-const hoje = new Date().toISOString().slice(0, 10);
-const diasAtras = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-const emDias = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+
+/**
+ * O DIA DA OPERAÇÃO, E NÃO O DIA EM UTC.
+ *
+ * ACHADO PELO PRÓPRIO CI, às 00h46 de UTC — 21h46 em São Paulo. O teste
+ * "nenhuma delas foi escondida num dia que já passou" reprovou uma alocação
+ * CORRETA: o alocador tinha posto uma lavagem em 27/08, que é hoje em São
+ * Paulo, e este arquivo comparava com 28/08, que é hoje em UTC.
+ *
+ * `diaOperacao` existe desde a 0114 e foi escrita para exatamente este bug —
+ * "com toISOString() o dia virava às 21h de Brasília". Todo o código de
+ * produção já a usa; este arquivo era o último lugar com a definição antiga.
+ * Duas definições de HOJE são duas contas sobre o mesmo fato, e é assim que
+ * elas começam iguais e terminam discordando — três horas por dia, todo dia.
+ */
+import { diaOperacao, somaDias } from "../src/lib/vencimento";
+
+const hoje = diaOperacao();
+const diasAtras = (n: number) => somaDias(hoje, -n);
+const emDias = (n: number) => somaDias(hoje, n);
 
 // ---------------------------------------------------------------- massa de dados
 function montarBanco(): Tabelas {
@@ -558,7 +575,8 @@ async function rodar() {
   //
   // Antecipar por semanas nao e otimizar: e lavar (e cobrar) fora do combinado.
   for (const s of banco.servicos) { if (s.status === "agendado") s.status = "executado"; }
-  const daquiA = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  // Mesma razão do `emDias` no topo: o dia da operação, não o dia em UTC.
+  const daquiA = (n: number) => somaDias(hoje, n);
   banco.servicos.push(
     { id: "futuro-1", org_id: ORG, tumulo_id: "t1", plano_id: "p1", cliente_id: "c-cec",
       data_prevista: daquiA(35), data_plano: daquiA(35), status: "pendente",

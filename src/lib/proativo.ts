@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { calcularSaldo } from "./financeiro";
+import { diaOperacao } from "./vencimento";
 
 // Tudo aqui gera mensagem PREPARADA (copiloto): nada sai sozinho. Quem manda é
 // a Sureya, tocando em "enviar" na tela de liberação.
@@ -332,9 +333,17 @@ export async function gatilhosDeData(): Promise<number> {
   const db = supabaseAdmin();
   const org = env.orgId();
 
-  const alvo = new Date(Date.now() + 7 * 86_400_000);
-  const mmdd = `${String(alvo.getMonth() + 1).padStart(2, "0")}-${String(alvo.getDate()).padStart(2, "0")}`;
-  const ano = alvo.getFullYear();
+  // O DIA DA OPERAÇÃO, E NÃO O DIA DA MÁQUINA.
+  //
+  // `new Date().getDate()` lê o fuso de quem executa — a Vercel roda em UTC, e
+  // das 21h à meia-noite de Brasília isso é o dia SEGUINTE. Uma data de memória
+  // seria procurada com um dia de diferença durante três horas por dia.
+  //
+  // Era a terceira definição de "hoje" no código TypeScript. `diaOperacao`
+  // (0114) é a única, e foi escrita para exatamente este bug.
+  const alvoISO = diaOperacao(7);
+  const mmdd = alvoISO.slice(5);
+  const ano = Number(alvoISO.slice(0, 4));
 
   let n = 0;
 

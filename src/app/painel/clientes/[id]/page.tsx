@@ -2757,6 +2757,50 @@ function Ajustes({ clienteId, nome, familiaId, familiaNome }:
   const perguntar = useConfirmar();
   const [aberto, setAberto] = useState(true);
   const [ocupado, setOcupado] = useState(false);
+  const [laudo, setLaudo] = useState<any>(null);
+
+  /**
+   * REMOVER OS DADOS A PEDIDO DA FAMÍLIA (0140).
+   *
+   * ISTO NÃO TINHA BOTÃO. A rota existia desde a 0010, foi reforçada na 0078 e
+   * de novo na 0135 — e não havia nenhum lugar no painel onde apertar. Era por
+   * isso que "exercitar a remoção" nunca tinha saído do backlog: não dava.
+   *
+   * É DIFERENTE DE "EXCLUIR FICHA", e por isso são dois botões:
+   *
+   *   Remover os dados   a pessoa continua no sistema como "Cliente removido",
+   *                      o jazigo e o contrato seguem existindo, e o histórico
+   *                      de dinheiro fica (a lei manda guardar). O que sai é o
+   *                      que identifica a pessoa.
+   *   Excluir a ficha    apaga o cadastro. É outra coisa, e continua ali.
+   *
+   * O LAUDO FICA NA TELA depois. Um pedido de remoção é a única operação deste
+   * sistema em que alguém pode ter de PROVAR, meses depois, que foi feita — e
+   * "apertei o botão e ele ficou verde" não é prova de nada.
+   */
+  async function removerDados() {
+    if (!await perguntar({
+      oQue: `Remover os dados de ${nome} a pedido dela?`,
+      efeito:
+        "Some o nome, os telefones, as conversas, as fotos e os rascunhos. O jazigo, o contrato "
+        + "e o histórico de pagamentos continuam — a lei manda guardar nota e comprovante. "
+        + "Não volta.",
+      confirmar: "Remover os dados", tom: "perigo",
+      pedirMotivo: "Quem pediu, e por qual canal? (fica no registro)",
+    })) return;
+
+    setOcupado(true); setLaudo(null);
+    const r = await fetch(`/api/clientes/${clienteId}/lgpd`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "anonimizar" }),
+    }).then((x) => x.json()).catch(() => null);
+    setOcupado(false);
+
+    if (!r?.ok) { recado.erro(r?.erro || "Não consegui remover."); return; }
+    setLaudo(r);
+    if (r.completa) recado.ok("Dados removidos. Nada sobrou com o telefone dela.");
+    else recado.aviso("Removi, mas sobrou coisa. Veja o laudo abaixo.");
+  }
 
   async function excluir() {
     if (!await perguntar({
@@ -2785,9 +2829,42 @@ function Ajustes({ clienteId, nome, familiaId, familiaNome }:
           >
             Exportar os dados desta família
           </a>
-          <Botao tom="perigo" onClick={excluir} disabled={ocupado}>
-            <Trash2 size={16} /> Excluir ficha
+          <Botao tom="perigo" onClick={removerDados} disabled={ocupado}>
+            Remover os dados a pedido da família
           </Botao>
+
+          {/* O LAUDO. Fica na tela, não em um recado que some em quatro
+              segundos: é a única operação do sistema em que alguém pode ter de
+              provar, meses depois, que foi feita e até onde alcançou. */}
+          {laudo && (
+            <div style={{ marginTop: 10 }} className="rounded-lg border border-line p-3 text-[13.5px] leading-relaxed">
+              {laudo.completa ? (
+                <p className="text-positivo">
+                  <b>Remoção completa.</b> O telefone dela não aparece em lugar nenhum do banco.
+                </p>
+              ) : (
+                <p className="text-perigo">
+                  <b>Removi, mas sobrou.</b> O telefone dela ainda aparece em{" "}
+                  {(laudo.sobrouPorTelefone || []).map((l: any) => `${l.onde} (${l.quantos})`).join(", ")}.
+                  Isto é falha da remoção — me avise.
+                </p>
+              )}
+              {(laudo.mencoesAoNome || []).length > 0 && (
+                <p className="mt-2 text-ink-soft">
+                  O <b>nome</b> ainda aparece em{" "}
+                  {(laudo.mencoesAoNome || []).map((l: any) => `${l.onde} (${l.quantos})`).join(", ")}.
+                  Isso pode ser outra pessoa com nome parecido — vale conferir, não é
+                  necessariamente dado dela.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 border-t border-line pt-3">
+            <Botao tom="perigo" onClick={excluir} disabled={ocupado}>
+              <Trash2 size={16} /> Excluir ficha
+            </Botao>
+          </div>
 
           {familiaId && <FundirOuExcluir familiaId={familiaId} familiaNome={familiaNome} />}
         </Cartao>
