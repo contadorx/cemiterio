@@ -74,11 +74,20 @@ export default function Conferencia() {
   const [fechadas, setFechadas] = useState<Set<string>>(new Set());
   const [soPendentes, setSoPendentes] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
+  /**
+   * FILTRAR PELO QUE FALTA (0141).
+   *
+   * Medido em 28/08: 363 famílias, 293 com pendência — e 290 delas travadas
+   * pela MESMA pergunta binária, "contrato ou avulso". Varrer 290 é trabalho
+   * de uma tarde; varrer 363 procurando quais são as 290 é trabalho de duas.
+   */
+  const [falta, setFalta] = useState<string>("");
 
   const carregar = useCallback(async () => {
     setErro("");
     try {
-      const r = await fetch("/api/conferencia").then((x) => x.json());
+      const url = falta ? `/api/conferencia?falta=${encodeURIComponent(falta)}` : "/api/conferencia";
+      const r = await fetch(url).then((x) => x.json());
       if (!r.ok) throw new Error(r.erro || "falhou");
       setDados(r);
       // Os blocos já vêm preenchidos do servidor. O que passar do teto continua
@@ -87,7 +96,7 @@ export default function Conferencia() {
     } catch (e: any) {
       setErro(e?.message || "não deu para carregar");
     }
-  }, []);
+  }, [falta]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -105,6 +114,29 @@ export default function Conferencia() {
     if (itens[f.familia_id]) return;
     const r = await fetch(`/api/conferencia?familiaId=${f.familia_id}`).then((x) => x.json());
     if (r.ok) setItens((x) => ({ ...x, [f.familia_id]: r.itens }));
+  }
+
+  /**
+   * CONTRATO OU AVULSO, NA PRÓPRIA LINHA (0141).
+   *
+   * A rota já sabia responder isto desde sempre — o que faltava era a lista
+   * oferecer. O cartão dizia "abra a ficha e escolha uma das duas", e eram 290
+   * aberturas para 290 escolhas binárias.
+   *
+   * NÃO É UM ATALHO PARA UMA DECISÃO DIFÍCIL: contrato e avulso são fluxos de
+   * cobrança diferentes, e quem responde já sabe qual é — o que ela não tem é
+   * paciência para abrir 290 fichas para dizer o que já sabe.
+   */
+  async function decidirRegime(f: Fam, regime: "contrato" | "avulso") {
+    setOcupado(f.familia_id);
+    try {
+      const r = await fetch("/api/conferencia", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familiaId: f.familia_id, regime }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { recado.erro(r?.erro || "não consegui salvar"); return; }
+      await carregar();
+    } finally { setOcupado(null); }
   }
 
   /** DAR O OK — recusado pelo banco enquanto houver pendência obrigatória. */
@@ -187,8 +219,16 @@ export default function Conferencia() {
           </p>
           <p className="mt-1 text-[14px] text-ink-soft">
             Não é detalhe de cadastro: são fluxos de cobrança diferentes, e a
-            lavagem não espera a decisão. Abra a ficha e escolha uma das duas.
+            lavagem não espera a decisão. Cada linha da lista tem os dois botões —
+            não precisa abrir a ficha para responder.
           </p>
+          {falta !== "contrato ou avulso" && (
+            <div className="mt-3">
+              <Botao onClick={() => setFalta("contrato ou avulso")}>
+                Ver só essas {dados.resumo.semRegime}
+              </Botao>
+            </div>
+          )}
         </Cartao>
       )}
 
@@ -204,6 +244,42 @@ export default function Conferencia() {
             contrato, ou feche contrato com famílias que já têm jazigo ligado.
           </p>
         </Cartao>
+      )}
+
+      {/* O QUE FALTA, POR TIPO — e quantas famílias em cada.
+          Sem isto a tela dá um número só ("293 com pendência") e manda procurar.
+          Com isto, o trabalho vira uma fila de cada vez: as 290 do regime numa
+          passada, as 122 sem jazigo em outra. */}
+      {Object.keys(dados.porPendencia || {}).length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[13px] text-ink-soft">O que falta:</span>
+          <button
+            onClick={() => setFalta("")}
+            className={`rounded-full border px-3 py-1.5 text-[13px] ${
+              !falta ? "border-brand bg-brand text-white" : "border-line bg-card text-ink hover:border-brand"}`}>
+            tudo
+          </button>
+          {Object.entries(dados.porPendencia as Record<string, number>)
+            .sort((a, b) => b[1] - a[1])
+            .map(([item, n]) => (
+              <button key={item}
+                      onClick={() => setFalta(falta === item ? "" : item)}
+                      className={`rounded-full border px-3 py-1.5 text-[13px] ${
+                        falta === item ? "border-brand bg-brand text-white"
+                                       : "border-line bg-card text-ink hover:border-brand"}`}>
+                {item} <b>{n}</b>
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* MOSTRANDO ≠ TOTAL. Com um filtro ligado, calar quantas ficaram de fora
+          faria "363 famílias" no resumo brigar com a lista na tela. */}
+      {falta && (
+        <p className="mb-3 text-[14px] text-ink-soft">
+          Mostrando <b>{dados.mostrando}</b> de {dados.resumo.total} famílias — as que
+          precisam de <b>{falta}</b>.
+        </p>
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -246,6 +322,26 @@ export default function Conferencia() {
                 </span>
               </button>
               <span className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                {/* CONTRATO OU AVULSO, AQUI (0141).
+                    Só aparece enquanto ninguém decidiu: depois de decidido, o
+                    regime é informação e mora na segunda linha do título.
+                    Trocar de ideia continua sendo na ficha, de propósito —
+                    mudar o regime de uma família que já tem contrato muda como
+                    ela é cobrada, e isso não é decisão de passar o dedo. */}
+                {f.regime === "nao_definido" && (
+                  <>
+                    <button disabled={ocupado === f.familia_id}
+                            onClick={() => decidirRegime(f, "contrato")}
+                            className="rounded-lg border border-brand px-3 py-1.5 text-[13px] font-medium text-brand hover:bg-brand hover:text-white disabled:opacity-50">
+                      Contrato
+                    </button>
+                    <button disabled={ocupado === f.familia_id}
+                            onClick={() => decidirRegime(f, "avulso")}
+                            className="rounded-lg border border-line px-3 py-1.5 text-[13px] text-ink hover:border-brand disabled:opacity-50">
+                      Avulso
+                    </button>
+                  </>
+                )}
                 {f.conferida_em && <Selo tom="bom">✓ conferida</Selo>}
                 <Selo tom={pend === 0 ? "bom" : "atencao"}>
                   {pend === 0 ? "sem pendência" : `${pend} a corrigir`}

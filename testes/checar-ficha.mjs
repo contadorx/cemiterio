@@ -1579,4 +1579,66 @@ ok("existe onde apertar, e e diferente de excluir a ficha",
 ok("a coluna que so existia em producao entrou na trilha",
    /alter table interacoes_ia add column if not exists motivo_retencao text/.test(mig40));
 
+// ===========================================================================
+// A CONFERENCIA VIRA UMA FILA DE DECISOES (0141)
+//
+// Medido em 28/08: 363 familias, 293 com pendencia — e 290 delas travadas pela
+// MESMA pergunta binaria, "contrato ou avulso". O cartao mandava "abra a ficha
+// e escolha uma das duas": 290 aberturas para 290 escolhas.
+//
+// E a soma das pendencias era 838, porque as 122 familias sem jazigo eram
+// contadas QUATRO vezes — tres itens diziam, literalmente, "nenhum jazigo para
+// conferir". Quem cadastra um jazigo via quatro pendencias sumirem, e aprendia
+// que o numero nao quer dizer nada.
+// ===========================================================================
+const mig41 = readFileSync("migrations/0141_a_conferencia_conta_problemas_nao_sintomas.sql", "utf8");
+const rotaConf = readFileSync("src/app/api/conferencia/route.ts", "utf8");
+const telaConf = readFileSync("src/app/painel/conferencia/page.tsx", "utf8");
+const confVisivel = semComentarios(telaConf);
+
+// Nao ter o que olhar nao e ter achado um problema — mesma regra que `ritmo`
+// ja usava para o avulso.
+ok("o item que depende do jazigo nao conta como pendencia quando nao ha jazigo",
+   (semComentariosSql(mig41).match(/depende do jazigo, que ainda nao existe/g) || []).length === 3);
+
+// Mas com jazigo eles VOLTAM a ser cobrados: um conserto que calasse sempre
+// seria pior que a contagem inflada.
+ok("e o 'nao se aplica' e so quando nao existe jazigo",
+   /not exists \(select 1 from jaz\) then 'nao se aplica'/.test(mig41));
+
+// A causa continua sendo apontada.
+ok("a pendencia de verdade — o jazigo — continua obrigatoria",
+   /'jazigo cadastrado',\s*\n\s*case when \(select count\(\*\) from jaz\) > 0 then 'ok' else 'pendente' end/.test(mig41));
+
+// 290 aberturas para 290 escolhas binarias.
+ok("contrato ou avulso se responde na propria linha",
+   /decidirRegime/.test(confVisivel)
+   && /f\.regime === "nao_definido"/.test(confVisivel));
+
+// Trocar de ideia continua sendo na ficha: mudar o regime de quem ja tem
+// contrato muda como a familia e cobrada.
+ok("mas so enquanto ninguem decidiu — trocar de ideia e na ficha",
+   /regime === "nao_definido" && \(/.test(confVisivel));
+
+// Varrer 290 e trabalho de uma tarde; varrer 363 procurando quais sao as 290
+// e trabalho de duas.
+ok("da para filtrar pelo que falta, com a contagem de cada tipo",
+   /porPendencia/.test(rotaConf) && /porPendencia/.test(confVisivel)
+   && /searchParams\.get\("falta"\)/.test(rotaConf));
+
+// O resumo e do TODO: com filtro ligado, contar o filtrado faria "363
+// familias" virar "290" sem avisar.
+ok("o resumo continua sendo do todo, nao do filtro",
+   /total: todas\.length/.test(rotaConf)
+   && /mostrando: familias\.length/.test(rotaConf));
+
+// E a tela diz quantas ficaram de fora, senao o resumo briga com a lista.
+ok("e a tela diz quantas esta mostrando",
+   /dados\.mostrando/.test(confVisivel));
+
+// O cartao mandava abrir 290 fichas.
+ok("o cartao do regime deixou de mandar abrir a ficha",
+   !/Abra a ficha e escolha uma das duas/.test(confVisivel)
+   && /Ver só essas/.test(confVisivel));
+
 process.exit(falhas ? 1 : 0);

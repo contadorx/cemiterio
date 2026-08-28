@@ -795,6 +795,23 @@ echo
 # erro de ordem esta escrito de um jeito que parece certo, e nenhuma tela muda.
 # So varrendo o banco depois da remocao da para saber o que ficou.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# A CONFERENCIA CONTA PROBLEMAS, NAO SINTOMAS
+#
+# Contagem inflada nao da erro e nao muda tela: ela so ensina que o numero nao
+# quer dizer nada. Quem cadastra UM jazigo ve QUATRO pendencias sumirem.
+# ---------------------------------------------------------------------------
+echo "CONFERENCIA — um buraco conta uma vez, nao quatro"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/conferencia_conta_certo.sql 2>&1); then
+  echo "$saida" | grep -E "CONFERENCIA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Numero inflado ensina a ignorar o numero."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "REMOCAO — o que a familia pediu para tirar nao fica em canto nenhum"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/remocao_a_pedido.sql 2>&1); then
   echo "$saida" | grep -E "REMOCAO FALHOU|ERROR" | sed 's/^/  /'

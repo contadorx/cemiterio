@@ -37,7 +37,33 @@ export async function GET(req: NextRequest) {
   // Mesma regra do funil e do saldo: falha aparece, não vira zero.
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  const familias = (data || []) as any[];
+  const todas = (data || []) as any[];
+
+  // ==========================================================================
+  // A CONFERÊNCIA VIRA UMA FILA DE DECISÕES (0141)
+  // ==========================================================================
+  //
+  // Medido em 28/08: 363 famílias, 293 com pendência — e 290 delas travadas
+  // pela MESMA pergunta binária, "contrato ou avulso". O cartão da tela dizia
+  // "abra a ficha e escolha uma das duas": 290 aberturas para 290 escolhas.
+  //
+  // A contagem por tipo sai de `o_que_falta`, que a view JÁ traz. Uma segunda
+  // consulta para contar o que já está na mão seria uma segunda conta sobre os
+  // mesmos fatos — o defeito que este projeto mais repete.
+  const porPendencia: Record<string, number> = {};
+  for (const f of todas) {
+    for (const item of String(f.o_que_falta || "").split("; ")) {
+      const k = item.trim();
+      if (k) porPendencia[k] = (porPendencia[k] || 0) + 1;
+    }
+  }
+
+  // FILTRAR PELO QUE FALTA. Varrer 290 famílias é trabalho de uma tarde; varrer
+  // 363 procurando quais são as 290 é trabalho de duas.
+  const falta = (req.nextUrl.searchParams.get("falta") || "").trim();
+  const familias = falta
+    ? todas.filter((f) => String(f.o_que_falta || "").split("; ").some((i) => i.trim() === falta))
+    : todas;
 
   // OS BLOCOS VÊM PREENCHIDOS.
   //
@@ -64,18 +90,26 @@ export async function GET(req: NextRequest) {
     familias,
     itens,
     preenchidas: preencher.length,
+    // O RESUMO É DO TODO, NÃO DO FILTRO.
+    //
+    // Com um filtro ligado, contar `familias` faria "363 famílias" virar "290"
+    // e o número mudaria de significado sem avisar — quem filtrou por "sem
+    // regime" leria "290 famílias" e acharia que perdeu 73 do cadastro.
+    filtro: falta || null,
+    mostrando: familias.length,
+    porPendencia,
     resumo: {
-      total: familias.length,
+      total: todas.length,
       // "Pronta" agora conta só o OBRIGATÓRIO: antes um consentimento não
       // registrado — que é um aviso — pesava igual a um telefone faltando.
-      prontas: familias.filter((f) => Number(f.pendencias) === 0).length,
-      conferidas: familias.filter((f) => !!f.conferida_em).length,
+      prontas: todas.filter((f) => Number(f.pendencias) === 0).length,
+      conferidas: todas.filter((f) => !!f.conferida_em).length,
       // Uma família pronta mas sem regime definido não serve para o piloto:
       // ninguém sabe como cobrar a limpeza dela.
-      prontasContratadas: familias.filter(
+      prontasContratadas: todas.filter(
         (f) => Number(f.pendencias) === 0 && f.regime === "contrato").length,
-      avulsas: familias.filter((f) => f.regime === "avulso").length,
-      semRegime: familias.filter((f) => f.regime === "nao_definido").length,
+      avulsas: todas.filter((f) => f.regime === "avulso").length,
+      semRegime: todas.filter((f) => f.regime === "nao_definido").length,
     },
   });
 }
