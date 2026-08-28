@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function GET() {
   const org = await orgAtual(db);
   if (!org) return NextResponse.json({ ok: false, erro: "sem_org" }, { status: 400 });
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
 
   const [conv, fila, comp, contatos, semJazigo, lavagens] = await Promise.all([
     db.rpc("sureya_contadores_conversas"),

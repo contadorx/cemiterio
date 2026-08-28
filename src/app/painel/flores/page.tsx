@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { painel, cor } from "../ui";
 import { prepararFoto, motivoFalha } from "@/lib/foto";
+import { diaOperacao } from "@/lib/vencimento";
 
 /**
  * O SÁBADO DAS FLORES.
@@ -31,7 +32,7 @@ const dia = (iso: string) => {
   return `${semana}, ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`;
 };
 
-const hojeISO = () => new Date().toISOString().slice(0, 10);
+const hojeISO = () => diaOperacao();
 
 export default function Flores() {
   const [d, setD] = useState<any>(null);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { descreverRitmo, gerarEsteiraDeExtras } from "@/lib/extras";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
     // não pode reescrever o que já foi combinado com a família.
     preco_unit: Number(b?.preco ?? (item as any).preco) || 0,
     custo_unit: Number(b?.custo ?? (item as any).custo) || 0,
-    inicio: b?.inicio || new Date().toISOString().slice(0, 10),
+    inicio: b?.inicio || diaOperacao(),
     observacao: b?.observacao ? String(b.observacao).slice(0, 300) : null,
   });
 

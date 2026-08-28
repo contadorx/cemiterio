@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { orgAtual } from "@/lib/org";
+import { calcularSaldo } from "@/lib/saldo";
+import { diaOperacao } from "@/lib/vencimento";
 import { exigirAdmin } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -74,6 +77,48 @@ export async function GET(req: NextRequest) {
   // Uma consulta por família, em paralelo, com teto: com quatrocentas famílias
   // isso viraria quatrocentas consultas e a tela nasceria travada. Acima do
   // teto, as de baixo continuam abrindo sob demanda.
+  // ==========================================================================
+  // O DINHEIRO DA FAMÍLIA, DENTRO DA CONFERÊNCIA
+  // ==========================================================================
+  //
+  // A tarefa original pedia a FICHA inteira aqui. Isso continua recusado: uma
+  // ficha copiada é uma segunda verdade sobre a mesma família, e cada campo que
+  // faltasse na cópia mandaria a pessoa para a original no meio da correção.
+  //
+  // O que faltava de verdade era o dinheiro — bater o extrato contra o caderno
+  // é parte da conferência, e era o único pedaço que obrigava a sair da tela.
+  //
+  // UMA CONSULTA, NÃO UMA POR FAMÍLIA. São 363: uma chamada a
+  // `/api/conta-corrente` por família seria 363 idas ao servidor para ler a
+  // primeira linha. Aqui os lançamentos vêm de uma vez e o saldo sai de
+  // `calcularSaldo` — a MESMA função que aquela rota usa. A regra é uma;
+  // o que muda é quantas famílias entram por vez.
+  const hojeConf = diaOperacao();
+  const orgConf = await orgAtual(auth.db);
+  const { data: mov, error: eMov } = orgConf
+    ? await auth.db
+        .from("conta_corrente")
+        .select("familia_id,tipo,valor,data")
+        .eq("org_id", orgConf)
+        .limit(20000)
+    : { data: null, error: { message: "sem_org" } as any };
+
+  const porFamilia = new Map<string, any[]>();
+  for (const m of (mov || []) as any[]) {
+    if (!m.familia_id) continue;
+    porFamilia.set(m.familia_id, [...(porFamilia.get(m.familia_id) || []), m]);
+  }
+
+  // FALHA NÃO VIRA "R$ 0,00". Numa tela de conferência, um saldo zerado por
+  // erro de leitura é pior que nenhum: ela daria o ok achando que a família
+  // está quite. `null` faz a tela dizer que não soube.
+  const dinheiro: Record<string, any> | null = eMov ? null : {};
+  if (dinheiro) {
+    for (const f of todas) {
+      dinheiro[f.familia_id] = calcularSaldo(porFamilia.get(f.familia_id) || [], hojeConf);
+    }
+  }
+
   const TETO = 60;
   const preencher = familias.slice(0, TETO);
   const itens: Record<string, any[]> = {};
@@ -95,6 +140,7 @@ export async function GET(req: NextRequest) {
     // Com um filtro ligado, contar `familias` faria "363 famílias" virar "290"
     // e o número mudaria de significado sem avisar — quem filtrou por "sem
     // regime" leria "290 famílias" e acharia que perdeu 73 do cadastro.
+    dinheiro,
     filtro: falta || null,
     mostrando: familias.length,
     porPendencia,

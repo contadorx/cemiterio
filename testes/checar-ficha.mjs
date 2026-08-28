@@ -210,11 +210,27 @@ ok("a lista de familias marca atrasado pelo que VENCEU",
 ok("e mostra o mesmo numero que usou para marcar",
    /money\(Math\.abs\(c\.vencido\)\)/.test(lista));
 
+// A REGRA MUDOU DE CASA, E A GUARDA FOI ATRAS DELA.
+//
+// Ela cobrava a conta dentro de `/api/conta-corrente`. A conferencia passou a
+// mostrar o mesmo saldo, e recalcular la seria a segunda conta sobre os mesmos
+// fatos — entao a regra virou `lib/saldo.ts`, chamada pelas duas rotas.
+//
+// A guarda foi atualizada porque o CODIGO mudou de proposito, nao porque era
+// mais facil mexer nela: o que ela protege continua sendo o mesmo, e agora tem
+// tambem oito asserts de comportamento em `testes/simular.ts` — inclusive o do
+// debito que vence HOJE, que e onde o dia em UTC estragava tudo.
+const libSaldo = readFileSync("src/lib/saldo.ts", "utf8");
+
 ok("a ficha diz 'Em dia' sobre o que venceu, nao sobre o que existe",
-   /emDia: vencido <= 0\.005/.test(rotaCC));
+   /emDia: vencido <= 0\.005/.test(libSaldo));
 
 ok("e o que ainda vai vencer aparece, em vez de sumir",
-   /a vencer/.test(rotaCC) && /aVencer/.test(ficha));
+   /a vencer/.test(libSaldo) && /aVencer/.test(ficha));
+
+// O dia que decide o vencimento e o da OPERACAO. Era aqui que o UTC entrava.
+ok("e quem decide o vencido e o dia da operacao, nao o de UTC",
+   /hoje = diaOperacao\(\)/.test(libSaldo));
 
 ok("o corte de INADIMPLENTE na fila usa vencido, nao saldo",
    /select\("familia_id,vencido"\)/.test(rotaFila));
@@ -1749,5 +1765,61 @@ ok("nao ha uma segunda lista de menu em ui.tsx",
 
 ok("e o menu de verdade nao tem entrada propria de WhatsApp",
    !/href: "\/painel\/whatsapp"/.test(semComentarios(sidebar)));
+
+// ===========================================================================
+// UM "HOJE" SO, EM TODO O CODIGO
+//
+// `diaOperacao()` existe desde a 0114 e foi escrita para um bug concreto: com
+// `toISOString()` o dia vira as 21h de Brasilia, e das 21h a meia-noite o
+// sistema opera com a data de AMANHA. Tres horas por dia, todo dia.
+//
+// Mesmo assim, 13 arquivos continuavam calculando o dia em UTC — entre eles o
+// MOTOR DO DINHEIRO (`financeiro.ts`), o que decide o que esta VENCIDO
+// (`conta-corrente`) e o painel do mes, que pinta de vermelho quem atrasou.
+//
+// Esta guarda e negativa de proposito: nao basta ter a funcao certa, tem de
+// nao haver a errada. Foi assim que o defeito sobreviveu a 0114.
+// ===========================================================================
+import { readdirSync as _lerDir, statSync as _stat } from "node:fs";
+
+function arquivosDe(dir) {
+  const saida = [];
+  for (const nome of _lerDir(dir)) {
+    const caminho = `${dir}/${nome}`;
+    if (_stat(caminho).isDirectory()) saida.push(...arquivosDe(caminho));
+    else if (/\.(ts|tsx)$/.test(nome)) saida.push(caminho);
+  }
+  return saida;
+}
+
+// A regra do saldo mora num lugar so: a ficha e a conferencia leem a MESMA
+// funcao. Recalcular na segunda tela seria a segunda conta sobre os mesmos
+// fatos — e quando duas contas discordam sobre dinheiro, alguem liga para uma
+// familia cobrando o que ela ja pagou.
+const rotaConta = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+const rotaConf41 = readFileSync("src/app/api/conferencia/route.ts", "utf8");
+ok("o saldo e calculado por uma funcao so, chamada pelas duas rotas",
+   /calcularSaldo\(/.test(rotaConta) && /calcularSaldo\(/.test(rotaConf41)
+   && !/function frasear\(/.test(semComentarios(rotaConta)));
+
+// Numa tela de conferencia, saldo zerado por erro de leitura faz dar o ok
+// achando que a familia esta quite.
+ok("conta que nao pode ser lida vira null, nao R$ 0,00",
+   /const dinheiro: Record<string, any> \| null = eMov \? null/.test(rotaConf41)
+   && /dados\.dinheiro === null/.test(readFileSync("src/app/painel/conferencia/page.tsx", "utf8")));
+
+// 363 familias: uma chamada por familia seriam 363 idas ao servidor.
+ok("e vem numa consulta so, nao uma por familia",
+   /from\("conta_corrente"\)[\s\S]{0,200}limit\(20000\)/.test(rotaConf41));
+
+const comHojeEmUtc = arquivosDe("src").filter((f) =>
+  /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
+
+ok("nenhum arquivo calcula o dia de hoje em UTC",
+   comHojeEmUtc.length === 0);
+if (comHojeEmUtc.length) {
+  for (const f of comHojeEmUtc) console.log(`      ${f}`);
+  console.log("      use diaOperacao() de src/lib/vencimento.ts");
+}
 
 process.exit(falhas ? 1 : 0);

@@ -114,7 +114,10 @@ export async function calcularSaldo(clienteId: string): Promise<Saldo> {
   let aConferir = 0;
   let vencido = 0;
   let aVencer = 0;
-  const hoje = new Date().toISOString().slice(0, 10);
+  // O DIA DA OPERACAO, e nao o de UTC. Este arquivo e o motor do dinheiro:
+  // com o dia em UTC, das 21h a meia-noite ele cobrava e classificava usando
+  // a data de amanha. `diaOperacao()` existe desde a 0114 para exatamente isto.
+  const hoje = diaOperacao();
   for (const m of data || []) {
     const st = (m as any).status_conc;
     const v = Number((m as any).valor) || 0;
@@ -198,7 +201,7 @@ export async function calcularSaldosPorFamilia(
 
   // O CORTE DO VENCIDO ACOMPANHA `opts.ate`. Pedir "o saldo como era em 31/07"
   // e responder com o vencimento de hoje daria duas leituras da mesma data.
-  const corte = opts?.ate || new Date().toISOString().slice(0, 10);
+  const corte = opts?.ate || diaOperacao();
 
   for (const m of data || []) {
     const fid = (m as any).familia_id as string;

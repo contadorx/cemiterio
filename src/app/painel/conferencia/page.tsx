@@ -386,6 +386,33 @@ export default function Conferencia() {
                   </div>
                 ))}
 
+                {/* O DINHEIRO DA FAMÍLIA — o pedaço que obrigava a sair da tela.
+                    A tarefa original pedia a FICHA inteira aqui dentro; isso
+                    continua recusado, porque uma ficha copiada é uma segunda
+                    verdade sobre a mesma família. O que entra é só o que a
+                    conferência precisa bater contra o caderno, e vem de
+                    `calcularSaldo` — a MESMA função da ficha. */}
+                {dados.dinheiro === null ? (
+                  // NÃO SOUBE ≠ ESTÁ QUITE. Saldo zerado por erro de leitura,
+                  // numa tela de conferência, faria dar o ok achando que a
+                  // família não deve nada.
+                  <p className="mt-3 rounded-lg border border-aviso/40 bg-aviso/10 p-2 text-[13.5px] text-aviso">
+                    Não consegui ler a conta corrente. O checklist acima vale; o
+                    dinheiro é que não foi lido.
+                  </p>
+                ) : dados.dinheiro?.[f.familia_id] ? (
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border border-line bg-surface p-3">
+                    <span className={`text-[15px] font-semibold ${
+                      dados.dinheiro[f.familia_id].emDia ? "text-positivo" : "text-perigo"}`}>
+                      {dados.dinheiro[f.familia_id].frase}
+                    </span>
+                    <Link href={`/painel/clientes/${f.familia_id}?de=conferencia`}
+                          className="text-[13px] text-ink-soft underline">
+                      ver o extrato
+                    </Link>
+                  </div>
+                ) : null}
+
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {/* A FICHA DE VERDADE, e não uma cópia dela. Reproduzir a
                       ficha aqui criava uma segunda verdade sobre a mesma

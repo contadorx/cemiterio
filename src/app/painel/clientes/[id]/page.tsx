@@ -8,6 +8,7 @@ import { Cartao, Campo, Entrada, Selecao, Botao, Selo, dinheiro } from "../../pe
 import { prepararFoto, motivoFalha } from "@/lib/foto";
 import Flores from "./Flores";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
+import { diaOperacao } from "@/lib/vencimento";
 
 /**
  * A FICHA DA FAMÍLIA.
@@ -1265,7 +1266,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
   // A data nasce hoje porque é o caso comum, mas precisa ser editável: o Pix
   // costuma cair antes de a Sureya sentar para lançar, e sem isso o extrato
   // registra o dia do lançamento em vez do dia do dinheiro.
-  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(() => diaOperacao());
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -1369,7 +1370,7 @@ function ContaCorrente({ familiaId, clienteId, aoMudar, aLancar }: {
       if (!r?.ok) { setErro(r?.mensagem || "Não consegui lançar."); return; }
       setAbrindo(null); setValor(""); setDescricao(""); setComprovante(null); setLeitura(null);
       setDesconto(""); setJuros(""); setMulta(""); setOutros("");
-      setData(new Date().toISOString().slice(0, 10));
+      setData(diaOperacao());
       carregar(); aoMudar();
     } finally {
       setOcupado(false);
@@ -1740,7 +1741,7 @@ function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
   const [lista, setLista] = useState<any[]>([]);
   const [lancando, setLancando] = useState(false);
   const [tumuloId, setTumuloId] = useState("");
-  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(() => diaOperacao());
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
   const [depois, setDepois] = useState<{ b64: string; mt: string; previa: string } | null>(null);
@@ -1763,7 +1764,7 @@ function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
    */
   const [marcando, setMarcando] = useState(false);
   const [mTumulo, setMTumulo] = useState("");
-  const [mData, setMData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [mData, setMData] = useState(() => diaOperacao());
   const [mValor, setMValor] = useState("");
   const [mQuando, setMQuando] = useState<"depois" | "antes">("depois");
   const [mQuem, setMQuem] = useState("");
@@ -2008,7 +2009,7 @@ function Limpezas({ clienteId, familiaId, tumulos, aoMudar }: {
               </Selecao>
             </Campo>
             <Campo rotulo="Quando foi feita" dica="pode ser uma data passada">
-              <Entrada type="date" value={data} max={new Date().toISOString().slice(0, 10)}
+              <Entrada type="date" value={data} max={diaOperacao()}
                        onChange={(e: any) => setData(e.target.value)} />
             </Campo>
           </div>

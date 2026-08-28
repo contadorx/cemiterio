@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao } from "@/lib/vencimento";
+import { calcularSaldo } from "@/lib/saldo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,25 +21,6 @@ export const dynamic = "force-dynamic";
  *
  * Saldo positivo = a família deve. Negativo = crédito a favor dela.
  */
-
-/**
- * Frase escrita para ser dita ao telefone, sem tradução. Nada de "inadimplente".
- *
- * DUAS CONTAS, NÃO UMA (0114). `vencido` é o que já era devido e não foi pago —
- * é disso que se cobra. `aVencer` é competência já prestada com o vencimento
- * lá na frente: a Anninha tem seis meses lançados e não deve nada até 10/12.
- *
- * Dizer "Em aberto · R$ 240" para ela seria falso, e dizer só "Em dia"
- * esconderia os R$ 240 que vão entrar.
- */
-function frasear(vencido: number, aVencer: number): string {
-  const dinheiro = (v: number) =>
-    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const futuro = aVencer > 0.005 ? ` · ${dinheiro(aVencer)} a vencer` : "";
-  if (vencido < -0.005) return `Pago adiantado · ${dinheiro(-vencido)} a favor${futuro}`;
-  if (vencido > 0.005) return `Em aberto · ${dinheiro(vencido)}${futuro}`;
-  return aVencer > 0.005 ? `Em dia${futuro}` : "Em dia";
-}
 
 export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
@@ -89,40 +72,20 @@ export async function GET(req: NextRequest) {
     codigo: l.tumulos?.codigo ?? null,
   }));
 
-  // Soma no servidor: o saldo é a resposta que a Sureya lê antes de ligar
-  // para a família, e não pode depender de a lista ter sido paginada.
+  // A CONTA MORA EM `lib/saldo.ts`, e nao aqui.
   //
-  // A LAVAGEM CONTA, quando tem valor.
-  //
-  // No modo consumo cada limpeza debita o que vale, e é isso que faz o saldo
-  // mostrar a sobra. No modo competência ela vem com valor zero e não altera
-  // nada — somar tudo funciona nos dois casos, sem precisar saber o modo aqui.
-  const saldo = linhas.reduce(
-    (s, l) => s + (l.tipo === "debito" ? l.valor : -l.valor), 0
-  );
-  const arredondado = Math.round(saldo * 100) / 100;
-
-  // `data` É O VENCIMENTO desde a 0114. O que ainda não venceu não é dívida:
-  // separar aqui é o que permite lançar a competência do mês prestado sem
-  // transformar quem paga no fim do período em inadimplente.
-  const hoje = new Date().toISOString().slice(0, 10);
-  const vencido = linhas.reduce(
-    (s, l) => s + (l.data <= hoje ? (l.tipo === "debito" ? l.valor : -l.valor) : 0), 0
-  );
-  const aVencer = linhas.reduce(
-    (s, l) => s + (l.tipo === "debito" && l.data > hoje ? l.valor : 0), 0
-  );
-  const cent = (v: number) => Math.round(v * 100) / 100;
+  // A conferencia mostra o mesmo saldo, e recalcular la seria a segunda conta
+  // sobre os mesmos fatos. Uma funcao, dois chamadores.
+  const hoje = diaOperacao();
+  const conta = calcularSaldo(linhas as any, hoje);
 
   return NextResponse.json({
     ok: true,
-    saldo: arredondado,
-    vencido: cent(vencido),
-    aVencer: cent(aVencer),
-    frase: frasear(vencido, aVencer),
-    // "Em dia" passa a significar "nada VENCIDO em aberto", que é a pergunta
-    // que a Sureya faz antes de ligar. Antes significava "nada lançado".
-    emDia: vencido <= 0.005,
+    saldo: conta.saldo,
+    vencido: conta.vencido,
+    aVencer: conta.aVencer,
+    frase: conta.frase,
+    emDia: conta.emDia,
     linhas: linhas.map((l) => ({ ...l, aVencer: l.tipo === "debito" && l.data > hoje })),
   });
 }
@@ -223,7 +186,7 @@ export async function POST(req: NextRequest) {
       p_juros:       parte(b?.juros),
       p_multa:       parte(b?.multa),
       p_outros:      parte(b?.outros),
-      p_data:        b?.data || new Date().toISOString().slice(0, 10),
+      p_data:        b?.data || diaOperacao(),
       p_descricao:   String(b?.descricao || "").trim() || null,
       p_comprovante: b?.comprovanteId || null,
       p_tumulo:      b?.tumuloId || null,
@@ -259,7 +222,7 @@ export async function POST(req: NextRequest) {
     valor: Math.abs(Math.round(valor * 100) / 100),
     descricao: String(b?.descricao || "").trim() || rotuloPadrao,
     comprovante_id: b?.comprovanteId || null,
-    data: b?.data || new Date().toISOString().slice(0, 10),
+    data: b?.data || diaOperacao(),
   });
 
   if (error) {

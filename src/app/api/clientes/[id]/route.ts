@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,7 +134,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   // aqui crédito é positivo.
   let vencido = 0;
   let aVencer = 0;
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
   const pagamentos: any[] = [];
   for (const m of mov || []) {
     const st = (m as any).status_conc;

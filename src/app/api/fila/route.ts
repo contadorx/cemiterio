@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { env } from "@/lib/env";
 import { enviarWhatsapp, enviarWhatsappMidia } from "@/lib/evolution";
 import { statusConexao } from "@/lib/evolution-admin";
+import { diaOperacao } from "@/lib/vencimento";
 
 /**
  * FILA DE LIBERAÇÃO — o sistema prepara, a Sureya decide.
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
   //
   // `?adiadas=1` mostra só as guardadas, para ela conferir os combinados sem
   // ter de confiar na memória. É o mesmo dado, com a lente invertida.
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
   if (req.nextUrl.searchParams.get("adiadas") === "1") {
     consulta = consulta.gt("adiada_para", hoje);
   } else {

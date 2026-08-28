@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   const ate = new Date();
   ate.setMonth(ate.getMonth() + 12);
   const limite = ate.toISOString().slice(0, 10);
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = diaOperacao();
 
   const [{ data: o }, { data: eventos }, { data: semData }, { count: totalFalecidos }] =
     await Promise.all([

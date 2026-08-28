@@ -4,6 +4,7 @@ import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { subirArquivo } from "@/lib/storage";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
       cliente_id: clienteId,
       imagem_url: url,
       valor_extraido: isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : null,
-      data_extraida: b?.data || new Date().toISOString().slice(0, 10),
+      data_extraida: b?.data || diaOperacao(),
       id_transacao: idTransacao,
       status: "confirmado",
     })

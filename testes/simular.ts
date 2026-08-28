@@ -1275,6 +1275,72 @@ async function rodar() {
   // Build B / CP-06 e CP-08. A fila e IndexedDB, que nao existe aqui — mas as
   // REGRAS foram tiradas de dentro do fetch justamente para poderem ser
   // provadas. Sao elas que decidem se um trabalho fica esperando para sempre.
+  // ==========================================================================
+  // O SALDO DA FAMÍLIA — a regra, e o dia que a decide
+  // ==========================================================================
+  //
+  // `calcularSaldo` saiu de dentro de `/api/conta-corrente` porque a
+  // conferência passou a mostrar o mesmo número. Duas contas sobre os mesmos
+  // fatos começam iguais e terminam discordando — e quando discordam sobre
+  // dinheiro, alguém liga para uma família cobrando o que ela já pagou.
+  //
+  // E O DIA IMPORTA: o que decide "vencido" é a data da OPERAÇÃO, não a de UTC.
+  // Com `toISOString()` — que era o que havia na rota — o dia virava às 21h de
+  // Brasília, e das 21h à meia-noite uma competência que vence hoje já entrava
+  // como dívida. Três horas por dia, todo dia, sobre dinheiro.
+  console.log("\n=== 12b. O SALDO DA FAMILIA ===");
+  {
+    const { calcularSaldo } = await import("../src/lib/saldo");
+    const HOJE = "2026-08-28";
+
+    const vazio = calcularSaldo([], HOJE);
+    checar("familia sem lancamento esta em dia", vazio.emDia && vazio.frase === "Em dia",
+           `veio "${vazio.frase}"`);
+
+    // A ANNINHA (0114): seis meses ja prestados, todos vencendo la na frente.
+    // Somar tudo diria "Em aberto · R$ 240" e ela nao deve nada ainda.
+    const aVencer = calcularSaldo([
+      { tipo: "debito", valor: 40, data: "2026-09-10" },
+      { tipo: "debito", valor: 40, data: "2026-10-10" },
+    ], HOJE);
+    checar("competencia que ainda nao venceu NAO e divida", aVencer.emDia,
+           `veio "${aVencer.frase}"`);
+    checar("mas ela aparece como a vencer, em vez de sumir",
+           aVencer.aVencer === 80 && /80,00 a vencer/.test(aVencer.frase),
+           `veio "${aVencer.frase}"`);
+
+    const devendo = calcularSaldo([
+      { tipo: "debito", valor: 100, data: "2026-08-10" },
+      { tipo: "credito", valor: 40, data: "2026-08-15" },
+    ], HOJE);
+    checar("o que venceu e nao foi pago e cobranca",
+           !devendo.emDia && devendo.vencido === 60, `vencido ${devendo.vencido}`);
+
+    const adiantado = calcularSaldo([
+      { tipo: "credito", valor: 100, data: "2026-08-01" },
+      { tipo: "debito", valor: 25, data: "2026-08-20" },
+    ], HOJE);
+    checar("quem pagou adiantado ouve isso, e nao 'em dia'",
+           /Pago adiantado/.test(adiantado.frase) && adiantado.emDia,
+           `veio "${adiantado.frase}"`);
+
+    // O TESTE DO DIA. Um debito que vence HOJE ainda nao e atraso; o mesmo
+    // debito lido com o dia de amanha vira divida. E a diferenca que o UTC
+    // produzia entre 21h e a meia-noite.
+    const venceHoje = [{ tipo: "debito", valor: 40, data: HOJE }];
+    checar("o que vence HOJE ja conta como vencido",
+           calcularSaldo(venceHoje, HOJE).vencido === 40);
+    checar("e lido com o dia ANTERIOR ele ainda nao venceu",
+           calcularSaldo(venceHoje, "2026-08-27").vencido === 0
+           && calcularSaldo(venceHoje, "2026-08-27").aVencer === 40,
+           "um dia de diferenca muda quem esta devendo");
+
+    // A LAVAGEM DE VALOR ZERO (0104) nao pode mexer no saldo: no modo
+    // competencia o mes ja foi debitado inteiro.
+    checar("lancamento de R$ 0,00 nao muda nada",
+           calcularSaldo([{ tipo: "debito", valor: 0, data: "2026-08-01" }], HOJE).emDia);
+  }
+
   console.log("\n=== 13. FILA DO CAMPO (offline) ===");
   {
     const { classificar, contarFila, deduplicar, chaveDe } = await import("../src/lib/offline-fila");

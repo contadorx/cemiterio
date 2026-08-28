@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { normalizarMMDD } from "@/lib/memoria";
 import { apagarArquivos } from "@/lib/storage";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -287,7 +288,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Mudou o ritmo: o ponteiro da agenda volta para hoje. Sem isso, trocar de
     // mensal para semanal não teria efeito até o ponteiro antigo vencer — a
     // Sureya faria a troca e não veria diferença por semanas.
-    patch.proximo_servico = new Date().toISOString().slice(0, 10);
+    patch.proximo_servico = diaOperacao();
   }
   if (body.contratado !== undefined) patch.contratado = !!body.contratado;
 

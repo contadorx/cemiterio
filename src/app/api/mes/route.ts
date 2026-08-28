@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { calcularSaldosPorFamilia } from "@/lib/financeiro";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
+import { diaOperacao } from "@/lib/vencimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,9 @@ export async function GET(req: NextRequest) {
 
   // A competência é do passado se o mês já acabou. Só então a palavra
   // "fechamento" quer dizer alguma coisa.
-  const hojeStr = new Date().toISOString().slice(0, 10);
+  // O painel do mes pinta de vermelho quem esta em atraso. Em UTC, das 21h a
+  // meia-noite ele pintava um dia antes da hora.
+  const hojeStr = diaOperacao();
   const mesFechado = ultimoDia < hojeStr;
 
   const [famRes, tumRes, servRes] = await Promise.all([
