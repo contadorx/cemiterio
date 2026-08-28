@@ -1698,4 +1698,56 @@ ok("digitar alguem faz o contador da bancada andar",
 ok("a bancada tem porta na lista de jazigos",
    /\/painel\/jazigos\/lapides/.test(listaJazigos));
 
+// ===========================================================================
+// A FAMILIA CHEGA AO APP DE CAMPO
+//
+// A familia e a entidade do sistema desde a D-10 — dela e o contrato, ela
+// aparece na agenda do painel, na conferencia e na cobranca. O app de campo era
+// o UNICO lugar que nao a mostrava: a Nina via o jazigo, a quadra e o nome da
+// lapide, e nao sabia de quem estava cuidando. Medido: `/api/agenda/dia` nao
+// tinha uma unica mencao a familia.
+// ===========================================================================
+const rotaDia = readFileSync("src/app/api/agenda/dia/route.ts", "utf8");
+
+// A FAMILIA VEM DO TUMULO, nao do servico. `servicos.cliente_id` e quem PEDIU:
+// faz sentido num avulso e e nulo na lavagem de contrato, que e a maioria do
+// dia dela — lendo dali, o cartao ficaria vazio justamente nas de sempre.
+ok("a agenda do dia leva a familia, lida do tumulo",
+   /tumulos\([^)]*familias\(nome\)/.test(rotaDia)
+   && /familia: s\.tumulos\?\.familias\?\.nome \|\| null/.test(rotaDia));
+
+// O titulo do cartao continua sendo o que esta escrito na LAPIDE: e por ele
+// que ela reconhece a pedra. Trocar pelo nome da familia faria a Nina procurar
+// no cemiterio por um nome que nao esta gravado em lugar nenhum.
+ok("o cartao mantem a lapide no titulo e poe a familia embaixo",
+   /<div style=\{s\.nome\}>\{it\.falecido \|\| it\.tumulo\}<\/div>/.test(campoVisivel)
+   && /família \$\{it\.familia\}/.test(campoVisivel));
+
+// Linha vazia e ruido: sem familia e sem falecido, ela nao aparece.
+ok("e a linha nao aparece quando nao ha o que dizer",
+   /\{\(it\.familia \|\| it\.falecido\) && \(/.test(campoVisivel));
+
+// Chegando, a pergunta e "de quem e" — a tela de navegacao tambem responde.
+ok("a tela de como chegar tambem diz de quem e o jazigo",
+   /indo\.familia \? `família \$\{indo\.familia\}` : null/.test(campoVisivel));
+
+// ===========================================================================
+// O MENU MORTO DE `ui.tsx`
+//
+// `PainelNav` devolve null desde que o menu virou a coluna do AppShell, mas a
+// LISTA continuou no arquivo — completa, comentada e plausivel. Ela tinha
+// divergido do menu de verdade: trazia "WhatsApp" e "Liberacao" e nao trazia
+// Conversas, Jazigos, Conferencia nem Memoria.
+//
+// Quem fosse tirar o WhatsApp do menu editaria a lista morta, daria por feito e
+// nao mudaria nada na tela. Foi exatamente o que aconteceu aqui.
+// ===========================================================================
+const sidebar = readFileSync("src/app/painel/Sidebar.tsx", "utf8");
+
+ok("nao ha uma segunda lista de menu em ui.tsx",
+   !/const GRUPOS: \{ titulo: string/.test(uiTsx) && !/const ITENS = GRUPOS/.test(uiTsx));
+
+ok("e o menu de verdade nao tem entrada propria de WhatsApp",
+   !/href: "\/painel\/whatsapp"/.test(semComentarios(sidebar)));
+
 process.exit(falhas ? 1 : 0);

@@ -50,6 +50,8 @@ interface Item {
   rua: string;
   numero: string;
   falecido: string | null;
+  /** De quem é o jazigo. A família é a entidade desde a D-10. */
+  familia: string | null;
   cliente: string | null;
   lat: number | null;
   lng: number | null;
@@ -654,7 +656,12 @@ export default function Campo() {
       {indo && (
         <ComoChegar
           alvo={{
-            tumulo: indo.falecido ? `${indo.falecido} — ${indo.tumulo}` : indo.tumulo,
+            // A LÁPIDE PRIMEIRO, A FAMÍLIA DEPOIS — mesma ordem do cartão.
+            // Andando até lá, o que ela procura é o que está escrito na pedra;
+            // chegando, o que importa é de quem é.
+            tumulo: [indo.falecido ? `${indo.falecido} — ${indo.tumulo}` : indo.tumulo,
+                     indo.familia ? `família ${indo.familia}` : null]
+                    .filter(Boolean).join(" · "),
             quadra: indo.quadra, rua: indo.rua, numero: indo.numero,
             lat: indo.lat, lng: indo.lng, gpsPrecisao: indo.gpsPrecisao,
             fotoEnquadramento: indo.fotoEnquadramento, fotoReferencia: indo.fotoReferencia,
@@ -860,7 +867,21 @@ function Card({ it, ocupado, onIndo, onIniciar, onFinalizar, onNaoDeu, onAgora, 
     }}>
       <div style={s.local}>{local || "sem local"}</div>
       <div style={s.nome}>{it.falecido || it.tumulo}</div>
-      {it.falecido && <div style={s.jazigo}>{it.tumulo}</div>}
+
+      {/* DE QUEM É ESTE JAZIGO.
+          O título continua sendo o que está escrito na lápide — é por ele que
+          ela reconhece a pedra na frente dela, e trocar isso pelo nome da
+          família faria a Nina procurar no cemitério por um nome que não está
+          gravado em lugar nenhum.
+          A família vem embaixo, que é a pergunta seguinte: "de quem estou
+          cuidando?". É a entidade que o resto do sistema usa desde a D-10, e o
+          campo era o único lugar que não a mostrava. */}
+      {(it.familia || it.falecido) && (
+        <div style={s.jazigo}>
+          {[it.familia && `família ${it.familia}`, it.falecido ? it.tumulo : null]
+            .filter(Boolean).join(" · ")}
+        </div>
+      )}
 
       <Fotos it={it} emAndamento={emAndamento} />
 

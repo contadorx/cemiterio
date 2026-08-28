@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   let q = db
     .from("servicos")
     .select(
-      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,foto_antes_url,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,quadras(codigo,ordem,cemiterios(nome))),clientes(nome)"
+      "id,status,ordem_dia,tumulo_id,adiado_vezes,iniciado_em,foto_antes_url,tumulos(identificacao,numero,lat,lng,gps_precisao,gps_amostras,falecido_nome,rua,qr_token,datas_gatilho,foto_referencia_url,foto_enquadramento_url,familias(nome),quadras(codigo,ordem,cemiterios(nome))),clientes(nome)"
     )
     .eq("data_prevista", data)
     .in("status", ["pendente", "agendado", "executado"]);
@@ -54,6 +54,18 @@ export async function GET(req: NextRequest) {
     // 0044: com dois cemitérios, "Q-12" sozinho não diz onde a pessoa está
     cemiterio: s.tumulos?.quadras?.cemiterios?.nome || null,
     falecido: s.tumulos?.falecido_nome || null,
+    // DE QUEM É ESTE JAZIGO.
+    //
+    // A família é a entidade do sistema desde a D-10 — é dela o contrato, é
+    // ela que aparece na agenda do painel, na conferência e na cobrança. O app
+    // de campo era o único lugar que não a mostrava: a Nina via o jazigo, a
+    // quadra e o nome da lápide, e não sabia de quem estava cuidando.
+    //
+    // Vem do TÚMULO, não do serviço. `servicos.cliente_id` é quem PEDIU — faz
+    // sentido num avulso e é nulo na lavagem de contrato, que é a maioria do
+    // dia dela. Ler a família dali deixaria o cartão vazio justamente nas
+    // lavagens de sempre.
+    familia: s.tumulos?.familias?.nome || null,
     cliente: s.clientes?.nome || null,
     lat: s.tumulos?.lat ?? null,
     lng: s.tumulos?.lng ?? null,

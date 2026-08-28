@@ -31,66 +31,21 @@ export const cor = {
 };
 
 /**
- * O MENU ENXUTO.
+ * O MENU DESTE ARQUIVO FOI APAGADO — ele estava MORTO e parecia vivo.
  *
- * O painel tinha 12 itens porque o sistema tentava ser um mini-ERP: CRM de
- * leads, agente de IA no WhatsApp, plaquetas QR, mapa. Para uma operação de
- * duas pessoas — a Sureya e a Nina — isso é tela demais para achar o que
- * importa.
+ * `PainelNav` devolve `null` desde que o menu passou para a coluna do
+ * `AppShell` (ver mais abaixo), mas a lista de itens continuou aqui, completa,
+ * comentada e plausível. Ninguém a renderizava.
  *
- * Ficaram só os itens que servem ao ciclo real do mês: quem foi limpo e quem
- * pagou.
+ * O ESTRAGO NÃO É O BYTE PARADO, É A LEITURA. Ela tinha divergido do menu de
+ * verdade (`Sidebar.tsx`): a lista daqui ainda trazia "WhatsApp" e "Liberação",
+ * e não trazia Conversas, Jazigos, Conferência nem Memória. Quem viesse tirar
+ * o WhatsApp do menu — e foi exatamente o que aconteceu — editaria esta lista,
+ * daria o trabalho por feito e não mudaria nada na tela.
  *
- * O QUE SAIU DAQUI (e por quê):
- *   Atendimento e WhatsApp  · o agente de IA foi desligado; a Sureya atende
- *                             pelo WhatsApp Business, com tom humano e custo
- *                             zero. No lugar entrou a Liberação.
- *   Plaquetas               · a plaquinha redonda de 4 cm aprovada não tem QR,
- *                             por legibilidade. A tela perdeu a função.
- *   Jazigos                 · não sumiu: virou um bloco dentro da ficha da
- *                             família, junto do plano e do valor.
- *
- * NADA FOI APAGADO. As telas continuam no repositório e os dados no banco —
- * só saíram do menu e as rotas devolvem 404 (ver src/middleware.ts). Religar
- * é devolver a linha a esta lista.
+ * O MENU DE VERDADE É `Sidebar.tsx`, e lá o WhatsApp já não estava.
  */
-const GRUPOS: { titulo: string; itens: { href: string; label: string }[] }[] = [
-  {
-    titulo: "Dia a dia",
-    itens: [
-      { href: "/painel", label: "Início" },
-      { href: "/painel/agenda", label: "Agenda" },
-      // A fila de rascunhos que esperam a aprovação da Sureya. Nada é enviado
-      // sem ela olhar e decidir, uma mensagem por vez.
-      { href: "/painel/fila", label: "Liberação" },
-      { href: "/painel/avulsos", label: "Avulsos" },
-      { href: "/campo", label: "📍 Campo" },
-    ],
-  },
-  {
-    titulo: "Carteira",
-    itens: [
-      { href: "/painel/clientes", label: "Famílias" },
-      // DINHEIRO TEM UMA PORTA SÓ.
-      // "Fechamento" era um item separado, e o Financeiro tinha uma aba "O
-      // mês": duas entradas para a mesma coisa, e ninguém sabia qual abrir.
-      // Agora fechar o mês é a primeira aba daqui.
-      { href: "/painel/financeiro", label: "Financeiro" },
-    ],
-  },
-  {
-    titulo: "Ajustes",
-    itens: [
-      // Onde se reconecta o WhatsApp. Voltou ao menu porque a entrega das
-      // fotos aprovadas na fila depende da instância estar de pé — sem esta
-      // tela, um WhatsApp caído não tem como ser religado.
-      { href: "/painel/whatsapp", label: "WhatsApp" },
-      { href: "/painel/config", label: "Config" },
-    ],
-  },
-];
 
-const ITENS = GRUPOS.flatMap((g) => g.itens);
 
 // Faixa de aviso que aparece em TODAS as telas do painel enquanto os disparos
 // automáticos estiverem desligados — para não esquecer que a IA não responde
