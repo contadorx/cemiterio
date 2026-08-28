@@ -36,6 +36,73 @@ export async function GET(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
 
+  // ==========================================================================
+  // A FILA DA BANCADA (?fila=1)
+  // ==========================================================================
+  //
+  // Medido em 28/08: 266 jazigos, 62 com alguém cadastrado, ZERO com mais de
+  // uma pessoa, e 62 de 62 sem nenhuma data. Os 62 nomes vieram do campo de
+  // texto antigo — Nakandakari, Ogasawara, "Família grave" — que é o que está
+  // escrito na LÁPIDE, não quem está enterrado.
+  //
+  // A ORDEM DA FILA É A ORDEM DO TRABALHO, e não a ordem do banco:
+  //
+  //   1º  jazigo com foto da lápide e NINGUÉM cadastrado — dá para transcrever
+  //       agora, e é a maior pilha (204).
+  //   2º  jazigo com gente mas SEM NENHUMA DATA — é o caso dos 62: o nome está
+  //       lá, falta o que o motor de memória precisa.
+  //   3º  o resto.
+  //
+  // Jazigo SEM foto vai para o fim de cada grupo, não para fora: dá para
+  // preencher pelo que a família contou. Sumir com ele esconderia trabalho.
+  if (req.nextUrl.searchParams.get("fila")) {
+    const { data, error } = await auth.db
+      .from("tumulos")
+      .select("id,identificacao,codigo,rua,foto_referencia_url,"
+            + "quadras(codigo),familias(nome),falecidos(id,data_nascimento,data_falecimento)")
+      .order("codigo", { ascending: true })
+      .limit(1000);
+
+    if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+    const jazigos = ((data || []) as any[]).map((t) => {
+      const gente = (t.falecidos || []) as any[];
+      const comData = gente.filter((f) => f.data_nascimento || f.data_falecimento).length;
+      return {
+        id: t.id,
+        identificacao: t.identificacao || null,
+        codigo: t.codigo || null,
+        quadra: t.quadras?.codigo || null,
+        rua: t.rua || null,
+        familia: t.familias?.nome || null,
+        fotoLapide: t.foto_referencia_url || null,
+        pessoas: gente.length,
+        comData,
+      };
+    });
+
+    const grupo = (j: any) => (j.pessoas === 0 ? 0 : j.comData === 0 ? 1 : 2);
+    const fila = jazigos
+      .filter((j) => grupo(j) < 2)
+      .sort((a, b) =>
+        grupo(a) - grupo(b) ||
+        // Com foto primeiro: é o que dá para transcrever sem ligar para ninguém.
+        (a.fotoLapide ? 0 : 1) - (b.fotoLapide ? 0 : 1) ||
+        String(a.codigo || a.identificacao || "").localeCompare(String(b.codigo || b.identificacao || "")));
+
+    return NextResponse.json({
+      ok: true,
+      fila,
+      resumo: {
+        jazigos: jazigos.length,
+        semNinguem: jazigos.filter((j) => j.pessoas === 0).length,
+        semData: jazigos.filter((j) => j.pessoas > 0 && j.comData === 0).length,
+        prontos: jazigos.filter((j) => j.pessoas > 0 && j.comData > 0).length,
+        semFoto: fila.filter((j) => !j.fotoLapide).length,
+      },
+    });
+  }
+
   const tumuloId = req.nextUrl.searchParams.get("tumuloId");
   if (!tumuloId) {
     return NextResponse.json({ ok: false, erro: "informe_o_tumulo" }, { status: 400 });

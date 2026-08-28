@@ -1641,4 +1641,61 @@ ok("o cartao do regime deixou de mandar abrir a ficha",
    !/Abra a ficha e escolha uma das duas/.test(confVisivel)
    && /Ver só essas/.test(confVisivel));
 
+// ===========================================================================
+// A BANCADA DAS LAPIDES (0142)
+//
+// Medido em 28/08: 266 jazigos, 62 com alguem cadastrado, ZERO com mais de uma
+// pessoa, e 62 de 62 sem nenhuma data. Os 62 nomes vieram do campo de texto
+// antigo — Nakandakari, Ogasawara, "Familia grave", "Filha do Sr joao": e o que
+// esta escrito na LAPIDE, nao quem esta enterrado. E 266 de 266 jazigos ja tem
+// a foto da lapide.
+//
+// O trabalho e o mesmo 266 vezes. Pela ficha seria: achar na lista, abrir,
+// rolar, digitar, voltar — a mesma forma do "abra a ficha e escolha" que
+// travava 290 familias na conferencia.
+// ===========================================================================
+const compQD = readFileSync("src/app/painel/jazigos/QuemDescansa.tsx", "utf8");
+const telaBancada = readFileSync("src/app/painel/jazigos/lapides/page.tsx", "utf8");
+const fichaJazigo = readFileSync("src/app/painel/jazigos/[id]/page.tsx", "utf8");
+const listaJazigos = readFileSync("src/app/painel/jazigos/page.tsx", "utf8");
+const rotaFalec = readFileSync("src/app/api/falecidos/route.ts", "utf8");
+
+// UMA IMPLEMENTACAO, DOIS LUGARES. Copiar o formulario para a segunda tela e
+// como, tres meses depois, um lugar aceita "so o ano" e o outro nao.
+ok("o cadastro de quem descansa e um componente so, montado nos dois lugares",
+   /export default function QuemDescansa/.test(compQD)
+   && /import QuemDescansa from "\.\.\/QuemDescansa"/.test(fichaJazigo)
+   && /import QuemDescansa from "\.\.\/QuemDescansa"/.test(telaBancada)
+   && !/function FormularioFalecido/.test(semComentarios(telaBancada)));
+
+// Transcrever com o documento noutra aba e como se troca um nome por outro
+// parecido e ninguem descobre nunca.
+ok("a foto da lapide fica grudada no formulario, nos dois",
+   /fotoLapide/.test(compQD)
+   && /fotoLapide=\{j\.fotoReferencia/.test(fichaJazigo)
+   && /fotoLapide=\{atual\.fotoLapide\}/.test(telaBancada));
+
+// Nao ter foto e diferente de nao ter pedido a foto.
+ok("e jazigo sem foto diz que da para preencher assim mesmo",
+   /fotoLapide === null/.test(compQD));
+
+// A fila ordena pelo trabalho, nao pelo banco.
+ok("a fila poe primeiro quem nao tem ninguem, e nunca esconde quem nao tem foto",
+   /searchParams\.get\("fila"\)/.test(rotaFalec)
+   && /grupo\(a\) - grupo\(b\)/.test(rotaFalec)
+   && /semFoto/.test(rotaFalec) && /semFoto/.test(telaBancada));
+
+// Sem `key`, o formulario meio preenchido do jazigo anterior apareceria em
+// cima da lapide do seguinte — o erro mais caro num trabalho de copiar nomes.
+ok("trocar de jazigo recomeca o formulario do zero",
+   /<QuemDescansa key=\{atual\.id\}/.test(telaBancada));
+
+// Contador que so anda ao trocar de jazigo nao mostra que o trabalho contou.
+ok("digitar alguem faz o contador da bancada andar",
+   /aoMudar\?\.\(\)/.test(compQD) && /aoMudar=\{carregar\}/.test(telaBancada));
+
+// Tela nova sem porta na tela de sempre e tela que ninguem abre.
+ok("a bancada tem porta na lista de jazigos",
+   /\/painel\/jazigos\/lapides/.test(listaJazigos));
+
 process.exit(falhas ? 1 : 0);

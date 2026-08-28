@@ -129,6 +129,23 @@ export default function JazigosPage() {
       <main style={painel.conteudo}>
         <h1 style={painel.h1}>Jazigos</h1>
 
+        {/* O CAMINHO ATÉ A BANCADA.
+            Transcrever a lápide é trabalho de jazigo, e é aqui que se procura
+            jazigo. Uma tela nova sem porta na tela de sempre é uma tela que
+            ninguém abre — foi o que aconteceu com o WhatsApp até a 0138. */}
+        <Link href="/painel/jazigos/lapides" style={{ textDecoration: "none" }}>
+          <div style={{ ...painel.card, borderLeft: `4px solid ${cor.navy}`, cursor: "pointer" }}>
+            <strong style={{ color: cor.navy, fontSize: 16 }}>
+              Bancada das lápides →
+            </strong>
+            <p style={{ color: cor.cinza, fontSize: 14.5, margin: "5px 0 0", lineHeight: 1.5 }}>
+              Quem descansa em cada jazigo, com as datas. A foto da lápide de um lado, o
+              cadastro do outro, um jazigo depois do outro — sem abrir ficha por ficha.
+              É o que destrava as datas de memória.
+            </p>
+          </div>
+        </Link>
+
         <div style={{ ...painel.card, background: "#f8fafc" }}>
           <strong style={{ color: cor.navy }}>Por que a foto não bate com a descrição</strong>
           <p style={{ color: cor.cinza, fontSize: 15, margin: "6px 0 0", lineHeight: 1.6 }}>
