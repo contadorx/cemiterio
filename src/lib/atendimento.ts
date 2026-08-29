@@ -44,6 +44,14 @@ interface SaidaIa {
   pedido_resumo?: string;
   pedido_prazo?: string;
   pedido_ocasiao?: string;
+  /**
+   * A PROMESSA (0142). `true` quando a resposta faz a família ESPERAR.
+   * Medido antes deste campo existir: 11 de 25 respostas prometiam voltar, e
+   * nenhuma deixava registro — a família esperava um retorno que ninguém
+   * sabia que devia.
+   */
+  prometeu_voltar?: boolean;
+  promessa_sobre?: string;
 }
 
 export async function garantirConversa(
@@ -121,6 +129,60 @@ async function gravarMensagem(
     processada: opts?.processada ?? true,
     transcrita: opts?.transcrita || false,
   });
+}
+
+/**
+ * ANOTA O QUE FOI PROMETIDO (0142).
+ *
+ * Só é chamada quando a mensagem SAI — rascunho descartado não promete nada a
+ * ninguém. Nunca lança: uma falha ao anotar não pode impedir a resposta de
+ * chegar à família, e o que não foi anotado aparece como ausência no
+ * "Precisa de você", não como erro no meio de uma conversa.
+ */
+/**
+ * A PROMESSA VIRA ANOTAÇÃO? — a regra, sozinha, sem banco.
+ *
+ * Está separada porque é ela que decide, e uma regra enterrada dentro de uma
+ * função que também escreve no banco não dá para provar sem um banco. Este
+ * projeto já pagou seis vezes o preço de ter a mesma regra escrita em dois
+ * lugares (0092, 0105, 0106, 0115, 0137, 0140); a saída é ter UM lugar, e que
+ * ele seja testável.
+ *
+ * Devolve o assunto limpo, ou null quando não há o que anotar.
+ */
+export function promessaAnotavel(
+  saida: { prometeu_voltar?: boolean; promessa_sobre?: string },
+): string | null {
+  if (!saida.prometeu_voltar) return null;
+  const sobre = String(saida.promessa_sobre || "").trim();
+  // SEM O "SOBRE O QUÊ", A ANOTAÇÃO NÃO SERVE. "Prometeu alguma coisa" numa
+  // lista de pendências é pior que nada: ocupa espaço e não diz o que fazer —
+  // e uma lista que não diz o que fazer se aprende a ignorar inteira.
+  if (!sobre) return null;
+  return sobre;
+}
+
+export async function anotarCompromisso(p: {
+  org: string;
+  clienteId: string;
+  conversaId: string | null;
+  saida: { prometeu_voltar?: boolean; promessa_sobre?: string };
+  texto: string;
+}): Promise<void> {
+  const sobre = promessaAnotavel(p.saida);
+  if (!sobre) return;
+  try {
+    await supabaseAdmin().from("compromissos").insert({
+      org_id: p.org,
+      cliente_id: p.clienteId,
+      conversa_id: p.conversaId,
+      sobre,
+      prometido_em_texto: p.texto,
+      origem: "ia",
+    });
+  } catch (e) {
+    console.error("[compromisso] nao anotei:", (e as any)?.message || e);
+  }
 }
 
 async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaIa> {
@@ -526,6 +588,15 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
       rascunho: out.resposta,
       acao_humana: "enviou_direto",
       texto_final: out.resposta,
+      prometeu_voltar: !!out.prometeu_voltar,
+      promessa_sobre: out.promessa_sobre || null,
+    });
+
+    // ENVIOU DIRETO E MESMO ASSIM PROMETEU: o compromisso nasce aqui também.
+    // Se ele só nascesse na aprovação humana, a promessa feita no automático
+    // ficaria sem dono — que é exatamente o buraco que a 0142 fechou.
+    await anotarCompromisso({
+      org, clienteId: cliente.id, conversaId, saida: out, texto: out.resposta,
     });
     return { acao: "enviado_automatico", texto: out.resposta };
   }
@@ -536,6 +607,8 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
     conversa_id: conversaId,
     assunto: out.assunto,
     rascunho: out.resposta,
+    prometeu_voltar: !!out.prometeu_voltar,
+    promessa_sobre: out.promessa_sobre || null,
     acao_humana: null,
     motivo_retencao: (temPedido ? "pedido de serviço adicional — precisa de preço e agenda" : null)
       || (!disparosLigados ? "disparos automáticos desligados" : null)

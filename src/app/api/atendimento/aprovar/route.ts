@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { enviarWhatsapp } from "@/lib/evolution";
+import { anotarCompromisso } from "@/lib/atendimento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   // Carrega a interação (RLS garante que é da org do usuário).
   const { data: inter } = await db
     .from("interacoes_ia")
-    .select("id,org_id,cliente_id,conversa_id,rascunho")
+    .select("id,org_id,cliente_id,conversa_id,rascunho,prometeu_voltar,promessa_sobre")
     .eq("id", interacaoId)
     .maybeSingle();
   if (!inter) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
@@ -55,6 +56,28 @@ export async function POST(req: NextRequest) {
       cliente_id: (inter as any).cliente_id,
       direcao: "saida",
       autor: "humano",
+      texto: textoParaEnviar,
+    });
+
+    // ======================================================================
+    // A PROMESSA VIRA COMPROMISSO — só agora, porque só agora ela existe
+    // ======================================================================
+    //
+    // Medido em 29/08: 11 das 25 respostas a famílias prometiam voltar, e
+    // nenhuma deixava registro. A família esperava um retorno que ninguém
+    // sabia que devia.
+    //
+    // NASCE NO ENVIO, NÃO NO RASCUNHO. Rascunho descartado não prometeu nada a
+    // ninguém — anotar na hora de rascunhar encheria a lista de dívidas que a
+    // família nunca ouviu.
+    await anotarCompromisso({
+      org: (inter as any).org_id,
+      clienteId: (inter as any).cliente_id,
+      conversaId: (inter as any).conversa_id || null,
+      saida: {
+        prometeu_voltar: !!(inter as any).prometeu_voltar,
+        promessa_sobre: (inter as any).promessa_sobre || "",
+      },
       texto: textoParaEnviar,
     });
   }

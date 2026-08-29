@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { PainelNav, painel, cor } from "../../ui";
 import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
+import Compromissos from "../Compromissos";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 export default function Thread() {
@@ -126,6 +127,11 @@ export default function Thread() {
         <p style={{ color: cor.cinza, marginTop: -10, fontSize: 14 }}>
           {d.conversa.escalada ? "Você está atendendo — a IA não responde." : "A IA está atendendo (rascunhos aparecem aqui)."}
         </p>
+
+        {/* O QUE VOCÊ PROMETEU E AINDA NÃO RESPONDEU (0142).
+            Antes das mensagens, porque quem abre a conversa para responder
+            precisa saber disso ANTES de escrever. */}
+        <Compromissos key={`k${versaoPedidos}`} conversaId={id} />
 
         {/* pedido de servico adicional feito nesta conversa */}
         <PedidosAdicionais key={versaoPedidos} conversaId={id} />

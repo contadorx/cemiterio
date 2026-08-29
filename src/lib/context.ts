@@ -15,7 +15,7 @@ export interface ClienteRow {
 }
 
 const CAMPOS_CLIENTE =
-  "id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia,tratamento,regua_cobranca,orientacao_cobranca";
+  "id,nome,telefone,ativo_ia,modo,score,perfil_ia,instrucoes_ia,tratamento,regua_cobranca,orientacao_cobranca,familia_id";
 
 // Acha o cliente pelo telefone dentro da org. É a allowlist:
 // telefone que não bater aqui = sem cliente = IA fica muda.
@@ -79,7 +79,9 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
   const org = env.orgId();
 
   const dadosCasa = await carregarDadosCasa();
-  const [saldoTexto, proximo, ultimo, tumulos] = await Promise.all([
+  const familiaId = (cliente as any).familia_id as string | null;
+
+  const [saldoTexto, proximo, ultimo, tumulos, catalogo, pedidos, comprovantes] = await Promise.all([
     calcularSaldoTexto(cliente.id),
     db
       .from("servicos")
@@ -104,6 +106,37 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
       .select("identificacao,falecido_nome,rua,quadras(codigo)")
       .eq("org_id", org)
       .eq("cliente_id", cliente.id),
+
+    // ------------------------------------------------------------------
+    // O QUE O BANCO JÁ SABIA E NÃO CHEGAVA ATÉ ELA (29/08)
+    //
+    // Medido: 11 das 25 respostas a famílias prometiam "deixa eu conferir e já
+    // te falo". Uma delas era sobre o valor de dois vasos — e "Troca de vaso:
+    // R$ 60,00" estava cadastrado. Ela prometia voltar por um dado que a casa
+    // tinha, porque o dado não vinha para cá.
+    // ------------------------------------------------------------------
+    db.from("servicos_extras")
+      .select("nome,preco,unidade")
+      .eq("org_id", org).eq("ativo", true)
+      .order("ordem", { ascending: true }).limit(40),
+
+    // Pedido que ela já fez e ainda não teve resposta. Sem isto, a mensagem
+    // seguinte é tratada como assunto novo e a família repete o que já disse.
+    familiaId || cliente.id
+      ? db.from("pedidos_conversa")
+          .select("resumo,ocasiao,prazo")
+          .eq("org_id", org).eq("cliente_id", cliente.id)
+          .in("status", ["aberto", "pendente"])
+          .order("criado_em", { ascending: false }).limit(5)
+      : Promise.resolve({ data: [] as any[] } as any),
+
+    // Comprovante recebido e ainda não conferido. Sem isto, ela pode pedir de
+    // novo o que a família já mandou.
+    db.from("comprovantes")
+      .select("valor_extraido,data_extraida")
+      .eq("org_id", org).eq("cliente_id", cliente.id)
+      .eq("status", "a_conferir")
+      .order("created_at", { ascending: false }).limit(5),
   ]);
 
   return {
@@ -118,6 +151,20 @@ export async function montarContexto(cliente: ClienteRow): Promise<ContextoClien
     reguaCobranca: (cliente as any).regua_cobranca || "padrao",
     orientacaoCobranca: (cliente as any).orientacao_cobranca || null,
     varosJazigos: (tumulos.data || []).length > 1,
+
+    // LISTA QUE NÃO VEIO NÃO É LISTA VAZIA — mas aqui o efeito de errar é
+    // brando e o de não ter é conhecido: sem catálogo ela volta a prometer
+    // conferir, que é o comportamento de antes. `|| []` mantém o prompt válido.
+    catalogo: ((catalogo as any).data || []).map((e: any) => ({
+      nome: e.nome, preco: Number(e.preco) || 0, unidade: e.unidade || null,
+    })).filter((e: any) => e.preco > 0),
+    pedidosAbertos: ((pedidos as any).data || []).map((p: any) => ({
+      resumo: p.resumo, ocasiao: p.ocasiao || null, prazo: formatarData(p.prazo),
+    })),
+    comprovantesPendentes: ((comprovantes as any).data || []).map((c: any) => ({
+      valor: c.valor_extraido === null ? null : Number(c.valor_extraido),
+      data: formatarData(c.data_extraida),
+    })),
     tumulos: (tumulos.data || []).map((t: any) => ({
       identificacao: t.identificacao,
       falecido: t.falecido_nome,

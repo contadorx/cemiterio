@@ -26,6 +26,30 @@ export interface ContextoCliente {
   orientacaoCobranca?: string | null;
   instrucoesIa?: string | null;   // treino manual DESTE contato (prioridade)
   perfilIa?: string | null;       // memória destilada do histórico
+
+  /**
+   * O QUE A CASA COBRA POR CADA EXTRA — medido em 29/08.
+   *
+   * Uma família perguntou "qual o valor dos 2 vasos que foram colocados?" e a
+   * resposta foi "deixa eu conferir isso direitinho aqui e já te falo".
+   * "Troca de vaso: R$ 60,00" ESTAVA CADASTRADO. O preço existia no sistema e
+   * não chegava até aqui — então ela prometeu voltar por um dado que tinha.
+   *
+   * 11 das 25 respostas a famílias (44%) prometiam voltar. Metade delas some
+   * quando o contexto carrega o que o banco já sabe.
+   */
+  catalogo?: { nome: string; preco: number; unidade?: string | null }[];
+
+  /** Pedidos adicionais desta família ainda em aberto. */
+  pedidosAbertos?: { resumo: string; ocasiao?: string | null; prazo?: string | null }[];
+
+  /** Comprovantes que ela mandou e ainda não foram conferidos. */
+  comprovantesPendentes?: { valor: number | null; data: string | null }[];
+}
+
+/** Reais, do jeito que se diz. */
+function formatarReal(n: number): string {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function montarSystemPrompt(
@@ -117,6 +141,7 @@ pessoa descarta em um clique; pedido perdido a família só descobre no dia.
 REGRAS DURAS
 - Nunca prometa data, valor ou serviço que não esteja no contexto nem no conhecimento do negócio. Não invente.
 - Se a informação pedida NÃO está no contexto nem no conhecimento do negócio, não responda o mérito: diga que vai confirmar e retorne já, e marque precisa_humano = true e confianca = "baixa". Errar um preço ou uma data quebra a confiança da família.
+${ctx.catalogo?.length ? `- MAS SE ESTIVER, DIGA. Preço que está na TABELA DE EXTRAS abaixo é preço da casa: responda o valor, com naturalidade. Prometer conferir o que você já tem na mão faz a família esperar por nada — e foi o que aconteceu 11 vezes em 25 respostas antes desta regra existir.` : ""}
 - Nunca exponha dados do falecido ou da família além do necessário para atender bem. É informação sensível.
 - Se as INSTRUÇÕES DESTE CONTATO abaixo disserem algo, elas têm prioridade sobre o comportamento padrão.
 - Responda SEMPRE chamando a ferramenta "responder".
@@ -134,6 +159,22 @@ ${tumulos}${
       ? "\nATENÇÃO: esta família cuida de MAIS DE UM jazigo. O valor de pagamento acima é o total dos jazigos juntos, não de um só. Ao falar de limpeza ou foto, diga SEMPRE de qual jazigo se trata. Ao falar de valores, deixe claro que se refere ao conjunto."
       : ""
   }
+
+${ctx.catalogo?.length ? `TABELA DE EXTRAS DA CASA (preço fechado — pode dizer)
+${ctx.catalogo.map((e) => `- ${e.nome}: ${formatarReal(e.preco)}${e.unidade ? ` (${e.unidade})` : ""}`).join("\n")}
+Estes valores são da casa e valem para qualquer família. Se perguntarem por um
+deles, RESPONDA o preço — não prometa conferir. Se pedirem para fazer, aí sim é
+pedido adicional: acolha, marque pedido = true e deixe a data para uma pessoa.` : ""}
+
+${ctx.pedidosAbertos?.length ? `PEDIDOS DESTA FAMÍLIA AINDA EM ABERTO
+${ctx.pedidosAbertos.map((p) => `- ${p.resumo}${p.ocasiao ? ` (${p.ocasiao})` : ""}${p.prazo ? ` — para ${p.prazo}` : ""}`).join("\n")}
+Ela JÁ PEDIU isto e ainda não teve resposta. Não trate como novidade e não peça
+para repetir. Se a mensagem for sobre isso, reconheça que está em andamento.` : ""}
+
+${ctx.comprovantesPendentes?.length ? `COMPROVANTES QUE ELA MANDOU E AINDA NÃO FORAM CONFERIDOS
+${ctx.comprovantesPendentes.map((c) => `- ${c.valor != null ? formatarReal(c.valor) : "valor não lido"}${c.data ? ` em ${c.data}` : ""}`).join("\n")}
+O recebimento já está registrado. Não peça o comprovante de novo, e não diga
+que não recebeu.` : ""}
 
 PIX DA CASA
 ${ctx.chavePix
@@ -211,10 +252,36 @@ export const responderTool = {
         description:
           "Nome da ocasião citada: 'Dia dos Pais', 'Finados', 'aniversário'. Vazio se não houve.",
       },
+
+      // ----------------------------------------------------------------
+      // A PROMESSA — medida antes de existir este campo.
+      //
+      // Em 29/08: 11 das 25 respostas a famílias diziam "deixa eu conferir e já
+      // te falo". Nenhuma delas gerava registro nenhum. A família ficava
+      // esperando um retorno que ninguém sabia que devia.
+      //
+      // Não se resolve proibindo a frase: às vezes conferir é a coisa certa a
+      // dizer. Resolve-se dando DONO e PRAZO ao que foi prometido.
+      // ----------------------------------------------------------------
+      prometeu_voltar: {
+        type: "boolean",
+        description:
+          "true se a sua resposta promete retornar depois — 'deixa eu conferir e já te falo', "
+          + "'vou ver a agenda e te confirmo', 'te aviso'. Seja honesta: se a frase faz a "
+          + "família ESPERAR por você, é true, mesmo que você não use a palavra prometer.",
+      },
+      promessa_sobre: {
+        type: "string",
+        description:
+          "O que exatamente você vai voltar para dizer, em uma linha, do jeito que alguém "
+          + "anotaria numa agenda: 'confirmar o valor dos 2 vasos', 'confirmar se o Pix de "
+          + "R$ 40 entrou'. Vazio se prometeu_voltar = false.",
+      },
     },
     required: [
       "assunto", "resposta", "sensivel", "precisa_humano", "confianca", "motivo",
       "pedido", "pedido_resumo", "pedido_prazo", "pedido_ocasiao",
+      "prometeu_voltar", "promessa_sobre",
     ],
   },
 };

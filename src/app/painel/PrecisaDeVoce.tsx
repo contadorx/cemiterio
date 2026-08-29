@@ -62,6 +62,15 @@ export default function PrecisaDeVoce() {
 
   const a = dados.agora || {};
   const filas: Fila[] = [
+    // A PROMESSA VEM PRIMEIRO (0142). Das quatro filas, é a única em que uma
+    // pessoa ouviu "já te falo" e está contando as horas. Medido em 29/08: 11
+    // de 25 respostas prometiam voltar e nenhuma deixava registro.
+    { chave: "promessas", n: a.promessas, href: "/painel/conversas",
+      um: "família esperando um retorno que você prometeu",
+      varios: "famílias esperando um retorno que você prometeu",
+      rodape: (a.promessasAtrasadas || 0) > 0
+        ? `${a.promessasAtrasadas} já passou do prazo.`
+        : "Você disse que ia conferir e voltar." },
     { chave: "liberacao", n: a.liberacao, href: "/painel/conversas",
       um: "mensagem pronta esperando você liberar",
       varios: "mensagens prontas esperando você liberar",

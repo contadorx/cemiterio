@@ -151,7 +151,11 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #   0127  +1  servicos_arquivados — o Leandro mandou apagar 257 lavagens da
 #             tela de Avulsos. A copia vem antes do delete: o que sai do lugar
 #             vivo muda de sala, nao evapora.
-TABELAS_DELTA=${TABELAS_DELTA:-14}
+#   0142  +1  compromissos — em 29/08, das 25 respostas a mensagens de familia,
+#             11 (44%) prometiam voltar, ZERO diziam prazo e ZERO deixavam
+#             registro. A promessa saia e evaporava; do lado de ca nao havia
+#             nem lista nem relogio nem dono.
+TABELAS_DELTA=${TABELAS_DELTA:-15}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -225,7 +229,9 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #   0119  +4  pausas_tumulo, mesmo desenho.
 #   0127  +5  servicos_arquivados: a da org, uma restritiva POR COMANDO e a que
 #              fecha para o campo. Um arquivo que se apaga nao e arquivo.
-POLICIES_DELTA=${POLICIES_DELTA:-99}
+#   0142  +5  compromissos: a da org e uma restritiva POR COMANDO — de novo a
+#              licao da 0079, `delete` nunca consulta `with check`.
+POLICIES_DELTA=${POLICIES_DELTA:-104}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -336,7 +342,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-99}
 #             0010, e foi reescrita — passou a gravar o evento com a versao.
 #             Em 27/08: 62 contatos marcados como tendo autorizado o contato e
 #             ZERO caracteres em orgs.aviso_privacidade — nunca houve texto.
-FUNCOES_DELTA=${FUNCOES_DELTA:-86}
+#   0140  +1  sureya_sobrou_da_remocao — a remocao a pedido deixava seis
+#             rastros, e um `update leads` que casava com ZERO linhas. Remocao
+#             que nao se prova nao e remocao.
+#   0142  +1  sureya_compromissos_abertos — o que foi prometido a uma familia
+#             e ainda nao foi respondido.
+FUNCOES_DELTA=${FUNCOES_DELTA:-87}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -850,6 +861,17 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/lavagens_incompletas.sql
   echo "$saida" | grep -E "LAVAGEM INCOMPLETA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Trabalho feito que ninguem conta nao aparece em lugar nenhum."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+echo "PROMESSA — o que foi prometido tem dono, prazo e desfecho"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/compromissos.sql 2>&1); then
+  echo "$saida" | grep -E "COMPROMISSOS FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Em 29/08, 44% das respostas prometiam voltar e nenhuma deixava marca."
   echo "============================================================"
   exit 1
 fi

@@ -61,7 +61,7 @@ export async function GET() {
 
   const hoje = diaOperacao();
 
-  const [conv, fila, comp, contatos, semJazigo, lavagens] = await Promise.all([
+  const [conv, fila, comp, contatos, semJazigo, lavagens, promessas] = await Promise.all([
     db.rpc("sureya_contadores_conversas"),
 
     db.from("fila_liberacao").select("id", { count: "exact", head: true })
@@ -84,6 +84,10 @@ export async function GET() {
     // TRABALHO FEITO QUE NÃO DEIXOU MARCA (0137). Mesma função da tela de
     // manutenção — não é uma segunda contagem.
     db.rpc("sureya_lavagens_incompletas_resumo", { p_org: org }),
+
+    // O QUE FOI PROMETIDO E NÃO FOI RESPONDIDO (0142). Tem gente do outro lado
+    // esperando — entra em "agora", não em "quando der".
+    db.rpc("sureya_compromissos_abertos", { p_org: org }),
   ]);
 
   // UMA FILA QUE NÃO RESPONDEU NÃO VALE ZERO.
@@ -105,6 +109,10 @@ export async function GET() {
       liberacao: n(fila),
       comprovantes: n(comp),
       contatos: n(contatos),
+      // PROMESSA É FILA COM RELÓGIO: alguém ouviu "já te falo" e está esperando.
+      promessas: promessas?.error ? null : ((promessas?.data as any[]) || []).length,
+      promessasAtrasadas: promessas?.error ? null
+        : ((promessas?.data as any[]) || []).filter((p: any) => p.atrasado).length,
     },
     quandoDer: {
       // A GUARDA CONTRA O ZERO SILENCIOSO NO OUTRO SENTIDO.

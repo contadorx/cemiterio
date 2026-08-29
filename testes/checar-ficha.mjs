@@ -1812,6 +1812,46 @@ ok("conta que nao pode ser lida vira null, nao R$ 0,00",
 ok("e vem numa consulta so, nao uma por familia",
    /from\("conta_corrente"\)[\s\S]{0,200}limit\(20000\)/.test(rotaConf41));
 
+// ===========================================================================
+// A PROMESSA NASCE NO ENVIO, E FECHAR NAO MANDA NADA (0142)
+//
+// Medido em 29/08: das 25 respostas a mensagens de familia, 11 (44%)
+// prometiam voltar, ZERO diziam prazo, ZERO deixavam registro.
+//
+// Duas regras estruturais que nenhum teste de funcao alcanca:
+//
+//   1. A promessa nasce quando a mensagem SAI, nao quando a IA rascunha.
+//      Rascunho descartado nao prometeu nada a ninguem; anotar no rascunho
+//      encheria a lista de dividas que a familia nunca ouviu.
+//   2. Fechar um compromisso NAO manda mensagem. "Ha nenhuma mensagem deve ir
+//      automatica ate o app se provar na operacao" — o disparo e manual, pela
+//      fila. Um botao de "ja respondi" que dispara texto seria uma segunda
+//      porta de envio, que e o defeito que a 0094 fechou.
+// ===========================================================================
+const rotaAprovar42 = readFileSync("src/app/api/atendimento/aprovar/route.ts", "utf8");
+ok("a promessa e anotada quando a mensagem sai, na rota de aprovar",
+   /anotarCompromisso\(/.test(semComentarios(rotaAprovar42)));
+
+const rotaComp42 = readFileSync("src/app/api/compromissos/route.ts", "utf8");
+ok("fechar um compromisso nao manda mensagem nenhuma",
+   !/enviarWhatsapp|enviarTextoComRetry|enviarMidia/.test(semComentarios(rotaComp42)));
+ok("e fechar exige dizer o que aconteceu com o assunto",
+   /"respondido", "nao_cabe"/.test(rotaComp42));
+ok("um compromisso ja fechado nao se fecha de novo",
+   /\.is\("cumprido_em", null\)/.test(semComentarios(rotaComp42)));
+
+// A regra de "isto vira pendencia?" mora num lugar so, e e o lugar testavel.
+const atend42 = readFileSync("src/lib/atendimento.ts", "utf8");
+ok("a regra da promessa esta numa funcao pura, nao enterrada no insert",
+   /export function promessaAnotavel\(/.test(atend42));
+
+// A caixa fica ANTES das mensagens: quem abre a conversa para responder
+// precisa saber o que ja foi prometido antes de escrever, nao depois de enviar.
+const telaConversa42 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+ok("a conversa mostra o que foi prometido, antes das mensagens",
+   telaConversa42.indexOf("<Compromissos") > 0
+   && telaConversa42.indexOf("<Compromissos") < telaConversa42.indexOf("d.mensagens.length === 0"));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

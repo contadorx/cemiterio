@@ -1288,6 +1288,112 @@ async function rodar() {
   // Com `toISOString()` — que era o que havia na rota — o dia virava às 21h de
   // Brasília, e das 21h à meia-noite uma competência que vence hoje já entrava
   // como dívida. Três horas por dia, todo dia, sobre dinheiro.
+  // ==========================================================================
+  // O QUE A IA SABE ANTES DE RESPONDER
+  // ==========================================================================
+  //
+  // Medido em 29/08, em producao: das 25 respostas a mensagens de familia, 11
+  // (44%) prometiam "deixa eu conferir isso direitinho e ja te falo". Uma delas
+  // respondia "qual o valor dos 2 vasos?" — e "Troca de vaso: R$ 60,00" ESTAVA
+  // cadastrado. Ela prometia voltar por um dado que a casa tinha.
+  //
+  // O prompt e funcao pura: da para provar o que ela recebe sem gastar um token.
+  console.log("\n=== 12c. O CONTEXTO QUE A IA RECEBE ===");
+  {
+    const { montarSystemPrompt } = await import("../src/lib/persona");
+    const base = {
+      nome: "Oscar", saldoTexto: "em dia", tumulos: [{ identificacao: "Q1-R1-001" }],
+    } as any;
+
+    const semCatalogo = montarSystemPrompt(base);
+    const comCatalogo = montarSystemPrompt({
+      ...base,
+      catalogo: [{ nome: "Troca de vaso", preco: 60 }, { nome: "Vela de sete dias", preco: 15 }],
+    });
+
+    checar("sem catalogo, o prompt nao inventa tabela de precos",
+           !/TABELA DE EXTRAS/.test(semCatalogo));
+    checar("com catalogo, o preco chega ate ela",
+           /Troca de vaso: R\$\s*60,00/.test(comCatalogo),
+           "o preco nao apareceu no prompt");
+    checar("e ela e mandada RESPONDER o preco, nao prometer conferir",
+           /RESPONDA o preço — não prometa conferir/.test(comCatalogo));
+
+    // Pedido ja feito: sem isto, a mensagem seguinte vira assunto novo e a
+    // familia repete o que ja disse.
+    const comPedido = montarSystemPrompt({
+      ...base,
+      pedidosAbertos: [{ resumo: "limpeza especial", ocasiao: "Dia dos Pais", prazo: "09/08/2026" }],
+    });
+    checar("pedido em aberto entra no contexto",
+           /limpeza especial \(Dia dos Pais\) — para 09\/08\/2026/.test(comPedido));
+    checar("e ela e avisada de que nao e novidade",
+           /Não trate como novidade e não peça\s+para repetir/.test(comPedido));
+
+    // Comprovante recebido: sem isto, ela pode pedir de novo o que ja chegou.
+    const comComprovante = montarSystemPrompt({
+      ...base, comprovantesPendentes: [{ valor: 40, data: "28/08/2026" }],
+    });
+    checar("comprovante ja recebido entra no contexto",
+           /R\$\s*40,00 em 28\/08\/2026/.test(comComprovante));
+    checar("e ela e proibida de dizer que nao recebeu",
+           /não diga\s+que não recebeu/.test(comComprovante));
+
+    // O valor NAO LIDO nao pode virar "R$ 0,00": um comprovante que o leitor
+    // nao entendeu ainda foi recebido, e dizer zero seria pior que nao dizer.
+    const semValor = montarSystemPrompt({
+      ...base, comprovantesPendentes: [{ valor: null, data: "28/08/2026" }],
+    });
+    checar("comprovante sem valor lido diz isso, nao R$ 0,00",
+           /valor não lido/.test(semValor) && !/R\$\s*0,00/.test(semValor));
+
+    // Os blocos so aparecem quando ha o que dizer: bloco vazio em prompt e
+    // token pago para nada, e ruido que a IA tenta interpretar.
+    checar("nenhum bloco novo aparece quando nao ha dados",
+           !/PEDIDOS DESTA FAMÍLIA/.test(semCatalogo)
+           && !/COMPROVANTES QUE ELA MANDOU/.test(semCatalogo));
+  }
+
+  // ==========================================================================
+  // A PROMESSA TEM DE VIRAR LINHA (0142)
+  // ==========================================================================
+  //
+  // Das 11 respostas que prometiam voltar, ZERO deixavam registro. O conserto
+  // nao e proibir a frase — as vezes conferir e a coisa certa a dizer, e uma
+  // IA proibida de dizer "vou conferir" inventa um numero, que e o defeito que
+  // o prompt inteiro foi escrito para evitar. O conserto e ANOTAR.
+  //
+  // Duas coisas podem dar errado, e as duas sao silenciosas:
+  //   anotar de menos  a promessa sai, nao vira linha, e a familia espera um
+  //                    retorno que ninguem sabe que deve. O estado de antes.
+  //   anotar de mais   entra "prometeu alguma coisa" sem dizer o que. Uma
+  //                    pendencia que nao diz o que fazer nao se cumpre — e uma
+  //                    lista assim se aprende a ignorar inteira.
+  console.log("\n=== 12d. A PROMESSA DEIXA MARCA ===");
+  {
+    const { promessaAnotavel } = await import("../src/lib/atendimento");
+    const { responderTool } = await import("../src/lib/persona");
+
+    checar("a IA e obrigada a dizer se prometeu voltar",
+           (responderTool as any).input_schema.required.includes("prometeu_voltar"),
+           "prometeu_voltar ficou opcional: o campo que nao e obrigatorio nao vem");
+    checar("e obrigada a dizer sobre o que",
+           (responderTool as any).input_schema.required.includes("promessa_sobre"));
+
+    checar("quem nao prometeu nao vira pendencia",
+           promessaAnotavel({ prometeu_voltar: false, promessa_sobre: "conferir o vaso" }) === null,
+           "anotou uma promessa que nao foi feita");
+    checar("quem prometeu vira pendencia com o assunto",
+           promessaAnotavel({ prometeu_voltar: true, promessa_sobre: " conferir o vaso " })
+             === "conferir o vaso",
+           "o assunto nao chegou limpo");
+    checar("prometeu sem dizer o que NAO vira pendencia",
+           promessaAnotavel({ prometeu_voltar: true, promessa_sobre: "   " }) === null,
+           "entrou uma pendencia que ninguem consegue cumprir");
+    checar("nem quando o campo nem veio",
+           promessaAnotavel({ prometeu_voltar: true }) === null);
+  }
+
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
   {
     const { calcularSaldo } = await import("../src/lib/saldo");
