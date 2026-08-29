@@ -178,7 +178,11 @@ ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 #   0131  +2  tg_nome_proprio_cliente e tg_nome_proprio_familia — sao cinco
 #             portas que escrevem nome; consertar numa e deixar quatro
 #             escrevendo torto e o defeito de forma de sempre.
-GATILHOS_DELTA=${GATILHOS_DELTA:-13}
+#   0145  +1  trg_familia_vazia_para_apagar. `conta_corrente.familia_id` e ON
+#             DELETE CASCADE e `clientes.familia_id` e SET NULL: apagar uma
+#             familia levava o razao junto e deixava a pessoa orfa — e
+#             `sureya_lancar` recusa orfao, entao todo pagamento dela falharia.
+GATILHOS_DELTA=${GATILHOS_DELTA:-14}
 ESPERADO_POLICIES=${ESPERADO_POLICIES:-67}
 
 # AS 7 POLICIES QUE PRODUCAO TEM A MAIS — E QUE NAO VAMOS RECRIAR
@@ -350,7 +354,12 @@ POLICIES_DELTA=${POLICIES_DELTA:-104}
 #   0144  +1  sureya_conciliar_comprovante_meses — a Thais mandou R$ 240 e
 #             escreveu "referente julho-dezembro". Seis competencias num
 #             pagamento so, e o seletor era de escolha unica.
-FUNCOES_DELTA=${FUNCOES_DELTA:-88}
+#   0145  +5  sureya_telefone_normalizado, sureya_achar_cliente,
+#             sureya_clientes_duplicados, sureya_fundir_clientes e
+#             sureya_familia_vazia_para_apagar. Em 29/08: 46 clientes
+#             cadastrados SEM o 55 e o WhatsApp sempre manda COM — nenhum deles
+#             era reconhecido, e 11 pares de duplicados nasceram disso.
+FUNCOES_DELTA=${FUNCOES_DELTA:-93}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -864,6 +873,18 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/lavagens_incompletas.sql
   echo "$saida" | grep -E "LAVAGEM INCOMPLETA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Trabalho feito que ninguem conta nao aparece em lugar nenhum."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+echo "TELEFONE E FUSAO — o mesmo numero e a mesma pessoa"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/telefone_e_fusao.sql 2>&1); then
+  echo "$saida" | grep -E "TELEFONE/FUSAO FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Casar de menos deixa a familia virar desconhecida; casar demais junta"
+  echo "dois razoes, e o erro so aparece cobrando quem ja pagou."
   echo "============================================================"
   exit 1
 fi

@@ -9,12 +9,13 @@ import { useConfirmar, useRecado } from "@/components/Dialogos";
 import Prioridade from "./Prioridade";
 import Manutencao from "./Manutencao";
 import Termo from "./Termo";
+import Duplicados from "./Duplicados";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
   | "regua" | "prioridade" | "extras"
   | "whatsapp" | "mensagens" | "campanhas" | "avaliacoes" | "indicacoes"
-  | "privacidade" | "auditoria" | "erros" | "manutencao";
+  | "privacidade" | "auditoria" | "erros" | "manutencao" | "duplicados";
 
 export default function Config() {
   const [aba, setAba] = useState<Aba>("casa");
@@ -47,6 +48,7 @@ export default function Config() {
         {aba === "extras" && <Extras />}
         {aba === "manutencao" && <Manutencao />}
         {aba === "privacidade" && <Termo />}
+        {aba === "duplicados" && <Duplicados />}
         {/* LISTA DO QUE ENTRA, NÃO DO QUE FICA DE FORA.
             Isto era uma corrente de sete `aba !== ...`: toda tela nova tinha de
             LEMBRAR de se excluir daqui, e a Régua de cobrança não lembrou —
@@ -126,6 +128,11 @@ const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
     // valor da equipe. A dívida da família vem da competência e não passa por
     // aqui. Quem abre esta aba está perguntando "está tudo consistente?".
     ["manutencao", "Manutenção"],
+    // CADASTROS REPETIDOS mora em "O sistema", ao lado de Manutencao, porque e
+    // a mesma pergunta — "esta tudo consistente?" — e nao uma decisao sobre
+    // dinheiro. Em 29/08 eram 11 pares, todos nascidos do mesmo defeito: o
+    // WhatsApp manda o numero com 55 e 46 cadastros estavam sem.
+    ["duplicados", "Cadastros repetidos"],
   ]},
 ];
 

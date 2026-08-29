@@ -41,6 +41,9 @@ declare
   k_um    uuid := '44444444-0000-0000-0000-0000000000b2';
   k_terco uuid := '44444444-0000-0000-0000-0000000000b3';
   k_curto uuid := '44444444-0000-0000-0000-0000000000b4';
+  v_out uuid := '44444444-0000-0000-0000-0000000000ff';
+  t_tres uuid := '44444444-0000-0000-0000-0000000000a3';
+  t_alheio uuid := '44444444-0000-0000-0000-0000000000a9';
   v_n int; v_soma numeric; v_erro text; v_linhas int;
 begin
   insert into orgs (id, nome) values (v_org, 'Teste 0144') on conflict (id) do nothing;
@@ -198,11 +201,86 @@ begin
                'aceitou repartir um pagamento entre nenhum mes');
 
   -- =========================================================================
+  -- VARIOS JAZIGOS NUM PAGAMENTO SO (0146)
+  --
+  -- A Katia e responsavel dos Tonellotti e a familia tem DOIS jazigos. Um Pix
+  -- dela pode cobrir os dois.
+  -- =========================================================================
+  insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo)
+    values ('44444444-0000-0000-0000-0000000000a2', v_org, v_qua, v_fam, 'T-2', 'Q2-R2-005')
+    on conflict (id) do nothing;
+  insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo)
+    values (t_tres, v_org, v_qua, v_fam, 'T-3', 'Q2-R2-006') on conflict (id) do nothing;
+
+  insert into comprovantes (id, org_id, cliente_id, valor_extraido, data_extraida, status)
+  values ('44444444-0000-0000-0000-0000000000b5', v_org, v_cli, 90.00, date '2026-02-02', 'a_conferir')
+  on conflict (id) do nothing;
+
+  perform sureya_conciliar_comprovante_meses(
+    '44444444-0000-0000-0000-0000000000b5', array[date '2025-12-01'], v_org,
+    null, null, null, false,
+    array[v_tum, '44444444-0000-0000-0000-0000000000a2'::uuid]);
+
+  select count(*), sum(valor) into v_linhas, v_soma
+    from conta_corrente where comprovante_id = '44444444-0000-0000-0000-0000000000b5';
+  perform ci44('o mes se divide entre os dois jazigos',
+               v_linhas = 2 and v_soma = 90.00,
+               'vieram ' || v_linhas || ' linhas somando ' || v_soma);
+  perform ci44('e cada jazigo recebe a sua parte',
+               (select count(distinct tumulo_id) from conta_corrente
+                 where comprovante_id = '44444444-0000-0000-0000-0000000000b5') = 2,
+               'as duas linhas cairam no mesmo jazigo');
+
+  -- O CENTAVO DA DIVISAO ENTRE JAZIGOS TAMBEM NAO SE PERDE.
+  insert into comprovantes (id, org_id, cliente_id, valor_extraido, data_extraida, status)
+  values ('44444444-0000-0000-0000-0000000000b6', v_org, v_cli, 100.00, date '2025-11-02', 'a_conferir')
+  on conflict (id) do nothing;
+  perform sureya_conciliar_comprovante_meses(
+    '44444444-0000-0000-0000-0000000000b6', array[date '2025-10-01'], v_org,
+    null, null, null, false,
+    array[v_tum, '44444444-0000-0000-0000-0000000000a2'::uuid, t_tres]);
+  select sum(valor) into v_soma from conta_corrente
+   where comprovante_id = '44444444-0000-0000-0000-0000000000b6';
+  perform ci44('R$ 100 em tres jazigos somam R$ 100',
+               v_soma = 100.00, 'sumiu centavo na divisao entre jazigos: ' || v_soma);
+
+  -- =========================================================================
+  -- JAZIGO DE OUTRA FAMILIA E RECUSADO (0146)
+  --
+  -- `sureya_lancar` deduz a familia do PAGADOR e aceitava o jazigo sem
+  -- conferir de quem era. Dava para gravar familia = A com jazigo = B, e
+  -- nenhuma das duas telas mostrava a verdade.
+  -- =========================================================================
+  insert into familias (id, org_id, nome) values (v_out, v_org, 'Vizinha')
+    on conflict (id) do nothing;
+  insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo)
+    values (t_alheio, v_org, v_qua, v_out, 'T-9', 'Q9-R9-009') on conflict (id) do nothing;
+
+  insert into comprovantes (id, org_id, cliente_id, valor_extraido, data_extraida, status)
+  values ('44444444-0000-0000-0000-0000000000b7', v_org, v_cli, 40.00, date '2025-09-02', 'a_conferir')
+  on conflict (id) do nothing;
+
+  begin
+    perform sureya_conciliar_comprovante_meses(
+      '44444444-0000-0000-0000-0000000000b7', array[date '2025-09-01'], v_org,
+      null, null, null, false, array[t_alheio]);
+    v_erro := null;
+  exception when others then v_erro := sqlerrm;
+  end;
+  perform ci44('jazigo de outra familia e recusado',
+               v_erro like '%jazigo_de_outra_familia%',
+               'o dinheiro ficaria no razao de uma familia apontando o jazigo de outra');
+  perform ci44('e nada foi lancado na recusa',
+               (select count(*) from conta_corrente
+                 where comprovante_id = '44444444-0000-0000-0000-0000000000b7') = 0,
+               'a recusa deixou lancamento pela metade');
+
+  -- =========================================================================
   -- QUEM PODE MOVER DINHEIRO — licao da 0129.
   -- =========================================================================
   perform ci44('anon nao concilia comprovante',
                not has_function_privilege('anon',
-                 'sureya_conciliar_comprovante_meses(uuid,date[],uuid,numeric,date,uuid,boolean)',
+                 'sureya_conciliar_comprovante_meses(uuid,date[],uuid,numeric,date,uuid,boolean,uuid[])',
                  'execute'),
                'uma funcao que credita dinheiro esta aberta no endereco publico da API');
 

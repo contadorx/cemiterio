@@ -201,7 +201,7 @@ function Comprovantes() {
   const [erro, setErro] = useState("");
   /** O que foi mexido, por comprovante. Vazio = "não corrigi nada". */
   const [ed, setEd] = useState<Record<string, {
-    valor: string; data: string; tumuloId: string; de: string; ate: string;
+    valor: string; data: string; tumuloIds: string[]; de: string; ate: string;
   }>>({});
   /** O rateio ensaiado, por comprovante. Nada disso foi escrito. */
   const [previa, setPrevia] = useState<Record<string,
@@ -220,7 +220,10 @@ function Comprovantes() {
       valor: c.valor != null ? String(c.valor) : "",
       data: c.data || "",
       // Um jazigo só não é escolha: já vem escolhido.
-      tumuloId: (c.jazigos || []).length === 1 ? c.jazigos[0].id : "",
+      // UM JAZIGO SO NAO E ESCOLHA: ja vem marcado. Com varios, nenhum vem —
+      // marcar todos por conta propria repartiria o pagamento entre jazigos
+      // que ninguem apontou.
+      tumuloIds: (c.jazigos || []).length === 1 ? [c.jazigos[0].id] : [],
       de: padrao, ate: padrao,
     };
   }
@@ -245,7 +248,7 @@ function Comprovantes() {
     }
     return saida;
   }
-  function mexer(c: Comp, campo: string, v: string) {
+  function mexer(c: Comp, campo: string, v: string | string[]) {
     setEd((x) => ({ ...x, [c.id]: { ...campos(c), [campo]: v } }));
     // Mexeu, a prévia velha morre: deixá-la na tela faria a pessoa confirmar
     // olhando para um rateio que não é mais o que vai acontecer.
@@ -299,7 +302,7 @@ function Comprovantes() {
         ...(aprovar ? {
           valor: f.valor,
           data: f.data || undefined,
-          tumuloId: f.tumuloId || undefined,
+          tumuloIds: f.tumuloIds.length ? f.tumuloIds : undefined,
           competencias: meses,
           ensaio,
         } : {}),
@@ -419,16 +422,43 @@ function Comprovantes() {
               <input type="date" style={{ ...painel.input, margin: 0 }} value={f.data}
                      onChange={(e) => mexer(c, "data", e.target.value)} />
             </div>
+            {/* DE QUAIS JAZIGOS — no plural (0146).
+                A Katia é responsável dos Tonellotti e a família tem DOIS
+                jazigos: um Pix dela pode cobrir os dois. Era escolha única, e
+                não havia como dizer isso.
+
+                Marcar mais de um reparte o valor de cada mês entre eles. Não
+                marcar nenhum é resposta legítima: o crédito entra no saldo da
+                família e não aponta jazigo. */}
             {(c.jazigos || []).length > 1 && (
-              <div>
-                <label style={painel.rotulo}>De qual jazigo</label>
-                <select style={{ ...painel.input, margin: 0 }} value={f.tumuloId}
-                        onChange={(e) => mexer(c, "tumuloId", e.target.value)}>
-                  <option value="">não sei / a família toda</option>
-                  {(c.jazigos || []).map((j) => (
-                    <option key={j.id} value={j.id}>{j.rotulo}</option>
-                  ))}
-                </select>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={painel.rotulo}>De quais jazigos</label>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {(c.jazigos || []).map((j) => {
+                    const marcado = f.tumuloIds.includes(j.id);
+                    return (
+                      <label key={j.id} style={{
+                        display: "flex", gap: 7, alignItems: "center", cursor: "pointer",
+                        padding: "8px 12px", borderRadius: 10, fontSize: 14,
+                        border: `1px solid ${marcado ? "rgb(var(--zm-teal) / 0.6)" : cor.linha}`,
+                        background: marcado ? "rgb(var(--zm-teal) / 0.07)" : cor.card,
+                      }}>
+                        <input type="checkbox" checked={marcado}
+                               onChange={() => mexer(c, "tumuloIds",
+                                 marcado ? f.tumuloIds.filter((x) => x !== j.id)
+                                         : [...f.tumuloIds, j.id])} />
+                        {j.rotulo}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 13, color: cor.cinza, margin: "6px 0 0", lineHeight: 1.45 }}>
+                  {f.tumuloIds.length > 1
+                    ? `O valor de cada mês se divide entre os ${f.tumuloIds.length} jazigos marcados.`
+                    : f.tumuloIds.length === 1
+                    ? "Só este jazigo recebe o crédito."
+                    : "Nenhum marcado: o crédito entra no saldo da família, sem apontar jazigo."}
+                </p>
               </div>
             )}
           </div>

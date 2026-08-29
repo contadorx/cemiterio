@@ -649,8 +649,11 @@ ok("o valor e a data sao corrigiveis na conferencia",
 // O rotulo virou PLURAL na 0144 — "A que meses se refere" —, porque um
 // pagamento cobre varios. A guarda acompanha: o que ela protege e que a tela
 // continue perguntando as duas coisas, nao a palavra exata.
-ok("da para dizer de qual jazigo e a que meses se refere",
-   /De qual jazigo/.test(telaFin) && /A que meses se refere/.test(telaFin));
+// Os DOIS rotulos viraram plural: um pagamento cobre varios meses (0144) e
+// varios jazigos (0146). A guarda protege que a tela continue perguntando as
+// duas coisas — nao a palavra exata.
+ok("da para dizer de quais jazigos e a que meses se refere",
+   /De quais jazigos/.test(telaFin) && /A que meses se refere/.test(telaFin));
 
 // Familia sem contrato e o caso de quem esta sendo cadastrada agora — nao e
 // erro, mas quem confirma precisa saber.
@@ -1995,6 +1998,50 @@ ok("mexer nos campos apaga a previa velha",
 // ninguem pediu.
 ok("intervalo invertido nao vira meses",
    /saida\.length < 60/.test(telaFin) && /mesesDe\(/.test(telaFinSem));
+
+// ===========================================================================
+// O TELEFONE NAO CRIA GENTE NOVA (0145/0146)
+//
+// `acharCliente` comparava com igualdade exata. O WhatsApp sempre manda o
+// numero com o DDI, e 46 clientes estavam cadastrados sem o 55 — nenhum deles
+// era reconhecido. Viravam lead, alguem cadastrava de novo, e nasciam os 11
+// pares de duplicados. O caso que expos isso: a Katia, responsavel dos
+// Tonellotti (2 jazigos), com a copia numa "Familia Katia" vazia segurando um
+// Pix de R$ 40.
+// ===========================================================================
+const ctx45 = readFileSync("src/lib/context.ts", "utf8");
+const ctx45Sem = semComentarios(ctx45);
+
+ok("a busca por telefone passa pela forma normalizada",
+   /sureya_achar_cliente/.test(ctx45Sem));
+// Uma normalizacao em TypeScript aqui seria a setima vez que este projeto paga
+// por duas implementacoes da mesma regra — e a lista de duplicados e a fusao
+// usariam a outra.
+ok("e a regra do numero mora num lugar so, no banco",
+   !/replace\(\/\\D\/g/.test(ctx45Sem) && !/startsWith\("55"\)/.test(ctx45Sem));
+// Devolver null num erro de rede faria a familia virar lead — o defeito
+// consertado, de volta por outro caminho.
+ok("falha na busca nao vira 'nao e cliente' em silencio",
+   /console\.error\("\[acharCliente\]/.test(ctx45));
+
+const rotaDup = readFileSync("src/app/api/duplicados/route.ts", "utf8");
+const telaDup = readFileSync("src/app/painel/config/Duplicados.tsx", "utf8");
+ok("a tela de duplicados mostra o que cada lado carrega",
+   /jazigos/.test(telaDup) && /comprovantes/.test(telaDup) && /conversas/.test(telaDup));
+// Fundir apaga um cadastro, e doze das vinte e nove referencias a `clientes`
+// sao ON DELETE CASCADE. Um botao que resolvesse os onze de uma vez apagaria
+// historico de familia com base num palpite.
+// `semComentarios` porque o proprio comentario da tela explica POR QUE nao
+// existe esse botao — e a guarda casaria com a explicacao.
+ok("nao existe botao de juntar todos de uma vez",
+   !/juntar todos|fundir todos|limpar tudo/i.test(semComentarios(telaDup)));
+ok("e a fusao tem ensaio antes",
+   /ensaio/.test(rotaDup) && /O que vai mudar/.test(telaDup));
+
+// O jazigo apontado tem de ser da familia do pagador: sem isso o dinheiro fica
+// no razao de uma familia apontando para o jazigo de outra.
+ok("jazigo de outra familia tem recado proprio",
+   /jazigo_de_outra_familia/.test(readFileSync("src/app/api/financeiro/conciliar/route.ts", "utf8")));
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

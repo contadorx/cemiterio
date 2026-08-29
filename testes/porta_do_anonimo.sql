@@ -30,7 +30,12 @@ insert into anonimo_pode values
  ('sureya_data_no_ano',       'conta pura de data'),
  ('sureya_lavagens_no_mes',   'conta pura sobre uma periodicidade'),
  ('sureya_meses_da_cobranca', 'conta pura sobre uma frequencia'),
- ('sureya_proxima_data_extra','conta pura de calendario');
+ ('sureya_proxima_data_extra','conta pura de calendario'),
+ -- CONTA PURA SOBRE UM TEXTO, e nao le nada do banco: saber que 11988758966
+ -- vira 5511988758966 nao conta nada sobre ninguem. Ela tambem entra em DOIS
+ -- INDICES FUNCIONAIS (clientes e telefones_cliente) — revogar arriscaria a
+ -- avaliacao da expressao no proprio cadastro, que e o oposto do conserto.
+ ('sureya_telefone_normalizado','conta pura sobre um texto, e usada em indice funcional');
 
 do $$
 declare

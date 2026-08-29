@@ -74,12 +74,21 @@ export async function POST(req: NextRequest) {
   const ensaio = !!body?.ensaio;
 
   if (aprovar && meses.length > 0) {
+    // UM OU VÁRIOS JAZIGOS (0146). A Katia é responsável dos Tonellotti e a
+    // família tem dois — um Pix dela pode cobrir os dois. O banco recusa
+    // jazigo que não seja da família do pagador: sem essa trava, o dinheiro
+    // ficaria no razão de uma família apontando para o jazigo de outra, e
+    // nenhuma das duas telas mostraria a verdade.
+    const jazigos: string[] = Array.isArray(body?.tumuloIds)
+      ? body.tumuloIds.map((x: any) => String(x || "").trim()).filter(Boolean)
+      : (body?.tumuloId ? [String(body.tumuloId)] : []);
+
     const { data: rateio, error: e } = await db.rpc("sureya_conciliar_comprovante_meses", {
       p_comprovante: comprovanteId,
       p_competencias: meses,
       p_valor: valor,
       p_data: data,
-      p_tumulo: body?.tumuloId || null,
+      p_tumulos: jazigos.length ? jazigos : null,
       p_ensaio: ensaio,
     });
     if (e) {
@@ -89,6 +98,9 @@ export async function POST(req: NextRequest) {
           ? "Este comprovante já virou crédito. Estorne antes de refazer."
           : /sem_competencia/.test(e.message)
           ? "Diga a que meses este pagamento se refere."
+          : /jazigo_de_outra_familia/.test(e.message)
+          ? "Um dos jazigos apontados não é desta família. Junte os cadastros repetidos "
+            + "em Configurações › Cadastros repetidos, ou escolha outro jazigo."
           : e.message,
       }, { status: 400 });
     }

@@ -74,6 +74,18 @@ function montarBanco(): Tabelas {
       { id: "f-anon", org_id: ORG, nome: "Família Removida", responsavel_id: "c-anon", silenciar: [] },
     ],
     clientes: [
+      // A FAMILIA CADASTRADA SEM O 55 (0145).
+      //
+      // Numero real do caso de producao. Ela existe no cadastro sem o DDI, e o
+      // WhatsApp manda `5511975904577`: ate a 0145, escrever significava virar
+      // desconhecida. Nao entra em nenhuma outra conta deste arquivo — nao tem
+      // familia com jazigo, nem razao, nem conversa — de proposito.
+      { id: "c-sem55", org_id: ORG, familia_id: "f-cec", responsavel_financeiro: false,
+        nome: "Vera (sem o 55)", telefone: "11975904577", ativo_ia: true,
+        modo: "manual", score: 0, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
+        anonimizado_em: null, perfil_ia: null, instrucoes_ia: null, perfil_ia_msgs: 0,
+        tratamento: "a senhora", regua_cobranca: "nao_cobrar", dias_entre_cobrancas: 7,
+        max_lembretes: 0, envio_automatico: false, ativacao_ativa: false, ativacao_meses: 6 },
       // adiantado (crédito sobra)
       { id: "c-cec", org_id: ORG, familia_id: "f-cec", responsavel_financeiro: true, nome: "Cecília Ramos", telefone: "5511900001", ativo_ia: true,
         modo: "automatico", score: 95, cobranca_nivel: 0, aviso_saldo_em: null, cobranca_em: null,
@@ -260,7 +272,33 @@ function checar(nome: string, condicao: boolean, detalhe = "") {
 // ---------------------------------------------------------------- execução
 async function rodar() {
   const banco = montarBanco();
-  const fake = criarFakeSupabase(banco);
+  /**
+   * A BUSCA POR TELEFONE VIRA RPC (0145) — e o simulador precisa saber dela.
+   *
+   * `acharCliente` deixou de comparar com igualdade exata e passou a chamar
+   * `sureya_achar_cliente`, que normaliza o numero no banco. A regra aqui e a
+   * MESMA da funcao SQL, de proposito: se as duas divergirem, o simulador
+   * passa a provar um comportamento que producao nao tem — que e pior do que
+   * nao testar.
+   */
+  const normalizar = (t: string): string => {
+    const n = String(t || "").replace(/\D/g, "");
+    if ((n.length === 12 || n.length === 13) && n.startsWith("55")) return n;
+    if (n.length === 10 || n.length === 11) return "55" + n;
+    return n;
+  };
+  const fake = criarFakeSupabase(banco, {
+    sureya_achar_cliente: (args: any) => {
+      const alvo = normalizar(args?.p_tel);
+      if (!alvo) return null;
+      const achado = (banco.clientes || []).find(
+        (c: any) => c.org_id === args?.p_org && normalizar(c.telefone) === alvo);
+      if (achado) return achado.id;
+      const extra = (banco.telefones_cliente || []).find(
+        (t: any) => t.org_id === args?.p_org && normalizar(t.telefone) === alvo);
+      return extra ? extra.cliente_id : null;
+    },
+  });
 
   // o hook de módulos faz createClient() devolver este objeto
   (globalThis as any).__FAKE_SUPABASE__ = fake;
@@ -1558,6 +1596,46 @@ async function rodar() {
 
     checar("a folga da agenda e o que ainda cabe",
            Math.abs((c.folgaLavagens ?? 0) - (435 - 6.345)) < 0.1);
+  }
+
+  // ==========================================================================
+  // A FAMILIA CADASTRADA SEM O 55 NAO E DESCONHECIDA (0145)
+  // ==========================================================================
+  //
+  // Medido em 29/08: 46 clientes cadastrados sem o DDI, e o WhatsApp SEMPRE
+  // manda com. `acharCliente` comparava com igualdade exata — nenhum deles era
+  // reconhecido. Escreviam, viravam lead, recebiam a saudacao de desconhecido,
+  // e a IA respondia sem saber que havia jazigo, saldo ou combinado.
+  //
+  // Depois alguem cadastrava a pessoa outra vez, e nascia a copia com o 55.
+  // Onze pares de duplicados nasceram assim.
+  console.log("\n=== 12g. O NUMERO ACHA A PESSOA ===");
+  {
+    const { acharCliente } = await import("../src/lib/context");
+
+    // A VERA ESTA CADASTRADA SEM O 55 — o caso real, com o numero real.
+    // O WhatsApp manda COM. Ate a 0145 isto devolvia null e ela virava lead.
+    const comoOWhatsappManda = await acharCliente("5511975904577");
+    checar("o numero como o WhatsApp manda acha quem esta cadastrado sem o 55",
+           comoOWhatsappManda?.id === "c-sem55",
+           `veio ${comoOWhatsappManda?.id} — a familia cairia como desconhecida`);
+
+    checar("e o mesmo numero como esta no cadastro acha a mesma pessoa",
+           (await acharCliente("11975904577"))?.id === "c-sem55");
+
+    checar("numero com pontuacao tambem acha",
+           (await acharCliente("(11) 97590-4577"))?.id === "c-sem55",
+           "o numero digitado com parenteses virou outra pessoa");
+
+    // CASAR DEMAIS E PIOR QUE CASAR DE MENOS: num sistema onde o telefone diz
+    // QUEM PAGA, um falso positivo junta dois razoes, e o erro so aparece
+    // quando alguem for cobrado pelo que ja pagou.
+    checar("numero de ninguem continua sendo de ninguem",
+           (await acharCliente("5511999999999")) === null,
+           "esta casando numero alheio — dois razoes viram um");
+    checar("numero vazio nao acha o primeiro da lista",
+           (await acharCliente("")) === null,
+           "cadastro sem telefone viraria a resposta de qualquer mensagem");
   }
 
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");

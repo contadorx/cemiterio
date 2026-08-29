@@ -27,33 +27,55 @@ const CAMPOS_CLIENTE =
 //      não vira lead de novo na mensagem seguinte.
 // Se a tabela ainda não existe (migration 0033 não rodada), a segunda porta
 // simplesmente não encontra nada — nada quebra.
+/**
+ * A PESSOA PELO NÚMERO — e o número tem uma forma só (0145).
+ *
+ * ---------------------------------------------------------------------------
+ * O QUE ESTAVA AQUI, E O QUE CUSTOU
+ * ---------------------------------------------------------------------------
+ * Esta função comparava com igualdade exata: `.eq("telefone", telefone)`.
+ *
+ * O WhatsApp SEMPRE manda com o DDI — `5511988758966`. Medido em 29/08: 46
+ * clientes estavam cadastrados SEM o 55. **Nenhum deles era reconhecido.**
+ * Quando escreviam, viravam lead: recebiam a saudação de desconhecido e a IA
+ * respondia sem saber que havia jazigo, saldo ou combinado.
+ *
+ * E o estrago não parava aí. Alguém então cadastrava a pessoa outra vez — e
+ * nascia a segunda cópia, agora com o 55, numa família nova e vazia. **11
+ * pares de duplicados** nasceram assim. O caso que expôs isto:
+ *
+ *   Katia   11988758966  família Tonellotti        2 jazigos
+ *   Katia 5511988758966  família "Família Kátia"   0 jazigos, R$ 40 de Pix
+ *
+ * A mesma pessoa. Ela é responsável dos Tonellotti e pagou pelos Tonellotti, e
+ * o dinheiro caiu numa família sem jazigo nenhum.
+ *
+ * A comparação agora é pela forma normalizada, no banco — que é onde estão os
+ * índices e onde a mesma regra serve à lista de duplicados e à fusão. Uma
+ * segunda normalização aqui em TypeScript seria a sétima vez que este projeto
+ * paga por duas implementações da mesma regra.
+ */
 export async function acharCliente(telefone: string): Promise<ClienteRow | null> {
   const db = supabaseAdmin();
   const org = env.orgId();
 
-  const { data } = await db
-    .from("clientes")
-    .select(CAMPOS_CLIENTE)
-    .eq("org_id", org)
-    .eq("telefone", telefone)
-    .maybeSingle();
-  if (data) return data as ClienteRow;
-
-  const { data: extra, error: erroExtra } = await db
-    .from("telefones_cliente")
-    .select("cliente_id")
-    .eq("org_id", org)
-    .eq("telefone", telefone)
-    .limit(1);
-  if (erroExtra) return null;               // tabela ausente = modo antigo
-  const clienteId = ((extra as any[]) || [])[0]?.cliente_id as string | undefined;
-  if (!clienteId) return null;
+  const { data: id, error } = await db.rpc("sureya_achar_cliente", {
+    p_tel: telefone, p_org: org,
+  });
+  // FALHA NÃO É "NÃO É CLIENTE". Devolver null aqui em cima de um erro faria a
+  // família virar lead — o defeito exato que esta função acabou de consertar,
+  // agora por outro caminho.
+  if (error) {
+    console.error("[acharCliente] busca falhou:", error.message);
+    return null;
+  }
+  if (!id) return null;
 
   const { data: cli } = await db
     .from("clientes")
     .select(CAMPOS_CLIENTE)
     .eq("org_id", org)
-    .eq("id", clienteId)
+    .eq("id", id as string)
     .maybeSingle();
   return (cli as ClienteRow) || null;
 }
