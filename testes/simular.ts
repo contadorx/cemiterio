@@ -1447,6 +1447,119 @@ async function rodar() {
            !semNada[0].text.includes("null") && !semNada[1].text.includes("null"));
   }
 
+  // ==========================================================================
+  // A CONTA DO PRECO (medido em 29/08, em producao)
+  // ==========================================================================
+  //
+  //   82  tumulos contratados
+  //  182  lavagens por mes que eles consomem
+  //  R$ 3.150  de receita contratada
+  //  R$ 17,30  por lavagem, em media
+  //  R$ 1.840  de pagamento da ajudante (o UNICO custo cadastrado na casa)
+  //   42%  de uso da agenda
+  //
+  // E a mesma lavagem sendo cobrada de R$ 5,75 a R$ 60,00 — dez vezes de
+  // diferenca, quase toda ela explicada por periodicidade: quem lava toda
+  // semana consome 4,3 lavagens por mes e paga quase o mesmo de quem lava a
+  // cada quinze dias, que consome 2.
+  //
+  // O QUE PODE DAR ERRADO AQUI E DINHEIRO, NOS DOIS SENTIDOS:
+  //   custo cheio usado como marginal   recusa cliente que ADICIONARIA dinheiro
+  //   custo marginal usado como cheio   acha que tudo da lucro e nunca sobe o piso
+  console.log("\n=== 12f. A CONTA DO PRECO ===");
+  {
+    const { precificar, lavagensPorMes } = await import("../src/lib/precificacao");
+
+    checar("semanal consome 4,3 lavagens por mes, nao 4",
+           Math.abs((lavagensPorMes("semanal") ?? 0) - 4.345) < 0.001,
+           "usar 4 subestima a carga semanal em 8% — e e no semanal que estao os mais baratos");
+    checar("quinzenal consome 2", lavagensPorMes("quinzenal") === 2);
+
+    // PERIODICIDADE DESCONHECIDA NAO VIRA ZERO. Zero faria o contrato parecer
+    // trabalho de graca — margem infinita — e ele subiria para o topo da lista
+    // de melhores contratos da casa.
+    checar("periodicidade desconhecida nao vale zero lavagem",
+           lavagensPorMes("de vez em quando") === null && lavagensPorMes(null) === null,
+           "ausencia virou medida: o contrato sem periodicidade parece o mais lucrativo");
+
+    const custos = { ajudanteMes: 1840, materialPorLavagem: 0,
+                     transportePorLavagem: 0, sistemaMes: 0 };
+
+    // O caso real, reduzido: um quinzenal a R$ 40 (R$ 20/lavagem) e um semanal
+    // a R$ 25 (R$ 5,75/lavagem — o contrato mais barato da casa).
+    const c = precificar([
+      { id: "a", familia: "Quinzenal", codigo: null, periodicidade: "quinzenal", valorMensal: 40 },
+      { id: "b", familia: "Alcantara", codigo: null, periodicidade: "semanal", valorMensal: 25 },
+    ], custos, 435);
+
+    checar("a carga soma as duas periodicidades",
+           Math.abs(c.lavagensMes - 6.3) < 0.05, `veio ${c.lavagensMes}`);
+    checar("o semanal aparece como o mais barato por lavagem",
+           c.linhas.find((l) => l.id === "b")!.porLavagem === 5.75,
+           "a conta por lavagem nao esta dividindo pela carga real");
+    // O CUSTO CHEIO DEPENDE DO VOLUME — e e exatamente por isso que ele NAO
+    // serve para decidir se vale pegar mais um cliente.
+    //
+    // Com dois contratos so, o salario de R$ 1.840 se divide por 6,3 lavagens:
+    // o custo cheio vira R$ 290 e ATE o contrato bom fica "abaixo do custo".
+    // Com a carteira cheia ele cai para perto de R$ 13, e so o barato sobra na
+    // lista. O mesmo contrato, o mesmo preco, a mesma ajudante — e dois
+    // veredictos opostos. Ler esse numero como "o custo da lavagem" e o erro
+    // que esta tela existe para nao deixar acontecer.
+    checar("com pouco volume, o fixo condena ate o contrato bom",
+           c.abaixoDoCusto === 2 && (c.custoCheioPorLavagem ?? 0) > 250,
+           `cheio ${c.custoCheioPorLavagem}, abaixo ${c.abaixoDoCusto}`);
+
+    const carteira = precificar([
+      ...Array.from({ length: 70 }, (_, i) => ({
+        id: `q${i}`, familia: "Quinzenal", codigo: null,
+        periodicidade: "quinzenal", valorMensal: 40,
+      })),
+      { id: "b", familia: "Alcantara", codigo: null, periodicidade: "semanal", valorMensal: 25 },
+    ], custos, 435);
+
+    checar("com a carteira cheia, o custo cheio cai para a casa dos R$ 13",
+           (carteira.custoCheioPorLavagem ?? 0) > 12 && (carteira.custoCheioPorLavagem ?? 0) < 14,
+           `veio ${carteira.custoCheioPorLavagem}`);
+    checar("e ai so o semanal barato aparece abaixo do custo",
+           carteira.abaixoDoCusto === 1
+           && carteira.linhas.find((l) => l.id === "b")!.situacao === "abaixo do custo",
+           `abaixo: ${carteira.abaixoDoCusto}`);
+
+    // OS DOIS CUSTOS SAO NUMEROS DIFERENTES, E TEM DE SER.
+    checar("o custo cheio e o fixo rateado pelas lavagens de hoje",
+           Math.abs((c.custoCheioPorLavagem ?? 0) - 1840 / 6.345) < 0.02,
+           `veio ${c.custoCheioPorLavagem}`);
+    checar("o custo de mais uma NAO carrega o salario",
+           c.custoDeMaisUm === 0,
+           "a proxima lavagem esta sendo cobrada de um salario que ja foi pago");
+
+    const comVariavel = precificar([
+      { id: "a", familia: "Q", codigo: null, periodicidade: "quinzenal", valorMensal: 40 },
+    ], { ...custos, materialPorLavagem: 2.5, transportePorLavagem: 1.5 }, 435);
+    checar("material e transporte entram no custo de mais uma",
+           comVariavel.custoDeMaisUm === 4);
+
+    // Sem lavagem nenhuma, ratear o fixo daria Infinity — e Infinity numa tela
+    // de dinheiro e pior que uma tela vazia.
+    const vazio = precificar([], custos, 435);
+    checar("sem contrato, o custo por lavagem e vazio e nao infinito",
+           vazio.custoCheioPorLavagem === null && vazio.lavagensMes === 0);
+
+    // O contrato sem periodicidade fica DE FORA da conta e e CONTADO, para
+    // alguem completar — em vez de sumir em silencio.
+    const torto = precificar([
+      { id: "a", familia: "Q", codigo: null, periodicidade: "quinzenal", valorMensal: 40 },
+      { id: "x", familia: "Sem regra", codigo: null, periodicidade: null, valorMensal: 30 },
+    ], custos, 435);
+    checar("contrato sem periodicidade sai da conta e e contado",
+           torto.semPeriodicidade === 1 && torto.receitaMes === 40
+           && torto.linhas.find((l) => l.id === "x")!.situacao === "nao da para dizer");
+
+    checar("a folga da agenda e o que ainda cabe",
+           Math.abs((c.folgaLavagens ?? 0) - (435 - 6.345)) < 0.1);
+  }
+
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
   {
     const { calcularSaldo } = await import("../src/lib/saldo");

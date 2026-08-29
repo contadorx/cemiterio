@@ -1903,6 +1903,49 @@ ok("e o tom cabe numa caixa que se le",
    && agente42.slice(0, agente42.indexOf("value={tom}")).lastIndexOf("<textarea")
       > agente42.slice(0, agente42.indexOf("value={tom}")).lastIndexOf("<input"));
 
+// ===========================================================================
+// O PRECO MOSTRA OS DOIS CUSTOS, E NAO CHAMA NENHUM DELES DE "O CUSTO"
+//
+// "Quanto custa uma lavagem?" tem duas respostas certas, e trocar uma pela
+// outra custa dinheiro nos dois sentidos: o custo CHEIO (o fixo rateado pelas
+// lavagens de hoje) responde "este contrato paga o proprio custo?"; o custo de
+// MAIS UMA responde "vale pegar mais um jazigo?". Com a agenda em 42% de uso
+// eles sao numeros muito diferentes.
+//
+// A guarda e negativa junto com a positiva: nao basta mostrar os dois, tem de
+// nao existir um terceiro calculo escondido na tela.
+// ===========================================================================
+const libPreco = readFileSync("src/lib/precificacao.ts", "utf8");
+const telaPreco = readFileSync("src/app/painel/financeiro/Preco.tsx", "utf8");
+const rotaPreco = readFileSync("src/app/api/precificacao/route.ts", "utf8");
+
+ok("a tela mostra o custo cheio E o custo de mais uma",
+   /custoCheioPorLavagem/.test(telaPreco) && /custoDeMaisUm/.test(telaPreco));
+ok("e a conta mora numa funcao so, nao na tela",
+   /export function precificar\(/.test(libPreco)
+   && /precificar\(/.test(semComentarios(rotaPreco))
+   && !/precificar\(/.test(semComentarios(telaPreco)));
+
+// Periodicidade desconhecida virando zero lavagem faria o contrato parecer
+// trabalho de graca — margem infinita — e ele subiria para o topo da lista de
+// melhores contratos da casa.
+ok("periodicidade desconhecida nao vira zero lavagem",
+   /return null;/.test(libPreco) && !/default: return 0/.test(libPreco));
+
+// Uma sobra calculada com material, transporte e sistema em ZERO, lida como
+// lucro, e o jeito mais rapido de baixar um preco que ja nao paga a conta.
+ok("a tela avisa quando a sobra foi calculada com custo faltando",
+   /buracos/.test(rotaPreco) && /o teto, não o que sobra/.test(telaPreco));
+
+// A tela de preco nao pode ter uma capacidade propria: ela e a agenda
+// discordando de si mesma, com as duas certas segundo a propria conta.
+ok("a capacidade vem da configuracao da casa, nao de um numero na tela",
+   /limpezas_por_dia/.test(rotaPreco) && !/435|4\.345/.test(telaPreco));
+
+// Enquanto os dados nao foram revisados com a Sureya, a tela so le.
+ok("a tela de preco nao grava nada",
+   !/method: "(POST|PUT|PATCH|DELETE)"/.test(telaPreco));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

@@ -10,6 +10,7 @@ import { PainelFechamento } from "../fechamento/Fechamento";
 import Entradas from "./Entradas";
 import Equipe from "./Equipe";
 import Reajustes from "./Reajustes";
+import Preco from "./Preco";
 import Mes from "./Mes";
 import Remuneracao from "./Remuneracao";
 import { diaOperacao, mesOperacao } from "@/lib/vencimento";
@@ -40,7 +41,7 @@ interface Comp {
  * Reajuste entrou aqui como aba: e decisao de PRECO, mora junto com entradas,
  * resultado por jazigo e conta da equipe. /painel/reajustes redireciona.
  */
-type AbaFin = "fechar" | "mes" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
+type AbaFin = "fechar" | "mes" | "preco" | "gestao" | "conferir" | "equipe" | "pagamento" | "jazigos" | "reajustes";
 
 const ABAS_FIN: [AbaFin, string][] = [
   // "O mês" é a primeira e a padrão: é a pergunta que se faz primeiro, e era a
@@ -68,6 +69,11 @@ const ABAS_FIN: [AbaFin, string][] = [
   ["mes", "O mês"],
   ["conferir", "Conferir entradas"],
   ["jazigos", "Resultado por jazigo"],
+  // O PRECO ENTROU AQUI, no fim, porque nao e coisa do dia: e a conversa de
+  // uma vez por trimestre. Medido em 29/08: 82 contratos, 182 lavagens/mes,
+  // R$ 17,30 por lavagem em media — e a mesma lavagem sendo cobrada de R$ 5,75
+  // a R$ 60,00, dez vezes de diferenca, sem que nada na tela dissesse isso.
+  ["preco", "Preço"],
 ];
 
 /** A aba que abre sem `?aba=` — e o único endereço sem parâmetro. */
@@ -123,6 +129,7 @@ export default function Financeiro() {
         {aba === "equipe" && <Equipe />}
         {aba === "pagamento" && <Remuneracao />}
         {aba === "jazigos" && <PorJazigo />}
+        {aba === "preco" && <Preco />}
         {aba === "reajustes" && <Reajustes />}
       </div>
     </div>
