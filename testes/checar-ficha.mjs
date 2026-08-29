@@ -2087,6 +2087,57 @@ ok("e apaga uma a uma, contando as recusas",
 ok("a tela diz que a pessoa sai junto com a familia",
    /órfã/.test(telaVaz));
 
+// ===========================================================================
+// UMA CAIXA SO, E O QUE VAI E O QUE ESTA NELA (0148)
+//
+// O QUE ACONTECEU COM A JOSEFINA, EM 29/08:
+//   09:10  a IA rascunha uma resposta sobre luto
+//   12:35  a familia volta e pergunta OUTRA coisa: "Qual valor", "quando vc
+//          poderia vir"
+//   16:59  o rascunho das 9h sai, palavra por palavra
+//
+// A tela tinha DUAS caixas editaveis e TRES botoes de enviar. Ele reescreveu o
+// texto na caixa do rascunho e clicou em "Aprovar e enviar" — o unico dos
+// botoes que NAO olhava para a caixa. `texto_final` ficou null: a edicao nao
+// chegou nem a ser gravada.
+//
+// Estas guardas sao NEGATIVAS de proposito: o defeito nao era falta de aviso,
+// era a existencia da segunda caixa e do botao que a ignorava.
+// ===========================================================================
+const telaConv48 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv48Sem = semComentarios(telaConv48);
+
+// Contar `<textarea>` no arquivo inteiro pegaria os do painel "Me ajuda a
+// escrever", que sao outra coisa. O defeito era um SEGUNDO ESTADO editavel
+// para a MESMA resposta — `rascText` ao lado de `texto`. E isso que nao pode
+// voltar.
+ok("nao ha um segundo estado editavel para a mesma resposta",
+   !/rascText/.test(telaConv48)
+   && (telaConv48Sem.match(/value=\{texto\}/g) || []).length === 1);
+ok("nem o botao que enviava o rascunho ignorando a caixa",
+   !/Aprovar e enviar/.test(telaConv48Sem) && !/Enviar editado/.test(telaConv48Sem));
+ok("a sugestao da IA vai PARA a caixa, em vez de ter a sua",
+   /Usar esta resposta/.test(telaConv48Sem) && /setTexto\(d\?\.rascunho\?\.rascunho/.test(telaConv48Sem));
+
+// A rota conserta todos os outros caminhos: tela conserta o de hoje.
+const rotaApr48 = readFileSync("src/app/api/atendimento/aprovar/route.ts", "utf8");
+const rotaApr48Sem = semComentarios(rotaApr48);
+ok("a rota manda o texto que veio, nao o rascunho do banco",
+   /const textoParaEnviar = veio \|\| rascunhoOriginal;/.test(rotaApr48Sem));
+// "aprovou" com texto diferente e edicao — a acao passa a ser deduzida do
+// texto em vez de acreditada, senao o score aprenderia errado.
+ok("e deduz se foi aprovacao ou edicao comparando com o rascunho",
+   /veio !== rascunhoOriginal \? "editou" : "aprovou"/.test(rotaApr48Sem));
+
+// Responder pela caixa livre deixava a interacao ABERTA, e a conversa ficava
+// eternamente "precisa de voce" por um rascunho que ninguem ia mais usar.
+ok("enviar com rascunho pendente fecha o rascunho",
+   /d\?\.rascunho\?\.id/.test(telaConv48Sem) && /atendimento\/aprovar/.test(telaConv48Sem));
+
+// O rascunho da Josefina tinha OITO HORAS e respondia outro assunto.
+ok("a tela avisa quando a sugestao esta velha",
+   /rascunhoVelho/.test(telaConv48Sem) && /msgsDepois/.test(telaConv48Sem));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

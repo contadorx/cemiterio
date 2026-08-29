@@ -14,7 +14,6 @@ export default function Thread() {
   const id = params?.id as string;
   const [d, setD] = useState<any>(null);
   const [texto, setTexto] = useState("");
-  const [rascText, setRascText] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const [versaoPedidos, setVersaoPedidos] = useState(0);
@@ -62,7 +61,6 @@ export default function Thread() {
     const r = await fetch(`/api/conversas/${id}`).then((x) => x.json());
     if (r.ok) {
       setD(r);
-      setRascText(r.rascunho?.rascunho || "");
     }
     // As promessas em aberto vêm da MESMA rota que a caixa acima usa — uma
     // definição só de "em aberto", senão o aviso de finalizar discordaria da
@@ -78,28 +76,73 @@ export default function Thread() {
     fim.current?.scrollIntoView();
   }, [d]);
 
+  /**
+   * UMA CAIXA SÓ, E O QUE VAI É O QUE ESTÁ NELA.
+   *
+   * -------------------------------------------------------------------------
+   * O QUE ACONTECEU COM A JOSEFINA, EM 29/08
+   * -------------------------------------------------------------------------
+   *   09:10  a IA rascunha uma resposta sobre luto ("Sinto muito pela sua mãe")
+   *   12:35  a família volta e pergunta OUTRA coisa: "Qual valor", "quando vc
+   *          poderia vir"
+   *   16:59  o rascunho das 9h sai, palavra por palavra
+   *
+   * Havia DUAS caixas de texto na tela e TRÊS botões de enviar. Ele reescreveu
+   * o texto na caixa do rascunho e clicou em "Aprovar e enviar" — o único dos
+   * botões que NÃO olhava para a caixa. Foi o rascunho de oito horas antes,
+   * respondendo um assunto que já tinha passado.
+   *
+   * Dois campos editáveis para a mesma resposta, com botões que dizem a mesma
+   * coisa e fazem coisas diferentes: o erro não foi dele.
+   *
+   * Agora há UMA caixa. A sugestão da IA entra NELA — que é o que "Sugerir
+   * resposta" já fazia — e o envio é um só. Não existe mais um caminho que
+   * mande outra coisa que não o que está escrito na tela.
+   */
   async function enviar() {
-    if (!texto.trim()) return;
+    const t = texto.trim();
+    if (!t) return;
     setOcupado(true);
-    await fetch(`/api/conversas/${id}/enviar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto }),
-    });
-    setTexto("");
-    setOcupado(false);
-    carregar();
+    try {
+      // COM RASCUNHO PENDENTE, O ENVIO PASSA POR ELE — senão a interação ficaria
+      // aberta para sempre e a IA continuaria "esperando decisão" sobre uma
+      // resposta que já foi. A rota deduz sozinha se foi aprovada ou editada,
+      // comparando com o rascunho original.
+      if (d?.rascunho?.id) {
+        await fetch("/api/atendimento/aprovar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "editou", textoFinal: t }),
+        });
+      } else {
+        await fetch(`/api/conversas/${id}/enviar`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: t }),
+        });
+      }
+      setTexto("");
+      carregar();
+    } finally { setOcupado(false); }
   }
 
-  async function agirRascunho(acao: "aprovou" | "editou" | "descartou") {
+  /** Joga a sugestão da IA na caixa. Daí em diante ela é texto seu. */
+  async function usarSugestao() {
+    if (texto.trim() && !await perguntar({
+      oQue: "Substituir o que você já escreveu pela sugestão da IA?",
+      efeito: "O seu texto se perde. Se quiser guardar, copie antes.",
+      confirmar: "Substituir", tom: "perigo",
+    })) return;
+    setTexto(d?.rascunho?.rascunho || "");
+  }
+
+  async function descartarRascunho() {
     setOcupado(true);
-    await fetch("/api/atendimento/aprovar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ interacaoId: d.rascunho.id, acao, textoFinal: acao === "editou" ? rascText : undefined }),
-    });
-    setOcupado(false);
-    carregar();
+    try {
+      await fetch("/api/atendimento/aprovar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "descartou" }),
+      });
+      carregar();
+    } finally { setOcupado(false); }
   }
 
   /**
@@ -167,6 +210,26 @@ export default function Thread() {
     setOcupado(false);
     carregar();
   }
+
+  /**
+   * QUANTO TEMPO O RASCUNHO TEM, e quantas mensagens chegaram depois dele.
+   *
+   * O da Josefina tinha OITO HORAS e respondia luto; entre ele e o envio a
+   * família perguntou preço e data. Um rascunho velho não é só desatualizado —
+   * ele responde outra conversa.
+   */
+  const nascidoEm = d?.rascunho?.created_at ? new Date(d.rascunho.created_at).getTime() : 0;
+  const horas = nascidoEm ? Math.floor((Date.now() - nascidoEm) / 3600000) : 0;
+  const msgsDepois = nascidoEm
+    ? (d?.mensagens || []).filter((m: any) =>
+        m.autor === "cliente" && new Date(m.created_at || 0).getTime() > nascidoEm).length
+    : 0;
+  // Velho é ter mais de duas horas OU ter chegado mensagem depois — o segundo
+  // caso importa mais: dez minutos bastam se a família mudou de assunto.
+  const rascunhoVelho = !!nascidoEm && (horas >= 2 || msgsDepois > 0);
+  const idadeRascunho = horas >= 24
+    ? `há ${Math.floor(horas / 24)} dia${horas >= 48 ? "s" : ""}`
+    : horas >= 1 ? `há ${horas}h` : "agora há pouco";
 
   if (!d) {
     return (
@@ -264,24 +327,59 @@ export default function Thread() {
           <div ref={fim} />
         </div>
 
+        {/* A SUGESTÃO DA IA NÃO É MAIS UMA SEGUNDA CAIXA — é um cartão de
+            leitura, com um botão que joga o texto na caixa de baixo.
+
+            Ela era editável, e tinha três botões de envio ao lado. Um deles,
+            "Aprovar e enviar", era o único que NÃO olhava para o que estava
+            escrito ali: mandava o rascunho do banco. Foi assim que a resposta
+            de 09:10 saiu às 16:59 para a Josefina, falando de luto quando ela
+            já tinha perguntado preço e data. */}
         {d.rascunho && (
           <div style={{ ...painel.card, borderColor: "#fbbf24", background: "#fffbeb" }}>
-            <div style={painel.rotulo}>Rascunho da IA — revise antes de enviar</div>
+            <div style={painel.rotulo}>
+              A IA sugeriu uma resposta
+              {rascunhoVelho && (
+                <b style={{ color: "rgb(var(--zm-perigo))" }}> · escrita {idadeRascunho}</b>
+              )}
+            </div>
             {d.rascunho.motivo_retencao && (
               <p style={{ fontSize: 15, color: "#92400e", margin: "0 0 8px" }}>
                 Não foi automático porque: {d.rascunho.motivo_retencao}
               </p>
             )}
-            <textarea
-              style={{ ...painel.input, minHeight: 160, resize: "vertical", fontFamily: "inherit" }}
-              value={rascText}
-              onChange={(e) => setRascText(e.target.value)}
-            />
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              <button style={painel.botao} disabled={ocupado} onClick={() => agirRascunho("aprovou")}>Aprovar e enviar</button>
-              <button style={painel.botaoSec} disabled={ocupado} onClick={() => agirRascunho("editou")}>Enviar editado</button>
-              <button style={painel.botaoPerigo} disabled={ocupado} onClick={() => agirRascunho("descartou")}>Descartar</button>
+
+            {/* O RASCUNHO VELHO É O PERIGO DE VERDADE. O da Josefina tinha oito
+                horas e respondia um assunto que já tinha passado — e nada na
+                tela dizia isso. */}
+            {rascunhoVelho && (
+              <p style={{ fontSize: 14, color: "rgb(var(--zm-perigo))", margin: "0 0 8px",
+                          lineHeight: 1.5 }}>
+                <b>Cuidado:</b> esta sugestão foi escrita {idadeRascunho}
+                {msgsDepois > 0
+                  ? `, e a família mandou ${msgsDepois === 1 ? "mais uma mensagem" : `mais ${msgsDepois} mensagens`} depois disso.`
+                  : "."}{" "}
+                Leia a conversa antes de usar — ela pode estar respondendo outra coisa.
+              </p>
+            )}
+
+            <p style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.5,
+                        margin: "0 0 10px", color: "rgb(var(--zm-ink))" }}>
+              {d.rascunho.rascunho}
+            </p>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={painel.botao} disabled={ocupado} onClick={usarSugestao}>
+                Usar esta resposta
+              </button>
+              <button style={painel.botaoPerigo} disabled={ocupado} onClick={descartarRascunho}>
+                Descartar
+              </button>
             </div>
+            <p style={{ fontSize: 13, color: cor.cinza, margin: "8px 0 0", lineHeight: 1.45 }}>
+              “Usar esta resposta” copia o texto para a caixa abaixo. Você corrige lá, e
+              o que for enviado é <b>exatamente o que estiver escrito nela</b>.
+            </p>
           </div>
         )}
 

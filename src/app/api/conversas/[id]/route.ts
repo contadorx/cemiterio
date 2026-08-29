@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const [msgsCruas, { data: rasc }] = await Promise.all([
     carregarMensagens(),
-    db.from("interacoes_ia").select("id,rascunho,assunto,motivo_retencao").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    db.from("interacoes_ia").select("id,rascunho,assunto,motivo_retencao,created_at").eq("conversa_id", id).is("acao_humana", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   // O LINK QUE ABRE, NO LUGAR DO ENDEREÇO CRU (0139).

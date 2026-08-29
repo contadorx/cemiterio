@@ -33,10 +33,39 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!inter) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
 
-  const textoParaEnviar =
-    acao === "editou" ? (textoFinal || "").trim() : (inter as any).rascunho;
+  // ==========================================================================
+  // VAI O QUE ESTÁ NA TELA — NUNCA O QUE ESTÁ NO BANCO
+  // ==========================================================================
+  //
+  // O QUE ACONTECEU EM 29/08, COM A JOSEFINA
+  //
+  //   09:10  a IA rascunha uma resposta sobre luto ("Sinto muito pela sua mãe")
+  //   12:35  a família volta e pergunta OUTRA coisa: "Qual valor", "quando vc
+  //          poderia vir"
+  //   16:59  o rascunho das 9h é enviado, palavra por palavra
+  //
+  // Ele tinha reescrito o texto na caixa e clicado em "Aprovar e enviar". Este
+  // ramo ignorava a caixa e mandava `inter.rascunho` — o texto de OITO HORAS
+  // antes, respondendo um assunto que já tinha passado. `texto_final` ficou
+  // null: a edição não chegou nem a ser gravada.
+  //
+  // Dois botões que dizem "enviar", com uma caixa editável entre eles, e só um
+  // deles olhando para a caixa. A tela agora tem UMA caixa e UM envio — mas a
+  // trava fica aqui também, porque tela conserta o caminho de hoje e a rota
+  // conserta todos os outros.
+  //
+  // A REGRA: se veio texto, é ele que vai. `acao` continua descrevendo o que a
+  // pessoa fez (para o score saber se a IA acertou), e passa a ser DEDUZIDA do
+  // texto em vez de acreditada — quem manda um texto diferente do rascunho
+  // editou, tenha clicado no botão que tiver.
+  const veio = (textoFinal ?? "").trim();
+  const rascunhoOriginal = String((inter as any).rascunho || "").trim();
+  const textoParaEnviar = veio || rascunhoOriginal;
+  const acaoReal = acao === "descartou"
+    ? "descartou"
+    : veio && veio !== rascunhoOriginal ? "editou" : "aprovou";
 
-  if (acao !== "descartou") {
+  if (acaoReal !== "descartou") {
     if (!textoParaEnviar)
       return NextResponse.json({ ok: false, erro: "texto_vazio" }, { status: 400 });
 
@@ -85,10 +114,10 @@ export async function POST(req: NextRequest) {
   // Move o score e fecha a interação.
   const { data: novoScore, error } = await db.rpc("sureya_registrar_acao_ia", {
     p_interacao: interacaoId,
-    p_acao: acao,
-    p_texto_final: acao === "editou" ? textoParaEnviar : null,
+    p_acao: acaoReal,
+    p_texto_final: acaoReal === "editou" ? textoParaEnviar : null,
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, enviado: acao !== "descartou", score: novoScore });
+  return NextResponse.json({ ok: true, enviado: acaoReal !== "descartou", score: novoScore });
 }
