@@ -128,11 +128,14 @@ const GRUPOS: { titulo: string; itens: [Aba, string][] }[] = [
     // valor da equipe. A dívida da família vem da competência e não passa por
     // aqui. Quem abre esta aba está perguntando "está tudo consistente?".
     ["manutencao", "Manutenção"],
-    // CADASTROS REPETIDOS mora em "O sistema", ao lado de Manutencao, porque e
+    // ARRUMAR CADASTROS mora em "O sistema", ao lado de Manutencao, porque e
     // a mesma pergunta — "esta tudo consistente?" — e nao uma decisao sobre
-    // dinheiro. Em 29/08 eram 11 pares, todos nascidos do mesmo defeito: o
-    // WhatsApp manda o numero com 55 e 46 cadastros estavam sem.
-    ["duplicados", "Cadastros repetidos"],
+    // dinheiro. Sao DUAS coisas na mesma aba, e a ordem entre elas importa:
+    // primeiro juntar os repetidos (11 pares em 29/08, todos nascidos do
+    // WhatsApp mandar o numero com 55 e 46 cadastros estarem sem), so depois
+    // apagar as familias que ficarem sem jazigo. Ao contrario, a copia ficaria
+    // orfa e ainda visivel para o WhatsApp.
+    ["duplicados", "Arrumar cadastros"],
   ]},
 ];
 

@@ -284,3 +284,143 @@ begin
 end $$;
 
 drop function ci45(text, boolean, text);
+
+-- ============================================================================
+-- A FAXINA DAS FAMILIAS SEM JAZIGO (0147)
+--
+-- Medido em 29/08, com os 11 duplicados ja juntados: 122 familias sem jazigo,
+-- 113 pessoas dentro, 103 delas criadas no mesmo dia (a importacao). E TRES que
+-- escreveram de verdade — Eliana, Nena Roberto e Zulmira.
+--
+-- O QUE PODE DAR ERRADO AQUI E MUDO:
+--   apagar demais   `mensagens.cliente_id` e CASCADE: a conversa da familia
+--                   sumiria junto com a limpeza, sem aviso.
+--   apagar de menos deixar a pessoa para tras a torna ORFA, e orfao nao recebe
+--                   pagamento (`sureya_lancar` recusa) — 113 de uma vez.
+-- ============================================================================
+create or replace function ci47(nome text, condicao boolean, porque text) returns void
+language plpgsql as $$
+begin
+  if condicao is distinct from true then
+    raise exception 'FAXINA FALHOU — %: %', nome, porque;
+  end if;
+  raise notice '  ok  %', nome;
+end $$;
+
+do $$
+declare
+  v_org uuid := '47474747-4747-4747-4747-474747474747';
+  v_cem uuid := '47474747-0000-0000-0000-0000000000ce';
+  v_qua uuid := '47474747-0000-0000-0000-0000000000dd';
+  f_seca uuid := '47474747-0000-0000-0000-0000000000f1';  -- so a pessoa
+  f_fala uuid := '47474747-0000-0000-0000-0000000000f2';  -- escreveu (Zulmira)
+  f_tem  uuid := '47474747-0000-0000-0000-0000000000f3';  -- tem jazigo
+  c_seca uuid := '47474747-0000-0000-0000-0000000000c1';
+  c_fala uuid := '47474747-0000-0000-0000-0000000000c2';
+  c_tem  uuid := '47474747-0000-0000-0000-0000000000c3';
+  v_cnv  uuid := '47474747-0000-0000-0000-0000000000cc';
+  v_erro text; v_n int;
+begin
+  insert into orgs (id, nome) values (v_org, 'Teste 0147') on conflict (id) do nothing;
+  insert into cemiterios (id, org_id, nome) values (v_cem, v_org, 'Cem') on conflict (id) do nothing;
+  insert into quadras (id, org_id, cemiterio_id, codigo) values (v_qua, v_org, v_cem, 'Q1')
+    on conflict (id) do nothing;
+
+  insert into familias (id, org_id, nome) values (f_seca, v_org, 'So a pessoa') on conflict (id) do nothing;
+  insert into familias (id, org_id, nome) values (f_fala, v_org, 'Zulmira') on conflict (id) do nothing;
+  insert into familias (id, org_id, nome) values (f_tem,  v_org, 'Com jazigo') on conflict (id) do nothing;
+
+  insert into clientes (id, org_id, nome, telefone, familia_id)
+    values (c_seca, v_org, 'Importada', '5511911110001', f_seca) on conflict (id) do nothing;
+  insert into clientes (id, org_id, nome, telefone, familia_id)
+    values (c_fala, v_org, 'Zulmira', '5511911110002', f_fala) on conflict (id) do nothing;
+  insert into clientes (id, org_id, nome, telefone, familia_id)
+    values (c_tem, v_org, 'Dona do jazigo', '5511911110003', f_tem) on conflict (id) do nothing;
+
+  insert into tumulos (id, org_id, quadra_id, familia_id, identificacao, codigo)
+    values ('47474747-0000-0000-0000-0000000000a1', v_org, v_qua, f_tem, 'T-1', 'Q1-R1-001')
+    on conflict (id) do nothing;
+
+  insert into conversas (id, org_id, cliente_id) values (v_cnv, v_org, c_fala)
+    on conflict (id) do nothing;
+  insert into mensagens (org_id, conversa_id, cliente_id, direcao, autor, texto)
+    values (v_org, v_cnv, c_fala, 'entrada', 'cliente', 'Bom dia, quando vao la?');
+
+  -- =========================================================================
+  -- A LISTA SEPARA QUEM PODE DE QUEM SEGURA.
+  -- =========================================================================
+  perform ci47('a familia com jazigo nao entra na lista',
+               not exists (select 1 from sureya_familias_sem_jazigo(v_org)
+                            where familia_id = f_tem),
+               'a faxina esta olhando para familia que tem jazigo');
+  perform ci47('a que so tem a pessoa pode sair',
+               (select pode_apagar from sureya_familias_sem_jazigo(v_org)
+                 where familia_id = f_seca) = true, '');
+  perform ci47('a que escreveu NAO pode sair',
+               (select pode_apagar from sureya_familias_sem_jazigo(v_org)
+                 where familia_id = f_fala) = false,
+               'a conversa da familia sumiria junto com a limpeza, sem aviso');
+  perform ci47('e a lista diz por que ela fica',
+               (select porque from sureya_familias_sem_jazigo(v_org)
+                 where familia_id = f_fala) like '%escreveu%',
+               'a tela nao teria como explicar a recusa');
+  perform ci47('quem segura aparece primeiro',
+               (select familia_id from sureya_familias_sem_jazigo(v_org) limit 1) = f_fala,
+               'no fim de uma lista de 122, a informacao que muda a decisao nao e lida');
+
+  -- =========================================================================
+  -- O ENSAIO NAO APAGA NADA.
+  -- =========================================================================
+  perform sureya_apagar_familia_sem_jazigo(f_seca, v_org, true);
+  perform ci47('o ensaio nao apaga nada',
+               (select count(*) from familias where id = f_seca) = 1
+               and (select count(*) from clientes where id = c_seca) = 1,
+               'a previa apagou de verdade');
+
+  -- =========================================================================
+  -- APAGAR VALENDO — a pessoa vai junto.
+  -- =========================================================================
+  perform sureya_apagar_familia_sem_jazigo(f_seca, v_org);
+  perform ci47('a familia sai', (select count(*) from familias where id = f_seca) = 0, '');
+  perform ci47('e a pessoa vai junto, sem virar orfa',
+               (select count(*) from clientes where id = c_seca) = 0,
+               'a pessoa ficou sem familia — e orfao nao recebe pagamento');
+
+  -- =========================================================================
+  -- QUEM ESCREVEU E RECUSADO PELO BANCO, nao so escondido na tela.
+  -- =========================================================================
+  begin
+    perform sureya_apagar_familia_sem_jazigo(f_fala, v_org);
+    v_erro := null;
+  exception when others then v_erro := sqlerrm;
+  end;
+  perform ci47('quem escreveu e recusado pelo banco',
+               v_erro like '%familia_tem_historico%',
+               'a tela e a unica coisa protegendo a conversa da familia');
+  perform ci47('e a mensagem continua la',
+               (select count(*) from mensagens where conversa_id = v_cnv) = 1,
+               'a recusa apagou a conversa pela metade');
+
+  -- =========================================================================
+  -- FAMILIA COM JAZIGO E RECUSADA — esta funcao apaga a PESSOA junto.
+  -- =========================================================================
+  begin
+    perform sureya_apagar_familia_sem_jazigo(f_tem, v_org);
+    v_erro := null;
+  exception when others then v_erro := sqlerrm;
+  end;
+  perform ci47('familia com jazigo e recusada',
+               v_erro like '%familia_tem_jazigo%',
+               'apagaria o dono de um jazigo');
+
+  perform ci47('anon nao lista familias sem jazigo',
+               not has_function_privilege('anon', 'sureya_familias_sem_jazigo(uuid)', 'execute'), '');
+  perform ci47('anon nao apaga familia',
+               not has_function_privilege('anon',
+                 'sureya_apagar_familia_sem_jazigo(uuid,uuid,boolean)', 'execute'),
+               'uma funcao que apaga cadastro esta aberta no endereco publico');
+
+  raise notice '  ---';
+end $$;
+
+drop function ci47(text, boolean, text);

@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: conv } = await db
     .from("conversas")
-    .select("id,cliente_id,escalada_humano,clientes(nome,telefone)")
+    .select("id,cliente_id,escalada_humano,resolvida,arquivada_em,clientes(nome,telefone)")
     .eq("id", id)
     .maybeSingle();
   if (!conv) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
@@ -72,6 +72,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       clienteId: (conv as any).cliente_id,
       cliente: (conv as any).clientes?.nome || (conv as any).clientes?.telefone || "—",
       escalada: (conv as any).escalada_humano,
+      // O ESTADO TEM DE CHEGAR NA TELA DA CONVERSA.
+      //
+      // "Resolver" e "Arquivar" existiam so na LISTA. Quem estava dentro da
+      // conversa — que e onde se decide que o assunto acabou, porque e onde se
+      // acabou de responder — tinha de voltar, achar a linha e agir de fora.
+      // A tela nem sabia se aquela conversa ja estava resolvida.
+      resolvida: !!(conv as any).resolvida,
+      arquivada: !!(conv as any).arquivada_em,
     },
     mensagens: msgs || [],
     rascunho: rasc || null,

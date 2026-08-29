@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { painel, cor } from "../ui";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
+import FamiliasVazias from "./FamiliasVazias";
 
 /**
  * A MESMA PESSOA, CADASTRADA DUAS VEZES (0145).
@@ -104,13 +105,20 @@ export default function Duplicados() {
 
   if (pares.length === 0) {
     return (
-      <div style={painel.card}>
+      <>
+        <div style={painel.card}>
         <div style={painel.rotulo}>Cadastros repetidos</div>
         <p style={{ fontSize: 14, color: cor.cinza, margin: 0, lineHeight: 1.5 }}>
           Nenhum número aparece em dois cadastros. A busca por telefone agora ignora a
           diferença do <b>55</b>, então novos duplicados não nascem mais por esse caminho.
         </p>
-      </div>
+        </div>
+        {/* A FAXINA VEM DEPOIS DA FUSÃO, e mora na mesma aba de propósito: é o
+            mesmo trabalho — arrumar cadastro — e a ordem entre as duas importa.
+            Apagar antes de fundir deixaria a cópia órfã e ainda visível para o
+            WhatsApp. */}
+        <FamiliasVazias />
+      </>
     );
   }
 
@@ -197,6 +205,9 @@ export default function Duplicados() {
           </div>
         );
       })}
+
+      {/* Depois de juntar os pares, o que sobra sem jazigo pode sair. */}
+      <FamiliasVazias />
     </div>
   );
 }

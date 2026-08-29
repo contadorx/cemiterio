@@ -21,6 +21,8 @@ export default function Thread() {
   /** A sugestão da IA, e o que ela leu para escrever. */
   const [sugerindo, setSugerindo] = useState(false);
   const [leu, setLeu] = useState<number | null>(null);
+  /** Quantas promessas desta conversa ainda estão em aberto (0142). */
+  const [promessas, setPromessas] = useState(0);
 
   /**
    * SUGERIR RESPOSTA — a IA lê tudo e escreve uma proposta no campo.
@@ -62,6 +64,12 @@ export default function Thread() {
       setD(r);
       setRascText(r.rascunho?.rascunho || "");
     }
+    // As promessas em aberto vêm da MESMA rota que a caixa acima usa — uma
+    // definição só de "em aberto", senão o aviso de finalizar discordaria da
+    // caixa que está na tela dois centímetros acima.
+    const p = await fetch(`/api/compromissos?conversa=${encodeURIComponent(id)}`)
+      .then((x) => x.json()).catch(() => null);
+    setPromessas(p?.ok ? (p.compromissos || []).length : 0);
   }
   useEffect(() => {
     if (id) carregar();
@@ -94,6 +102,61 @@ export default function Thread() {
     carregar();
   }
 
+  /**
+   * FINALIZAR O ATENDIMENTO — de dentro da conversa.
+   *
+   * "Resolver" e "Arquivar" existiam só na LISTA. Mas o momento em que se sabe
+   * que o assunto acabou é o momento em que se acabou de responder — e esse
+   * momento acontece AQUI. Ter de voltar para a lista, achar a linha e agir de
+   * fora é fricção no lugar exato onde ela custa mais: o que dá trabalho fica
+   * para depois, e "depois" é como a fila de 164 mensagens nasceu.
+   *
+   * A CONVERSA VOLTA PARA A IA JUNTO. `resolver` já apaga `escalada_humano` no
+   * banco; deixar a conversa resolvida E assumida seria dizer duas coisas
+   * contrárias sobre a mesma linha.
+   */
+  async function finalizar() {
+    // PROMESSA EM ABERTO É MOTIVO PARA PARAR E OLHAR.
+    //
+    // Fechar o atendimento com uma promessa pendente é exatamente o defeito que
+    // a 0142 mediu: a família esperando um retorno que ninguém sabia que devia.
+    // Não proíbe — às vezes a resposta acabou de sair pela fila —, mas não
+    // deixa acontecer sem ver.
+    const aviso = promessas > 0
+      ? `Ainda há ${promessas === 1 ? "uma promessa em aberto" : `${promessas} promessas em aberto`} `
+        + "nesta conversa. Se já respondeu, feche a promessa também — senão ela "
+        + "continua cobrando você no “Precisa de você”."
+      : "A conversa sai da fila de pendentes e volta para a IA. "
+        + "Ela reabre sozinha se a família escrever de novo.";
+
+    if (!await perguntar({
+      oQue: "Finalizar o atendimento desta conversa?",
+      efeito: aviso,
+      confirmar: "Finalizar", tom: promessas > 0 ? "perigo" : "normal",
+    })) return;
+
+    setOcupado(true);
+    try {
+      const r = await fetch(`/api/conversas/${id}/acao`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "resolver" }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { recado.erro(r?.erro || "Não consegui finalizar agora."); return; }
+      carregar();
+    } finally { setOcupado(false); }
+  }
+
+  async function reabrir() {
+    setOcupado(true);
+    try {
+      await fetch(`/api/conversas/${id}/acao`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "reabrir" }),
+      });
+      carregar();
+    } finally { setOcupado(false); }
+  }
+
   async function alternarIa() {
     setOcupado(true);
     await fetch(`/api/conversas/${id}`, {
@@ -118,14 +181,28 @@ export default function Thread() {
     <div style={painel.wrap}>
       <PainelNav atual="/painel/conversas" />
       <div style={painel.conteudo}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h1 style={painel.h1}>{d.conversa.cliente}</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                      gap: 10, flexWrap: "wrap" }}>
+          <h1 style={{ ...painel.h1, marginRight: "auto" }}>{d.conversa.cliente}</h1>
           <button style={d.conversa.escalada ? painel.botao : painel.botaoSec} onClick={alternarIa} disabled={ocupado}>
             {d.conversa.escalada ? "Devolver para a IA" : "Assumir conversa"}
           </button>
+          {/* FINALIZAR MORA AQUI, e não só na lista.
+              O momento em que se sabe que o assunto acabou é o momento em que
+              se acabou de responder — e esse momento acontece nesta tela. */}
+          {d.conversa.resolvida
+            ? <button style={painel.botaoSec} onClick={reabrir} disabled={ocupado}>
+                Reabrir atendimento
+              </button>
+            : <button style={painel.botaoSec} onClick={finalizar} disabled={ocupado}>
+                Finalizar atendimento
+              </button>}
         </div>
         <p style={{ color: cor.cinza, marginTop: -10, fontSize: 14 }}>
-          {d.conversa.escalada ? "Você está atendendo — a IA não responde." : "A IA está atendendo (rascunhos aparecem aqui)."}
+          {d.conversa.resolvida
+            ? "Atendimento finalizado — ela reabre sozinha se a família escrever de novo."
+            : d.conversa.escalada ? "Você está atendendo — a IA não responde."
+            : "A IA está atendendo (rascunhos aparecem aqui)."}
         </p>
 
         {/* O QUE VOCÊ PROMETEU E AINDA NÃO RESPONDEU (0142).

@@ -2043,6 +2043,50 @@ ok("e a fusao tem ensaio antes",
 ok("jazigo de outra familia tem recado proprio",
    /jazigo_de_outra_familia/.test(readFileSync("src/app/api/financeiro/conciliar/route.ts", "utf8")));
 
+// ===========================================================================
+// FINALIZAR O ATENDIMENTO MORA NA CONVERSA (0147)
+//
+// "Resolver" e "Arquivar" existiam so na LISTA. O momento em que se sabe que o
+// assunto acabou e o momento em que se acabou de responder — e esse momento
+// acontece DENTRO da conversa. Ter de voltar, achar a linha e agir de fora e
+// friccao no lugar onde ela custa mais: o que da trabalho fica para depois, e
+// "depois" foi como a fila de 164 mensagens nasceu.
+// ===========================================================================
+const telaConv47 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv47Sem = semComentarios(telaConv47);
+ok("a conversa tem botao de finalizar atendimento",
+   /Finalizar atendimento/.test(telaConv47Sem) && /acao: "resolver"/.test(telaConv47Sem));
+ok("e de reabrir quando ja esta finalizada",
+   /Reabrir atendimento/.test(telaConv47Sem) && /acao: "reabrir"/.test(telaConv47Sem));
+// Sem o estado vindo do servidor a tela nao sabe qual dos dois mostrar.
+ok("a rota da conversa devolve se ela esta resolvida",
+   /resolvida: !!\(conv as any\)\.resolvida/
+     .test(readFileSync("src/app/api/conversas/[id]/route.ts", "utf8")));
+// Fechar com promessa aberta e o defeito que a 0142 mediu: a familia esperando
+// um retorno que ninguem sabia que devia.
+ok("finalizar avisa quando ha promessa em aberto",
+   /promessas > 0/.test(telaConv47Sem));
+
+// ===========================================================================
+// A FAXINA VEM DEPOIS DA FUSAO (0147)
+//
+// `conta_corrente.familia_id` e CASCADE (o razao some), `mensagens.cliente_id`
+// tambem (a conversa some) e `clientes.familia_id` e SET NULL (a pessoa fica
+// orfa, e `sureya_lancar` recusa orfao). Medido em 29/08: das 122 familias sem
+// jazigo, 3 escreveram de verdade — Eliana, Nena Roberto e Zulmira.
+// ===========================================================================
+const rotaVaz = readFileSync("src/app/api/familias-vazias/route.ts", "utf8");
+const telaVaz = readFileSync("src/app/painel/config/FamiliasVazias.tsx", "utf8");
+ok("a faxina separa quem tem historico de quem nao tem",
+   /pode_apagar/.test(rotaVaz) && /seguram/.test(telaVaz));
+// Um `delete in (...)` pararia tudo na primeira recusa e a tela diria "falhou"
+// sobre 119 familias por causa de uma.
+ok("e apaga uma a uma, contando as recusas",
+   /recusadas/.test(semComentarios(rotaVaz)));
+// A pessoa vai junto: deixa-la criaria o orfao que sureya_lancar recusa.
+ok("a tela diz que a pessoa sai junto com a familia",
+   /órfã/.test(telaVaz));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

@@ -359,7 +359,10 @@ POLICIES_DELTA=${POLICIES_DELTA:-104}
 #             sureya_familia_vazia_para_apagar. Em 29/08: 46 clientes
 #             cadastrados SEM o 55 e o WhatsApp sempre manda COM — nenhum deles
 #             era reconhecido, e 11 pares de duplicados nasceram disso.
-FUNCOES_DELTA=${FUNCOES_DELTA:-93}
+#   0147  +2  sureya_familias_sem_jazigo e sureya_apagar_familia_sem_jazigo.
+#             Depois da fusao sobraram 122 familias sem jazigo — 103 pessoas da
+#             importacao de 19/08 — e TRES que escreveram de verdade.
+FUNCOES_DELTA=${FUNCOES_DELTA:-95}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
