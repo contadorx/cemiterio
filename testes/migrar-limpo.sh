@@ -882,6 +882,17 @@ fi
 echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
 echo
 
+echo "CRACHA — a aba conta o que a lista mostra"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/cracha_conversas.sql 2>&1); then
+  echo "$saida" | grep -E "CRACHA FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Em producao o cracha dizia 7 e a lista mostrava 1."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
 echo "TELEFONE E FUSAO — o mesmo numero e a mesma pessoa"
 if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/telefone_e_fusao.sql 2>&1); then
   echo "$saida" | grep -E "TELEFONE/FUSAO FALHOU|ERROR" | sed 's/^/  /'

@@ -2138,6 +2138,27 @@ ok("enviar com rascunho pendente fecha o rascunho",
 ok("a tela avisa quando a sugestao esta velha",
    /rascunhoVelho/.test(telaConv48Sem) && /msgsDepois/.test(telaConv48Sem));
 
+// ===========================================================================
+// RESOLVER FECHA O RASCUNHO QUE SOBROU (0148)
+//
+// Medido em 29/08: o cracha dizia 7 e a lista mostrava 1. Das 6 de diferenca,
+// CINCO eram conversas ja resolvidas com rascunho da IA aberto — e
+// `tem_rascunho` entra na conta de quem precisa de voce. A conversa voltava a
+// pesar depois de atendida, e nao havia botao para tira-la: a lista so mostra
+// "Resolver" em quem ainda NAO esta resolvida.
+//
+// `descartou` e a verdade do que houve: a pessoa resolveu sem usar o texto.
+// "aprovou" mentiria para o score — a IA aprenderia que acertou uma resposta
+// que nunca saiu.
+// ===========================================================================
+const rotaAcao48 = readFileSync("src/app/api/conversas/[id]/acao/route.ts", "utf8");
+const rotaAcao48Sem = semComentarios(rotaAcao48);
+ok("resolver e arquivar fecham o rascunho pendente",
+   /acao === "resolver" \|\| acao === "arquivar"/.test(rotaAcao48Sem)
+   && /acao_humana: "descartou"/.test(rotaAcao48Sem));
+ok("e so o que estava aberto",
+   /\.is\("acao_humana", null\)/.test(rotaAcao48Sem));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

@@ -33,5 +33,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { error } = await db.from("conversas").update(mapa[acao]).eq("id", params.id);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+
+  // ==========================================================================
+  // FINALIZAR FECHA O RASCUNHO QUE SOBROU
+  // ==========================================================================
+  //
+  // Medido em 29/08: o crachá de "Precisam de você" dizia 7 e a lista mostrava
+  // 1. Das 6 de diferença, CINCO eram conversas já resolvidas que ainda tinham
+  // rascunho da IA aberto (`acao_humana is null`).
+  //
+  // São duas causas somadas, e esta é a segunda: resolver a conversa não
+  // fechava o rascunho. Ele ficava "esperando decisão" para sempre, e como
+  // `tem_rascunho` entra na conta de quem precisa de você, a conversa voltava
+  // a pesar mesmo depois de atendida.
+  //
+  // `descartou` é a verdade do que aconteceu: a pessoa resolveu o assunto sem
+  // usar aquele texto. Marcar como "aprovou" mentiria para o score — a IA
+  // aprenderia que acertou uma resposta que nunca saiu.
+  if (acao === "resolver" || acao === "arquivar") {
+    await db.from("interacoes_ia")
+      .update({ acao_humana: "descartou" })
+      .eq("conversa_id", params.id)
+      .is("acao_humana", null);
+  }
+
   return NextResponse.json({ ok: true });
 }
