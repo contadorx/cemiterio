@@ -347,7 +347,10 @@ POLICIES_DELTA=${POLICIES_DELTA:-104}
 #             que nao se prova nao e remocao.
 #   0142  +1  sureya_compromissos_abertos — o que foi prometido a uma familia
 #             e ainda nao foi respondido.
-FUNCOES_DELTA=${FUNCOES_DELTA:-87}
+#   0144  +1  sureya_conciliar_comprovante_meses — a Thais mandou R$ 240 e
+#             escreveu "referente julho-dezembro". Seis competencias num
+#             pagamento so, e o seletor era de escolha unica.
+FUNCOES_DELTA=${FUNCOES_DELTA:-88}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -861,6 +864,18 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/lavagens_incompletas.sql
   echo "$saida" | grep -E "LAVAGEM INCOMPLETA FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Trabalho feito que ninguem conta nao aparece em lugar nenhum."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+echo "VARIOS MESES — um pagamento se reparte sem perder centavo"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/comprovante_varios_meses.sql 2>&1); then
+  echo "$saida" | grep -E "VARIOS MESES FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Dinheiro no lugar errado do calendario e pior que dinheiro nenhum:"
+  echo "ele parece certo."
   echo "============================================================"
   exit 1
 fi

@@ -201,20 +201,55 @@ function Comprovantes() {
   const [erro, setErro] = useState("");
   /** O que foi mexido, por comprovante. Vazio = "não corrigi nada". */
   const [ed, setEd] = useState<Record<string, {
-    valor: string; data: string; tumuloId: string; competencia: string;
+    valor: string; data: string; tumuloId: string; de: string; ate: string;
   }>>({});
+  /** O rateio ensaiado, por comprovante. Nada disso foi escrito. */
+  const [previa, setPrevia] = useState<Record<string,
+    { competencia: string; valor: number; cobria_divida: boolean }[]>>({});
 
   function campos(c: Comp) {
+    // O MÊS COMEÇA NO PRIMEIRO EM ABERTO, não no mês do Pix.
+    //
+    // Era o mês do Pix, por um gatilho que carimbava `date_trunc(data)`. Para
+    // quem paga em agosto a mensalidade de julho — que é a regra da casa, não a
+    // exceção — isso jogava o dinheiro no mês errado do calendário, e o
+    // relatório por competência passava a mentir nos dois meses.
+    const padrao = (c.competencias || [])[0]?.competencia
+                   || String(c.data || "").slice(0, 7);
     return ed[c.id] || {
       valor: c.valor != null ? String(c.valor) : "",
       data: c.data || "",
       // Um jazigo só não é escolha: já vem escolhido.
       tumuloId: (c.jazigos || []).length === 1 ? c.jazigos[0].id : "",
-      competencia: "",
+      de: padrao, ate: padrao,
     };
+  }
+
+  /**
+   * OS MESES ENTRE "DE" E "ATÉ", inclusive os dois.
+   *
+   * Um intervalo invertido (de 12/2026 até 07/2026) devolve VAZIO, e não a
+   * ordem trocada: aceitar isso calado repartiria o pagamento em seis meses que
+   * a pessoa não pediu.
+   */
+  function mesesDe(de: string, ate: string): string[] {
+    if (!/^\d{4}-\d{2}$/.test(de) || !/^\d{4}-\d{2}$/.test(ate)) return [];
+    const saida: string[] = [];
+    let [a, m] = de.split("-").map(Number);
+    const [af, mf] = ate.split("-").map(Number);
+    // 60 é teto de segurança: cinco anos de mensalidade num pagamento só não
+    // acontece, e sem ele um dedo errado no ano geraria centenas de linhas.
+    while ((a < af || (a === af && m <= mf)) && saida.length < 60) {
+      saida.push(`${a}-${String(m).padStart(2, "0")}`);
+      m++; if (m > 12) { m = 1; a++; }
+    }
+    return saida;
   }
   function mexer(c: Comp, campo: string, v: string) {
     setEd((x) => ({ ...x, [c.id]: { ...campos(c), [campo]: v } }));
+    // Mexeu, a prévia velha morre: deixá-la na tela faria a pessoa confirmar
+    // olhando para um rateio que não é mais o que vai acontecer.
+    setPrevia((x) => { const y = { ...x }; delete y[c.id]; return y; });
   }
 
   /**
@@ -243,10 +278,16 @@ function Comprovantes() {
     carregar();
   }, []);
 
-  async function conciliar(c: Comp, aprovar: boolean) {
+  async function conciliar(c: Comp, aprovar: boolean, ensaio = false) {
     setOcupado(c.id);
     setErro("");
     const f = campos(c);
+    const meses = mesesDe(f.de, f.ate);
+    if (aprovar && meses.length === 0) {
+      setOcupado(null);
+      setErro("O mês final não pode ser antes do inicial.");
+      return;
+    }
     const r = await fetch("/api/financeiro/conciliar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -259,13 +300,17 @@ function Comprovantes() {
           valor: f.valor,
           data: f.data || undefined,
           tumuloId: f.tumuloId || undefined,
-          competencia: f.competencia || undefined,
+          competencias: meses,
+          ensaio,
         } : {}),
       }),
     }).then((x) => x.json()).catch(() => null);
     setOcupado(null);
     if (!r?.ok) { setErro(r?.mensagem || r?.erro || "Não consegui salvar."); return; }
+    // O ENSAIO NÃO FECHA NADA: ele só desenha o que aconteceria.
+    if (ensaio) { setPrevia((x) => ({ ...x, [c.id]: r.rateio || [] })); return; }
     setEd((x) => { const y = { ...x }; delete y[c.id]; return y; });
+    setPrevia((x) => { const y = { ...x }; delete y[c.id]; return y; });
     carregar();
   }
 
@@ -393,23 +438,75 @@ function Comprovantes() {
               agosto dela" —, e NÃO marca aquela competência como paga: o razão
               desta casa é um saldo corrente, não uma lista de faturas. Prometer
               quitação item a item seria inventar um mecanismo que não existe. */}
+          {/* A QUE MESES SE REFERE — no plural, porque um pagamento cobre vários.
+              A Thaís mandou R$ 240 e escreveu "referente julho-dezembro": seis
+              competências num pagamento só. O seletor era de escolha única, e
+              quando nada era apontado um gatilho carimbava o mês do Pix — então
+              a opção "sem apontar" nunca existiu de fato. */}
           <div style={{ marginTop: 10 }}>
-            <label style={painel.rotulo}>A que se refere</label>
-            {(c.competencias || []).length === 0 ? (
-              <p style={{ fontSize: 14, color: cor.cinza, margin: 0 }}>
-                Não há mensalidade a receber para apontar. Entra como pagamento sem
-                destino — o saldo dela sobe e o abate acontece quando houver cobrança.
+            <label style={painel.rotulo}>A que meses se refere</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input type="month" style={{ ...painel.input, margin: 0, maxWidth: 170 }}
+                     value={f.de} onChange={(e) => mexer(c, "de", e.target.value)} />
+              <span style={{ fontSize: 14, color: cor.cinza }}>até</span>
+              <input type="month" style={{ ...painel.input, margin: 0, maxWidth: 170 }}
+                     value={f.ate} onChange={(e) => mexer(c, "ate", e.target.value)} />
+              <button style={painel.botaoMiniSec} disabled={ocupado === c.id}
+                      onClick={() => conciliar(c, true, true)}>
+                Ver como fica
+              </button>
+            </div>
+
+            {(c.competencias || []).length > 0 ? (
+              <p style={{ fontSize: 13.5, color: cor.cinza, margin: "6px 0 0", lineHeight: 1.5 }}>
+                Em aberto:{" "}
+                {(c.competencias || []).map((k) =>
+                  `${mesPorExtenso(k.competencia)} ${dinheiroBR(k.valor)}`).join(" · ")}
               </p>
             ) : (
-              <select style={{ ...painel.input, margin: 0, maxWidth: 420 }} value={f.competencia}
-                      onChange={(e) => mexer(c, "competencia", e.target.value)}>
-                <option value="">sem apontar — só entra no saldo</option>
-                {(c.competencias || []).map((k) => (
-                  <option key={k.competencia + k.venceu} value={k.competencia}>
-                    {mesPorExtenso(k.competencia)} · {dinheiroBR(k.valor)}
-                  </option>
+              <p style={{ fontSize: 13.5, color: cor.cinza, margin: "6px 0 0", lineHeight: 1.5 }}>
+                Esta família ainda não tem mensalidade lançada. O pagamento é dividido
+                igualmente entre os meses que você apontar — e quando o plano existir, os
+                débitos encontram estes créditos.
+              </p>
+            )}
+
+            {/* A PRÉVIA, e ela não escreveu nada. É a MESMA função que executa
+                rodando em modo ensaio: prévia e execução com contas diferentes
+                seria a sexta vez que este projeto paga por duas implementações
+                da mesma regra. */}
+            {previa[c.id] && (
+              <div style={{
+                marginTop: 10, padding: "10px 12px", borderRadius: 10,
+                border: `1px solid ${cor.linha}`, background: "rgb(var(--zm-ink) / 0.03)",
+              }}>
+                <div style={{ fontSize: 12.5, color: cor.cinza, marginBottom: 6 }}>
+                  Como vai ficar — <b>nada foi lançado ainda</b>
+                </div>
+                {(previa[c.id] || []).map((l) => (
+                  <div key={l.competencia} style={{
+                    display: "flex", justifyContent: "space-between", gap: 12,
+                    fontSize: 14, padding: "3px 0",
+                  }}>
+                    <span>{mesPorExtenso(String(l.competencia).slice(0, 7))}
+                      {l.cobria_divida
+                        ? <span style={{ color: cor.cinza }}> · quita a mensalidade</span>
+                        : <span style={{ color: cor.cinza }}> · entra como crédito</span>}
+                    </span>
+                    <b style={{ fontVariantNumeric: "tabular-nums" }}>{dinheiroBR(l.valor)}</b>
+                  </div>
                 ))}
-              </select>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", gap: 12,
+                  fontSize: 14, paddingTop: 6, marginTop: 4,
+                  borderTop: `1px solid ${cor.linha}`, color: cor.cinza,
+                }}>
+                  <span>soma</span>
+                  <b style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {dinheiroBR((previa[c.id] || []).reduce((t, l) => t + Number(l.valor || 0), 0))}
+                  </b>
+                </div>
+              </div>
             )}
           </div>
 

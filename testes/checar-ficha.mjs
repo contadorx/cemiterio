@@ -646,8 +646,11 @@ ok("o valor e a data sao corrigiveis na conferencia",
    /Valor que entrou/.test(telaFin) && /Dia em que caiu/.test(telaFin) &&
    /a leitura dizia/.test(telaFin));
 
-ok("da para dizer de qual jazigo e a que se refere",
-   /De qual jazigo/.test(telaFin) && /A que se refere/.test(telaFin));
+// O rotulo virou PLURAL na 0144 — "A que meses se refere" —, porque um
+// pagamento cobre varios. A guarda acompanha: o que ela protege e que a tela
+// continue perguntando as duas coisas, nao a palavra exata.
+ok("da para dizer de qual jazigo e a que meses se refere",
+   /De qual jazigo/.test(telaFin) && /A que meses se refere/.test(telaFin));
 
 // Familia sem contrato e o caso de quem esta sendo cadastrada agora — nao e
 // erro, mas quem confirma precisa saber.
@@ -1945,6 +1948,53 @@ ok("a capacidade vem da configuracao da casa, nao de um numero na tela",
 // Enquanto os dados nao foram revisados com a Sureya, a tela so le.
 ok("a tela de preco nao grava nada",
    !/method: "(POST|PUT|PATCH|DELETE)"/.test(telaPreco));
+
+// ===========================================================================
+// UM PAGAMENTO COBRE VARIOS MESES (0144)
+//
+// A Thais mandou R$ 240 e escreveu "referente julho-dezembro". Seis
+// competencias num pagamento so, e o seletor era de escolha unica — e quando
+// nada era apontado, um gatilho carimbava o mes do Pix. Entao a opcao
+// "sem apontar — so entra no saldo", que a tela oferecia, NUNCA EXISTIU: o
+// lancamento saia carimbado assim mesmo, no mes errado do calendario.
+//
+// O saldo da familia continuava certo (ele e soma), mas o RELATORIO POR
+// COMPETENCIA — o que a Sureya confere — mostrava agosto inflado e set-dez
+// zerados, com a familia parecendo inadimplente enquanto tinha credito.
+// Dinheiro no lugar errado do calendario e pior que dinheiro nenhum: ele
+// parece certo.
+// ===========================================================================
+// Reusa as leituras da secao 0134 — reler o mesmo arquivo com outro nome e o
+// mesmo defeito de forma que estas guardas existem para caçar.
+const rotaConcSem = semComentarios(rotaConc);
+const telaFinSem = semComentarios(telaFin);
+
+ok("a rota sabe repartir um pagamento entre varios meses",
+   /sureya_conciliar_comprovante_meses/.test(rotaConcSem));
+ok("e a tela pede os meses no plural, com de e ate",
+   /type="month"/.test(telaFinSem) && /competencias: meses/.test(telaFinSem));
+
+// A previa TEM de ser a mesma conta da execucao. Duas implementacoes da mesma
+// regra e o defeito que este projeto mais repete — e aqui ele apareceria como
+// "a previa dizia outra coisa", em cima de dinheiro.
+ok("a previa e a MESMA funcao, em modo ensaio",
+   /p_ensaio: ensaio/.test(rotaConcSem)
+   && !/function\s+ratear|const ratear\s*=/.test(telaFinSem));
+
+// Um ensaio que fecha o comprovante deixa de ser ensaio.
+ok("o ensaio nao audita nem fecha nada",
+   /if \(ensaio\) return NextResponse/.test(rotaConcSem));
+
+// Mexer nos campos e continuar vendo a previa velha faria confirmar olhando
+// para um rateio que ja nao e o que vai acontecer.
+ok("mexer nos campos apaga a previa velha",
+   /setPrevia\(\(x\) => \{ const y = \{ \.\.\.x \}; delete y\[c\.id\]; return y; \}\);/
+     .test(telaFinSem));
+
+// Intervalo invertido aceito calado repartiria o pagamento em meses que
+// ninguem pediu.
+ok("intervalo invertido nao vira meses",
+   /saida\.length < 60/.test(telaFin) && /mesesDe\(/.test(telaFinSem));
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

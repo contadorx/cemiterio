@@ -53,6 +53,58 @@ export async function POST(req: NextRequest) {
     .eq("id", comprovanteId)
     .maybeSingle();
 
+  // VÁRIOS MESES NUM PAGAMENTO SÓ (0144).
+  //
+  // A Thaís mandou R$ 240 e escreveu "referente julho-dezembro". São seis
+  // competências num pagamento, e o caminho de um mês só não sabe dizer isso:
+  // ele lançaria tudo em agosto, e o relatório por competência — o que a
+  // Sureya confere — mostraria agosto inflado e set–dez zerados, com a família
+  // parecendo inadimplente enquanto tem crédito.
+  //
+  // `ensaio` devolve o rateio SEM ESCREVER: a tela mostra quanto cai em cada
+  // mês antes de a pessoa decidir. É a MESMA função que executa — previa e
+  // execução com contas diferentes seria a sexta vez que este projeto paga por
+  // duas implementações da mesma regra.
+  const meses: string[] = Array.isArray(body?.competencias)
+    ? body.competencias
+        .map((m: any) => String(m || "").trim())
+        .filter((m: string) => /^\d{4}-\d{2}$/.test(m))
+        .map((m: string) => `${m}-01`)
+    : [];
+  const ensaio = !!body?.ensaio;
+
+  if (aprovar && meses.length > 0) {
+    const { data: rateio, error: e } = await db.rpc("sureya_conciliar_comprovante_meses", {
+      p_comprovante: comprovanteId,
+      p_competencias: meses,
+      p_valor: valor,
+      p_data: data,
+      p_tumulo: body?.tumuloId || null,
+      p_ensaio: ensaio,
+    });
+    if (e) {
+      return NextResponse.json({
+        ok: false, erro: e.message,
+        mensagem: /ja_conferido/.test(e.message)
+          ? "Este comprovante já virou crédito. Estorne antes de refazer."
+          : /sem_competencia/.test(e.message)
+          ? "Diga a que meses este pagamento se refere."
+          : e.message,
+      }, { status: 400 });
+    }
+    // O ENSAIO PARA AQUI. Nada foi escrito, então não há o que auditar nem
+    // régua para zerar — e devolver "ok, conferido" numa prévia seria mentir.
+    if (ensaio) return NextResponse.json({ ok: true, ensaio: true, rateio: rateio || [] });
+
+    const org = await orgAtual(db);
+    if (org) {
+      await auditar(db, org, auth.userId || null, "conciliou_comprovante",
+        { tipo: "comprovante", id: comprovanteId }, { meses: meses.length, valor });
+    }
+    return NextResponse.json({ ok: true, rateio: rateio || [] });
+  }
+
+  // Um mês só (ou rejeitar): o caminho de sempre.
   const { error } = await db.rpc("sureya_conciliar_comprovante", {
     p_comprovante: comprovanteId,
     p_aprovar: aprovar,
