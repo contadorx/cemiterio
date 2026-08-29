@@ -185,6 +185,47 @@ export async function anotarCompromisso(p: {
   }
 }
 
+/**
+ * O PROMPT QUE VAI PARA O MODELO — UMA MONTAGEM SÓ.
+ *
+ * Está exportada porque a bancada de calibração precisa montar EXATAMENTE o
+ * mesmo prompt. O simulador antigo montava o dele: um bloco só, com o
+ * conhecimento embutido, sobre uma família fictícia chamada "Maria (teste)".
+ * Quem afinava o tom ali afinava contra um prompt que nunca rodou — e nenhum
+ * dos blocos que causaram os 44% de promessas (a tabela de extras, os pedidos
+ * em aberto, os comprovantes a conferir) existia naquele contexto de mentira.
+ *
+ * É a mesma família de defeito de sempre (0092, 0105, 0106, 0115, 0137, 0140,
+ * 0142): duas implementações da mesma regra, que divergem em silêncio. A saída
+ * continua sendo uma só.
+ *
+ * DOIS BLOCOS, e o primeiro é cacheado: o conhecimento do negócio (~3.800
+ * caracteres em 29/08) é o mesmo para todas as famílias, então é cobrado uma
+ * vez e reaproveitado na janela de 5 min — entre famílias, entre os dois passes
+ * e entre os dois lados da bancada. O contexto do cliente vai no bloco
+ * seguinte, sem cache, porque muda a cada conversa.
+ */
+export function montarSystemDeProducao(
+  ctx: Parameters<typeof montarSystemPrompt>[0],
+  config: { conhecimento: string | null; tom: string | null },
+): any {
+  return [
+    {
+      type: "text",
+      text: `CONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${config.conhecimento || ""}`,
+      cache_control: { type: "ephemeral" },
+    },
+    {
+      type: "text",
+      // `conhecimento: null` porque ele JÁ FOI no bloco cacheado acima. Mandar
+      // de novo aqui seria pagar duas vezes pelo mesmo texto em toda chamada.
+      text: montarSystemPrompt(ctx, { conhecimento: null, tom: config.tom }),
+    },
+    // cast: o cache_control é aceito pela API estável, mas os tipos do SDK 0.32
+    // só o declaram no namespace beta. Runtime OK.
+  ] as any;
+}
+
 async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaIa> {
   // teto de custo diário (A8): se estourou, escala pra humano em vez de gastar
   const custo = await podeChamarIa();
@@ -209,19 +250,7 @@ async function chamarIa(cliente: ClienteRow, conversaId: string): Promise<SaidaI
   // reaproveitado nas chamadas seguintes (janela de 5 min) — inclusive entre
   // famílias diferentes, e entre os dois passes abaixo. O contexto do cliente
   // vai no bloco seguinte, sem cache, porque muda a cada conversa.
-  const system = [
-    {
-      type: "text",
-      text: `CONHECIMENTO DO NEGÓCIO (preços, procedimentos, respostas — use como fonte)\n${config.conhecimento || ""}`,
-      cache_control: { type: "ephemeral" },
-    },
-    {
-      type: "text",
-      text: montarSystemPrompt(ctx, { conhecimento: null, tom: config.tom }),
-    },
-    // cast: o cache_control é aceito pela API estável, mas os tipos do SDK 0.32
-    // só o declaram no namespace beta. Runtime OK.
-  ] as any;
+  const system = montarSystemDeProducao(ctx, config);
   const messages = historico.length
     ? historico
     : [{ role: "user" as const, content: "(cliente iniciou conversa)" }];

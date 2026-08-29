@@ -1394,6 +1394,59 @@ async function rodar() {
            promessaAnotavel({ prometeu_voltar: true }) === null);
   }
 
+  // ==========================================================================
+  // A BANCADA CALIBRA CONTRA O PROMPT DE VERDADE
+  // ==========================================================================
+  //
+  // O simulador antigo montava o prompt de um jeito e a producao de outro: um
+  // bloco so, com o conhecimento embutido, sobre uma familia inventada. Quem
+  // afinava o tom la afinava contra algo que nunca rodou.
+  //
+  // Agora ha UMA montagem, e ela e testavel: e funcao pura.
+  console.log("\n=== 12e. O PROMPT QUE VAI PARA O MODELO ===");
+  {
+    const { montarSystemDeProducao } = await import("../src/lib/atendimento");
+    const ctx = {
+      nome: "Oscar", saldoTexto: "em dia", tumulos: [{ identificacao: "Q1-R1-001" }],
+      catalogo: [{ nome: "Troca de vaso", preco: 60 }],
+    } as any;
+    const blocos = montarSystemDeProducao(ctx, {
+      conhecimento: "A limpeza avulsa custa R$ 40.",
+      tom: "Fale como pessoa de confianca da familia.",
+    }) as any[];
+
+    checar("sao dois blocos, e so o primeiro e cacheado",
+           blocos.length === 2
+           && blocos[0].cache_control?.type === "ephemeral"
+           && !blocos[1].cache_control,
+           `vieram ${blocos.length} blocos`);
+
+    // O conhecimento tem ~3.800 caracteres em producao e e o mesmo para todas
+    // as familias. Mandar duas vezes seria pagar duas vezes o mesmo texto em
+    // TODA chamada — e o cache do primeiro bloco perderia a razao de existir.
+    const inteiro = blocos.map((b) => b.text).join("\n");
+    checar("o conhecimento vai UMA vez so, no bloco cacheado",
+           blocos[0].text.includes("A limpeza avulsa custa R$ 40.")
+           && !blocos[1].text.includes("A limpeza avulsa custa R$ 40."),
+           "o conhecimento foi repetido: paga-se duas vezes pelo mesmo texto");
+
+    checar("o tom vai no bloco do cliente",
+           blocos[1].text.includes("Fale como pessoa de confianca da familia."));
+
+    // A bancada existe para descobrir isto: o preco cadastrado chegando (ou
+    // nao) ate ela. Se o catalogo nao entrasse aqui, a bancada mostraria dois
+    // lados igualmente cegos e ninguem descobriria nada.
+    checar("o catalogo da casa chega pelo mesmo caminho",
+           /Troca de vaso: R\$\s*60,00/.test(inteiro),
+           "o preco cadastrado nao entrou no prompt de producao");
+
+    // Sem conhecimento salvo o bloco nasce vazio — e vazio nao pode virar a
+    // string "null" dentro do prompt.
+    const semNada = montarSystemDeProducao(ctx, { conhecimento: null, tom: null }) as any[];
+    checar("sem conhecimento salvo, o bloco nao escreve 'null'",
+           !semNada[0].text.includes("null") && !semNada[1].text.includes("null"));
+  }
+
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
   {
     const { calcularSaldo } = await import("../src/lib/saldo");

@@ -74,6 +74,24 @@ async function calcularSaldoTexto(clienteId: string): Promise<string> {
   return saldoTexto(await calcularSaldo(clienteId));
 }
 
+/**
+ * A FAMÍLIA PELO ID — os MESMOS campos que `acharCliente` traz.
+ *
+ * A bancada de calibração entra por uma conversa, não por um telefone, e
+ * precisa da linha idêntica à que o atendimento de verdade recebe. Buscar com
+ * outra lista de campos faria a bancada montar um contexto que a produção não
+ * monta — que é justamente o defeito que ela existe para não repetir.
+ */
+export async function carregarCliente(id: string): Promise<ClienteRow | null> {
+  const { data } = await supabaseAdmin()
+    .from("clientes")
+    .select(CAMPOS_CLIENTE)
+    .eq("org_id", env.orgId())
+    .eq("id", id)
+    .maybeSingle();
+  return (data as ClienteRow) || null;
+}
+
 export async function montarContexto(cliente: ClienteRow): Promise<ContextoCliente> {
   const db = supabaseAdmin();
   const org = env.orgId();

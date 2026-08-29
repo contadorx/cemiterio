@@ -1852,6 +1852,57 @@ ok("a conversa mostra o que foi prometido, antes das mensagens",
    telaConversa42.indexOf("<Compromissos") > 0
    && telaConversa42.indexOf("<Compromissos") < telaConversa42.indexOf("d.mensagens.length === 0"));
 
+// ===========================================================================
+// A BANCADA CALIBRA CONTRA A FAMILIA DE VERDADE
+//
+// O simulador antigo montava um contexto ficticio ali dentro — "Maria
+// (teste)", "Familia Exemplo", saldo "em dia" — e um prompt de bloco unico.
+// Nenhum dos blocos que causaram os 44% de promessas (a tabela de extras, os
+// pedidos em aberto, os comprovantes a conferir) existia naquele contexto,
+// porque ele nao passava por `montarContexto`. Afinar o tom ali era afinar
+// contra algo que nunca rodou.
+//
+// Estas guardas sao NEGATIVAS de proposito: o defeito nao era falta de tela,
+// era a existencia de uma SEGUNDA montagem. Basta alguem recriar uma para o
+// defeito voltar inteiro.
+// ===========================================================================
+ok("o simulador de familia ficticia nao existe mais",
+   !existsSync("src/app/api/simulador"));
+
+const rotaCal = readFileSync("src/app/api/calibragem/route.ts", "utf8");
+const rotaCalSem = semComentarios(rotaCal);
+ok("a bancada monta o contexto pelo caminho da producao",
+   /montarContexto\(/.test(rotaCalSem) && /montarSystemDeProducao\(/.test(rotaCalSem));
+ok("e nao inventa uma familia dentro dela",
+   !/saldoTexto:\s*["'`]/.test(rotaCalSem) && !/identificacao:\s*["'`]/.test(rotaCalSem));
+
+// O modelo e amostrado: a MESMA pergunta da textos diferentes a cada rodada.
+// Sem fixar isso, a diferenca entre as duas colunas seria em parte o ajuste e
+// em parte o acaso — e ele mudaria o tom por causa de ruido.
+ok("os dois lados rodam sem a variacao do modelo",
+   /temperature: 0/.test(rotaCalSem));
+
+// Uma bancada que envia deixa de ser bancada. "Nenhuma mensagem deve ir
+// automatica ate o app se provar na operacao" — o disparo e manual, pela fila.
+ok("a bancada nao envia nem grava resposta",
+   !/enviarWhatsapp|enviarTextoComRetry|from\("mensagens"\)\s*\n?\s*\.insert|from\("interacoes_ia"\)/
+      .test(rotaCalSem));
+
+// Gasto de testar que se esconde dentro do atendimento faz o custo do
+// atendimento subir sem que ninguem saiba por que.
+ok("o custo da bancada aparece separado do atendimento",
+   /proposito: "calibragem"/.test(rotaCalSem));
+
+const agente42 = readFileSync("src/app/painel/conversas/VisaoAgente.tsx", "utf8");
+ok("a tela de ensinar a IA mostra a bancada",
+   /<Bancada /.test(agente42));
+// 786 caracteres de instrucao num campo de UMA LINHA: nao dava para ler o que
+// estava escrito nem achar a frase que se queria mudar.
+ok("e o tom cabe numa caixa que se le",
+   /value=\{tom\}/.test(agente42)
+   && agente42.slice(0, agente42.indexOf("value={tom}")).lastIndexOf("<textarea")
+      > agente42.slice(0, agente42.indexOf("value={tom}")).lastIndexOf("<input"));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

@@ -20,7 +20,11 @@ import { diaOperacao } from "./vencimento";
  */
 
 export type Proposito =
-  | "atendimento" | "destilacao" | "redator" | "campo" | "comprovante" | "classificacao";
+  | "atendimento" | "destilacao" | "redator" | "campo" | "comprovante" | "classificacao"
+  // A BANCADA GASTA DE VERDADE, E APARECE SEPARADA. Testar o tom chama o
+  // modelo duas vezes por rodada. Se esse gasto entrasse como "atendimento",
+  // o custo do atendimento subiria sem que ninguem soubesse por que.
+  | "calibragem";
 
 export interface EscolhaModelo {
   modelo: string;
