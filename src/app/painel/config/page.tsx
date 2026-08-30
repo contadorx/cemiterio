@@ -10,6 +10,7 @@ import Prioridade from "./Prioridade";
 import Manutencao from "./Manutencao";
 import Termo from "./Termo";
 import Duplicados from "./Duplicados";
+import QuadrasERuas from "./QuadrasERuas";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -806,6 +807,14 @@ function Cemiterios() {
             </span>
           </div>
           {c.endereco && <p style={{ margin: "4px 0 0", color: cor.cinza, fontSize: 14 }}>{c.endereco}</p>}
+
+          {/* AS QUADRAS E AS RUAS.
+              As do Cemiterio da Saudade nasceram de uma migration, e nunca fez
+              falta uma tela: so havia um cemiterio, ja pronto. Com o segundo,
+              a falta trava tudo — a rota de cadastro de jazigo exige que a
+              quadra exista, e responde "Escolha a quadra na lista" com a lista
+              vazia. */}
+          <QuadrasERuas cemiterioId={c.id} cemiterio={c.nome} />
 
           {/* dias de atendimento */}
           <div style={{ marginTop: 12 }}>

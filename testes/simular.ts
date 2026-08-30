@@ -1638,6 +1638,55 @@ async function rodar() {
            "cadastro sem telefone viraria a resposta de qualquer mensagem");
   }
 
+  // ==========================================================================
+  // O NOME DO LUGAR TEM UMA FORMA SO (0149)
+  // ==========================================================================
+  //
+  // A licao ja estava escrita na rota de cadastro de jazigo:
+  //
+  //   "Antes esta rota criava a quadra quando o codigo nao existia. Parecia
+  //    gentil e foi o que produziu TREZE QUADRAS para um cemiterio de quatro:
+  //    'QD 1', 'Q1', 'Qd 1', 'Q01' e 'Quadra 1' eram o mesmo lugar do mundo
+  //    real em cinco registros diferentes — e o roteiro do dia se perdia."
+  //
+  // A resposta de la foi proibir criar por texto livre. Mas alguem tem de criar
+  // a primeira quadra do Santa Lidia — e ai a digitacao volta. Se a tela de
+  // criar aceitasse qualquer forma, as treze nasceriam de novo, uma tela
+  // adiante.
+  console.log("\n=== 12h. O NOME DA QUADRA E DA RUA ===");
+  {
+    const { formaDaQuadra, formaDaRua, mesmoLugar } = await import("../src/lib/lugar");
+
+    // As cinco formas reais que viraram cinco registros.
+    for (const escrito of ["QD 1", "Q1", "Qd 1", "Q01", "Quadra 1", "quadra 01", "q 1"]) {
+      checar(`"${escrito}" e a quadra Q1`, formaDaQuadra(escrito) === "Q1",
+             `virou ${formaDaQuadra(escrito)}`);
+    }
+
+    // O ZERO A ESQUERDA CAI: "Q01" e "Q1" sao o mesmo lugar, e mante-los
+    // diferentes E o defeito.
+    checar("Q01 e Q1 sao o mesmo lugar", mesmoLugar("Q01", "Q1", "quadra"));
+    checar("mas Q1 e Q2 nao sao", !mesmoLugar("Q1", "Q2", "quadra"));
+
+    // NOME QUE NAO E NUMERO SOBREVIVE. Quadra "FUNDOS" existe, e forca-la a
+    // virar "Q0" seria pior que aceitar o nome dela.
+    checar("quadra com nome proprio nao vira Q inventado",
+           formaDaQuadra("Fundos") === "FUNDOS",
+           `virou ${formaDaQuadra("Fundos")}`);
+
+    for (const escrito of ["R5", "rua 5", "RUA 05", "Rua5", "r 5"]) {
+      checar(`"${escrito}" e a RUA 5`, formaDaRua(escrito) === "RUA 5",
+             `virou ${formaDaRua(escrito)}`);
+    }
+    checar("rua com nome proprio sobrevive", formaDaRua("Principal") === "PRINCIPAL");
+
+    // Vazio nao casa com vazio: senao duas quadras sem nome seriam "o mesmo
+    // lugar", e a segunda seria recusada por engano.
+    checar("vazio nao e o mesmo lugar que vazio",
+           !mesmoLugar("", "", "quadra") && !mesmoLugar("  ", "", "rua"),
+           "duas quadras sem nome viraram a mesma");
+  }
+
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
   {
     const { calcularSaldo } = await import("../src/lib/saldo");

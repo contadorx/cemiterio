@@ -2159,6 +2159,42 @@ ok("resolver e arquivar fecham o rascunho pendente",
 ok("e so o que estava aberto",
    /\.is\("acao_humana", null\)/.test(rotaAcao48Sem));
 
+// ===========================================================================
+// UM CEMITERIO NOVO TEM POR ONDE COMECAR (0149)
+//
+// As 4 quadras e 44 ruas do Cemiterio da Saudade nasceram de uma migration.
+// Nunca fez falta uma tela: so havia um cemiterio, e ele ja veio pronto.
+//
+// Com o Santa Lidia (cadastrado em 23/08, ZERO quadras) isso trava tudo: a
+// rota de cadastro de jazigo EXIGE que a quadra exista e responde "Escolha a
+// quadra na lista" — com a lista vazia.
+//
+// E a digitacao livre volta aqui, junto com o defeito das treze quadras.
+// ===========================================================================
+const rotaQuadras = readFileSync("src/app/api/quadras/route.ts", "utf8");
+const rotaRuas = readFileSync("src/app/api/ruas/route.ts", "utf8");
+const telaQR = readFileSync("src/app/painel/config/QuadrasERuas.tsx", "utf8");
+
+ok("da para criar quadra e rua pelo painel",
+   /export async function POST/.test(rotaQuadras) && /export async function POST/.test(rotaRuas));
+// O indice unico do banco so pega a colisao EXATA: "QD 1" passaria por ele.
+ok("e o nome passa pela forma unica antes de gravar",
+   /formaDaQuadra\(/.test(rotaQuadras) && /formaDaRua\(/.test(rotaRuas));
+ok("com recusa quando o mesmo lugar ja existe escrito de outro jeito",
+   /mesmoLugar\(/.test(semComentarios(rotaQuadras))
+   && /mesmoLugar\(/.test(semComentarios(rotaRuas)));
+// A regra mora num lugar so: uma segunda normalizacao na tela seria a oitava
+// vez que este projeto paga por duas implementacoes da mesma regra.
+ok("a regra do nome mora numa lib, nao na tela",
+   !/replace\(\/\\s\+\//.test(semComentarios(telaQR))
+   && /formaDaQuadra/.test(readFileSync("src/lib/lugar.ts", "utf8")));
+// Com dois cemiterios, quem lista as quadras precisa saber de qual e cada uma.
+ok("a lista de quadras diz de qual cemiterio cada uma e",
+   /cemiterio_id/.test(rotaQuadras));
+// Sem rua o jazigo fica fora do roteiro, e a Nina so descobre andando.
+ok("a tela avisa que sem rua o jazigo fica fora do roteiro",
+   /fora do roteiro/.test(telaQR));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 
