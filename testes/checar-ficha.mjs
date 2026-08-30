@@ -2252,6 +2252,35 @@ ok("o seletor so aparece com mais de um cemiterio",
    /cemiterios \|\| \[\]\)\.length > 1/.test(telaJaz50)
    && /cemiterios \|\| \[\]\)\.length > 1/.test(telaLap50));
 
+// ===========================================================================
+// A AGENDA DIZ DE QUAL CEMITERIO (0150)
+//
+// A agenda E o roteiro do dia, e a roteirizacao automatica e por sequencia de
+// quadra e rua com serpentina — ordem que so faz sentido DENTRO de um
+// cemiterio. Uma lista que mistura os dois manda a Nina atravessar Maua no
+// meio do expediente, e nada na tela dizia isso: a linha mostrava "Quadra 1",
+// e a quadra 1 existe nos dois lugares.
+// ===========================================================================
+const rotaSem50 = readFileSync("src/app/api/agenda/semana/route.ts", "utf8");
+const telaAg50 = readFileSync("src/app/painel/agenda/page.tsx", "utf8");
+const telaAg50Sem = semComentarios(telaAg50);
+
+ok("a agenda da semana traz o cemiterio de cada linha",
+   /cemiterios\(nome\)/.test(rotaSem50) && /cemiterio: \(s as any\)/.test(rotaSem50));
+ok("e a tela recorta por ele",
+   /cemFiltro/.test(telaAg50Sem) && /s\.cemiterio !== cemFiltro/.test(telaAg50Sem));
+// Oferecer um cemiterio sem lavagem no periodo seria uma opcao que devolve
+// lista vazia — a mesma escolha que a lista de ruas ja faz aqui do lado.
+ok("os chips sao os cemiterios COM lavagem no periodo, nao os cadastrados",
+   /Object\.values\(dias\)\.flat\(\)\.map\(\(s\) => s\.cemiterio\)/.test(telaAg50Sem));
+// Um chip que nunca muda nada e ruido numa barra que ja tem busca e cinco
+// recortes; e com um cemiterio so, repetir o nome em trinta linhas tambem.
+ok("e so aparecem com mais de um",
+   /cemiterios\.length > 1 && cemiterios\.map/.test(telaAg50Sem)
+   && /cemiterios\.length > 1 && s\.cemiterio/.test(telaAg50Sem));
+ok("limpar filtro limpa o cemiterio tambem",
+   /setCemFiltro\(""\)/.test(telaAg50Sem));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 
