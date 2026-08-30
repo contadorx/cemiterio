@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { diasDaCasa, diasQueRendem } from "@/lib/jornada";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 
@@ -41,11 +42,18 @@ export async function GET() {
 
   const ids = (cems || []).map((c: any) => c.id);
 
-  const [{ data: quadras }, { data: tumulos }, { data: equipe }] = await Promise.all([
+  const [{ data: quadras }, { data: tumulos }, { data: equipe }, { data: orgRow }] = await Promise.all([
     db.from("quadras").select("id,cemiterio_id"),
     db.from("tumulos").select("id,cemiterio_id,cliente_id"),
     db.from("membros").select("user_id,nome,papel,ativo,cemiterio_id").eq("ativo", true),
+    db.from("orgs").select("dias_semana,dias_trabalhados_semana").eq("id", org).maybeSingle(),
   ]);
+
+  // A JORNADA DA CASA ENTRA NA CONTA.
+  // Marcar "sábado e domingo" num cemitério não quer dizer nada sozinho: se a
+  // casa só trabalha de segunda a sexta, a interseção é vazia e aquele lugar
+  // nunca entra na agenda. A tela precisa do número para poder avisar.
+  const jornadaCasa = diasDaCasa(orgRow);
 
   const lista = (cems || []).map((c: any) => {
     const meusTumulos = (tumulos || []).filter((t: any) => t.cemiterio_id === c.id);
@@ -56,6 +64,7 @@ export async function GET() {
       ativo: c.ativo !== false,
       ordem: c.ordem ?? 0,
       diasSemana: Array.isArray(c.dias_semana) && c.dias_semana.length ? c.dias_semana : null,
+      diasQueRendem: diasQueRendem(jornadaCasa, c.dias_semana as number[] | null),
       quadras: (quadras || []).filter((q: any) => q.cemiterio_id === c.id).length,
       jazigos: meusTumulos.length,
       familias: new Set(meusTumulos.map((t: any) => t.cliente_id).filter(Boolean)).size,
@@ -67,6 +76,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
+    jornadaCasa,
     cemiterios: lista,
     dias: DIAS,
     // quem está em campo e ainda não foi amarrado a lugar nenhum

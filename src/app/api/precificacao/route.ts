@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { diasDaCasa } from "@/lib/jornada";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { precificar, SEMANAS_MES, type Custos } from "@/lib/precificacao";
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const { data: orgRow } = await auth.db
     .from("orgs")
-    .select("custo_mensal_ajudante,limpezas_por_dia,dias_trabalhados_semana,valor_referencia_limpeza")
+    .select("custo_mensal_ajudante,limpezas_por_dia,dias_semana,dias_trabalhados_semana,valor_referencia_limpeza")
     .eq("id", org).maybeSingle();
 
   const { data: tums, error } = await auth.db
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
   // Inventar outra aqui faria a tela de preço discordar da agenda sobre quantas
   // lavagens cabem no mês — e as duas estariam certas segundo a própria conta.
   const porDia = Number((orgRow as any)?.limpezas_por_dia) || 0;
-  const diasSemana = Number((orgRow as any)?.dias_trabalhados_semana) || 0;
+  const diasSemana = diasDaCasa(orgRow).length;
   const capacidadeMes = porDia > 0 && diasSemana > 0
     ? Math.round(porDia * diasSemana * SEMANAS_MES) : null;
 

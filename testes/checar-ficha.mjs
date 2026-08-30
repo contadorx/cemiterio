@@ -2281,6 +2281,47 @@ ok("e so aparecem com mais de um",
 ok("limpar filtro limpa o cemiterio tambem",
    /setCemFiltro\(""\)/.test(telaAg50Sem));
 
+// ===========================================================================
+// 0151 — OS DIAS DE TRABALHO SAO UMA REGRA SO
+// ===========================================================================
+const libJornada = readFileSync("src/lib/jornada.ts", "utf8");
+const rotaPreco51 = readFileSync("src/app/api/precificacao/route.ts", "utf8");
+const libCapac = readFileSync("src/lib/capacidade.ts", "utf8");
+const libAgenda51 = readFileSync("src/lib/agenda.ts", "utf8");
+const rotaCems51 = readFileSync("src/app/api/cemiterios/route.ts", "utf8");
+const telaCfg51 = readFileSync("src/app/painel/config/page.tsx", "utf8");
+
+ok("existe um lugar so que decide os dias da casa",
+   /export function diasDaCasa/.test(libJornada)
+   && /export function diasQueRendem/.test(libJornada));
+// O comentario da precificacao dizia que a capacidade vinha "da mesma
+// configuracao que o alocador usa". Vinha de OUTRA coluna: o alocador lia a
+// lista `dias_semana`, a precificacao lia o numero `dias_trabalhados_semana`.
+// A coluna continua sendo BUSCADA: ela e o plano B de `diasDaCasa` quando a
+// lista nao existe. O que nao pode voltar e alguem CONTAR os dias por ela.
+ok("ninguem mais conta os dias pelo numero solto",
+   !/Number\([^)]*dias_trabalhados_semana/.test(semComentarios(rotaPreco51))
+   && !/Number\([^)]*dias_trabalhados_semana/.test(semComentarios(libCapac))
+   && /diasDaCasa\(/.test(rotaPreco51) && /diasDaCasa\(/.test(libCapac));
+// E quem pergunta precisa TRAZER a lista, senao `diasDaCasa` cai no plano B
+// para sempre e o conserto nao vale nada.
+ok("e quem pergunta traz a lista junto",
+   /dias_semana/.test(rotaPreco51) && /dias_semana/.test(libCapac)
+   && /dias_semana,dias_trabalhados_semana/.test(libAgenda51));
+ok("o alocador tambem pergunta no mesmo lugar",
+   /diasDaCasa\(o\)/.test(libAgenda51) && /diasQueRendem\(jornada\.dias/.test(libAgenda51));
+// Um cemiterio marcado so no fim de semana, com a casa de segunda a sexta, da
+// interseçao vazia: o alocador nao acha dia e devolve o mesmo "0 agendados" de
+// quando nao ha nada a fazer. Sao situaçoes opostas. Vazio nao e zero.
+ok("um cemiterio sem dia possivel sai do alocador NOMEADO",
+   /semDia\.push\(/.test(libAgenda51) && /pendentes: grupo\.itens\.length/.test(libAgenda51));
+ok("a rota de cemiterios diz quantos dias cada um realmente rende",
+   /diasQueRendem: diasQueRendem\(jornadaCasa/.test(rotaCems51)
+   && /jornadaCasa,/.test(rotaCems51));
+ok("e a tela avisa, em vermelho, quando nao sobra dia nenhum",
+   /diasQueRendem \|\| \[\]\)\.length === 0/.test(telaCfg51)
+   && /nunca vai entrar na agenda/.test(telaCfg51));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

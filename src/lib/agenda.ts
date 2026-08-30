@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase-admin";
+import { diasDaCasa, diasQueRendem } from "./jornada";
 import { env } from "./env";
 import { diaOperacao, somaDias } from "./vencimento";
 import { registrarErro } from "./monitor";
@@ -30,6 +31,9 @@ function addDias(iso: string, dias: number): string {
 function ehDomingo(iso: string): boolean {
   return new Date(iso + "T12:00:00Z").getUTCDay() === 0;
 }
+/** Um cemitério com pendências e nenhum dia possível — ver `semDia` no alocador. */
+export interface SemDia { cemiterioId: string | null; nome: string; pendentes: number }
+
 // Jornada configurada: quais dias a equipe trabalha e quais datas estão bloqueadas.
 interface Jornada {
   dias: number[];          // 0=dom ... 6=sáb
@@ -39,13 +43,11 @@ interface Jornada {
 async function carregarJornada(): Promise<Jornada> {
   const db = supabaseAdmin();
   const org = env.orgId();
-  const { data: o } = await db.from("orgs").select("dias_semana").eq("id", org).maybeSingle();
+  const { data: o } = await db
+    .from("orgs").select("dias_semana,dias_trabalhados_semana").eq("id", org).maybeSingle();
   const { data: bl } = await db
     .from("dias_sem_campo").select("data").eq("org_id", org).gte("data", isoHoje());
-  const dias = Array.isArray((o as any)?.dias_semana) && (o as any).dias_semana.length
-    ? ((o as any).dias_semana as number[])
-    : [1, 2, 3, 4, 5, 6];
-  return { dias, bloqueadas: new Set((bl || []).map((x: any) => x.data)) };
+  return { dias: diasDaCasa(o), bloqueadas: new Set((bl || []).map((x: any) => x.data)) };
 }
 
 function diaDaSemana(iso: string): number {
@@ -486,7 +488,7 @@ function ordenarPorEndereco(itens: ServicoPend[]): ServicoPend[] {
 
 export async function alocarAgenda(
   opts?: { aPartirDe?: string },
-): Promise<{ agendados: number; dias: number }> {
+): Promise<{ agendados: number; dias: number; semDia: SemDia[] }> {
   const db = supabaseAdmin();
   const org = env.orgId();
 
@@ -655,7 +657,7 @@ export async function alocarAgenda(
     },
   }));
 
-  if (!itens.length) return { agendados: 0, dias: 0 };
+  if (!itens.length) return { agendados: 0, dias: 0, semDia: [] };
 
   const jornada = await carregarJornada();
   // O PISO DA DISTRIBUIÇÃO.
@@ -744,6 +746,17 @@ export async function alocarAgenda(
   let dias = 0;
   let agendados = 0;
   const diasComAlgo = new Set<string>();
+  /**
+   * CEMITERIOS QUE NAO TEM UM DIA SEQUER.
+   *
+   * A interseçao entre a jornada da casa e os dias do cemiterio pode ser
+   * VAZIA — Santa Lidia so no fim de semana, casa so de segunda a sexta. Antes
+   * o laço abaixo simplesmente nao achava dia, nao agendava nada e devolvia o
+   * mesmo "0 agendados" de quando nao ha o que fazer. As duas situaçoes sao
+   * opostas: numa nao ha trabalho, na outra ha trabalho que nunca vai sair.
+   * Vazio nao e zero — entao o cemiterio sai daqui NOMEADO.
+   */
+  const semDia: SemDia[] = [];
 
   for (const grupo of grupos) {
     // quem pode trabalhar NESTE cemitério: quem está amarrado a ele + quem não
@@ -754,8 +767,13 @@ export async function alocarAgenda(
     if (!turnosDoGrupo.length) continue;
 
     // o dia serve para este cemitério? (jornada da casa ∩ dias do cemitério)
+    const diasUteis = diasQueRendem(jornada.dias, grupo.dias);
+    if (!diasUteis.length) {
+      semDia.push({ cemiterioId: grupo.cemiterioId, nome: grupo.nome, pendentes: grupo.itens.length });
+      continue;
+    }
     const diaServe = (d: string) =>
-      proximoDiaUtil(d, jornada) === d && (!grupo.dias || grupo.dias.includes(diaDaSemana(d)));
+      proximoDiaUtil(d, jornada) === d && diasUteis.includes(diaDaSemana(d));
 
     const proximoDiaDoGrupo = (d: string) => {
       let x = proximoDiaUtil(d, jornada);
@@ -979,7 +997,7 @@ export async function alocarAgenda(
   }
 
   dias = diasComAlgo.size;
-  return { agendados, dias };
+  return { agendados, dias, semDia };
 }
 
 /**
@@ -1009,7 +1027,7 @@ export async function alocarAgenda(
  */
 export async function refazerRoteiro(
   aPartirDe?: string,
-): Promise<{ soltos: number; agendados: number; dias: number; de: string }> {
+): Promise<{ soltos: number; agendados: number; dias: number; de: string; semDia: SemDia[] }> {
   const db = supabaseAdmin();
   const org = env.orgId();
   const de = aPartirDe && aPartirDe > isoHoje() ? aPartirDe : addDias(isoHoje(), 1);
