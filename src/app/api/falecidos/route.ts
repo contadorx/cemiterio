@@ -56,12 +56,22 @@ export async function GET(req: NextRequest) {
   // Jazigo SEM foto vai para o fim de cada grupo, não para fora: dá para
   // preencher pelo que a família contou. Sumir com ele esconderia trabalho.
   if (req.nextUrl.searchParams.get("fila")) {
-    const { data, error } = await auth.db
+    // O CEMITÉRIO ESTREITA A FILA (0150).
+    //
+    // A bancada é trabalho de uma pessoa sentada com as fotos de UM cemitério.
+    // Sem este filtro, a fila do Santa Lídia vem misturada com os 266 do
+    // Saudade — e a contagem que a tela mostra ("204 para transcrever") passa a
+    // falar de um trabalho que não é o que está na frente dela.
+    const cemFila = req.nextUrl.searchParams.get("cemiterio") || "";
+
+    let q = auth.db
       .from("tumulos")
-      .select("id,identificacao,codigo,rua,foto_referencia_url,"
+      .select("id,identificacao,codigo,rua,foto_referencia_url,cemiterio_id,"
             + "quadras(codigo),familias(nome),falecidos(id,data_nascimento,data_falecimento)")
       .order("codigo", { ascending: true })
       .limit(1000);
+    if (cemFila) q = q.eq("cemiterio_id", cemFila);
+    const { data, error } = await q;
 
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
@@ -100,6 +110,12 @@ export async function GET(req: NextRequest) {
         prontos: jazigos.filter((j) => j.pessoas > 0 && j.comData > 0).length,
         semFoto: fila.filter((j) => !j.fotoLapide).length,
       },
+      // A LISTA DE CEMITERIOS, para a tela montar o seletor sem uma segunda
+      // chamada. Vem sempre, mesmo com um so — quem decide se mostra o filtro
+      // e a tela, e ela precisa saber quantos existem para decidir.
+      cemiterios: (((await auth.db.from("cemiterios")
+        .select("id,nome").order("ordem")).data as any[]) || [])
+        .map((c) => ({ id: c.id, nome: c.nome })),
     });
   }
 

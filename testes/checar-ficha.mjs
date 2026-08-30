@@ -2220,6 +2220,38 @@ ok("o contador da rua so anda depois do jazigo entrar",
 ok("erro de codigo repetido vira recado que da para agir",
    /Já existe um jazigo com o código/.test(rotaTum));
 
+// ===========================================================================
+// COM DOIS CEMITERIOS, A LISTA PRECISA DIZER DE QUAL (0150)
+//
+// A tela de Jazigos e a bancada das lapides misturavam os 266 do Cemiterio da
+// Saudade com os do Santa Lidia. Quem transcreve lapide trabalha com as fotos
+// de UM cemiterio, e o contador ("204 para transcrever") passava a falar de um
+// trabalho que nao era o que estava na frente dela.
+// ===========================================================================
+const rotaJaz50 = readFileSync("src/app/api/jazigos/route.ts", "utf8");
+const telaJaz50 = readFileSync("src/app/painel/jazigos/page.tsx", "utf8");
+const rotaFal50 = readFileSync("src/app/api/falecidos/route.ts", "utf8");
+const telaLap50 = readFileSync("src/app/painel/jazigos/lapides/page.tsx", "utf8");
+
+ok("a lista de jazigos filtra por cemiterio",
+   /sp\.get\("cemiterio"\)/.test(rotaJaz50) && /cemiterioFiltro/.test(telaJaz50));
+ok("e a bancada das lapides tambem",
+   /searchParams\.get\("cemiterio"\)/.test(rotaFal50) && /&cemiterio=/.test(telaLap50));
+
+// As quadras de um cemiterio nao servem ao outro: "Quadra 1" e "Q1" apareciam
+// lado a lado sem dizer de onde era cada uma, e escolher a errada devolvia
+// lista vazia sem explicar.
+ok("as quadras oferecidas seguem o cemiterio escolhido",
+   /q\.cemiterio_id === cemiterioId/.test(rotaJaz50));
+ok("e trocar de cemiterio limpa a quadra escolhida",
+   /setQuadraFiltro\(""\)/.test(semComentarios(telaJaz50)));
+
+// Um seletor de uma opcao so e ruido numa barra que ja tem busca, quadra, rua
+// e cinco botoes.
+ok("o seletor so aparece com mais de um cemiterio",
+   /cemiterios \|\| \[\]\)\.length > 1/.test(telaJaz50)
+   && /cemiterios \|\| \[\]\)\.length > 1/.test(telaLap50));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

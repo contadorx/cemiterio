@@ -66,7 +66,8 @@ interface Jazigo {
   motivos: string[];
 }
 
-interface Quadra { id: string; codigo: string; cemiterio: string | null }
+interface Quadra { id: string; codigo: string; cemiterio: string | null; cemiterioId?: string }
+interface Cemiterio { id: string; nome: string }
 /** A lista continua se chamando `Cliente` na resposta da API, mas desde a
     0091 o conteúdo é de FAMÍLIAS — inclusive as que ainda não têm contato. */
 interface Cliente { id: string; nome: string; contato?: string | null; semContato?: boolean }
@@ -83,11 +84,21 @@ function quando(d: string | null) {
 export default function JazigosPage() {
   const [dados, setDados] = useState<{
     jazigos: Jazigo[]; quadras: Quadra[]; clientes: Cliente[]; ruas: string[];
+    cemiterios: Cemiterio[];
     total: number; suspeitos: number; completo: boolean;
   } | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
+  /**
+   * O CEMITERIO E O FILTRO MAIS AMPLO — e passou a existir com o segundo.
+   *
+   * Sem ele a lista mistura os 266 jazigos do Cemiterio da Saudade com os do
+   * Santa Lidia. Quem esta transcrevendo lapide de um cemiterio nao tem o que
+   * fazer com os do outro, e o contador no canto ("N de 266") passa a contar
+   * uma coisa que ninguem pediu.
+   */
+  const [cemiterioFiltro, setCemiterioFiltro] = useState("");
   const [quadraFiltro, setQuadraFiltro] = useState("");
   const [ruaFiltro, setRuaFiltro] = useState("");
 
@@ -104,13 +115,14 @@ export default function JazigosPage() {
     setCarregando(true);
     const p = new URLSearchParams();
     if (filtro !== "todos") p.set("filtro", filtro);
+    if (cemiterioFiltro) p.set("cemiterio", cemiterioFiltro);
     if (quadraFiltro) p.set("quadra", quadraFiltro);
     if (ruaFiltro) p.set("rua", ruaFiltro);
     const r = await fetch(`/api/jazigos?${p.toString()}`).then((x) => x.json()).catch(() => null);
     if (!r?.ok) setErro(r?.erro || "não consegui carregar a lista");
     else { setErro(""); setDados(r); }
     setCarregando(false);
-  }, [filtro, quadraFiltro, ruaFiltro]);
+  }, [filtro, cemiterioFiltro, quadraFiltro, ruaFiltro]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -169,6 +181,28 @@ export default function JazigosPage() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
             />
+            {/* O CEMITERIO VEM PRIMEIRO: e o filtro que contem os outros dois.
+                So aparece quando ha mais de um — um seletor de uma opcao so e
+                ruido numa barra que ja tem busca, quadra, rua e cinco botoes. */}
+            {(dados?.cemiterios || []).length > 1 && (
+              <select
+                style={{ ...painel.input, maxWidth: 200, margin: 0 }}
+                value={cemiterioFiltro}
+                onChange={(e) => {
+                  setCemiterioFiltro(e.target.value);
+                  // A QUADRA ESCOLHIDA MORRE JUNTO. Ela e de um cemiterio so, e
+                  // manter a selecao devolveria lista vazia sem dizer por que.
+                  setQuadraFiltro("");
+                  setRuaFiltro("");
+                }}
+              >
+                <option value="">todos os cemitérios</option>
+                {(dados?.cemiterios || []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome.split("—")[0].split(" - ")[0].trim()}</option>
+                ))}
+              </select>
+            )}
+
             <select
               style={{ ...painel.input, maxWidth: 180, margin: 0 }}
               value={quadraFiltro}
@@ -176,7 +210,12 @@ export default function JazigosPage() {
             >
               <option value="">todas as quadras</option>
               {(dados?.quadras || []).map((q) => (
-                <option key={q.id} value={q.id}>{q.codigo}</option>
+                <option key={q.id} value={q.id}>
+                  {q.codigo}
+                  {/* Sem cemiterio escolhido, "Q1" e "Quadra 1" aparecem juntas
+                      e nao da para saber de onde e cada uma. */}
+                  {!cemiterioFiltro && q.cemiterio ? ` · ${q.cemiterio.split("—")[0].split(" - ")[0].trim()}` : ""}
+                </option>
               ))}
             </select>
 

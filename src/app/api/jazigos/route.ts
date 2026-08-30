@@ -35,6 +35,11 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const busca = (sp.get("q") || "").trim().toLowerCase();
   const quadraId = sp.get("quadra") || "";
+  // O CEMITÉRIO É O FILTRO MAIS AMPLO, e passou a existir quando o segundo
+  // nasceu. Sem ele a lista mistura os 266 do Saudade com os do Santa Lídia —
+  // e quem está transcrevendo lápide de um cemitério não tem o que fazer com
+  // os jazigos do outro.
+  const cemiterioId = sp.get("cemiterio") || "";
   const ruaFiltro = sp.get("rua") || "";
   const filtro = sp.get("filtro") || "todos";
   const limite = Math.min(Number(sp.get("limite") || 800), 2000);
@@ -46,6 +51,10 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limite);
     if (quadraId) s = s.eq("quadra_id", quadraId);
+    // `tumulos.cemiterio_id` existe desde a 0044 e está preenchido nos 266.
+    // Filtrar por ele em vez de pela quadra evita um segundo ida-e-volta ao
+    // banco só para descobrir quais quadras são daquele cemitério.
+    if (cemiterioId) s = s.eq("cemiterio_id", cemiterioId);
     // FILTRO POR RUA.
     //
     // Quadra sozinha não estreita o bastante: a Quadra 1 tem dezenas de
@@ -197,7 +206,7 @@ export async function GET(req: NextRequest) {
   // listas de apoio da tela: para onde mover um jazigo e para quem atribuir
   const [{ data: quads }, { data: cems }, { data: cli }] = await Promise.all([
     db.from("quadras").select("id,codigo,cemiterio_id").order("ordem"),
-    db.from("cemiterios").select("id,nome").order("nome"),
+    db.from("cemiterios").select("id,nome,ativo").order("ordem"),
     // AS FAMÍLIAS, e não os contatos. Vinha de `clientes` porque a família era
     // o apelido de um contato; desde a 0091 ela é a entidade, e a lista PRECISA
     // incluir as que ainda não têm com quem falar — são elas que resolvem os
@@ -213,11 +222,22 @@ export async function GET(req: NextRequest) {
     total: jazigos.length,
     suspeitos: jazigos.filter((j) => j.suspeito).length,
     jazigos: filtrados,
-    quadras: ((quads as any[]) || []).map((q) => ({
-      id: q.id,
-      codigo: q.codigo,
-      cemiterio: ((cems as any[]) || []).find((c) => c.id === q.cemiterio_id)?.nome || null,
-    })),
+    // AS QUADRAS SEGUEM O CEMITÉRIO ESCOLHIDO.
+    //
+    // Oferecer todas faria o seletor mostrar "Quadra 1" (Saudade) e "Q1"
+    // (Santa Lídia) lado a lado, sem dizer de onde é cada uma — e escolher a
+    // errada devolve lista vazia sem explicar por quê.
+    quadras: ((quads as any[]) || [])
+      .filter((q) => !cemiterioId || q.cemiterio_id === cemiterioId)
+      .map((q) => ({
+        id: q.id,
+        codigo: q.codigo,
+        cemiterioId: q.cemiterio_id,
+        cemiterio: ((cems as any[]) || []).find((c) => c.id === q.cemiterio_id)?.nome || null,
+      })),
+    // A LISTA DE CEMITÉRIOS, para a tela montar o seletor. Só os ativos: um
+    // cemitério desligado no filtro seria uma opção que nunca traz nada.
+    cemiterios: ((cems as any[]) || []).map((c) => ({ id: c.id, nome: c.nome })),
     // O nome continua `clientes` na resposta para não quebrar chamada antiga,
     // mas o conteúdo agora é de FAMÍLIAS. Cada uma diz se tem contato: a tela
     // marca as que não têm, em vez de deixar a Sureya descobrir na cobrança.

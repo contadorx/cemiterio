@@ -38,12 +38,26 @@ export default function Lapides() {
   const [erro, setErro] = useState("");
   const [i, setI] = useState(0);
 
+  /**
+   * O CEMITERIO ESTREITA A BANCADA (0150).
+   *
+   * A transcricao e trabalho de uma pessoa sentada com as fotos de UM
+   * cemiterio. Sem o filtro, a fila do Santa Lidia vem misturada com os 266 do
+   * Saudade — e o contador ("204 para transcrever") passa a falar de um
+   * trabalho que nao e o que esta na frente dela.
+   */
+  const [cem, setCem] = useState("");
+
   const carregar = useCallback(async () => {
     setErro("");
-    const r = await fetch("/api/falecidos?fila=1").then((x) => x.json()).catch(() => null);
+    const r = await fetch(`/api/falecidos?fila=1${cem ? `&cemiterio=${encodeURIComponent(cem)}` : ""}`)
+      .then((x) => x.json()).catch(() => null);
     if (!r?.ok) { setErro(r?.erro || "não deu para carregar a fila"); return; }
     setD(r);
-  }, []);
+    // Trocar de cemitério recomeça a fila do começo: o índice atual apontava
+    // para um jazigo que já não está na lista.
+    setI(0);
+  }, [cem]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -76,6 +90,24 @@ export default function Lapides() {
       <PainelNav atual="/painel/jazigos" />
       <div style={painel.conteudo}>
         <h1 style={painel.h1}>Bancada das lápides</h1>
+
+        {/* O CEMITERIO PRIMEIRO — a transcricao e trabalho de uma pessoa
+            sentada com as fotos de UM cemiterio. So aparece com mais de um:
+            um seletor de uma opcao so e ruido. */}
+        {(d.cemiterios || []).length > 1 && (
+          <div style={{ ...painel.card, paddingTop: 12, paddingBottom: 12 }}>
+            <label style={painel.rotulo}>De qual cemitério</label>
+            <select style={{ ...painel.input, margin: 0, maxWidth: 320 }}
+                    value={cem} onChange={(e) => setCem(e.target.value)}>
+              <option value="">todos os cemitérios</option>
+              {(d.cemiterios || []).map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {String(c.nome).split("—")[0].split(" - ")[0].trim()}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <section style={painel.card}>
           <p style={{ color: cor.cinza, fontSize: 15, margin: 0, lineHeight: 1.55 }}>
