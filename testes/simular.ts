@@ -1687,6 +1687,56 @@ async function rodar() {
            "duas quadras sem nome viraram a mesma");
   }
 
+  // ==========================================================================
+  // O CODIGO DO JAZIGO (0149)
+  // ==========================================================================
+  //
+  // O QUE ACONTECEU EM 30/08, NO SANTA LIDIA, COM ELE DE PE NO CEMITERIO
+  //
+  // Ele criou a quadra Q3 e chamou a rua de "RUA 1 Q3" — repetindo a quadra no
+  // nome, que e razoavel do lado de quem digita. `gerarCodigo` colava TODOS os
+  // digitos do nome da rua: o 1 da rua com o 3 da quadra, virando **R13**. O
+  // codigo saiu `Q3-R13-001`, que JA EXISTIA no Cemiterio da Saudade, na Rua
+  // 13 da Quadra 3.
+  //
+  // A tela mostrou "duplicate key value violates unique constraint
+  // idx_tumulos_codigo_unico" para quem estava de celular na mao.
+  console.log("\n=== 12i. O CODIGO DO JAZIGO ===");
+  {
+    const { gerarCodigo } = await import("../src/lib/rota");
+
+    // O CASO REAL.
+    checar('"RUA 1 Q3" e a rua 1, nao a rua 13',
+           gerarCodigo("Q3", "RUA 1 Q3", 1) === "Q3-R1-001",
+           `veio ${gerarCodigo("Q3", "RUA 1 Q3", 1)}`);
+
+    // E a rua 13 de verdade continua sendo a 13.
+    checar("Rua 13 continua R13",
+           gerarCodigo("Quadra 3", "Rua 13", 1) === "Q3-R13-001");
+
+    // Zero a esquerda cai: "RUA 05" e "RUA 5" sao a mesma rua, e dois codigos
+    // para ela seriam o defeito das treze quadras uma casa adiante.
+    checar("RUA 05 e RUA 5 dao o mesmo codigo",
+           gerarCodigo("Q1", "RUA 05", 7) === gerarCodigo("Q1", "RUA 5", 7));
+
+    // A quadra tambem: "Quadra 3" e "Q3" sao a mesma.
+    checar("Quadra 3 e Q3 dao o mesmo codigo",
+           gerarCodigo("Quadra 3", "RUA 1", 1) === gerarCodigo("Q3", "RUA 1", 1));
+
+    // Rua sem numero e a principal — nao vira R0.
+    checar("rua sem numero vira PR, nao R0",
+           gerarCodigo("Q2", "PRINCIPAL", 4) === "Q2-PR-004",
+           `veio ${gerarCodigo("Q2", "PRINCIPAL", 4)}`);
+
+    // Transversal tem prefixo proprio: e outro caminho no mesmo cruzamento, e
+    // T3 e R3 sao ruas diferentes.
+    checar("transversal e T, nao R",
+           gerarCodigo("Q1", "TRANSVERSAL 3", 2) === "Q1-T3-002");
+
+    checar("a sequencia vem com tres casas",
+           gerarCodigo("Q1", "RUA 1", 7).endsWith("-007"));
+  }
+
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
   {
     const { calcularSaldo } = await import("../src/lib/saldo");

@@ -258,9 +258,28 @@ export function encaixarPeloGps(
  * A Nina nunca digita nem procura por isso: ela reconhece pela foto.
  */
 export function gerarCodigo(quadraCodigo: string, ruaNome: string, seqCadastro: number): string {
-  const q = quadraCodigo.replace(/\D/g, "") || "0";
-  const num = ruaNome.replace(/\D/g, "");
+  const q = primeiroNumero(quadraCodigo) || "0";
+  // O PRIMEIRO NÚMERO DA RUA, NÃO TODOS OS DÍGITOS DELA.
+  //
+  // Era `ruaNome.replace(/\D/g, "")` — a colagem de todo dígito que houvesse no
+  // nome. Em 30/08, no Santa Lídia, uma rua chamada "RUA 1 Q3" virou **R13**:
+  // o 1 da rua colado no 3 da quadra que estava escrito no nome. O código saiu
+  // `Q3-R13-001` — que já existia no Cemitério da Saudade, na Rua 13 da
+  // Quadra 3 — e o cadastro morreu com erro de chave duplicada.
+  //
+  // Quem cadastra escreve o nome da rua como o cemitério a chama, e às vezes
+  // repete a quadra ali. Isso é razoável do lado de quem digita; o código é que
+  // não pode depender disso.
+  const num = primeiroNumero(ruaNome);
   const prefixo = /transversal/i.test(ruaNome) ? "T" : "R";
   const rua = num ? `${prefixo}${num}` : "PR";        // PR = Principal
   return `Q${q}-${rua}-${String(seqCadastro).padStart(3, "0")}`;
+}
+
+/** O primeiro grupo de dígitos de um texto. "RUA 1 Q3" → "1"; "Rua 13" → "13". */
+function primeiroNumero(texto: string): string {
+  const m = String(texto || "").match(/\d+/);
+  // Zero à esquerda cai: "RUA 05" e "RUA 5" são a mesma rua, e dois códigos
+  // para ela seriam o mesmo defeito das treze quadras, uma casa adiante.
+  return m ? String(Number(m[0])) : "";
 }

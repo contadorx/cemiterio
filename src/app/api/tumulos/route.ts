@@ -330,6 +330,7 @@ export async function POST(req: NextRequest) {
   // NENHUM VIZINHO É RENUMERADO: o código de um túmulo já foi para a ficha da
   // família e para as fotos, e mudar isso apontaria o histórico para a pedra
   // errada.
+  let seqUsada = 0;
   {
     const { data: naRua } = await db
       .from("tumulos").select("id,ordem_na_rua,lat,lng")
@@ -349,9 +350,18 @@ export async function POST(req: NextRequest) {
     // CÓDIGO — "Q1-R5-007". O número é a ordem de CADASTRO na rua, nunca a
     // posição física: a posição muda quando entra um túmulo no meio, o código
     // não pode mudar nunca. Buracos na numeração são normais e esperados.
-    const seq = Number((ruaRow as any).seq_cadastro || 0) + 1;
-    linha.codigo = gerarCodigo(quadraCodigo, ruaNome, seq);
-    await db.from("ruas").update({ seq_cadastro: seq }).eq("id", ruaId);
+    seqUsada = Number((ruaRow as any).seq_cadastro || 0) + 1;
+    linha.codigo = gerarCodigo(quadraCodigo, ruaNome, seqUsada);
+    // O CONTADOR SÓ ANDA DEPOIS QUE O JAZIGO ENTRA (abaixo).
+    //
+    // Ele andava aqui, antes do insert. Toda tentativa que falhava queimava um
+    // número: em 30/08 a "RUA 1 Q3" do Santa Lídia estava com `seq_cadastro`
+    // em 3 e NENHUM túmulo — três tentativas barradas pela chave duplicada,
+    // três números perdidos.
+    //
+    // Buraco na numeração por túmulo excluído é normal e esperado (o código já
+    // foi para a ficha e para as fotos, e não se renumera). Buraco por erro é
+    // outra coisa: não houve pedra nenhuma naquele número.
   }
 
   let { data: tum, error } = await db.from("tumulos").insert(linha).select("id").single();
@@ -367,9 +377,27 @@ export async function POST(req: NextRequest) {
     const r2 = await db.from("tumulos").insert(linha).select("id").single();
     tum = r2.data; error = r2.error;
   }
-  if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
+  if (error) {
+    // A MENSAGEM DO POSTGRES NÃO SE MOSTRA CRUA A QUEM ESTÁ NO CEMITÉRIO.
+    //
+    // Em 30/08 a tela mostrou "duplicate key value violates unique constraint
+    // idx_tumulos_codigo_unico" para quem estava de pé no Santa Lídia, de
+    // celular na mão. Não dá para agir sobre isso.
+    const cru = error.message || "";
+    return NextResponse.json({
+      ok: false, erro: cru,
+      mensagem: /idx_tumulos_codigo_unico|duplicate key/i.test(cru)
+        ? `Já existe um jazigo com o código ${linha.codigo} neste cemitério. `
+          + "Confira se ele não foi cadastrado agora há pouco."
+        : "Não consegui criar o jazigo. " + cru,
+    }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true, tumuloId: (tum as any).id, quadraId });
+  // O CONTADOR DA RUA ANDA AGORA, com o jazigo já dentro.
+  await db.from("ruas").update({ seq_cadastro: seqUsada }).eq("id", ruaId);
+
+  return NextResponse.json({ ok: true, tumuloId: (tum as any).id, quadraId,
+                             codigo: linha.codigo });
 }
 
 /**

@@ -2195,6 +2195,31 @@ ok("a lista de quadras diz de qual cemiterio cada uma e",
 ok("a tela avisa que sem rua o jazigo fica fora do roteiro",
    /fora do roteiro/.test(telaQR));
 
+// ===========================================================================
+// O CODIGO DO JAZIGO NAO DEPENDE DE COMO A RUA FOI ESCRITA (0149)
+//
+// Em 30/08, no Santa Lidia: a rua "RUA 1 Q3" virou R13 — o 1 da rua colado no
+// 3 da quadra que ele repetiu no nome — e o codigo Q3-R13-001 ja existia no
+// Saudade. A tela mostrou "duplicate key value violates unique constraint" no
+// celular de quem estava de pe no cemiterio.
+// ===========================================================================
+const libRota = readFileSync("src/lib/rota.ts", "utf8");
+const rotaTum = readFileSync("src/app/api/tumulos/route.ts", "utf8");
+const rotaTumSem = semComentarios(rotaTum);
+
+ok("o codigo le o PRIMEIRO numero da rua, nao todos os digitos",
+   /function primeiroNumero/.test(libRota)
+   && !/ruaNome\.replace\(\/\\D\/g, ""\)/.test(semComentarios(libRota)));
+// O contador andava antes do insert: tentativa que falhava queimava numero, e
+// a "RUA 1 Q3" ficou com seq_cadastro em 3 sem nenhum tumulo.
+ok("o contador da rua so anda depois do jazigo entrar",
+   /seq_cadastro: seqUsada/.test(rotaTumSem)
+   && rotaTumSem.indexOf("seq_cadastro: seqUsada") > rotaTumSem.indexOf('.insert(linha)'));
+// "duplicate key value violates unique constraint" nao se mostra a quem esta
+// de celular na mao no meio de um cemiterio.
+ok("erro de codigo repetido vira recado que da para agir",
+   /Já existe um jazigo com o código/.test(rotaTum));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 
