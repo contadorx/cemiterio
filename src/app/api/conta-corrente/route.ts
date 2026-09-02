@@ -4,7 +4,7 @@ import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { diaOperacao } from "@/lib/vencimento";
-import { calcularSaldo, porCompetencia } from "@/lib/saldo";
+import { calcularSaldo, porCompetencia, frasearAtraso } from "@/lib/saldo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +78,7 @@ export async function GET(req: NextRequest) {
   // sobre os mesmos fatos. Uma funcao, dois chamadores.
   const hoje = diaOperacao();
   const conta = calcularSaldo(linhas as any, hoje);
+  const mesesDaConta = porCompetencia(linhas as any, hoje);
 
   return NextResponse.json({
     ok: true,
@@ -88,7 +89,10 @@ export async function GET(req: NextRequest) {
     emDia: conta.emDia,
     // MÊS A MÊS — para responder "de qual mês é este pagamento" sem sair da
     // conversa. Mesma lista de lançamentos, agrupada; nenhuma conta nova.
-    meses: porCompetencia(linhas as any),
+    meses: mesesDaConta,
+    // A resposta da pergunta que se faz olhando o comprovante, já pronta:
+    // a tela não deve recalcular atraso, senão viram duas contas.
+    fraseAtraso: frasearAtraso(mesesDaConta, hoje),
     linhas: linhas.map((l) => ({ ...l, aVencer: l.tipo === "debito" && l.data > hoje })),
   });
 }

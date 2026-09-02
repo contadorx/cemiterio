@@ -2383,7 +2383,8 @@ ok("o mes a mes AGRUPA pela competencia, e nao adivinha",
    && /const comp = String\(m\.competencia \|\| ""\)\.slice\(0, 7\);/.test(libSaldo53)
    && /if \(!comp\) continue;/.test(libSaldo53));
 ok("e a rota devolve os meses sem refazer a conta",
-   /meses: porCompetencia\(linhas as any\)/.test(rotaCC53));
+   /porCompetencia\(linhas as any, hoje\)/.test(rotaCC53)
+   && /meses: mesesDaConta/.test(rotaCC53));
 // Sem familia vinculada nao existe conta; dizer "Em dia" ali seria apresentar
 // ausencia como medicao.
 ok("sem familia vinculada o cartao NAO diz 'em dia'",
@@ -2391,8 +2392,12 @@ ok("sem familia vinculada o cartao NAO diz 'em dia'",
 ok("uma falha ao ler a conta vira recado, nao silencio",
    /Não consegui carregar a conta desta família/.test(contaFam53));
 // Quem responde um recado de saudade nao precisa de dinheiro na frente.
-ok("o cartao so abre sozinho quando ha mes em aberto",
-   /setAberto\(!j\.emDia\)/.test(semComentarios(contaFam53)));
+// O CRITERIO MUDOU NA 0155, e esta guarda muda com ele: era "em aberto", que
+// pegava 158 meses da casa; passou a ser ATRASO, que sao 55. A intencao segue
+// a mesma — o cartao so salta quando o dinheiro muda a resposta que vai ser
+// escrita. Ver a guarda irma no bloco da 0155.
+ok("o cartao nao abre sozinho por qualquer saldo",
+   !/setAberto\(!j\.emDia\)/.test(semComentarios(contaFam53)));
 
 // ===========================================================================
 // 0154 — AS FOTOS DAS LAPIDES DEIXAM DE SER PUBLICAS
@@ -2440,6 +2445,37 @@ for (const f of arquivosDe("src/app/api")) {
 }
 ok("nenhuma rota devolve o endereco cru de uma foto", cruas.length === 0);
 for (const c of cruas) console.log(`      ${c}`);
+
+// ===========================================================================
+// 0155 — EM ABERTO NAO E ATRASADO
+//
+// O cartao da 0153 mostrava os 158 meses em aberto da casa como "falta". So
+// 55 estavam vencidos: os outros 103 sao cobrancas cujo prazo nao chegou.
+// Isso faz 21 familias em atraso parecerem 71 — e a pergunta que o cartao
+// existe para responder ("este pagamento e de atrasados?") vira palpite.
+// ===========================================================================
+const libSaldo55 = readFileSync("src/lib/saldo.ts", "utf8");
+const contaFam55 = readFileSync("src/app/painel/conversas/[id]/ContaDaFamilia.tsx", "utf8");
+const rotaCC55 = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+
+ok("o mes sabe se VENCEU, e nao so se falta pagar",
+   /atrasado: !quitado && !!v\.vence && v\.vence <= hoje/.test(libSaldo55));
+// Duas cobrancas no mesmo mes: o atraso comeca na primeira que venceu, senao
+// ele parece mais novo do que e.
+ok("com duas cobrancas no mes vale o vencimento mais antigo",
+   /if \(!alvo\.vence \|\| m\.data < alvo\.vence\) alvo\.vence = m\.data;/.test(libSaldo55));
+ok("existe uma frase pronta que responde a pergunta",
+   /export function frasearAtraso/.test(libSaldo55) && /Em atraso: /.test(libSaldo55));
+// Recalcular atraso na tela seria a segunda conta sobre os mesmos fatos.
+ok("a frase vem da rota, e a tela nao recalcula atraso",
+   /fraseAtraso: frasearAtraso\(mesesDaConta, hoje\)/.test(rotaCC55)
+   && !/vence <=|atrasado =/.test(semComentarios(contaFam55)));
+ok("a tela mostra tres estados, e nao dois",
+   /atrasado \? `\$\{dinheiro\(m\.falta\)\} atrasado`/.test(contaFam55)
+   && /vence \$\{dia\(m\.vence\)\}/.test(contaFam55));
+// Um alarme que toca em quase toda conversa para de ser lido.
+ok("o cartao abre sozinho por ATRASO, nao por qualquer coisa em aberto",
+   /some\(\(m\) => m\.atrasado\)/.test(semComentarios(contaFam55)));
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

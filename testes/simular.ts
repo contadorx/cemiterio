@@ -350,6 +350,56 @@ async function rodar() {
          naoVaza.find((m) => m.competencia === "2026-08")?.quitado === false,
          JSON.stringify(naoVaza));
 
+  // -------------------------------------------------------------------------
+  // EM ABERTO NAO E ATRASADO (0155)
+  //
+  // Medido em 02/09: 158 meses em aberto na casa, e apenas 55 vencidos. Uma
+  // tela que chama os 158 de "falta" faz 21 familias em atraso parecerem 71 —
+  // e transforma "este pagamento e de atrasados?" num palpite.
+  // -------------------------------------------------------------------------
+  const HOJE = "2026-09-02";
+  const mmA = sal.porCompetencia([
+    // julho venceu e nao foi pago: ATRASO
+    { tipo: "debito",  valor: 70, data: "2026-07-10", competencia: "2026-07-01" },
+    // agosto venceu e foi pago
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 70, data: "2026-08-11", competencia: "2026-08-01" },
+    // setembro ainda NAO venceu: em aberto, mas nao e divida
+    { tipo: "debito",  valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+  ], HOJE);
+  const em = (c: string) => mmA.find((m) => m.competencia === c)!;
+  checar("mes vencido e nao pago e ATRASO", em("2026-07").atrasado === true);
+  checar("mes pago nao e atraso", em("2026-08").atrasado === false);
+  checar("mes que ainda NAO venceu nao e atraso, mesmo em aberto",
+         em("2026-09").atrasado === false && em("2026-09").quitado === false,
+         JSON.stringify(em("2026-09")));
+  checar("a frase nomeia o mes atrasado, e nao so o total",
+         sal.frasearAtraso(mmA, HOJE).includes("07/2026"),
+         sal.frasearAtraso(mmA, HOJE));
+  // Sem atraso, "nada atrasado" sozinho deixa a pessoa sem saber se pode cobrar.
+  const mmB = sal.porCompetencia([
+    { tipo: "debito", valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+  ], HOJE);
+  checar("sem atraso, a frase diz QUANDO vence o proximo",
+         sal.frasearAtraso(mmB, HOJE).includes("10/09/2026"),
+         sal.frasearAtraso(mmB, HOJE));
+  // Duas cobrancas no mesmo mes: o atraso comeca na PRIMEIRA que venceu.
+  const mmC = sal.porCompetencia([
+    { tipo: "debito", valor: 30, data: "2026-07-05", competencia: "2026-07-01" },
+    { tipo: "debito", valor: 40, data: "2026-07-25", competencia: "2026-07-01" },
+  ], HOJE);
+  checar("com duas cobrancas no mes, vale o vencimento MAIS ANTIGO",
+         mmC[0].vence === "2026-07-05", String(mmC[0].vence));
+  // O que vence HOJE ja conta como vencido — e a mesma regra de `calcularSaldo`
+  // ("o que venceu e nao foi pago e cobranca"), e ter duas respostas para isso
+  // faria a ficha e o cartao discordarem sobre a mesma familia. O dia e o DIA
+  // DA OPERACAO, nunca o de UTC: das 21h a meia-noite o de UTC ja virou, e a
+  // competencia entraria como atraso uma noite antes da hora.
+  checar("o que vence HOJE ja conta como atrasado, igual ao saldo",
+         sal.porCompetencia(
+           [{ tipo: "debito", valor: 70, data: HOJE, competencia: "2026-09-01" }],
+           HOJE)[0].atrasado === true);
+
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
   const sCec = await fin.calcularSaldo("c-cec");

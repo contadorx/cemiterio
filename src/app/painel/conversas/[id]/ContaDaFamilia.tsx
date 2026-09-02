@@ -35,8 +35,11 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
         if (!vivo) return;
         if (!r.ok || !j?.ok) { setErro(j?.erro || "não consegui ler a conta"); return; }
         setD(j);
-        // em aberto abre sozinho; em dia fica recolhido
-        setAberto(!j.emDia);
+        // ABRE POR ATRASO, NÃO POR "EM ABERTO".
+        // Medido em 02/09: 158 meses em aberto na casa, e só 55 vencidos.
+        // Abrir em cima dos 158 faria o cartão saltar em quase toda conversa,
+        // e um alarme que toca sempre para de ser lido.
+        setAberto(((j.meses || []) as any[]).some((m) => m.atrasado));
       } catch {
         if (vivo) setErro("não consegui falar com o servidor");
       }
@@ -75,9 +78,15 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
   }
 
   const meses: any[] = d.meses || [];
-  const abertos = meses.filter((m) => !m.quitado);
+  const atrasados = meses.filter((m) => m.atrasado);
+  const aVencer = meses.filter((m) => !m.quitado && !m.atrasado);
   const dinheiro = (v: number) =>
     Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const dia = (iso: string | null) => {
+    if (!iso) return "—";
+    const [, m, d] = String(iso).split("-");
+    return `${d}/${m}`;
+  };
   const mes = (comp: string) => {
     const [a, m] = String(comp).split("-");
     return `${m}/${a}`;
@@ -90,9 +99,9 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
                          color: d.emDia ? cor.teal : "rgb(var(--zm-perigo))" }}>
           {d.frase}
         </strong>
-        {abertos.length > 0 && (
+        {aVencer.length > 0 && (
           <span style={{ fontSize: 14, color: cor.cinza }}>
-            · {abertos.length === 1 ? "1 mês em aberto" : `${abertos.length} meses em aberto`}
+            · {aVencer.length === 1 ? "1 mês a vencer" : `${aVencer.length} meses a vencer`}
           </span>
         )}
         <button style={{ ...painel.botaoMiniSec, marginLeft: "auto" }}
@@ -100,6 +109,18 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
           {aberto ? "esconder" : "ver os meses"}
         </button>
       </div>
+
+      {/* A PERGUNTA QUE SE FAZ OLHANDO O COMPROVANTE.
+          "Em aberto" e "atrasado" não são a mesma coisa: 158 meses da casa
+          estão em aberto e só 55 venceram. Sem essa linha, quem recebe um Pix
+          não sabe se ele cobre um mês vencido ou o mês que ainda vai vencer —
+          e é justamente isso que decide se dá para cobrar o resto. */}
+      {d.fraseAtraso && (
+        <div style={{ marginTop: 6, fontSize: 15, fontWeight: atrasados.length ? 700 : 400,
+                      color: atrasados.length ? "rgb(var(--zm-perigo))" : cor.cinza }}>
+          {d.fraseAtraso}
+        </div>
+      )}
 
       {aberto && (
         meses.length === 0 ? (
@@ -114,7 +135,7 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
                   <th style={{ padding: "4px 8px 4px 0", fontWeight: 500 }}>mês</th>
                   <th style={{ padding: "4px 8px", fontWeight: 500, textAlign: "right" }}>cobrado</th>
                   <th style={{ padding: "4px 8px", fontWeight: 500, textAlign: "right" }}>pago</th>
-                  <th style={{ padding: "4px 0 4px 8px", fontWeight: 500, textAlign: "right" }}>falta</th>
+                  <th style={{ padding: "4px 0 4px 8px", fontWeight: 500, textAlign: "right" }}>situação</th>
                 </tr>
               </thead>
               <tbody style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -122,15 +143,22 @@ export default function ContaDaFamilia({ familiaId }: { familiaId: string | null
                   <tr key={m.competencia}
                       style={{ borderTop: `1px solid ${cor.linha}`,
                                color: m.quitado ? cor.cinza : "rgb(var(--zm-ink))" }}>
-                    <td style={{ padding: "5px 8px 5px 0", fontWeight: m.quitado ? 400 : 700 }}>
+                    <td style={{ padding: "5px 8px 5px 0", fontWeight: m.atrasado ? 700 : 400 }}>
                       {mes(m.competencia)}
                     </td>
                     <td style={{ padding: "5px 8px", textAlign: "right" }}>{dinheiro(m.devido)}</td>
                     <td style={{ padding: "5px 8px", textAlign: "right" }}>{dinheiro(m.pago)}</td>
+                    {/* TRÊS ESTADOS, NÃO DOIS. Um mês que ainda não venceu não
+                        é dívida: chamá-lo de "falta" em vermelho faria a
+                        família parecer inadimplente por uma cobrança cujo
+                        prazo nem chegou. */}
                     <td style={{ padding: "5px 0 5px 8px", textAlign: "right",
-                                 fontWeight: m.quitado ? 400 : 700,
-                                 color: m.quitado ? cor.teal : "rgb(var(--zm-perigo))" }}>
-                      {m.quitado ? "✓" : dinheiro(m.falta)}
+                                 fontWeight: m.atrasado ? 700 : 400,
+                                 color: m.quitado ? cor.teal
+                                      : m.atrasado ? "rgb(var(--zm-perigo))" : cor.cinza }}>
+                      {m.quitado ? "✓ pago"
+                        : m.atrasado ? `${dinheiro(m.falta)} atrasado`
+                        : `${dinheiro(m.falta)} · vence ${dia(m.vence)}`}
                     </td>
                   </tr>
                 ))}
