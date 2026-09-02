@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { exigirLogado } from "@/lib/roles";
 import { avisosDoJazigo } from "@/lib/briefing";
 import { diaOperacao } from "@/lib/vencimento";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +46,12 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
+  // O BALDE `servicos` FECHOU (0154): o endereço guardado não abre mais sozinho.
+  // Um lote só para a lista inteira — assinar dentro do `map` faria uma ida ao
+  // Storage por foto e devolveria Promise para a tela.
+  const links154 = await assinarVarios(supabaseAdmin(), (servs || []).flatMap((s: any) => [s.foto_antes_url, s.tumulos?.foto_referencia_url, s.tumulos?.foto_enquadramento_url]));
+  const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
+
   const lista = (servs || []).map((s: any) => ({
     id: s.id,
     tumuloId: s.tumulo_id,
@@ -71,11 +79,11 @@ export async function GET(req: NextRequest) {
     lng: s.tumulos?.lng ?? null,
     gpsPrecisao: s.tumulos?.gps_precisao ?? null,
     gpsAmostras: s.tumulos?.gps_amostras ?? 0,
-    fotoReferencia: s.tumulos?.foto_referencia_url || null,
+    fotoReferencia: abrir154(s.tumulos?.foto_referencia_url),
     // foto do "antes" DESTE servico (nao a do cadastro do jazigo): existe
     // quando a ajudante ja apertou Comecar e tirou a foto
-    fotoAntes: s.foto_antes_url || null,
-    fotoEnquadramento: s.tumulos?.foto_enquadramento_url || null,
+    fotoAntes: abrir154(s.foto_antes_url),
+    fotoEnquadramento: abrir154(s.tumulos?.foto_enquadramento_url),
     rua: s.tumulos?.rua || "",
     numero: s.tumulos?.numero || "",
     qrToken: s.tumulos?.qr_token || null,

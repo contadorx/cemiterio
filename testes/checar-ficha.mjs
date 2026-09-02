@@ -2394,6 +2394,53 @@ ok("uma falha ao ler a conta vira recado, nao silencio",
 ok("o cartao so abre sozinho quando ha mes em aberto",
    /setAberto\(!j\.emDia\)/.test(semComentarios(contaFam53)));
 
+// ===========================================================================
+// 0154 — AS FOTOS DAS LAPIDES DEIXAM DE SER PUBLICAS
+//
+// Medido em 02/09: o balde `servicos` estava `public = true` com 822 arquivos —
+// 534 deles as fotos de referencia e enquadramento dos 267 jazigos. Qualquer
+// pessoa com o endereco via a lapide, com o nome e as datas de quem esta ali,
+// para sempre e sem passar por login nenhum. A 0139 fechou os outros dois
+// baldes e deixou este de proposito, dizendo que fecha-lo seria um build
+// proprio. E este.
+// ===========================================================================
+const libStore54 = readFileSync("src/lib/storage.ts", "utf8");
+const rotaPortal54 = readFileSync("src/app/api/portal/route.ts", "utf8");
+const rotaFila54 = readFileSync("src/app/api/fila/route.ts", "utf8");
+
+ok("o balde das fotos esta na lista dos fechados",
+   /BUCKET_SERVICOS,\n\]\)/.test(libStore54.replace(/ +/g, " ")) 
+   || /BALDES_PRIVADOS[\s\S]{0,400}BUCKET_SERVICOS/.test(libStore54));
+// Assinar um a um seria 534 idas ao Storage para desenhar a lista de Jazigos.
+ok("existe um jeito de assinar em lote",
+   /export async function assinarVarios/.test(libStore54)
+   && /createSignedUrls/.test(libStore54));
+// A pagina da familia e publica por token: se ela parar de mostrar as fotos, a
+// familia perde justamente o que ela paga para ver.
+ok("o portal da familia assina as fotos que devolve",
+   /assinarVarios/.test(rotaPortal54) && /foto_referencia_url: abrir/.test(rotaPortal54));
+// Link assinado e perecivel; endereco guardado nao. Um item pode ficar horas na
+// fila ate alguem tocar em Enviar.
+ok("o WhatsApp assina na HORA de enviar, e nao ao enfileirar",
+   /assinarVarios\(supabaseAdmin\(\), fotos, 7200\)/.test(rotaFila54));
+ok("e um link que nao abriu NAO vira mensagem",
+   /if \(!link\) throw new Error/.test(rotaFila54));
+
+// A varredura que importa: nenhuma rota pode devolver o endereco cru de uma
+// foto. Meio balde fechado quebra imagem em producao sem avisar ninguem.
+const cruas = [];
+for (const f of arquivosDe("src/app/api")) {
+  const t = semComentarios(readFileSync(f, "utf8"));
+  for (const linha of t.split("\n")) {
+    if (/^\s+[a-zA-Z]+: *[a-zA-Z]+[A-Za-z]*(\?\.)?[a-zA-Z_.?]*foto_[a-z]+_url( \|\| null)?,?\s*$/.test(linha)
+        && !/abrir154|assinar/.test(linha)) {
+      cruas.push(`${f}: ${linha.trim()}`);
+    }
+  }
+}
+ok("nenhuma rota devolve o endereco cru de uma foto", cruas.length === 0);
+for (const c of cruas) console.log(`      ${c}`);
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

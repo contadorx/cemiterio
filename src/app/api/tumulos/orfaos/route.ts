@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +41,12 @@ export async function GET() {
     .limit(500);
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
+  // O balde `servicos` fechou (0154): o endereço guardado não abre mais
+  // sozinho. Um lote só, porque `map` não espera promessa.
+  const links154 = await assinarVarios(supabaseAdmin(),
+    (linhas || []).flatMap((t: any) => [t.foto_referencia_url, t.foto_enquadramento_url]));
+  const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
+
   const orfaos = (linhas || []).map((t: any) => ({
     id: t.id,
     identificacao: t.identificacao,
@@ -53,8 +61,8 @@ export async function GET() {
     lng: t.lng ?? null,
     gpsPrecisao: t.gps_precisao ?? null,
     gpsEm: t.gps_atualizado_em || null,
-    fotoEnquadramento: t.foto_enquadramento_url || null,
-    fotoReferencia: t.foto_referencia_url || null,
+    fotoEnquadramento: abrir154(t.foto_enquadramento_url),
+    fotoReferencia: abrir154(t.foto_referencia_url),
     criadoEm: t.created_at || null,
   }));
 

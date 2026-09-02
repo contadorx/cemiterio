@@ -3,6 +3,8 @@ import { exigirAdmin } from "@/lib/roles";
 import { normalizarMMDD } from "@/lib/memoria";
 import { apagarArquivos } from "@/lib/storage";
 import { diaOperacao } from "@/lib/vencimento";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +50,22 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!t) return NextResponse.json({ ok: false, erro: "nao_encontrado" }, { status: 404 });
 
   const tt = t as any;
-  const historico = ((servs || []) as any[]).filter((s) => s.data_executada);
+
+  // O balde `servicos` fechou (0154): tanto as fotos do jazigo quanto as de
+  // cada lavagem do histórico precisam de link assinado. Um lote só.
+  const links154 = await assinarVarios(supabaseAdmin(), [
+    tt.foto_referencia_url, tt.foto_enquadramento_url,
+    ...((servs || []) as any[]).flatMap((s) => [s.foto_antes_url, s.foto_depois_url]),
+  ]);
+  const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
+
+  const historico = ((servs || []) as any[])
+    .filter((s) => s.data_executada)
+    .map((s) => ({
+      ...s,
+      foto_antes_url: abrir154(s.foto_antes_url),
+      foto_depois_url: abrir154(s.foto_depois_url),
+    }));
   const agendado = ((servs || []) as any[])
     .find((s) => !s.data_executada && s.status !== "cancelado") || null;
 
@@ -98,8 +115,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       contratado: !!tt.contratado,
       periodicidade: tt.periodicidade,
       valorLavagem: tt.valor_lavagem,
-      fotoReferencia: tt.foto_referencia_url,
-      fotoEnquadramento: tt.foto_enquadramento_url,
+      fotoReferencia: abrir154(tt.foto_referencia_url),
+      fotoEnquadramento: abrir154(tt.foto_enquadramento_url),
       temGps: tt.lat != null && tt.lng != null,
       ultimaLavagemInformada: tt.ultima_lavagem_informada,
       familia: tt.familias?.nome || null,

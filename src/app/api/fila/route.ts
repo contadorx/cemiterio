@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { enviarWhatsapp, enviarWhatsappMidia } from "@/lib/evolution";
 import { statusConexao } from "@/lib/evolution-admin";
 import { diaOperacao } from "@/lib/vencimento";
+import { assinarVarios } from "@/lib/storage";
 
 /**
  * FILA DE LIBERAÇÃO — o sistema prepara, a Sureya decide.
@@ -210,6 +211,14 @@ export async function GET(req: NextRequest) {
   // Zero desliga o aviso. `?? 30` cobre o banco antigo, antes da coluna existir.
   const diasEntreFotos = Number((cfg as any)?.dias_entre_fotos ?? 30) || 0;
 
+  // Um lote só para a lista inteira: assinar dentro do `map` faria uma ida ao
+  // Storage por foto, e `map` não espera promessa — o `url` sairia como
+  // [object Promise] na tela, que é o mesmo tropeço que a 0139 já pagou.
+  const linksFila = await assinarVarios(
+    supabaseAdmin(),
+    (data || []).flatMap((f: any) => (Array.isArray(f.fotos) ? f.fotos : [])),
+  );
+
   const itens = (data || []).map((f: any) => {
     // QUAL É O ANTES E QUAL É O DEPOIS.
     //
@@ -222,8 +231,11 @@ export async function GET(req: NextRequest) {
     // nenhuma das duas fica sem rótulo, em vez de receber um chute.
     const antes  = f.servicos?.foto_antes_url  || null;
     const depois = f.servicos?.foto_depois_url || null;
+    // O RÓTULO CONTINUA VINDO DO ENDEREÇO GUARDADO, e o link assinado só entra
+    // no `url`. Comparar o link assinado com `antes`/`depois` nunca casaria —
+    // toda foto ficaria sem rótulo, que é o chute que este bloco evita.
     const fotos = (Array.isArray(f.fotos) ? f.fotos : []).map((url: string) => ({
-      url,
+      url: linksFila.get(url) ?? null,
       etapa: url === antes ? "antes" : url === depois ? "depois" : null,
     }));
 
@@ -498,8 +510,28 @@ export async function POST(req: NextRequest) {
       //
       // Numa retomada, a legenda JÁ FOI com a foto que já saiu. Repeti-la seria
       // mandar o texto duas vezes.
+      // ====================================================================
+      // O LINK É ASSINADO NA HORA DE ENVIAR — NUNCA GUARDADO ASSINADO (0154)
+      // ====================================================================
+      //
+      // `servicos` fechou: o endereço guardado não abre mais sozinho, e é o
+      // Evolution quem vai BUSCAR a imagem. Ele precisa de um link que abra.
+      //
+      // Assinar aqui, e não ao enfileirar, não é preciosismo: um item pode
+      // ficar na fila horas — a Sureya libera em lote quando tem tempo — e um
+      // link guardado assinado teria expirado antes de alguém tocar em Enviar.
+      // Link assinado é perecível; endereço guardado não.
+      //
+      // Duas horas, e não uma: o laço manda várias fotos em sequência com
+      // pausa entre elas, e uma retomada assina tudo de novo do zero.
+      const links = await assinarVarios(supabaseAdmin(), fotos, 7200);
       for (let i = enviadas; i < fotos.length; i++) {
-        await enviarWhatsappMidia(telefone, fotos[i], i === 0 ? corpo : "");
+        const link = links.get(fotos[i]) ?? null;
+        // MANDAR UM LINK QUEBRADO É PIOR QUE NÃO MANDAR. A família receberia
+        // uma bolha de imagem vazia sobre o jazigo de alguém querido, e o
+        // sistema marcaria como entregue. Falha aqui devolve para a fila.
+        if (!link) throw new Error(`nao consegui abrir a foto ${i + 1} de ${fotos.length}`);
+        await enviarWhatsappMidia(telefone, link, i === 0 ? corpo : "");
         enviadas = i + 1;
       }
     }

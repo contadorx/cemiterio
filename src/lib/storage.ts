@@ -53,6 +53,9 @@ export const BUCKET_CONVERSAS = "conversas";
 export const BALDES_PRIVADOS: ReadonlySet<string> = new Set([
   BUCKET_COMPROVANTES,
   BUCKET_CONVERSAS,
+  // 0154 — `servicos` fecha. Ver o bloco acima: a 0139 o deixou aberto de
+  // propósito e disse que fechá-lo seria um build próprio. É este.
+  BUCKET_SERVICOS,
 ]);
 
 // 25 MB: a foto ja sobe reduzida (~300 KB); o teto so evita abuso.
@@ -157,6 +160,58 @@ export async function assinar(
   return data.signedUrl;
 }
 
+
+/**
+ * MUITOS LINKS DE UMA VEZ.
+ *
+ * `assinar()` faz uma ida ao Storage por arquivo. A tela de Jazigos devolve 267
+ * linhas com duas fotos cada: 534 idas para desenhar uma lista. Isso não é um
+ * detalhe de desempenho — é a diferença entre a tela abrir e a tela estourar o
+ * tempo da função.
+ *
+ * Agrupa por balde, assina em lote, e devolve um mapa do endereço GUARDADO para
+ * o link que abre. Quem não conseguiu assinar entra no mapa como `null`, e não
+ * fica de fora: quem chama precisa distinguir "não consegui abrir" de "não tem
+ * foto", que é a mesma regra de `assinar()`.
+ */
+export async function assinarVarios(
+  db: SupabaseClient,
+  urls: (string | null | undefined)[],
+  segundos = 3600,
+): Promise<Map<string, string | null>> {
+  const saida = new Map<string, string | null>();
+  const porBalde = new Map<string, Map<string, string>>();  // balde -> caminho -> url
+
+  for (const u of urls) {
+    if (!u || saida.has(u)) continue;
+    const balde = baldeDaUrl(u);
+    if (!balde) { saida.set(u, null); continue; }
+    // balde aberto: o próprio endereço já abre, não custa nada
+    if (!BALDES_PRIVADOS.has(balde)) { saida.set(u, u); continue; }
+    const caminho = caminhoDaUrl(u, balde);
+    if (!caminho) { saida.set(u, null); continue; }
+    if (!porBalde.has(balde)) porBalde.set(balde, new Map());
+    porBalde.get(balde)!.set(caminho, u);
+  }
+
+  for (const [balde, caminhos] of porBalde) {
+    const lista = [...caminhos.keys()];
+    const { data, error } = await db.storage.from(balde).createSignedUrls(lista, segundos);
+    if (error || !data) {
+      console.error(`[storage] nao consegui assinar ${lista.length} de ${balde}:`, error?.message);
+      for (const u of caminhos.values()) saida.set(u, null);
+      continue;
+    }
+    for (const item of data) {
+      const original = caminhos.get(String((item as any).path || ""));
+      if (original) saida.set(original, (item as any).signedUrl || null);
+    }
+    // o que o Storage não devolveu não pode sair do mapa como se tivesse dado certo
+    for (const u of caminhos.values()) if (!saida.has(u)) saida.set(u, null);
+  }
+
+  return saida;
+}
 
 /**
  * DE URL PÚBLICA PARA CAMINHO DENTRO DO BALDE.

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +78,8 @@ export async function GET(req: NextRequest) {
 
   const linhas = (data as any[]) || [];
 
+
+
   // ---------------------------------------------------------------------
   // A ÚLTIMA LAVAGEM DE CADA JAZIGO (0093)
   //
@@ -98,6 +102,16 @@ export async function GET(req: NextRequest) {
         .in("tumulo_id", ids)
     : { data: [] as any[] };
   const ultimaDe = new Map(((lavagens as any[]) || []).map((l) => [l.tumulo_id, l]));
+
+  // O balde `servicos` fechou (0154): o endereço guardado não abre mais
+  // sozinho. Um lote só, porque `map` não espera promessa.
+  const links154 = await assinarVarios(supabaseAdmin(), [
+    ...linhas.flatMap((t: any) => [t.foto_referencia_url, t.foto_enquadramento_url]),
+    // a foto da ÚLTIMA LAVAGEM mora noutra tabela e escapou da primeira
+    // varredura: um balde meio fechado quebra imagem em produção sem avisar.
+    ...[...ultimaDe.values()].map((u: any) => u?.foto_depois_url),
+  ]);
+  const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
 
   // Quantas vezes cada identificação aparece — número repetido é o gatilho da
   // fusão. A chave inclui o CEMITÉRIO (0044): contar sobre a lista inteira
@@ -162,8 +176,8 @@ export async function GET(req: NextRequest) {
       gpsPrecisao: t.gps_precisao ?? null,
       gpsAmostras: t.gps_amostras ?? 0,
       gpsEm: t.gps_atualizado_em ?? null,
-      fotoLapide: t.foto_referencia_url || null,
-      fotoLonge: t.foto_enquadramento_url || null,
+      fotoLapide: abrir154(t.foto_referencia_url),
+      fotoLonge: abrir154(t.foto_enquadramento_url),
       criadoEm: t.created_at,
       alteradoEm: t.updated_at,
       // a última lavagem DE VERDADE — nula quando o jazigo nunca foi lavado
@@ -174,7 +188,7 @@ export async function GET(req: NextRequest) {
           dia: u.dia,
           executora: u.executora || null,
           noCampo: !!u.no_campo,
-          foto: u.foto_depois_url || null,
+          foto: abrir154(u.foto_depois_url),
           minutos: u.duracao_minutos ?? null,
         };
       })(),

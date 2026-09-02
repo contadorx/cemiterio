@@ -3,6 +3,8 @@ import { exigirAdmin, exigirLogado } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { explicarErroJazigo, resolverCemiterio } from "@/lib/jazigo";
 import { encaixarPeloGps, gerarCodigo } from "@/lib/rota";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +70,11 @@ export async function GET() {
     ((fotos as any[]) || []).map((t) => [t.id, t.foto_referencia_url || null]),
   );
 
+  // O balde `servicos` fechou (0154): o endereço guardado não abre mais
+  // sozinho. Um lote só, porque `map` não espera promessa.
+  const links154 = await assinarVarios(supabaseAdmin(), [...fotoDe.values()]);
+  const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
+
   const semDono = ((orfaos as any[]) || []).map((t: any) => ({
     id: t.id,
     identificacao: t.identificacao,
@@ -75,7 +82,7 @@ export async function GET() {
     rua: t.rua || null,
     quadra: t.quadra || null,
     falecido: t.falecido_nome || null,
-    foto: fotoDe.get(t.id) || null,
+    foto: abrir154(fotoDe.get(t.id)),
   }));
 
   return NextResponse.json({ ok: true, cemiterios, semDono });
@@ -235,6 +242,9 @@ export async function POST(req: NextRequest) {
       .eq("id", existente.id)
       .maybeSingle();
     const f = (ficha || existente) as any;
+    // Este cartão mostra a lápide para a pessoa decidir "é este mesmo ou é
+    // outro?". Sem a foto ela não decide — então o link precisa abrir (0154).
+    const lk = await assinarVarios(supabaseAdmin(), [f.foto_referencia_url, f.foto_enquadramento_url]);
     return NextResponse.json({
       ok: false,
       erro: "confirmar_existente",
@@ -244,8 +254,8 @@ export async function POST(req: NextRequest) {
         identificacao: f.identificacao,
         falecido: f.falecido_nome || null,
         observacoes: f.observacoes || null,
-        fotoLapide: f.foto_referencia_url || null,
-        fotoLonge: f.foto_enquadramento_url || null,
+        fotoLapide: f.foto_referencia_url ? lk.get(f.foto_referencia_url) ?? null : null,
+        fotoLonge: f.foto_enquadramento_url ? lk.get(f.foto_enquadramento_url) ?? null : null,
         temGps: f.lat != null,
         // A FAMÍLIA, não o contato. O contato fica de reserva para o cadastro
         // antigo que ainda não tem família — mas quem está olhando a lápide

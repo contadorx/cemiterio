@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
 import { lerDataDeMemoria, PRECISOES } from "@/lib/memoria";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinarVarios } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +77,13 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
+    // A BANCADA VIVE DA FOTO. Com o balde `servicos` fechado (0154), o
+    // endereço guardado não abre mais sozinho — e uma bancada de transcrição
+    // sem imagem não é uma tela degradada, é uma tela inútil.
+    const links154 = await assinarVarios(supabaseAdmin(),
+      ((data || []) as any[]).map((t) => t.foto_referencia_url));
+    const abrir154 = (u: any) => (u ? links154.get(u) ?? null : null);
+
     const jazigos = ((data || []) as any[]).map((t) => {
       const gente = (t.falecidos || []) as any[];
       const comData = gente.filter((f) => f.data_nascimento || f.data_falecimento).length;
@@ -85,7 +94,7 @@ export async function GET(req: NextRequest) {
         quadra: t.quadras?.codigo || null,
         rua: t.rua || null,
         familia: t.familias?.nome || null,
-        fotoLapide: t.foto_referencia_url || null,
+        fotoLapide: abrir154(t.foto_referencia_url),
         pessoas: gente.length,
         comData,
       };
