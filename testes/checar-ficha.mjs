@@ -2477,6 +2477,41 @@ ok("a tela mostra tres estados, e nao dois",
 ok("o cartao abre sozinho por ATRASO, nao por qualquer coisa em aberto",
    /some\(\(m\) => m\.atrasado\)/.test(semComentarios(contaFam55)));
 
+// ===========================================================================
+// 0156 — A PROXIMA DA FILA, SEM PASSAR PELA LISTA
+//
+// Medido em 02/09: 197 conversas "nao resolvidas" e apenas 31 esperando
+// resposta de alguem. Uma "proxima" que andasse pelas 197 levaria a Sureya
+// por 166 conversas sem nada a fazer.
+// ===========================================================================
+const rotaConv56 = readFileSync("src/app/api/conversas/route.ts", "utf8");
+const telaConv56 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv56Sem = semComentarios(telaConv56);
+
+// A ordem da fila e feita de quatro regras (filtro de situacao, precisaDeVoce,
+// quem espera ha mais tempo, e a caixa da equipe fixada). Uma rota propria
+// teria de repetir as quatro — e o crachao dizia 7 enquanto a lista mostrava 1
+// exatamente por isso.
+ok("a proxima sai da MESMA lista que a tela de conversas desenha",
+   /const proximaDe = q\.get\("proximaDe"\)/.test(rotaConv56)
+   && /conversas\.findIndex/.test(rotaConv56));
+ok("e a tela pede a fila JA FILTRADA, nao tudo que nao foi resolvido",
+   /situacao=pendentes&proximaDe=/.test(telaConv56Sem));
+// Quem acabou de finalizar sai da fila: cair em "nao ha proxima" seria o fim
+// da fila mentindo com 30 pessoas ainda esperando.
+ok("se a conversa atual ja saiu da fila, a proxima e a primeira",
+   /i >= 0 \? conversas\[i \+ 1\] : conversas\.find/.test(rotaConv56));
+ok("finalizar leva para a proxima, e o botao AVISA que leva",
+   /if \(fila\?\.proxima\) \{ irParaProxima\(\); return; \}/.test(telaConv56Sem)
+   && /Finalizar e ir para a próxima/.test(telaConv56));
+// Levar o rascunho de uma familia para a conversa de outra e o defeito que a
+// caixa unica acabou de consertar.
+ok("trocar de conversa recarrega a pagina, e nao carrega estado junto",
+   /window\.location\.href = `\/painel\/conversas\/\$\{alvo\.id\}`/.test(telaConv56Sem));
+// `fila` nulo e "nao consegui ler", e nao "zero esperando".
+ok("a fila que nao carregou nao vira numero na tela",
+   /fila && fila\.naFila > 0/.test(telaConv56Sem));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

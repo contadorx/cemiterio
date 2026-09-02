@@ -23,6 +23,9 @@ export default function Thread() {
   const [leu, setLeu] = useState<number | null>(null);
   /** Quantas promessas desta conversa ainda estão em aberto (0142). */
   const [promessas, setPromessas] = useState(0);
+  // A PRÓXIMA DA FILA. Vem da MESMA rota que desenha a lista — a ordem da fila
+  // é feita de quatro regras e repeti-las aqui daria uma quinta.
+  const [fila, setFila] = useState<{ proxima: { id: string; cliente: string } | null; naFila: number } | null>(null);
   // O recado do envio. Fica FORA do try/finally do `enviar` porque ele
   // precisa sobreviver ao fim da chamada — e some so quando ela tenta de novo.
   const [avisoEnvio, setAvisoEnvio] = useState<{ tom: "erro" | "aviso"; texto: string } | null>(null);
@@ -69,6 +72,13 @@ export default function Thread() {
     // As promessas em aberto vêm da MESMA rota que a caixa acima usa — uma
     // definição só de "em aberto", senão o aviso de finalizar discordaria da
     // caixa que está na tela dois centímetros acima.
+    fetch(`/api/conversas?situacao=pendentes&proximaDe=${encodeURIComponent(id)}`)
+      .then((x) => x.json())
+      .then((j) => setFila(j?.ok ? { proxima: j.proxima || null, naFila: Number(j.naFila) || 0 } : null))
+      // A fila é conforto, não o trabalho: se ela não carregar, o botão some e
+      // a conversa continua inteira. Derrubar a tela por causa dele seria pior.
+      .catch(() => setFila(null));
+
     const p = await fetch(`/api/compromissos?conversa=${encodeURIComponent(id)}`)
       .then((x) => x.json()).catch(() => null);
     setPromessas(p?.ok ? (p.compromissos || []).length : 0);
@@ -232,8 +242,32 @@ export default function Thread() {
         body: JSON.stringify({ acao: "resolver" }),
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) { recado.erro(r?.erro || "Não consegui finalizar agora."); return; }
+      // FINALIZOU: A PRÓXIMA JÁ. Voltar para a lista, achar onde parou e abrir
+      // a linha seguinte é a fricção que faz o que dá trabalho ficar para
+      // depois — e "depois" é como a fila de 164 mensagens nasceu. O rótulo do
+      // botão diz que isso vai acontecer, então não é surpresa.
+      if (fila?.proxima) { irParaProxima(); return; }
+      recado.ok("Atendimento finalizado. Não há mais ninguém esperando resposta.");
       carregar();
     } finally { setOcupado(false); }
+  }
+
+  /**
+   * IR PARA A PRÓXIMA — sem passar pela lista.
+   *
+   * MEDIDO EM 02/09: 197 conversas "não resolvidas", e apenas 31 esperando
+   * resposta de alguém. Por isso a próxima sai da FILA (o que precisa de você),
+   * e não de "tudo que não foi resolvido": andar pelas 197 seria passear por
+   * 166 conversas sem nada a fazer.
+   */
+  function irParaProxima() {
+    const alvo = fila?.proxima;
+    if (!alvo) return;
+    // `location.href` e não router.push: a página inteira recarrega, e com ela
+    // todo o estado — caixa de texto, sugestão da IA, compromissos. Levar o
+    // rascunho de uma família para a conversa de outra é o erro que a caixa
+    // única acabou de consertar; não vou reabri-lo por outra porta.
+    window.location.href = `/painel/conversas/${alvo.id}`;
   }
 
   async function reabrir() {
@@ -305,14 +339,36 @@ export default function Thread() {
                 Reabrir atendimento
               </button>
             : <button style={painel.botaoSec} onClick={finalizar} disabled={ocupado}>
-                Finalizar atendimento
+                {/* O RÓTULO DIZ O QUE VAI ACONTECER. Finalizar e ser levado
+                    para outra conversa sem aviso seria um susto; escrito no
+                    botão, é o fluxo de quem está limpando a fila. */}
+                {fila?.proxima ? "Finalizar e ir para a próxima" : "Finalizar atendimento"}
               </button>}
+
+          {/* IR PARA A PRÓXIMA SEM FINALIZAR — para quem só quer passar
+              adiante o que ainda não dá para fechar. */}
+          {fila?.proxima && (
+            <button style={painel.botaoSec} onClick={irParaProxima} disabled={ocupado}
+                    title={`Próxima: ${fila.proxima.cliente}`}>
+              Próxima →
+            </button>
+          )}
         </div>
         <p style={{ color: cor.cinza, marginTop: -10, fontSize: 14 }}>
           {d.conversa.resolvida
             ? "Atendimento finalizado — ela reabre sozinha se a família escrever de novo."
             : d.conversa.escalada ? "Você está atendendo — a IA não responde."
             : "A IA está atendendo (rascunhos aparecem aqui)."}
+          {/* QUANTAS AINDA PRECISAM DE VOCÊ, contando esta. É o número da fila
+              filtrada (31 em 02/09), e não o de conversas não resolvidas (197):
+              dizer 197 aqui faria a fila parecer intransponível quando ela cabe
+              numa manhã. `fila` nulo é "não consegui ler", e nesse caso não se
+              diz número nenhum — vazio não é zero. */}
+          {fila && fila.naFila > 0 && (
+            <span> · {fila.naFila === 1
+              ? "é a última que precisa de você"
+              : `${fila.naFila} precisam de você`}</span>
+          )}
         </p>
 
         {/* A CONTA DA FAMÍLIA — antes das mensagens, pelo mesmo motivo dos
