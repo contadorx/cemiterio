@@ -35,6 +35,8 @@ interface Item {
   tumuloId: string | null;
   jazigo: string;
   quadra: string | null;
+  /** Com dois cemitérios, "Quadra 1" sozinho não diz onde a pessoa está. */
+  cemiterio: string | null;
   rua: string | null;
   familia: string | null;
   falecido: string | null;
@@ -143,6 +145,17 @@ export default function AgendaPage() {
     useState<"tudo" | "atrasadas" | "aberto" | "pessoa" | "pedidos">("tudo");
 
   /**
+   * O CEMITERIO (0150) — o recorte que so passou a existir com o segundo.
+   *
+   * A agenda E o roteiro do dia. A roteirizacao automatica e por sequencia de
+   * quadra e rua, com serpentina — e essa ordem so faz sentido DENTRO de um
+   * cemiterio. Uma lista que mistura os dois manda a Nina atravessar Maua no
+   * meio do expediente, e nada na tela diz isso: a linha mostra "Quadra 1" e a
+   * quadra 1 existe nos dois lugares.
+   */
+  const [cemFiltro, setCemFiltro] = useState("");
+
+  /**
    * QUEM LIMPA — marcado em lote, e sempre opcional.
    *
    * O alocador não nomeia mais ninguém: "limpeza é limpeza", e a equipe não é
@@ -226,8 +239,9 @@ export default function AgendaPage() {
       // Antes o recorte não existia porque não havia como fazê-lo: toda
       // lavagem de contrato respondia "sim" à pergunta "é avulso?".
       if (recorte === "pedidos" && s.origem !== "pedido") return false;
+      if (cemFiltro && s.cemiterio !== cemFiltro) return false;
       if (!t) return true;
-      return [s.familia, s.jazigo, s.rua, s.quadra, s.falecido, s.contato]
+      return [s.familia, s.jazigo, s.rua, s.quadra, s.cemiterio, s.falecido, s.contato]
         .some((x) => (x || "").toLowerCase().includes(t));
     };
     const out: Record<string, Item[]> = {};
@@ -236,9 +250,20 @@ export default function AgendaPage() {
       if (f.length) out[d] = f;
     }
     return out;
-  }, [dias, busca, recorte]);
+  }, [dias, busca, recorte, cemFiltro]);
 
-  const filtrando = busca.trim() !== "" || recorte !== "tudo";
+  const filtrando = busca.trim() !== "" || recorte !== "tudo" || cemFiltro !== "";
+
+  /**
+   * OS CEMITERIOS QUE APARECEM NO PERIODO CARREGADO — nao os cadastrados.
+   *
+   * Oferecer um cemiterio que nao tem nenhuma lavagem nesta semana seria uma
+   * opcao que devolve lista vazia, e quem escolhe uma opcao espera resultado.
+   * E a mesma escolha que a lista de ruas ja faz aqui do lado.
+   */
+  const cemiterios = useMemo(
+    () => [...new Set(Object.values(dias).flat().map((s) => s.cemiterio).filter(Boolean))].sort(),
+    [dias]);
 
   // ---- o resumo do período ------------------------------------------------
   // O número que ela procura ao abrir a tela não é "quantas linhas": é quanto
@@ -663,9 +688,27 @@ export default function AgendaPage() {
                 {rot}
               </button>
             ))}
+
+            {/* O CEMITÉRIO (0150).
+                A roteirização é por sequência de quadra e rua, com serpentina —
+                e essa ordem só faz sentido DENTRO de um cemitério. Uma lista que
+                mistura os dois manda a Nina atravessar Mauá no meio do dia, e
+                nada dizia isso: a linha mostrava "Quadra 1", e a quadra 1 existe
+                nos dois lugares.
+
+                Aparece só quando há mais de um no período: um chip que nunca
+                muda nada é ruído numa barra que já tem busca e cinco recortes. */}
+            {cemiterios.length > 1 && cemiterios.map((c) => (
+              <button key={c as string}
+                      style={chip(cemFiltro === c)}
+                      onClick={() => setCemFiltro(cemFiltro === c ? "" : (c as string))}>
+                {String(c).split("—")[0].split(" - ")[0].trim()}
+              </button>
+            ))}
+
             {filtrando && (
               <button style={chip(false)}
-                      onClick={() => { setBusca(""); setRecorte("tudo"); }}>
+                      onClick={() => { setBusca(""); setRecorte("tudo"); setCemFiltro(""); }}>
                 limpar filtro
               </button>
             )}
@@ -945,6 +988,11 @@ export default function AgendaPage() {
                           "Quadra 1": a tela não põe mais um "Q" na frente. */}
                       <div style={{ color: "rgb(var(--zm-ink))", fontSize: 15, marginTop: 2 }}>
                         {s.jazigo || "jazigo sem identificação"}
+                        {/* O CEMITERIO SO APARECE QUANDO HA MAIS DE UM no
+                            periodo. Com um so, repeti-lo em trinta linhas e
+                            ruido; com dois, "Quadra 1" sozinho e ambiguo. */}
+                        {cemiterios.length > 1 && s.cemiterio
+                          ? ` · ${s.cemiterio.split("—")[0].split(" - ")[0].trim()}` : ""}
                         {s.quadra ? ` · ${s.quadra}` : ""}
                         {s.rua ? ` · ${s.rua}` : (
                           <span title="Sem rua cadastrada: esta lavagem cai no fim do dia, fora do roteiro"

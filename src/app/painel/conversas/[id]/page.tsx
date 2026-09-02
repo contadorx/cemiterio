@@ -6,6 +6,7 @@ import { PainelNav, painel, cor } from "../../ui";
 import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
 import Compromissos from "../Compromissos";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
+import ContaDaFamilia from "./ContaDaFamilia";
 
 export default function Thread() {
   const recado = useRecado();
@@ -22,6 +23,12 @@ export default function Thread() {
   const [leu, setLeu] = useState<number | null>(null);
   /** Quantas promessas desta conversa ainda estão em aberto (0142). */
   const [promessas, setPromessas] = useState(0);
+  // A PRÓXIMA DA FILA. Vem da MESMA rota que desenha a lista — a ordem da fila
+  // é feita de quatro regras e repeti-las aqui daria uma quinta.
+  const [fila, setFila] = useState<{ proxima: { id: string; cliente: string } | null; naFila: number } | null>(null);
+  // O recado do envio. Fica FORA do try/finally do `enviar` porque ele
+  // precisa sobreviver ao fim da chamada — e some so quando ela tenta de novo.
+  const [avisoEnvio, setAvisoEnvio] = useState<{ tom: "erro" | "aviso"; texto: string } | null>(null);
 
   /**
    * SUGERIR RESPOSTA — a IA lê tudo e escreve uma proposta no campo.
@@ -65,6 +72,13 @@ export default function Thread() {
     // As promessas em aberto vêm da MESMA rota que a caixa acima usa — uma
     // definição só de "em aberto", senão o aviso de finalizar discordaria da
     // caixa que está na tela dois centímetros acima.
+    fetch(`/api/conversas?situacao=pendentes&proximaDe=${encodeURIComponent(id)}`)
+      .then((x) => x.json())
+      .then((j) => setFila(j?.ok ? { proxima: j.proxima || null, naFila: Number(j.naFila) || 0 } : null))
+      // A fila é conforto, não o trabalho: se ela não carregar, o botão some e
+      // a conversa continua inteira. Derrubar a tela por causa dele seria pior.
+      .catch(() => setFila(null));
+
     const p = await fetch(`/api/compromissos?conversa=${encodeURIComponent(id)}`)
       .then((x) => x.json()).catch(() => null);
     setPromessas(p?.ok ? (p.compromissos || []).length : 0);
@@ -99,28 +113,71 @@ export default function Thread() {
    * resposta" já fazia — e o envio é um só. Não existe mais um caminho que
    * mande outra coisa que não o que está escrito na tela.
    */
+  /**
+   * O QUE ACONTECEU EM 02/09, COM A ELIETE
+   *
+   * Ele escreveu a resposta, clicou em Enviar, a caixa esvaziou e a tela
+   * recarregou. A mensagem nao chegou na familia. Nao houve erro na tela.
+   *
+   * Este `enviar` mandava o `fetch` e NUNCA OLHAVA A RESPOSTA: limpava a caixa
+   * e recarregava tivesse a rota respondido 200, 400 ou 500. Do outro lado, a
+   * rota chamava um envio que LANCA quando o WhatsApp recusa — e a mensagem
+   * nao saia, nao ficava em fila e nao era gravada em lugar nenhum.
+   *
+   * Medido: 161 interacoes com acao humana, 58 saidas no total, ultima saida do
+   * dia anterior. Nao da para saber quantas se perderam antes desta, porque
+   * perder em silencio nao deixa marca — e essa e exatamente a razao de o
+   * conserto precisar existir.
+   *
+   * Agora: se falhou, O TEXTO FICA NA CAIXA e a tela diz o que houve. Se saiu
+   * mas ficou na fila de reenvio, tambem diz — nao e a mesma coisa que chegar.
+   */
   async function enviar() {
     const t = texto.trim();
     if (!t) return;
     setOcupado(true);
+    setAvisoEnvio(null);
     try {
       // COM RASCUNHO PENDENTE, O ENVIO PASSA POR ELE — senão a interação ficaria
       // aberta para sempre e a IA continuaria "esperando decisão" sobre uma
       // resposta que já foi. A rota deduz sozinha se foi aprovada ou editada,
       // comparando com o rascunho original.
-      if (d?.rascunho?.id) {
-        await fetch("/api/atendimento/aprovar", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "editou", textoFinal: t }),
+      const r = d?.rascunho?.id
+        ? await fetch("/api/atendimento/aprovar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "editou", textoFinal: t }),
+          })
+        : await fetch(`/api/conversas/${id}/enviar`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ texto: t }),
+          });
+
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !(j as any).ok) {
+        // O TEXTO NAO SE PERDE. Quem escreveu tres paragrafos para uma familia
+        // enlutada nao pode ter que reescrever porque o WhatsApp recusou.
+        setAvisoEnvio({
+          tom: "erro",
+          texto: "A mensagem NÃO foi enviada. O seu texto continua aqui na caixa. "
+               + ((j as any)?.erro ? `O WhatsApp respondeu: ${(j as any).erro}` : "Tente de novo em instantes."),
         });
-      } else {
-        await fetch(`/api/conversas/${id}/enviar`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ texto: t }),
+        return;
+      }
+
+      if ((j as any).entregue === false) {
+        setAvisoEnvio({
+          tom: "aviso",
+          texto: "Não saiu agora — ficou na fila e o sistema vai tentar de novo sozinho. "
+               + "Confira em Configurações se o WhatsApp está conectado.",
         });
       }
       setTexto("");
       carregar();
+    } catch (e: any) {
+      setAvisoEnvio({
+        tom: "erro",
+        texto: "Não consegui falar com o servidor. A mensagem NÃO foi enviada e o seu texto continua aqui.",
+      });
     } finally { setOcupado(false); }
   }
 
@@ -185,8 +242,32 @@ export default function Thread() {
         body: JSON.stringify({ acao: "resolver" }),
       }).then((x) => x.json()).catch(() => null);
       if (!r?.ok) { recado.erro(r?.erro || "Não consegui finalizar agora."); return; }
+      // FINALIZOU: A PRÓXIMA JÁ. Voltar para a lista, achar onde parou e abrir
+      // a linha seguinte é a fricção que faz o que dá trabalho ficar para
+      // depois — e "depois" é como a fila de 164 mensagens nasceu. O rótulo do
+      // botão diz que isso vai acontecer, então não é surpresa.
+      if (fila?.proxima) { irParaProxima(); return; }
+      recado.ok("Atendimento finalizado. Não há mais ninguém esperando resposta.");
       carregar();
     } finally { setOcupado(false); }
+  }
+
+  /**
+   * IR PARA A PRÓXIMA — sem passar pela lista.
+   *
+   * MEDIDO EM 02/09: 197 conversas "não resolvidas", e apenas 31 esperando
+   * resposta de alguém. Por isso a próxima sai da FILA (o que precisa de você),
+   * e não de "tudo que não foi resolvido": andar pelas 197 seria passear por
+   * 166 conversas sem nada a fazer.
+   */
+  function irParaProxima() {
+    const alvo = fila?.proxima;
+    if (!alvo) return;
+    // `location.href` e não router.push: a página inteira recarrega, e com ela
+    // todo o estado — caixa de texto, sugestão da IA, compromissos. Levar o
+    // rascunho de uma família para a conversa de outra é o erro que a caixa
+    // única acabou de consertar; não vou reabri-lo por outra porta.
+    window.location.href = `/painel/conversas/${alvo.id}`;
   }
 
   async function reabrir() {
@@ -258,15 +339,42 @@ export default function Thread() {
                 Reabrir atendimento
               </button>
             : <button style={painel.botaoSec} onClick={finalizar} disabled={ocupado}>
-                Finalizar atendimento
+                {/* O RÓTULO DIZ O QUE VAI ACONTECER. Finalizar e ser levado
+                    para outra conversa sem aviso seria um susto; escrito no
+                    botão, é o fluxo de quem está limpando a fila. */}
+                {fila?.proxima ? "Finalizar e ir para a próxima" : "Finalizar atendimento"}
               </button>}
+
+          {/* IR PARA A PRÓXIMA SEM FINALIZAR — para quem só quer passar
+              adiante o que ainda não dá para fechar. */}
+          {fila?.proxima && (
+            <button style={painel.botaoSec} onClick={irParaProxima} disabled={ocupado}
+                    title={`Próxima: ${fila.proxima.cliente}`}>
+              Próxima →
+            </button>
+          )}
         </div>
         <p style={{ color: cor.cinza, marginTop: -10, fontSize: 14 }}>
           {d.conversa.resolvida
             ? "Atendimento finalizado — ela reabre sozinha se a família escrever de novo."
             : d.conversa.escalada ? "Você está atendendo — a IA não responde."
             : "A IA está atendendo (rascunhos aparecem aqui)."}
+          {/* QUANTAS AINDA PRECISAM DE VOCÊ, contando esta. É o número da fila
+              filtrada (31 em 02/09), e não o de conversas não resolvidas (197):
+              dizer 197 aqui faria a fila parecer intransponível quando ela cabe
+              numa manhã. `fila` nulo é "não consegui ler", e nesse caso não se
+              diz número nenhum — vazio não é zero. */}
+          {fila && fila.naFila > 0 && (
+            <span> · {fila.naFila === 1
+              ? "é a última que precisa de você"
+              : `${fila.naFila} precisam de você`}</span>
+          )}
         </p>
+
+        {/* A CONTA DA FAMÍLIA — antes das mensagens, pelo mesmo motivo dos
+            compromissos: para responder um comprovante é preciso saber de qual
+            mês ele é, e essa resposta estava a três telas daqui. */}
+        <ContaDaFamilia familiaId={d.conversa.familiaId} />
 
         {/* O QUE VOCÊ PROMETEU E AINDA NÃO RESPONDEU (0142).
             Antes das mensagens, porque quem abre a conversa para responder
@@ -384,6 +492,19 @@ export default function Thread() {
         )}
 
         <div>
+          {/* O RECADO DO ENVIO FICA COLADO NA CAIXA, e nao no topo da tela: e
+              aqui que a pessoa esta olhando quando clica em Enviar. */}
+          {avisoEnvio && (
+            <div style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 10,
+                          fontSize: 15, lineHeight: 1.5,
+                          background: avisoEnvio.tom === "erro"
+                            ? "rgb(var(--zm-perigo) / 0.10)" : "rgb(var(--zm-aviso) / 0.12)",
+                          border: `1px solid ${avisoEnvio.tom === "erro"
+                            ? "rgb(var(--zm-perigo))" : "rgb(var(--zm-aviso))"}`,
+                          color: "rgb(var(--zm-ink))" }}>
+              {avisoEnvio.texto}
+            </div>
+          )}
           <textarea
             rows={5}
             style={{ ...painel.input, width: "100%", minHeight: 130, resize: "vertical",

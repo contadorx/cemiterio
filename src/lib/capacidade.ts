@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { env } from "./env";
 import { DIAS_CICLO } from "./agenda";
+import { diasDaCasa } from "./jornada";
 
 export interface CapacidadeLocal {
   cemiterioId: string | null;
@@ -61,13 +62,7 @@ export async function calcularCapacidade(): Promise<Capacidade> {
 
   // a MESMA lista de dias que o alocador usa; o fallback antigo (um número
   // solto) só entra se a lista não existir
-  const diasLista: number[] | null =
-    Array.isArray((orgRow as any)?.dias_semana) && (orgRow as any).dias_semana.length
-      ? ((orgRow as any).dias_semana as number[])
-      : null;
-  const diasSemanaCasa = diasLista
-    ? diasLista.length
-    : Number((orgRow as any)?.dias_trabalhados_semana) || 6;
+  const diasSemanaCasa = diasDaCasa(orgRow).length;
 
   // ---- a equipe de campo (é ela quem define a capacidade real) -------------
   let campo: any[] | null = null;

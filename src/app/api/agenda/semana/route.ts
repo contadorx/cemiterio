@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
     .select(
       "id,data_prevista,data_plano,ordem_dia,status,valor,estornado_em,motivo_estorno," +
       "fixado_em,executora_id,tumulo_id,origem,data_desejada," +
-      "tumulos(identificacao,falecido_nome,quadras(codigo),ruas(nome),familias(nome))," +
+      // O CEMITERIO VEM JUNTO (0150). Com dois, "Quadra 1" sozinho nao diz onde
+      // a pessoa esta — e a agenda e o roteiro do dia: uma lista que mistura os
+      // dois manda a Nina atravessar Maua no meio do expediente sem avisar.
+      "tumulos(identificacao,falecido_nome,quadras(codigo,cemiterios(nome)),ruas(nome),familias(nome))," +
       "clientes(nome)",
     )
     .gte("data_prevista", inicio)
@@ -133,6 +136,7 @@ export async function GET(req: NextRequest) {
       // saía "QQuadra 1" — o prefixo mora aqui, não lá, para não haver duas
       // opiniões sobre como uma quadra se chama.
       quadra: (s as any).tumulos?.quadras?.codigo || null,
+      cemiterio: (s as any).tumulos?.quadras?.cemiterios?.nome || null,
       rua: (s as any).tumulos?.ruas?.nome || null,
       familia: (s as any).tumulos?.familias?.nome || null,
       falecido: (s as any).tumulos?.falecido_nome || null,

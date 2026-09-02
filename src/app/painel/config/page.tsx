@@ -10,6 +10,7 @@ import Prioridade from "./Prioridade";
 import Manutencao from "./Manutencao";
 import Termo from "./Termo";
 import Duplicados from "./Duplicados";
+import QuadrasERuas from "./QuadrasERuas";
 
 type Aba =
   | "casa" | "equipe" | "cemiterios" | "jornada" | "campo"
@@ -807,6 +808,14 @@ function Cemiterios() {
           </div>
           {c.endereco && <p style={{ margin: "4px 0 0", color: cor.cinza, fontSize: 14 }}>{c.endereco}</p>}
 
+          {/* AS QUADRAS E AS RUAS.
+              As do Cemiterio da Saudade nasceram de uma migration, e nunca fez
+              falta uma tela: so havia um cemiterio, ja pronto. Com o segundo,
+              a falta trava tudo — a rota de cadastro de jazigo exige que a
+              quadra exista, e responde "Escolha a quadra na lista" com a lista
+              vazia. */}
+          <QuadrasERuas cemiterioId={c.id} cemiterio={c.nome} />
+
           {/* dias de atendimento */}
           <div style={{ marginTop: 12 }}>
             <label style={painel.rotulo}>Dias em que a equipe vem aqui</label>
@@ -832,6 +841,26 @@ function Cemiterios() {
                 : `Sem marcação: a equipe vem em qualquer dia de trabalho da casa — que é o padrão.`}
               {" "}Desmarcar todos volta ao padrão.
             </p>
+
+            {/* A INTERSEÇÃO VAZIA NÃO PODE FICAR CALADA.
+                Marcar sábado e domingo aqui não quer dizer nada se a casa só
+                trabalha de segunda a sexta: o alocador precisa de um dia que
+                sirva aos DOIS, e sem ele este cemitério nunca entra na agenda.
+                Antes isso era invisível — o lugar simplesmente não aparecia. */}
+            {c.diasSemana && (c.diasQueRendem || []).length === 0 && (
+              <div style={{ marginTop: 8, padding: "10px 12px", borderRadius: 10,
+                            background: "rgb(var(--zm-perigo) / 0.08)",
+                            border: "1px solid rgb(var(--zm-perigo))",
+                            fontSize: 14, lineHeight: 1.5, color: "rgb(var(--zm-ink))" }}>
+                <strong>Este cemitério nunca vai entrar na agenda.</strong>{" "}
+                Ele está marcado para{" "}
+                {(c.diasSemana || []).map((i: number) => (d.dias || [])[i]).filter(Boolean).join(" e ")},
+                mas a casa só trabalha{" "}
+                {(d.jornadaCasa || []).map((i: number) => (d.dias || [])[i]).filter(Boolean).join(", ")}.
+                Não sobra um dia sequer. Marque esses dias também na jornada da
+                casa, logo abaixo, ou mude os dias daqui.
+              </div>
+            )}
           </div>
 
           {/* quem trabalha aqui */}

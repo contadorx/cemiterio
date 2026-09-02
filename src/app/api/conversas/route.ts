@@ -202,9 +202,39 @@ export async function GET(req: NextRequest) {
     return String(b.atualizada).localeCompare(String(a.atualizada));
   });
 
+  // ==========================================================================
+  // A PRÓXIMA DA FILA (0156)
+  // ==========================================================================
+  //
+  // Mora AQUI, e não numa rota própria, de propósito. A ordem da fila é feita
+  // de quatro coisas — o filtro de `situacao`, o `precisaDeVoce`, a ordenação
+  // por quem espera há mais tempo e a caixa da equipe fixada no topo. Uma rota
+  // separada teria de repetir as quatro, e este projeto já sabe o que acontece
+  // quando a mesma regra vive em dois lugares: o crachá dizia 7 e a lista
+  // mostrava 1.
+  //
+  // MEDIDO EM 02/09: 197 conversas estão "não resolvidas", mas só 31 esperam
+  // resposta de alguém. Andar pelas 197 levaria a Sureya por 166 conversas sem
+  // nada a fazer — por isso a próxima sai desta lista, que já é a filtrada, e
+  // não de "tudo que não foi resolvido".
+  //
+  // Se a conversa atual ainda está na fila, a próxima é a seguinte. Se ela SAIU
+  // (acabou de ser finalizada, que é o caso comum de quem clica), a próxima é a
+  // primeira — em vez de "não há próxima", que seria o fim da fila mentindo.
+  const proximaDe = q.get("proximaDe") || "";
+  let proxima: { id: string; cliente: string } | null = null;
+  if (proximaDe) {
+    const i = conversas.findIndex((c: any) => c.id === proximaDe);
+    const alvo = i >= 0 ? conversas[i + 1] : conversas.find((c: any) => c.id !== proximaDe);
+    proxima = alvo ? { id: alvo.id, cliente: alvo.cliente } : null;
+  }
+
   return NextResponse.json({
     ok: true,
     conversas,
+    // quantas ainda precisam de você, contando a que está aberta
+    naFila: conversas.length,
+    proxima,
     contadores: {
       pendentes: c0.pendentes || 0,
       aguardando: c0.aguardando || 0,

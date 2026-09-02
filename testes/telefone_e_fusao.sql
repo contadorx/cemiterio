@@ -424,3 +424,70 @@ begin
 end $$;
 
 drop function ci47(text, boolean, text);
+
+-- ============================================================================
+-- O CODIGO DO JAZIGO E UNICO DENTRO DO CEMITERIO (0149)
+--
+-- Em 30/08, com ele de pe no Santa Lidia, o cadastro morreu com "duplicate key
+-- value violates unique constraint idx_tumulos_codigo_unico" — o codigo
+-- Q3-R13-001 ja existia no Cemiterio da Saudade.
+--
+-- O codigo e um endereco DENTRO de um cemiterio. Dois cemiterios tem uma
+-- quadra 3 cada, e as duas sao reais.
+-- ============================================================================
+create or replace function ci49(nome text, condicao boolean, porque text) returns void
+language plpgsql as $$
+begin
+  if condicao is distinct from true then
+    raise exception 'CODIGO FALHOU — %: %', nome, porque;
+  end if;
+  raise notice '  ok  %', nome;
+end $$;
+
+do $$
+declare
+  v_org uuid := '49494949-4949-4949-4949-494949494949';
+  c_um  uuid := '49494949-0000-0000-0000-0000000000e1';
+  c_doi uuid := '49494949-0000-0000-0000-0000000000e2';
+  q_um  uuid := '49494949-0000-0000-0000-0000000000d1';
+  q_doi uuid := '49494949-0000-0000-0000-0000000000d2';
+  v_erro text;
+begin
+  insert into orgs (id, nome) values (v_org, 'Teste 0149') on conflict (id) do nothing;
+  insert into cemiterios (id, org_id, nome) values (c_um, v_org, 'Saudade') on conflict (id) do nothing;
+  insert into cemiterios (id, org_id, nome) values (c_doi, v_org, 'Santa Lidia') on conflict (id) do nothing;
+  insert into quadras (id, org_id, cemiterio_id, codigo) values (q_um, v_org, c_um, 'Q3')
+    on conflict (id) do nothing;
+  insert into quadras (id, org_id, cemiterio_id, codigo) values (q_doi, v_org, c_doi, 'Q3')
+    on conflict (id) do nothing;
+
+  insert into tumulos (org_id, cemiterio_id, quadra_id, identificacao, codigo)
+    values (v_org, c_um, q_um, 'Silva', 'Q3-R1-001');
+
+  -- O MESMO CODIGO NO OUTRO CEMITERIO TEM DE ENTRAR. Era isto que quebrava.
+  begin
+    insert into tumulos (org_id, cemiterio_id, quadra_id, identificacao, codigo)
+      values (v_org, c_doi, q_doi, 'Roberto', 'Q3-R1-001');
+    v_erro := null;
+  exception when others then v_erro := sqlerrm;
+  end;
+  perform ci49('o mesmo codigo entra no outro cemiterio',
+               v_erro is null,
+               'o Santa Lidia continua colidindo com o Saudade: ' || coalesce(v_erro, ''));
+
+  -- E DENTRO DO MESMO CEMITERIO CONTINUA RECUSANDO. Sem isso, a protecao
+  -- inteira teria sido trocada por nada.
+  begin
+    insert into tumulos (org_id, cemiterio_id, quadra_id, identificacao, codigo)
+      values (v_org, c_um, q_um, 'Outro', 'Q3-R1-001');
+    v_erro := null;
+  exception when unique_violation then v_erro := 'recusou';
+  end;
+  perform ci49('mas o mesmo codigo NO MESMO cemiterio e recusado',
+               v_erro = 'recusou',
+               'dois jazigos com o mesmo endereco no mesmo cemiterio');
+
+  raise notice '  ---';
+end $$;
+
+drop function ci49(text, boolean, text);

@@ -2159,6 +2159,359 @@ ok("resolver e arquivar fecham o rascunho pendente",
 ok("e so o que estava aberto",
    /\.is\("acao_humana", null\)/.test(rotaAcao48Sem));
 
+// ===========================================================================
+// UM CEMITERIO NOVO TEM POR ONDE COMECAR (0149)
+//
+// As 4 quadras e 44 ruas do Cemiterio da Saudade nasceram de uma migration.
+// Nunca fez falta uma tela: so havia um cemiterio, e ele ja veio pronto.
+//
+// Com o Santa Lidia (cadastrado em 23/08, ZERO quadras) isso trava tudo: a
+// rota de cadastro de jazigo EXIGE que a quadra exista e responde "Escolha a
+// quadra na lista" — com a lista vazia.
+//
+// E a digitacao livre volta aqui, junto com o defeito das treze quadras.
+// ===========================================================================
+const rotaQuadras = readFileSync("src/app/api/quadras/route.ts", "utf8");
+const rotaRuas = readFileSync("src/app/api/ruas/route.ts", "utf8");
+const telaQR = readFileSync("src/app/painel/config/QuadrasERuas.tsx", "utf8");
+
+ok("da para criar quadra e rua pelo painel",
+   /export async function POST/.test(rotaQuadras) && /export async function POST/.test(rotaRuas));
+// O indice unico do banco so pega a colisao EXATA: "QD 1" passaria por ele.
+ok("e o nome passa pela forma unica antes de gravar",
+   /formaDaQuadra\(/.test(rotaQuadras) && /formaDaRua\(/.test(rotaRuas));
+ok("com recusa quando o mesmo lugar ja existe escrito de outro jeito",
+   /mesmoLugar\(/.test(semComentarios(rotaQuadras))
+   && /mesmoLugar\(/.test(semComentarios(rotaRuas)));
+// A regra mora num lugar so: uma segunda normalizacao na tela seria a oitava
+// vez que este projeto paga por duas implementacoes da mesma regra.
+ok("a regra do nome mora numa lib, nao na tela",
+   !/replace\(\/\\s\+\//.test(semComentarios(telaQR))
+   && /formaDaQuadra/.test(readFileSync("src/lib/lugar.ts", "utf8")));
+// Com dois cemiterios, quem lista as quadras precisa saber de qual e cada uma.
+ok("a lista de quadras diz de qual cemiterio cada uma e",
+   /cemiterio_id/.test(rotaQuadras));
+// Sem rua o jazigo fica fora do roteiro, e a Nina so descobre andando.
+ok("a tela avisa que sem rua o jazigo fica fora do roteiro",
+   /fora do roteiro/.test(telaQR));
+
+// ===========================================================================
+// O CODIGO DO JAZIGO NAO DEPENDE DE COMO A RUA FOI ESCRITA (0149)
+//
+// Em 30/08, no Santa Lidia: a rua "RUA 1 Q3" virou R13 — o 1 da rua colado no
+// 3 da quadra que ele repetiu no nome — e o codigo Q3-R13-001 ja existia no
+// Saudade. A tela mostrou "duplicate key value violates unique constraint" no
+// celular de quem estava de pe no cemiterio.
+// ===========================================================================
+const libRota = readFileSync("src/lib/rota.ts", "utf8");
+const rotaTum = readFileSync("src/app/api/tumulos/route.ts", "utf8");
+const rotaTumSem = semComentarios(rotaTum);
+
+ok("o codigo le o PRIMEIRO numero da rua, nao todos os digitos",
+   /function primeiroNumero/.test(libRota)
+   && !/ruaNome\.replace\(\/\\D\/g, ""\)/.test(semComentarios(libRota)));
+// O contador andava antes do insert: tentativa que falhava queimava numero, e
+// a "RUA 1 Q3" ficou com seq_cadastro em 3 sem nenhum tumulo.
+ok("o contador da rua so anda depois do jazigo entrar",
+   /seq_cadastro: seqUsada/.test(rotaTumSem)
+   && rotaTumSem.indexOf("seq_cadastro: seqUsada") > rotaTumSem.indexOf('.insert(linha)'));
+// "duplicate key value violates unique constraint" nao se mostra a quem esta
+// de celular na mao no meio de um cemiterio.
+ok("erro de codigo repetido vira recado que da para agir",
+   /Já existe um jazigo com o código/.test(rotaTum));
+
+// ===========================================================================
+// COM DOIS CEMITERIOS, A LISTA PRECISA DIZER DE QUAL (0150)
+//
+// A tela de Jazigos e a bancada das lapides misturavam os 266 do Cemiterio da
+// Saudade com os do Santa Lidia. Quem transcreve lapide trabalha com as fotos
+// de UM cemiterio, e o contador ("204 para transcrever") passava a falar de um
+// trabalho que nao era o que estava na frente dela.
+// ===========================================================================
+const rotaJaz50 = readFileSync("src/app/api/jazigos/route.ts", "utf8");
+const telaJaz50 = readFileSync("src/app/painel/jazigos/page.tsx", "utf8");
+const rotaFal50 = readFileSync("src/app/api/falecidos/route.ts", "utf8");
+const telaLap50 = readFileSync("src/app/painel/jazigos/lapides/page.tsx", "utf8");
+
+ok("a lista de jazigos filtra por cemiterio",
+   /sp\.get\("cemiterio"\)/.test(rotaJaz50) && /cemiterioFiltro/.test(telaJaz50));
+ok("e a bancada das lapides tambem",
+   /searchParams\.get\("cemiterio"\)/.test(rotaFal50) && /&cemiterio=/.test(telaLap50));
+
+// As quadras de um cemiterio nao servem ao outro: "Quadra 1" e "Q1" apareciam
+// lado a lado sem dizer de onde era cada uma, e escolher a errada devolvia
+// lista vazia sem explicar.
+ok("as quadras oferecidas seguem o cemiterio escolhido",
+   /q\.cemiterio_id === cemiterioId/.test(rotaJaz50));
+ok("e trocar de cemiterio limpa a quadra escolhida",
+   /setQuadraFiltro\(""\)/.test(semComentarios(telaJaz50)));
+
+// Um seletor de uma opcao so e ruido numa barra que ja tem busca, quadra, rua
+// e cinco botoes.
+ok("o seletor so aparece com mais de um cemiterio",
+   /cemiterios \|\| \[\]\)\.length > 1/.test(telaJaz50)
+   && /cemiterios \|\| \[\]\)\.length > 1/.test(telaLap50));
+
+// ===========================================================================
+// A AGENDA DIZ DE QUAL CEMITERIO (0150)
+//
+// A agenda E o roteiro do dia, e a roteirizacao automatica e por sequencia de
+// quadra e rua com serpentina — ordem que so faz sentido DENTRO de um
+// cemiterio. Uma lista que mistura os dois manda a Nina atravessar Maua no
+// meio do expediente, e nada na tela dizia isso: a linha mostrava "Quadra 1",
+// e a quadra 1 existe nos dois lugares.
+// ===========================================================================
+const rotaSem50 = readFileSync("src/app/api/agenda/semana/route.ts", "utf8");
+const telaAg50 = readFileSync("src/app/painel/agenda/page.tsx", "utf8");
+const telaAg50Sem = semComentarios(telaAg50);
+
+ok("a agenda da semana traz o cemiterio de cada linha",
+   /cemiterios\(nome\)/.test(rotaSem50) && /cemiterio: \(s as any\)/.test(rotaSem50));
+ok("e a tela recorta por ele",
+   /cemFiltro/.test(telaAg50Sem) && /s\.cemiterio !== cemFiltro/.test(telaAg50Sem));
+// Oferecer um cemiterio sem lavagem no periodo seria uma opcao que devolve
+// lista vazia — a mesma escolha que a lista de ruas ja faz aqui do lado.
+ok("os chips sao os cemiterios COM lavagem no periodo, nao os cadastrados",
+   /Object\.values\(dias\)\.flat\(\)\.map\(\(s\) => s\.cemiterio\)/.test(telaAg50Sem));
+// Um chip que nunca muda nada e ruido numa barra que ja tem busca e cinco
+// recortes; e com um cemiterio so, repetir o nome em trinta linhas tambem.
+ok("e so aparecem com mais de um",
+   /cemiterios\.length > 1 && cemiterios\.map/.test(telaAg50Sem)
+   && /cemiterios\.length > 1 && s\.cemiterio/.test(telaAg50Sem));
+ok("limpar filtro limpa o cemiterio tambem",
+   /setCemFiltro\(""\)/.test(telaAg50Sem));
+
+// ===========================================================================
+// 0151 — OS DIAS DE TRABALHO SAO UMA REGRA SO
+// ===========================================================================
+const libJornada = readFileSync("src/lib/jornada.ts", "utf8");
+const rotaPreco51 = readFileSync("src/app/api/precificacao/route.ts", "utf8");
+const libCapac = readFileSync("src/lib/capacidade.ts", "utf8");
+const libAgenda51 = readFileSync("src/lib/agenda.ts", "utf8");
+const rotaCems51 = readFileSync("src/app/api/cemiterios/route.ts", "utf8");
+const telaCfg51 = readFileSync("src/app/painel/config/page.tsx", "utf8");
+
+ok("existe um lugar so que decide os dias da casa",
+   /export function diasDaCasa/.test(libJornada)
+   && /export function diasQueRendem/.test(libJornada));
+// O comentario da precificacao dizia que a capacidade vinha "da mesma
+// configuracao que o alocador usa". Vinha de OUTRA coluna: o alocador lia a
+// lista `dias_semana`, a precificacao lia o numero `dias_trabalhados_semana`.
+// A coluna continua sendo BUSCADA: ela e o plano B de `diasDaCasa` quando a
+// lista nao existe. O que nao pode voltar e alguem CONTAR os dias por ela.
+ok("ninguem mais conta os dias pelo numero solto",
+   !/Number\([^)]*dias_trabalhados_semana/.test(semComentarios(rotaPreco51))
+   && !/Number\([^)]*dias_trabalhados_semana/.test(semComentarios(libCapac))
+   && /diasDaCasa\(/.test(rotaPreco51) && /diasDaCasa\(/.test(libCapac));
+// E quem pergunta precisa TRAZER a lista, senao `diasDaCasa` cai no plano B
+// para sempre e o conserto nao vale nada.
+ok("e quem pergunta traz a lista junto",
+   /dias_semana/.test(rotaPreco51) && /dias_semana/.test(libCapac)
+   && /dias_semana,dias_trabalhados_semana/.test(libAgenda51));
+ok("o alocador tambem pergunta no mesmo lugar",
+   /diasDaCasa\(o\)/.test(libAgenda51) && /diasQueRendem\(jornada\.dias/.test(libAgenda51));
+// Um cemiterio marcado so no fim de semana, com a casa de segunda a sexta, da
+// interseçao vazia: o alocador nao acha dia e devolve o mesmo "0 agendados" de
+// quando nao ha nada a fazer. Sao situaçoes opostas. Vazio nao e zero.
+ok("um cemiterio sem dia possivel sai do alocador NOMEADO",
+   /semDia\.push\(/.test(libAgenda51) && /pendentes: grupo\.itens\.length/.test(libAgenda51));
+ok("a rota de cemiterios diz quantos dias cada um realmente rende",
+   /diasQueRendem: diasQueRendem\(jornadaCasa/.test(rotaCems51)
+   && /jornadaCasa,/.test(rotaCems51));
+ok("e a tela avisa, em vermelho, quando nao sobra dia nenhum",
+   /diasQueRendem \|\| \[\]\)\.length === 0/.test(telaCfg51)
+   && /nunca vai entrar na agenda/.test(telaCfg51));
+
+// ===========================================================================
+// 0152 — O ENVIO QUE FALHA FALA, E NAO LEVA O TEXTO JUNTO
+//
+// 02/09: escreveu para a Eliete, clicou em Enviar, a caixa esvaziou, a tela
+// recarregou — e a mensagem nao chegou. Medido: 161 interacoes com acao
+// humana, 58 saidas no total, ultima saida do dia ANTERIOR, fila de reenvio
+// vazia. A mensagem nao saiu, nao ficou em fila e nao foi gravada.
+// ===========================================================================
+const rotaAprov52 = readFileSync("src/app/api/atendimento/aprovar/route.ts", "utf8");
+const rotaEnv52 = readFileSync("src/app/api/conversas/[id]/enviar/route.ts", "utf8");
+const telaConv52 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv52Sem = semComentarios(telaConv52);
+const persona52 = readFileSync("src/lib/persona.ts", "utf8");
+
+// `enviarWhatsapp` LANCA. Os dois caminhos humanos o chamavam cru, enquanto o
+// caminho automatico ja usava o que enfileira e tenta de novo — e o automatico
+// esta desligado por decisao da casa. A pior implementacao era a unica em uso.
+ok("os dois envios humanos usam o caminho que nao perde a mensagem",
+   /enviarTextoComRetry/.test(rotaAprov52) && /enviarTextoComRetry/.test(rotaEnv52)
+   && !/enviarWhatsapp\(/.test(semComentarios(rotaAprov52))
+   && !/enviarWhatsapp\(/.test(semComentarios(rotaEnv52)));
+ok("e as duas rotas dizem se saiu AGORA ou so ficou na fila",
+   /entregue/.test(rotaAprov52) && /entregue/.test(rotaEnv52));
+// Limpar a caixa sem olhar a resposta foi o que fez a mensagem sumir em
+// silencio: para quem clicou, 500 e 200 tinham exatamente a mesma cara.
+ok("a tela OLHA a resposta antes de limpar a caixa",
+   /if \(!r\.ok \|\| !\(j as any\)\.ok\)/.test(telaConv52Sem)
+   && telaConv52Sem.indexOf("setTexto(\"\")") > telaConv52Sem.indexOf("if (!r.ok"));
+ok("falhou: o texto FICA na caixa e a tela diz que nao foi",
+   /NÃO foi enviada/.test(telaConv52) && /continua aqui/.test(telaConv52));
+ok("ficou na fila NAO e o mesmo que chegou",
+   /entregue === false/.test(telaConv52Sem) && /fila/.test(telaConv52));
+// A resposta a Eliete agradecia a ela por "cuidar do jazigo da familia" —
+// quem cuida do jazigo e a casa; ela paga por isso.
+ok("a persona proibe inverter quem cuida do jazigo",
+   /QUEM CUIDA DO JAZIGO É VOCÊ, NÃO A FAMÍLIA/.test(persona52));
+
+// ===========================================================================
+// 0153 — DE QUAL MES E ESTE PAGAMENTO, SEM SAIR DA CONVERSA
+//
+// 02/09: "para conferir o mes eu abri a conversa, o comprovante e a ficha,
+// tres telas". A pergunta nasce olhando o comprovante no WhatsApp; a resposta
+// morava em outro lugar.
+// ===========================================================================
+const contaFam53 = readFileSync("src/app/painel/conversas/[id]/ContaDaFamilia.tsx", "utf8");
+const telaConv53 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const rotaConv53 = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
+const rotaCC53 = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+const libSaldo53 = readFileSync("src/lib/saldo.ts", "utf8");
+
+ok("a conta da familia aparece DENTRO da conversa",
+   /<ContaDaFamilia/.test(telaConv53) && /familiaId=\{d\.conversa\.familiaId\}/.test(telaConv53));
+ok("e a rota da conversa manda o familiaId para isso ser possivel",
+   /familiaId: \(conv as any\)\.clientes\?\.familia_id/.test(rotaConv53));
+// O mes vem de um campo declarado, nunca de palpite: casar pagamento com mes
+// por proximidade de data seria uma segunda verdade sobre dinheiro.
+ok("o mes a mes AGRUPA pela competencia, e nao adivinha",
+   /export function porCompetencia/.test(libSaldo53)
+   && /const comp = String\(m\.competencia \|\| ""\)\.slice\(0, 7\);/.test(libSaldo53)
+   && /if \(!comp\) continue;/.test(libSaldo53));
+ok("e a rota devolve os meses sem refazer a conta",
+   /porCompetencia\(linhas as any, hoje\)/.test(rotaCC53)
+   && /meses: mesesDaConta/.test(rotaCC53));
+// Sem familia vinculada nao existe conta; dizer "Em dia" ali seria apresentar
+// ausencia como medicao.
+ok("sem familia vinculada o cartao NAO diz 'em dia'",
+   /não está ligado a uma família/.test(contaFam53));
+ok("uma falha ao ler a conta vira recado, nao silencio",
+   /Não consegui carregar a conta desta família/.test(contaFam53));
+// Quem responde um recado de saudade nao precisa de dinheiro na frente.
+// O CRITERIO MUDOU NA 0155, e esta guarda muda com ele: era "em aberto", que
+// pegava 158 meses da casa; passou a ser ATRASO, que sao 55. A intencao segue
+// a mesma — o cartao so salta quando o dinheiro muda a resposta que vai ser
+// escrita. Ver a guarda irma no bloco da 0155.
+ok("o cartao nao abre sozinho por qualquer saldo",
+   !/setAberto\(!j\.emDia\)/.test(semComentarios(contaFam53)));
+
+// ===========================================================================
+// 0154 — AS FOTOS DAS LAPIDES DEIXAM DE SER PUBLICAS
+//
+// Medido em 02/09: o balde `servicos` estava `public = true` com 822 arquivos —
+// 534 deles as fotos de referencia e enquadramento dos 267 jazigos. Qualquer
+// pessoa com o endereco via a lapide, com o nome e as datas de quem esta ali,
+// para sempre e sem passar por login nenhum. A 0139 fechou os outros dois
+// baldes e deixou este de proposito, dizendo que fecha-lo seria um build
+// proprio. E este.
+// ===========================================================================
+const libStore54 = readFileSync("src/lib/storage.ts", "utf8");
+const rotaPortal54 = readFileSync("src/app/api/portal/route.ts", "utf8");
+const rotaFila54 = readFileSync("src/app/api/fila/route.ts", "utf8");
+
+ok("o balde das fotos esta na lista dos fechados",
+   /BUCKET_SERVICOS,\n\]\)/.test(libStore54.replace(/ +/g, " ")) 
+   || /BALDES_PRIVADOS[\s\S]{0,400}BUCKET_SERVICOS/.test(libStore54));
+// Assinar um a um seria 534 idas ao Storage para desenhar a lista de Jazigos.
+ok("existe um jeito de assinar em lote",
+   /export async function assinarVarios/.test(libStore54)
+   && /createSignedUrls/.test(libStore54));
+// A pagina da familia e publica por token: se ela parar de mostrar as fotos, a
+// familia perde justamente o que ela paga para ver.
+ok("o portal da familia assina as fotos que devolve",
+   /assinarVarios/.test(rotaPortal54) && /foto_referencia_url: abrir/.test(rotaPortal54));
+// Link assinado e perecivel; endereco guardado nao. Um item pode ficar horas na
+// fila ate alguem tocar em Enviar.
+ok("o WhatsApp assina na HORA de enviar, e nao ao enfileirar",
+   /assinarVarios\(supabaseAdmin\(\), fotos, 7200\)/.test(rotaFila54));
+ok("e um link que nao abriu NAO vira mensagem",
+   /if \(!link\) throw new Error/.test(rotaFila54));
+
+// A varredura que importa: nenhuma rota pode devolver o endereco cru de uma
+// foto. Meio balde fechado quebra imagem em producao sem avisar ninguem.
+const cruas = [];
+for (const f of arquivosDe("src/app/api")) {
+  const t = semComentarios(readFileSync(f, "utf8"));
+  for (const linha of t.split("\n")) {
+    if (/^\s+[a-zA-Z]+: *[a-zA-Z]+[A-Za-z]*(\?\.)?[a-zA-Z_.?]*foto_[a-z]+_url( \|\| null)?,?\s*$/.test(linha)
+        && !/abrir154|assinar/.test(linha)) {
+      cruas.push(`${f}: ${linha.trim()}`);
+    }
+  }
+}
+ok("nenhuma rota devolve o endereco cru de uma foto", cruas.length === 0);
+for (const c of cruas) console.log(`      ${c}`);
+
+// ===========================================================================
+// 0155 — EM ABERTO NAO E ATRASADO
+//
+// O cartao da 0153 mostrava os 158 meses em aberto da casa como "falta". So
+// 55 estavam vencidos: os outros 103 sao cobrancas cujo prazo nao chegou.
+// Isso faz 21 familias em atraso parecerem 71 — e a pergunta que o cartao
+// existe para responder ("este pagamento e de atrasados?") vira palpite.
+// ===========================================================================
+const libSaldo55 = readFileSync("src/lib/saldo.ts", "utf8");
+const contaFam55 = readFileSync("src/app/painel/conversas/[id]/ContaDaFamilia.tsx", "utf8");
+const rotaCC55 = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+
+ok("o mes sabe se VENCEU, e nao so se falta pagar",
+   /atrasado: !quitado && !!v\.vence && v\.vence <= hoje/.test(libSaldo55));
+// Duas cobrancas no mesmo mes: o atraso comeca na primeira que venceu, senao
+// ele parece mais novo do que e.
+ok("com duas cobrancas no mes vale o vencimento mais antigo",
+   /if \(!alvo\.vence \|\| m\.data < alvo\.vence\) alvo\.vence = m\.data;/.test(libSaldo55));
+ok("existe uma frase pronta que responde a pergunta",
+   /export function frasearAtraso/.test(libSaldo55) && /Em atraso: /.test(libSaldo55));
+// Recalcular atraso na tela seria a segunda conta sobre os mesmos fatos.
+ok("a frase vem da rota, e a tela nao recalcula atraso",
+   /fraseAtraso: frasearAtraso\(mesesDaConta, hoje\)/.test(rotaCC55)
+   && !/vence <=|atrasado =/.test(semComentarios(contaFam55)));
+ok("a tela mostra tres estados, e nao dois",
+   /atrasado \? `\$\{dinheiro\(m\.falta\)\} atrasado`/.test(contaFam55)
+   && /vence \$\{dia\(m\.vence\)\}/.test(contaFam55));
+// Um alarme que toca em quase toda conversa para de ser lido.
+ok("o cartao abre sozinho por ATRASO, nao por qualquer coisa em aberto",
+   /some\(\(m\) => m\.atrasado\)/.test(semComentarios(contaFam55)));
+
+// ===========================================================================
+// 0156 — A PROXIMA DA FILA, SEM PASSAR PELA LISTA
+//
+// Medido em 02/09: 197 conversas "nao resolvidas" e apenas 31 esperando
+// resposta de alguem. Uma "proxima" que andasse pelas 197 levaria a Sureya
+// por 166 conversas sem nada a fazer.
+// ===========================================================================
+const rotaConv56 = readFileSync("src/app/api/conversas/route.ts", "utf8");
+const telaConv56 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv56Sem = semComentarios(telaConv56);
+
+// A ordem da fila e feita de quatro regras (filtro de situacao, precisaDeVoce,
+// quem espera ha mais tempo, e a caixa da equipe fixada). Uma rota propria
+// teria de repetir as quatro — e o crachao dizia 7 enquanto a lista mostrava 1
+// exatamente por isso.
+ok("a proxima sai da MESMA lista que a tela de conversas desenha",
+   /const proximaDe = q\.get\("proximaDe"\)/.test(rotaConv56)
+   && /conversas\.findIndex/.test(rotaConv56));
+ok("e a tela pede a fila JA FILTRADA, nao tudo que nao foi resolvido",
+   /situacao=pendentes&proximaDe=/.test(telaConv56Sem));
+// Quem acabou de finalizar sai da fila: cair em "nao ha proxima" seria o fim
+// da fila mentindo com 30 pessoas ainda esperando.
+ok("se a conversa atual ja saiu da fila, a proxima e a primeira",
+   /i >= 0 \? conversas\[i \+ 1\] : conversas\.find/.test(rotaConv56));
+ok("finalizar leva para a proxima, e o botao AVISA que leva",
+   /if \(fila\?\.proxima\) \{ irParaProxima\(\); return; \}/.test(telaConv56Sem)
+   && /Finalizar e ir para a próxima/.test(telaConv56));
+// Levar o rascunho de uma familia para a conversa de outra e o defeito que a
+// caixa unica acabou de consertar.
+ok("trocar de conversa recarrega a pagina, e nao carrega estado junto",
+   /window\.location\.href = `\/painel\/conversas\/\$\{alvo\.id\}`/.test(telaConv56Sem));
+// `fila` nulo e "nao consegui ler", e nao "zero esperando".
+ok("a fila que nao carregou nao vira numero na tela",
+   /fila && fila\.naFila > 0/.test(telaConv56Sem));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

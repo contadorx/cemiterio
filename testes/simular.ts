@@ -303,6 +303,103 @@ async function rodar() {
   // o hook de módulos faz createClient() devolver este objeto
   (globalThis as any).__FAKE_SUPABASE__ = fake;
 
+  // =========================================================================
+  // A CONTA MES A MES (0153)
+  //
+  // Relatado em 02/09: para saber de qual mes era um pagamento recebido no
+  // WhatsApp era preciso abrir TRES telas — conversa, comprovante e ficha.
+  // `porCompetencia` responde isso agrupando pelo campo que ja existe nas duas
+  // pontas. Ela NAO adivinha qual mes um pagamento cobre: se adivinhasse,
+  // seria uma segunda verdade sobre dinheiro.
+  // =========================================================================
+  console.log("\n=== 0. A CONTA MES A MES (porCompetencia) ===");
+  const sal = await import("../src/lib/saldo");
+  const mm = sal.porCompetencia([
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 70, data: "2026-08-12", competencia: "2026-08-01" },
+    { tipo: "debito",  valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+    { tipo: "credito", valor: 30, data: "2026-09-12", competencia: "2026-09-01" },
+    { tipo: "debito",  valor: 70, data: "2026-10-10", competencia: "2026-10-01" },
+  ]);
+  checar("um mes pago some da lista de abertos",
+         mm.find((m) => m.competencia === "2026-08")?.quitado === true,
+         JSON.stringify(mm.find((m) => m.competencia === "2026-08")));
+  checar("pagamento PARCIAL nao quita o mes",
+         mm.find((m) => m.competencia === "2026-09")?.falta === 40,
+         `veio ${mm.find((m) => m.competencia === "2026-09")?.falta}`);
+  checar("mes sem nenhum pagamento fica inteiro em aberto",
+         mm.find((m) => m.competencia === "2026-10")?.falta === 70);
+  checar("os meses saem em ordem, do mais antigo para o mais novo",
+         mm.map((m) => m.competencia).join(",") === "2026-08,2026-09,2026-10",
+         mm.map((m) => m.competencia).join(","));
+  // Empurrar um lancamento sem competencia para o mes corrente seria
+  // apresentar um palpite como se fosse o que esta escrito.
+  const semComp = sal.porCompetencia([
+    { tipo: "debito", valor: 50, data: "2026-09-10", competencia: null },
+  ]);
+  checar("lancamento SEM competencia nao entra em mes nenhum", semComp.length === 0,
+         JSON.stringify(semComp));
+  // O credito nao pode "vazar" de um mes para o outro: quem pagou setembro
+  // adiantado nao quitou agosto, e dizer que quitou faria a cobranca de agosto
+  // sumir sozinha.
+  const naoVaza = sal.porCompetencia([
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 200, data: "2026-09-12", competencia: "2026-09-01" },
+  ]);
+  checar("credito de um mes NAO quita o mes anterior",
+         naoVaza.find((m) => m.competencia === "2026-08")?.quitado === false,
+         JSON.stringify(naoVaza));
+
+  // -------------------------------------------------------------------------
+  // EM ABERTO NAO E ATRASADO (0155)
+  //
+  // Medido em 02/09: 158 meses em aberto na casa, e apenas 55 vencidos. Uma
+  // tela que chama os 158 de "falta" faz 21 familias em atraso parecerem 71 —
+  // e transforma "este pagamento e de atrasados?" num palpite.
+  // -------------------------------------------------------------------------
+  const HOJE = "2026-09-02";
+  const mmA = sal.porCompetencia([
+    // julho venceu e nao foi pago: ATRASO
+    { tipo: "debito",  valor: 70, data: "2026-07-10", competencia: "2026-07-01" },
+    // agosto venceu e foi pago
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 70, data: "2026-08-11", competencia: "2026-08-01" },
+    // setembro ainda NAO venceu: em aberto, mas nao e divida
+    { tipo: "debito",  valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+  ], HOJE);
+  const em = (c: string) => mmA.find((m) => m.competencia === c)!;
+  checar("mes vencido e nao pago e ATRASO", em("2026-07").atrasado === true);
+  checar("mes pago nao e atraso", em("2026-08").atrasado === false);
+  checar("mes que ainda NAO venceu nao e atraso, mesmo em aberto",
+         em("2026-09").atrasado === false && em("2026-09").quitado === false,
+         JSON.stringify(em("2026-09")));
+  checar("a frase nomeia o mes atrasado, e nao so o total",
+         sal.frasearAtraso(mmA, HOJE).includes("07/2026"),
+         sal.frasearAtraso(mmA, HOJE));
+  // Sem atraso, "nada atrasado" sozinho deixa a pessoa sem saber se pode cobrar.
+  const mmB = sal.porCompetencia([
+    { tipo: "debito", valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+  ], HOJE);
+  checar("sem atraso, a frase diz QUANDO vence o proximo",
+         sal.frasearAtraso(mmB, HOJE).includes("10/09/2026"),
+         sal.frasearAtraso(mmB, HOJE));
+  // Duas cobrancas no mesmo mes: o atraso comeca na PRIMEIRA que venceu.
+  const mmC = sal.porCompetencia([
+    { tipo: "debito", valor: 30, data: "2026-07-05", competencia: "2026-07-01" },
+    { tipo: "debito", valor: 40, data: "2026-07-25", competencia: "2026-07-01" },
+  ], HOJE);
+  checar("com duas cobrancas no mes, vale o vencimento MAIS ANTIGO",
+         mmC[0].vence === "2026-07-05", String(mmC[0].vence));
+  // O que vence HOJE ja conta como vencido — e a mesma regra de `calcularSaldo`
+  // ("o que venceu e nao foi pago e cobranca"), e ter duas respostas para isso
+  // faria a ficha e o cartao discordarem sobre a mesma familia. O dia e o DIA
+  // DA OPERACAO, nunca o de UTC: das 21h a meia-noite o de UTC ja virou, e a
+  // competencia entraria como atraso uma noite antes da hora.
+  checar("o que vence HOJE ja conta como atrasado, igual ao saldo",
+         sal.porCompetencia(
+           [{ tipo: "debito", valor: 70, data: HOJE, competencia: "2026-09-01" }],
+           HOJE)[0].atrasado === true);
+
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
   const sCec = await fin.calcularSaldo("c-cec");
@@ -1636,6 +1733,105 @@ async function rodar() {
     checar("numero vazio nao acha o primeiro da lista",
            (await acharCliente("")) === null,
            "cadastro sem telefone viraria a resposta de qualquer mensagem");
+  }
+
+  // ==========================================================================
+  // O NOME DO LUGAR TEM UMA FORMA SO (0149)
+  // ==========================================================================
+  //
+  // A licao ja estava escrita na rota de cadastro de jazigo:
+  //
+  //   "Antes esta rota criava a quadra quando o codigo nao existia. Parecia
+  //    gentil e foi o que produziu TREZE QUADRAS para um cemiterio de quatro:
+  //    'QD 1', 'Q1', 'Qd 1', 'Q01' e 'Quadra 1' eram o mesmo lugar do mundo
+  //    real em cinco registros diferentes — e o roteiro do dia se perdia."
+  //
+  // A resposta de la foi proibir criar por texto livre. Mas alguem tem de criar
+  // a primeira quadra do Santa Lidia — e ai a digitacao volta. Se a tela de
+  // criar aceitasse qualquer forma, as treze nasceriam de novo, uma tela
+  // adiante.
+  console.log("\n=== 12h. O NOME DA QUADRA E DA RUA ===");
+  {
+    const { formaDaQuadra, formaDaRua, mesmoLugar } = await import("../src/lib/lugar");
+
+    // As cinco formas reais que viraram cinco registros.
+    for (const escrito of ["QD 1", "Q1", "Qd 1", "Q01", "Quadra 1", "quadra 01", "q 1"]) {
+      checar(`"${escrito}" e a quadra Q1`, formaDaQuadra(escrito) === "Q1",
+             `virou ${formaDaQuadra(escrito)}`);
+    }
+
+    // O ZERO A ESQUERDA CAI: "Q01" e "Q1" sao o mesmo lugar, e mante-los
+    // diferentes E o defeito.
+    checar("Q01 e Q1 sao o mesmo lugar", mesmoLugar("Q01", "Q1", "quadra"));
+    checar("mas Q1 e Q2 nao sao", !mesmoLugar("Q1", "Q2", "quadra"));
+
+    // NOME QUE NAO E NUMERO SOBREVIVE. Quadra "FUNDOS" existe, e forca-la a
+    // virar "Q0" seria pior que aceitar o nome dela.
+    checar("quadra com nome proprio nao vira Q inventado",
+           formaDaQuadra("Fundos") === "FUNDOS",
+           `virou ${formaDaQuadra("Fundos")}`);
+
+    for (const escrito of ["R5", "rua 5", "RUA 05", "Rua5", "r 5"]) {
+      checar(`"${escrito}" e a RUA 5`, formaDaRua(escrito) === "RUA 5",
+             `virou ${formaDaRua(escrito)}`);
+    }
+    checar("rua com nome proprio sobrevive", formaDaRua("Principal") === "PRINCIPAL");
+
+    // Vazio nao casa com vazio: senao duas quadras sem nome seriam "o mesmo
+    // lugar", e a segunda seria recusada por engano.
+    checar("vazio nao e o mesmo lugar que vazio",
+           !mesmoLugar("", "", "quadra") && !mesmoLugar("  ", "", "rua"),
+           "duas quadras sem nome viraram a mesma");
+  }
+
+  // ==========================================================================
+  // O CODIGO DO JAZIGO (0149)
+  // ==========================================================================
+  //
+  // O QUE ACONTECEU EM 30/08, NO SANTA LIDIA, COM ELE DE PE NO CEMITERIO
+  //
+  // Ele criou a quadra Q3 e chamou a rua de "RUA 1 Q3" — repetindo a quadra no
+  // nome, que e razoavel do lado de quem digita. `gerarCodigo` colava TODOS os
+  // digitos do nome da rua: o 1 da rua com o 3 da quadra, virando **R13**. O
+  // codigo saiu `Q3-R13-001`, que JA EXISTIA no Cemiterio da Saudade, na Rua
+  // 13 da Quadra 3.
+  //
+  // A tela mostrou "duplicate key value violates unique constraint
+  // idx_tumulos_codigo_unico" para quem estava de celular na mao.
+  console.log("\n=== 12i. O CODIGO DO JAZIGO ===");
+  {
+    const { gerarCodigo } = await import("../src/lib/rota");
+
+    // O CASO REAL.
+    checar('"RUA 1 Q3" e a rua 1, nao a rua 13',
+           gerarCodigo("Q3", "RUA 1 Q3", 1) === "Q3-R1-001",
+           `veio ${gerarCodigo("Q3", "RUA 1 Q3", 1)}`);
+
+    // E a rua 13 de verdade continua sendo a 13.
+    checar("Rua 13 continua R13",
+           gerarCodigo("Quadra 3", "Rua 13", 1) === "Q3-R13-001");
+
+    // Zero a esquerda cai: "RUA 05" e "RUA 5" sao a mesma rua, e dois codigos
+    // para ela seriam o defeito das treze quadras uma casa adiante.
+    checar("RUA 05 e RUA 5 dao o mesmo codigo",
+           gerarCodigo("Q1", "RUA 05", 7) === gerarCodigo("Q1", "RUA 5", 7));
+
+    // A quadra tambem: "Quadra 3" e "Q3" sao a mesma.
+    checar("Quadra 3 e Q3 dao o mesmo codigo",
+           gerarCodigo("Quadra 3", "RUA 1", 1) === gerarCodigo("Q3", "RUA 1", 1));
+
+    // Rua sem numero e a principal — nao vira R0.
+    checar("rua sem numero vira PR, nao R0",
+           gerarCodigo("Q2", "PRINCIPAL", 4) === "Q2-PR-004",
+           `veio ${gerarCodigo("Q2", "PRINCIPAL", 4)}`);
+
+    // Transversal tem prefixo proprio: e outro caminho no mesmo cruzamento, e
+    // T3 e R3 sao ruas diferentes.
+    checar("transversal e T, nao R",
+           gerarCodigo("Q1", "TRANSVERSAL 3", 2) === "Q1-T3-002");
+
+    checar("a sequencia vem com tres casas",
+           gerarCodigo("Q1", "RUA 1", 7).endsWith("-007"));
   }
 
   console.log("\n=== 12b. O SALDO DA FAMILIA ===");
