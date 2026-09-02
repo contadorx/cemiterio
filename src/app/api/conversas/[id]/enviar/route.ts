@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
-import { enviarWhatsapp } from "@/lib/evolution";
+import { enviarTextoComRetry } from "@/lib/envio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const telefone = (conv as any).clientes?.telefone;
   if (!telefone) return NextResponse.json({ ok: false, erro: "sem_telefone" }, { status: 400 });
 
-  await enviarWhatsapp(telefone, texto);
+  // Mesma correcao da rota de aprovacao: `enviarWhatsapp` lanca e a mensagem
+  // some. `enviarTextoComRetry` enfileira o que nao saiu e devolve se saiu AGORA.
+  const entregue = await enviarTextoComRetry(telefone, texto);
 
   await db.from("mensagens").insert({
     org_id: (conv as any).org_id,
@@ -54,5 +56,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .then(() => null, () => null);
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, entregue });
 }

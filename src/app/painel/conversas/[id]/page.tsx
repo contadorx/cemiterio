@@ -22,6 +22,9 @@ export default function Thread() {
   const [leu, setLeu] = useState<number | null>(null);
   /** Quantas promessas desta conversa ainda estão em aberto (0142). */
   const [promessas, setPromessas] = useState(0);
+  // O recado do envio. Fica FORA do try/finally do `enviar` porque ele
+  // precisa sobreviver ao fim da chamada — e some so quando ela tenta de novo.
+  const [avisoEnvio, setAvisoEnvio] = useState<{ tom: "erro" | "aviso"; texto: string } | null>(null);
 
   /**
    * SUGERIR RESPOSTA — a IA lê tudo e escreve uma proposta no campo.
@@ -99,28 +102,71 @@ export default function Thread() {
    * resposta" já fazia — e o envio é um só. Não existe mais um caminho que
    * mande outra coisa que não o que está escrito na tela.
    */
+  /**
+   * O QUE ACONTECEU EM 02/09, COM A ELIETE
+   *
+   * Ele escreveu a resposta, clicou em Enviar, a caixa esvaziou e a tela
+   * recarregou. A mensagem nao chegou na familia. Nao houve erro na tela.
+   *
+   * Este `enviar` mandava o `fetch` e NUNCA OLHAVA A RESPOSTA: limpava a caixa
+   * e recarregava tivesse a rota respondido 200, 400 ou 500. Do outro lado, a
+   * rota chamava um envio que LANCA quando o WhatsApp recusa — e a mensagem
+   * nao saia, nao ficava em fila e nao era gravada em lugar nenhum.
+   *
+   * Medido: 161 interacoes com acao humana, 58 saidas no total, ultima saida do
+   * dia anterior. Nao da para saber quantas se perderam antes desta, porque
+   * perder em silencio nao deixa marca — e essa e exatamente a razao de o
+   * conserto precisar existir.
+   *
+   * Agora: se falhou, O TEXTO FICA NA CAIXA e a tela diz o que houve. Se saiu
+   * mas ficou na fila de reenvio, tambem diz — nao e a mesma coisa que chegar.
+   */
   async function enviar() {
     const t = texto.trim();
     if (!t) return;
     setOcupado(true);
+    setAvisoEnvio(null);
     try {
       // COM RASCUNHO PENDENTE, O ENVIO PASSA POR ELE — senão a interação ficaria
       // aberta para sempre e a IA continuaria "esperando decisão" sobre uma
       // resposta que já foi. A rota deduz sozinha se foi aprovada ou editada,
       // comparando com o rascunho original.
-      if (d?.rascunho?.id) {
-        await fetch("/api/atendimento/aprovar", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "editou", textoFinal: t }),
+      const r = d?.rascunho?.id
+        ? await fetch("/api/atendimento/aprovar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interacaoId: d.rascunho.id, acao: "editou", textoFinal: t }),
+          })
+        : await fetch(`/api/conversas/${id}/enviar`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ texto: t }),
+          });
+
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !(j as any).ok) {
+        // O TEXTO NAO SE PERDE. Quem escreveu tres paragrafos para uma familia
+        // enlutada nao pode ter que reescrever porque o WhatsApp recusou.
+        setAvisoEnvio({
+          tom: "erro",
+          texto: "A mensagem NÃO foi enviada. O seu texto continua aqui na caixa. "
+               + ((j as any)?.erro ? `O WhatsApp respondeu: ${(j as any).erro}` : "Tente de novo em instantes."),
         });
-      } else {
-        await fetch(`/api/conversas/${id}/enviar`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ texto: t }),
+        return;
+      }
+
+      if ((j as any).entregue === false) {
+        setAvisoEnvio({
+          tom: "aviso",
+          texto: "Não saiu agora — ficou na fila e o sistema vai tentar de novo sozinho. "
+               + "Confira em Configurações se o WhatsApp está conectado.",
         });
       }
       setTexto("");
       carregar();
+    } catch (e: any) {
+      setAvisoEnvio({
+        tom: "erro",
+        texto: "Não consegui falar com o servidor. A mensagem NÃO foi enviada e o seu texto continua aqui.",
+      });
     } finally { setOcupado(false); }
   }
 
@@ -384,6 +430,19 @@ export default function Thread() {
         )}
 
         <div>
+          {/* O RECADO DO ENVIO FICA COLADO NA CAIXA, e nao no topo da tela: e
+              aqui que a pessoa esta olhando quando clica em Enviar. */}
+          {avisoEnvio && (
+            <div style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 10,
+                          fontSize: 15, lineHeight: 1.5,
+                          background: avisoEnvio.tom === "erro"
+                            ? "rgb(var(--zm-perigo) / 0.10)" : "rgb(var(--zm-aviso) / 0.12)",
+                          border: `1px solid ${avisoEnvio.tom === "erro"
+                            ? "rgb(var(--zm-perigo))" : "rgb(var(--zm-aviso))"}`,
+                          color: "rgb(var(--zm-ink))" }}>
+              {avisoEnvio.texto}
+            </div>
+          )}
           <textarea
             rows={5}
             style={{ ...painel.input, width: "100%", minHeight: 130, resize: "vertical",

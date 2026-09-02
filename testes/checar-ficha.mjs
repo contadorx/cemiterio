@@ -2322,6 +2322,43 @@ ok("e a tela avisa, em vermelho, quando nao sobra dia nenhum",
    /diasQueRendem \|\| \[\]\)\.length === 0/.test(telaCfg51)
    && /nunca vai entrar na agenda/.test(telaCfg51));
 
+// ===========================================================================
+// 0152 — O ENVIO QUE FALHA FALA, E NAO LEVA O TEXTO JUNTO
+//
+// 02/09: escreveu para a Eliete, clicou em Enviar, a caixa esvaziou, a tela
+// recarregou — e a mensagem nao chegou. Medido: 161 interacoes com acao
+// humana, 58 saidas no total, ultima saida do dia ANTERIOR, fila de reenvio
+// vazia. A mensagem nao saiu, nao ficou em fila e nao foi gravada.
+// ===========================================================================
+const rotaAprov52 = readFileSync("src/app/api/atendimento/aprovar/route.ts", "utf8");
+const rotaEnv52 = readFileSync("src/app/api/conversas/[id]/enviar/route.ts", "utf8");
+const telaConv52 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const telaConv52Sem = semComentarios(telaConv52);
+const persona52 = readFileSync("src/lib/persona.ts", "utf8");
+
+// `enviarWhatsapp` LANCA. Os dois caminhos humanos o chamavam cru, enquanto o
+// caminho automatico ja usava o que enfileira e tenta de novo — e o automatico
+// esta desligado por decisao da casa. A pior implementacao era a unica em uso.
+ok("os dois envios humanos usam o caminho que nao perde a mensagem",
+   /enviarTextoComRetry/.test(rotaAprov52) && /enviarTextoComRetry/.test(rotaEnv52)
+   && !/enviarWhatsapp\(/.test(semComentarios(rotaAprov52))
+   && !/enviarWhatsapp\(/.test(semComentarios(rotaEnv52)));
+ok("e as duas rotas dizem se saiu AGORA ou so ficou na fila",
+   /entregue/.test(rotaAprov52) && /entregue/.test(rotaEnv52));
+// Limpar a caixa sem olhar a resposta foi o que fez a mensagem sumir em
+// silencio: para quem clicou, 500 e 200 tinham exatamente a mesma cara.
+ok("a tela OLHA a resposta antes de limpar a caixa",
+   /if \(!r\.ok \|\| !\(j as any\)\.ok\)/.test(telaConv52Sem)
+   && telaConv52Sem.indexOf("setTexto(\"\")") > telaConv52Sem.indexOf("if (!r.ok"));
+ok("falhou: o texto FICA na caixa e a tela diz que nao foi",
+   /NÃO foi enviada/.test(telaConv52) && /continua aqui/.test(telaConv52));
+ok("ficou na fila NAO e o mesmo que chegou",
+   /entregue === false/.test(telaConv52Sem) && /fila/.test(telaConv52));
+// A resposta a Eliete agradecia a ela por "cuidar do jazigo da familia" —
+// quem cuida do jazigo e a casa; ela paga por isso.
+ok("a persona proibe inverter quem cuida do jazigo",
+   /QUEM CUIDA DO JAZIGO É VOCÊ, NÃO A FAMÍLIA/.test(persona52));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

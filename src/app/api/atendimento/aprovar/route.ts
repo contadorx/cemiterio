@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirAdmin } from "@/lib/roles";
-import { enviarWhatsapp } from "@/lib/evolution";
+import { enviarTextoComRetry } from "@/lib/envio";
 import { anotarCompromisso } from "@/lib/atendimento";
 
 export const runtime = "nodejs";
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
   // pessoa fez (para o score saber se a IA acertou), e passa a ser DEDUZIDA do
   // texto em vez de acreditada — quem manda um texto diferente do rascunho
   // editou, tenha clicado no botão que tiver.
+  let entregue = false;
   const veio = (textoFinal ?? "").trim();
   const rascunhoOriginal = String((inter as any).rascunho || "").trim();
   const textoParaEnviar = veio || rascunhoOriginal;
@@ -76,7 +77,26 @@ export async function POST(req: NextRequest) {
       .eq("id", (inter as any).cliente_id)
       .single();
 
-    await enviarWhatsapp((cli as any).telefone, textoParaEnviar);
+    // ========================================================================
+    // O ENVIO QUE FALHA TEM DE FALAR — E NAO PODE PERDER O TEXTO
+    // ========================================================================
+    //
+    // MEDIDO EM 02/09: 161 interacoes com acao humana, 58 mensagens de saida no
+    // total, e a ultima saida foi do dia ANTERIOR — com mensagens da familia
+    // chegando o dia inteiro. A fila de reenvio estava vazia.
+    //
+    // Esta linha chamava `enviarWhatsapp`, que LANCA quando o WhatsApp recusa.
+    // Ninguem pegava: a rota devolvia 500, a tela nao olhava a resposta, limpava
+    // a caixa e recarregava. A mensagem nao saia, nao era enfileirada, nao era
+    // gravada e nao aparecia erro nenhum. Ela simplesmente deixava de existir, e
+    // a familia ficava esperando uma resposta que ninguem sabia que faltava.
+    //
+    // O caminho AUTOMATICO ja fazia certo, com `enviarTextoComRetry`: nunca
+    // lanca, enfileira o que nao saiu e tenta de novo. So que os disparos
+    // automaticos estao desligados por decisao da casa — entao o unico caminho
+    // que roda de verdade era justamente o fragil. Mesma regra, duas
+    // implementacoes, e a pior era a que estava em uso.
+    const entregue = await enviarTextoComRetry((cli as any).telefone, textoParaEnviar);
 
     // registra a saída na conversa
     await db.from("mensagens").insert({
@@ -119,5 +139,12 @@ export async function POST(req: NextRequest) {
   });
   if (error) return NextResponse.json({ ok: false, erro: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, enviado: acaoReal !== "descartou", score: novoScore });
+  return NextResponse.json({
+    ok: true,
+    enviado: acaoReal !== "descartou",
+    // `entregue` false NAO e erro: o texto ficou na fila e vai ser tentado de
+    // novo. A tela precisa saber a diferenca para dizer a verdade a quem clicou.
+    entregue: acaoReal === "descartou" ? null : entregue,
+    score: novoScore,
+  });
 }
