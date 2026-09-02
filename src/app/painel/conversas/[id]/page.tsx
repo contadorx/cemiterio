@@ -6,6 +6,7 @@ import { PainelNav, painel, cor } from "../../ui";
 import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
 import Compromissos from "../Compromissos";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
+import ContaDaFamilia from "./ContaDaFamilia";
 
 export default function Thread() {
   const recado = useRecado();
@@ -313,6 +314,11 @@ export default function Thread() {
             : d.conversa.escalada ? "Você está atendendo — a IA não responde."
             : "A IA está atendendo (rascunhos aparecem aqui)."}
         </p>
+
+        {/* A CONTA DA FAMÍLIA — antes das mensagens, pelo mesmo motivo dos
+            compromissos: para responder um comprovante é preciso saber de qual
+            mês ele é, e essa resposta estava a três telas daqui. */}
+        <ContaDaFamilia familiaId={d.conversa.familiaId} />
 
         {/* O QUE VOCÊ PROMETEU E AINDA NÃO RESPONDEU (0142).
             Antes das mensagens, porque quem abre a conversa para responder

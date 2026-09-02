@@ -4,7 +4,7 @@ import { assinar } from "@/lib/storage";
 import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { diaOperacao } from "@/lib/vencimento";
-import { calcularSaldo } from "@/lib/saldo";
+import { calcularSaldo, porCompetencia } from "@/lib/saldo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,6 +86,9 @@ export async function GET(req: NextRequest) {
     aVencer: conta.aVencer,
     frase: conta.frase,
     emDia: conta.emDia,
+    // MÊS A MÊS — para responder "de qual mês é este pagamento" sem sair da
+    // conversa. Mesma lista de lançamentos, agrupada; nenhuma conta nova.
+    meses: porCompetencia(linhas as any),
     linhas: linhas.map((l) => ({ ...l, aVencer: l.tipo === "debito" && l.data > hoje })),
   });
 }

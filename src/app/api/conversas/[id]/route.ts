@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const { data: conv } = await db
     .from("conversas")
-    .select("id,cliente_id,escalada_humano,resolvida,arquivada_em,clientes(nome,telefone)")
+    .select("id,cliente_id,escalada_humano,resolvida,arquivada_em,clientes(nome,telefone,familia_id)")
     .eq("id", id)
     .maybeSingle();
   if (!conv) return NextResponse.json({ ok: false, erro: "nao_encontrada" }, { status: 404 });
@@ -70,6 +70,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     conversa: {
       id: (conv as any).id,
       clienteId: (conv as any).cliente_id,
+      // A CONTA DA FAMÍLIA PRECISA DELE. Sem o familiaId a conversa não tem
+      // como perguntar "de qual mês é este pagamento", e a resposta continua
+      // a três telas de distância.
+      familiaId: (conv as any).clientes?.familia_id || null,
       cliente: (conv as any).clientes?.nome || (conv as any).clientes?.telefone || "—",
       escalada: (conv as any).escalada_humano,
       // O ESTADO TEM DE CHEGAR NA TELA DA CONVERSA.

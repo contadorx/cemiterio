@@ -2359,6 +2359,41 @@ ok("ficou na fila NAO e o mesmo que chegou",
 ok("a persona proibe inverter quem cuida do jazigo",
    /QUEM CUIDA DO JAZIGO É VOCÊ, NÃO A FAMÍLIA/.test(persona52));
 
+// ===========================================================================
+// 0153 — DE QUAL MES E ESTE PAGAMENTO, SEM SAIR DA CONVERSA
+//
+// 02/09: "para conferir o mes eu abri a conversa, o comprovante e a ficha,
+// tres telas". A pergunta nasce olhando o comprovante no WhatsApp; a resposta
+// morava em outro lugar.
+// ===========================================================================
+const contaFam53 = readFileSync("src/app/painel/conversas/[id]/ContaDaFamilia.tsx", "utf8");
+const telaConv53 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const rotaConv53 = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
+const rotaCC53 = readFileSync("src/app/api/conta-corrente/route.ts", "utf8");
+const libSaldo53 = readFileSync("src/lib/saldo.ts", "utf8");
+
+ok("a conta da familia aparece DENTRO da conversa",
+   /<ContaDaFamilia/.test(telaConv53) && /familiaId=\{d\.conversa\.familiaId\}/.test(telaConv53));
+ok("e a rota da conversa manda o familiaId para isso ser possivel",
+   /familiaId: \(conv as any\)\.clientes\?\.familia_id/.test(rotaConv53));
+// O mes vem de um campo declarado, nunca de palpite: casar pagamento com mes
+// por proximidade de data seria uma segunda verdade sobre dinheiro.
+ok("o mes a mes AGRUPA pela competencia, e nao adivinha",
+   /export function porCompetencia/.test(libSaldo53)
+   && /const comp = String\(m\.competencia \|\| ""\)\.slice\(0, 7\);/.test(libSaldo53)
+   && /if \(!comp\) continue;/.test(libSaldo53));
+ok("e a rota devolve os meses sem refazer a conta",
+   /meses: porCompetencia\(linhas as any\)/.test(rotaCC53));
+// Sem familia vinculada nao existe conta; dizer "Em dia" ali seria apresentar
+// ausencia como medicao.
+ok("sem familia vinculada o cartao NAO diz 'em dia'",
+   /não está ligado a uma família/.test(contaFam53));
+ok("uma falha ao ler a conta vira recado, nao silencio",
+   /Não consegui carregar a conta desta família/.test(contaFam53));
+// Quem responde um recado de saudade nao precisa de dinheiro na frente.
+ok("o cartao so abre sozinho quando ha mes em aberto",
+   /setAberto\(!j\.emDia\)/.test(semComentarios(contaFam53)));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

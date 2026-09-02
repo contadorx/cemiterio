@@ -303,6 +303,53 @@ async function rodar() {
   // o hook de módulos faz createClient() devolver este objeto
   (globalThis as any).__FAKE_SUPABASE__ = fake;
 
+  // =========================================================================
+  // A CONTA MES A MES (0153)
+  //
+  // Relatado em 02/09: para saber de qual mes era um pagamento recebido no
+  // WhatsApp era preciso abrir TRES telas — conversa, comprovante e ficha.
+  // `porCompetencia` responde isso agrupando pelo campo que ja existe nas duas
+  // pontas. Ela NAO adivinha qual mes um pagamento cobre: se adivinhasse,
+  // seria uma segunda verdade sobre dinheiro.
+  // =========================================================================
+  console.log("\n=== 0. A CONTA MES A MES (porCompetencia) ===");
+  const sal = await import("../src/lib/saldo");
+  const mm = sal.porCompetencia([
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 70, data: "2026-08-12", competencia: "2026-08-01" },
+    { tipo: "debito",  valor: 70, data: "2026-09-10", competencia: "2026-09-01" },
+    { tipo: "credito", valor: 30, data: "2026-09-12", competencia: "2026-09-01" },
+    { tipo: "debito",  valor: 70, data: "2026-10-10", competencia: "2026-10-01" },
+  ]);
+  checar("um mes pago some da lista de abertos",
+         mm.find((m) => m.competencia === "2026-08")?.quitado === true,
+         JSON.stringify(mm.find((m) => m.competencia === "2026-08")));
+  checar("pagamento PARCIAL nao quita o mes",
+         mm.find((m) => m.competencia === "2026-09")?.falta === 40,
+         `veio ${mm.find((m) => m.competencia === "2026-09")?.falta}`);
+  checar("mes sem nenhum pagamento fica inteiro em aberto",
+         mm.find((m) => m.competencia === "2026-10")?.falta === 70);
+  checar("os meses saem em ordem, do mais antigo para o mais novo",
+         mm.map((m) => m.competencia).join(",") === "2026-08,2026-09,2026-10",
+         mm.map((m) => m.competencia).join(","));
+  // Empurrar um lancamento sem competencia para o mes corrente seria
+  // apresentar um palpite como se fosse o que esta escrito.
+  const semComp = sal.porCompetencia([
+    { tipo: "debito", valor: 50, data: "2026-09-10", competencia: null },
+  ]);
+  checar("lancamento SEM competencia nao entra em mes nenhum", semComp.length === 0,
+         JSON.stringify(semComp));
+  // O credito nao pode "vazar" de um mes para o outro: quem pagou setembro
+  // adiantado nao quitou agosto, e dizer que quitou faria a cobranca de agosto
+  // sumir sozinha.
+  const naoVaza = sal.porCompetencia([
+    { tipo: "debito",  valor: 70, data: "2026-08-10", competencia: "2026-08-01" },
+    { tipo: "credito", valor: 200, data: "2026-09-12", competencia: "2026-09-01" },
+  ]);
+  checar("credito de um mes NAO quita o mes anterior",
+         naoVaza.find((m) => m.competencia === "2026-08")?.quitado === false,
+         JSON.stringify(naoVaza));
+
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
   const sCec = await fin.calcularSaldo("c-cec");

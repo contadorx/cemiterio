@@ -78,3 +78,59 @@ export function calcularSaldo(movimentos: Movimento[], hoje = diaOperacao()): Sa
     emDia: vencido <= 0.005,
   };
 }
+
+/** Um mês da conta: o que ele cobra, o que já entrou nele, e o que falta. */
+export interface MesDaConta {
+  /** "AAAA-MM". */
+  competencia: string;
+  devido: number;
+  pago: number;
+  falta: number;
+  quitado: boolean;
+}
+
+export interface MovimentoComMes extends Movimento {
+  competencia?: string | null;
+}
+
+/**
+ * A CONTA, MÊS A MÊS.
+ *
+ * `calcularSaldo` responde "quanto ela deve". Não responde a pergunta que se
+ * faz olhando um comprovante no WhatsApp: *de qual mês é este pagamento, e
+ * qual mês ainda falta?* Para responder isso a Sureya abria três telas — a
+ * conversa, o comprovante e a ficha — e comparava de cabeça.
+ *
+ * NÃO HÁ REGRA NOVA AQUI, E ISSO É DE PROPÓSITO. Não se adivinha qual mês um
+ * pagamento cobre: `competencia` é um campo declarado nas DUAS pontas, no
+ * débito e no crédito, e medido em 02/09 os 230 lançamentos da casa têm todos
+ * o seu. Esta função só AGRUPA por ele e soma. Inventar um casamento de
+ * pagamento com mês seria uma segunda verdade sobre dinheiro, e este projeto
+ * já sabe onde isso termina.
+ *
+ * Lançamento sem competência não é somado a mês nenhum — sai na chave vazia,
+ * para quem chama decidir o que dizer. Empurrá-lo para o mês corrente seria
+ * apresentar um palpite como se fosse o que está escrito.
+ */
+export function porCompetencia(movimentos: MovimentoComMes[]): MesDaConta[] {
+  const meses = new Map<string, { devido: number; pago: number }>();
+  for (const m of movimentos) {
+    const comp = String(m.competencia || "").slice(0, 7);
+    if (!comp) continue;
+    const alvo = meses.get(comp) || { devido: 0, pago: 0 };
+    if (m.tipo === "debito") alvo.devido += m.valor;
+    else alvo.pago += m.valor;
+    meses.set(comp, alvo);
+  }
+  return [...meses.entries()]
+    .map(([competencia, v]) => ({
+      competencia,
+      devido: cent(v.devido),
+      pago: cent(v.pago),
+      falta: cent(v.devido - v.pago),
+      // meio centavo de folga: o mesmo critério que `calcularSaldo` usa para
+      // não chamar de devedora quem pagou tudo e sobrou arredondamento
+      quitado: v.devido - v.pago <= 0.005,
+    }))
+    .sort((a, b) => (a.competencia < b.competencia ? -1 : 1));
+}
