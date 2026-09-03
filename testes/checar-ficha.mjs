@@ -2512,6 +2512,47 @@ ok("trocar de conversa recarrega a pagina, e nao carrega estado junto",
 ok("a fila que nao carregou nao vira numero na tela",
    /fila && fila\.naFila > 0/.test(telaConv56Sem));
 
+// ===========================================================================
+// 0157 — O TETO DE IA FALHA FECHADO, E TODA PORTA PASSA POR ELE
+//
+// 03/09: US$ 348,18 em 24h, 5.838 chamadas, sobre TRES conversas JA
+// FINALIZADAS reprocessadas ~990 vezes cada. Dia normal: 15 a 25 chamadas,
+// menos de US$ 2. O teto estava configurado em 150/dia e nao barrou nada.
+// ===========================================================================
+const custo57 = readFileSync("src/lib/custo-ia.ts", "utf8");
+const atend57 = readFileSync("src/lib/atendimento.ts", "utf8");
+const portasIa = [
+  "src/app/api/conversas/[id]/sugerir/route.ts",
+  "src/app/api/conversas/[id]/ajuda/route.ts",
+  "src/app/api/calibragem/route.ts",
+  "src/app/api/leads/[id]/abordagem/route.ts",
+  "src/app/api/comprovantes/ler/route.ts",
+];
+
+// Um controle de gasto que libera quando nao consegue medir nao e um controle.
+ok("nao medir o gasto NAO e permissao para gastar",
+   /pode: false[^}]*motivo: "não consegui medir o gasto/.test(custo57)
+   && !/return \{ pode: true, usadas: 0, teto: 0 \}/.test(custo57));
+// 150 chamadas de Haiku custam centavos; 150 de Sonnet com contexto grande
+// custam dezenas de dolares. O teto que protege e o de dinheiro.
+ok("o teto vale em DINHEIRO, e nao so em numero de chamadas",
+   /tetoDolar > 0 && gasto >= tetoDolar/.test(custo57)
+   && /TETO_DOLAR_PADRAO/.test(custo57));
+// O contador do teto marcou 14 enquanto chamadas_ia registrava 5.776.
+ok("a conta vem do registro do que aconteceu, nao de um contador paralelo",
+   /from\("chamadas_ia"\)/.test(custo57) && /\.select\("custo"\)/.test(custo57));
+// Um teto que vira as 21h daria tres horas de barra livre toda noite.
+ok("o dia do teto e o de Brasilia, nao o de UTC",
+   /setUTCHours\(3, 0, 0, 0\)/.test(custo57));
+// TODA porta que fala com o modelo pergunta antes.
+const semTeto = portasIa.filter((f) => !/podeChamarIa/.test(readFileSync(f, "utf8")));
+ok("nenhuma porta chama o modelo sem perguntar o teto", semTeto.length === 0);
+for (const f of semTeto) console.log(`      ${f}`);
+// Tres conversas finalizadas, sem mensagem nova desde 26/08, 29/08 e 01/09,
+// geraram 3.905 rascunhos que ninguem pediu.
+ok("atendimento finalizado nao volta para a IA",
+   /if \(\(conv as any\)\.resolvida\) return \{ acao: "nada_novo" \};/.test(atend57));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

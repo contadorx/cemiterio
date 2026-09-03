@@ -495,12 +495,27 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
 
   const { data: conv } = await db
     .from("conversas")
-    .select("cliente_id,escalada_humano")
+    .select("cliente_id,escalada_humano,resolvida")
     .eq("org_id", org)
     .eq("id", conversaId)
     .maybeSingle();
   if (!conv) return { acao: "nada_novo" };
   if ((conv as any).escalada_humano) return { acao: "escalado" };
+
+  // ==========================================================================
+  // ATENDIMENTO FINALIZADO NÃO VOLTA PARA A IA (0157)
+  // ==========================================================================
+  //
+  // Em 03/09 três conversas JÁ FINALIZADAS foram reprocessadas cerca de 990
+  // vezes cada, gerando 3.905 rascunhos que ninguém pediu e US$ 348 de gasto.
+  // Nenhuma delas tinha mensagem nova: a última entrada era de 26/08, 29/08 e
+  // 01/09.
+  //
+  // `resolvida` já queria dizer "o assunto acabou". Faltava alguém ler isso
+  // ANTES de gastar. Uma conversa finalizada que recebe mensagem nova reabre
+  // sozinha pelo gatilho do banco — e aí, reaberta, ela volta a passar por
+  // aqui. Enquanto estiver fechada, não se paga para responder de novo.
+  if ((conv as any).resolvida) return { acao: "nada_novo" };
 
   const { data: cli } = await db
     .from("clientes")

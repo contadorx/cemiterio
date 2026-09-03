@@ -8,6 +8,7 @@ import {
 } from "@/lib/context";
 import { montarSystemPrompt } from "@/lib/persona";
 import { escolherModelo, registrarChamada } from "@/lib/modelo-ia";
+import { podeChamarIa } from "@/lib/custo-ia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +110,26 @@ export async function POST(
       ? `\nA pessoa da casa já decidiu o que quer dizer, e é isto: "${intencao}". ` +
         "Escreva ISSO, no tom da casa. Não proponha outra coisa."
       : "\nResponda à última mensagem da família.");
+
+  // ==========================================================================
+  // ESTA PORTA NÃO TINHA TETO (0157)
+  // ==========================================================================
+  //
+  // `registrarChamada` era chamada aqui embaixo — a chamada ENTRAVA na conta —
+  // mas `podeChamarIa` não era consultada em lugar nenhum desta rota. Era uma
+  // porta para o modelo sem fechadura: o teto do dia podia estar estourado dez
+  // vezes que ela continuava gastando.
+  //
+  // Medido em 03/09: 1.926 chamadas com propósito "atendimento" no dia, e
+  // apenas 14 consultas ao teto no dia inteiro.
+  const cota = await podeChamarIa();
+  if (!cota.pode) {
+    return NextResponse.json(
+      { ok: false, erro: "teto_do_dia",
+        mensagem: `A IA está pausada por hoje: ${cota.motivo}. `
+                + "Escreva à mão, ou suba o teto em Configurações." },
+      { status: 429 });
+  }
 
   const escolha = await escolherModelo({
     proposito: "atendimento",
