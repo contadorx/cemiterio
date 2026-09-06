@@ -27,6 +27,8 @@ export type Proposito =
   | "calibragem";
 
 export interface EscolhaModelo {
+  /** Quem escreve: "anthropic" ou "deepseek". Vem da linha de `modelos_ia`. */
+  provedor: "anthropic" | "deepseek";
   modelo: string;
   apelido: string;
   precoEntrada: number;   // R$ por milhão
@@ -45,7 +47,7 @@ export async function escolherModelo(p: {
   const db = supabaseAdmin();
   const { data } = await db
     .from("modelos_ia")
-    .select("apelido,modelo,preco_entrada,preco_saida")
+    .select("apelido,modelo,preco_entrada,preco_saida,provedor")
     .eq("org_id", env.orgId())
     .eq("ativo", true);
 
@@ -55,6 +57,10 @@ export async function escolherModelo(p: {
   const escolher = (apelido: string, motivo: string): EscolhaModelo => {
     const m = porApelido.get(apelido) || porApelido.get("padrao");
     return {
+      // NA DÚVIDA, ANTHROPIC — é o que já rodava. Uma linha sem provedor
+      // apontando para o mais barato mudaria quem responde às famílias por
+      // omissão de alguém preenchendo uma coluna.
+      provedor: m?.provedor === "deepseek" ? "deepseek" : "anthropic",
       modelo: m?.modelo || env.ANTHROPIC_MODEL,
       apelido: m?.apelido || "padrao",
       precoEntrada: Number(m?.preco_entrada) || 0,

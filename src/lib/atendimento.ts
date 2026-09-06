@@ -526,6 +526,32 @@ export async function processarConversa(conversaId: string): Promise<ResultadoPr
   if (!cli) return { acao: "nada_novo" };
   const cliente = cli as ClienteRow;
 
+  // ==========================================================================
+  // A IA NÃO ESCREVE SOZINHA (0158)
+  // ==========================================================================
+  //
+  // MEDIDO EM 03/09, sobre os 196 rascunhos anteriores ao laço: 4 aprovados
+  // como estavam, 6 editados, 155 descartados. Cinco por cento de acerto. E o
+  // assunto que ela mais escrevia era o que menos servia — `cobranca`, 170
+  // rascunhos, 152 no lixo.
+  //
+  // Rascunho que ninguém pediu tem três custos, e só o primeiro aparece na
+  // fatura: o dinheiro do modelo, a fila de "precisa de você" cheia de coisa
+  // que não precisa, e o risco de alguém aprovar no automático um texto que a
+  // IA escreveu sobre uma conversa que já tinha virado outra.
+  //
+  // A partir daqui a IA responde por CLIQUE — em "Sugerir resposta", na
+  // bancada, no "Me ajuda a escrever". O caminho automático fica só com o que
+  // não custa: classificar já não é feito aqui, e o que se repete virou modelo
+  // pronto em `lib/modelos-mensagem.ts`, a custo zero.
+  //
+  // A conversa continua sendo REGISTRADA e continua aparecendo em "Precisa de
+  // você". O que deixa de acontecer é gastar para escrever antes de alguém
+  // querer ler.
+  if (!env.IA_ESCREVE_SOZINHA) {
+    return { acao: "nada_novo" };
+  }
+
   const out = await chamarIa(cliente, conversaId);
 
   // Pedido de serviço adicional NUNCA sai sozinho: tem preço e ocupa agenda.

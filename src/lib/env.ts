@@ -15,6 +15,12 @@ export const env = {
   // Anthropic
   anthropicKey: () => req("ANTHROPIC_API_KEY"),
   ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
+  // A IA NÃO ESCREVE SOZINHA (0158). Ligar isto faz o cron voltar a
+  // rascunhar sem ninguém pedir — foi assim que 03/09 custou US$ 348.
+  // Fica DESLIGADO por padrão: quem quiser o automático liga de propósito.
+  IA_ESCREVE_SOZINHA: process.env.IA_ESCREVE_SOZINHA === "1",
+  // Provedor do modelo quando a linha de `modelos_ia` não disser.
+  deepseekKey: () => process.env.DEEPSEEK_API_KEY || "",
 
   // Evolution API (WhatsApp, no Contabo)
   evolutionUrl: () => req("EVOLUTION_API_URL"),

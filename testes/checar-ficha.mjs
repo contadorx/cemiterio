@@ -2553,6 +2553,47 @@ for (const f of semTeto) console.log(`      ${f}`);
 ok("atendimento finalizado nao volta para a IA",
    /if \(\(conv as any\)\.resolvida\) return \{ acao: "nada_novo" \};/.test(atend57));
 
+// ===========================================================================
+// 0158 — A IA SO FALA QUANDO CHAMADA
+//
+// Dos 196 rascunhos anteriores ao laco de 03/09: 4 aprovados como estavam, 6
+// editados, 155 descartados. Cinco por cento de acerto — e o assunto que ela
+// mais escrevia era o que menos servia (cobranca: 170 rascunhos, 152 no lixo).
+// ===========================================================================
+const atend58 = readFileSync("src/lib/atendimento.ts", "utf8");
+const env58 = readFileSync("src/lib/env.ts", "utf8");
+const prov58 = readFileSync("src/lib/ia-provedor.ts", "utf8");
+const modIa58 = readFileSync("src/lib/modelo-ia.ts", "utf8");
+const telaConv58 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const rotaSug58 = readFileSync("src/app/api/conversas/[id]/sugerir/route.ts", "utf8");
+
+// Rascunho que ninguem pediu custa dinheiro, entope a fila de "precisa de
+// voce" e arrisca alguem aprovar texto escrito sobre uma conversa que virou
+// outra. So o primeiro custo aparece na fatura.
+ok("o caminho automatico nao chama mais a IA",
+   /if \(!env\.IA_ESCREVE_SOZINHA\) \{\s*return \{ acao: "nada_novo" \};/.test(atend58));
+ok("e o automatico nasce DESLIGADO",
+   /IA_ESCREVE_SOZINHA: process\.env\.IA_ESCREVE_SOZINHA === "1"/.test(env58));
+// Trocar quem escreve e decisao de gente, tomada olhando uma resposta de
+// verdade — nao efeito colateral de uma coluna em branco.
+ok("existe uma porta so para os dois provedores",
+   /export async function conversarComIa/.test(prov58)
+   && /api\.deepseek\.com/.test(prov58));
+ok("na duvida o provedor e o que ja rodava",
+   /provedor: m\?\.provedor === "deepseek" \? "deepseek" : "anthropic"/.test(modIa58));
+// O dialeto da OpenAI devolve os argumentos como TEXTO JSON. Um parse solto
+// derrubaria a rota por causa de uma virgula do modelo.
+ok("o JSON do DeepSeek e lido com rede embaixo",
+   /try \{ dados = JSON\.parse\(chamada\.function\.arguments\); \} catch \{ dados = null; \}/.test(prov58));
+ok("sem chave o DeepSeek diz que falta chave, e nao 'nao estruturou'",
+   /DEEPSEEK_API_KEY não está configurada/.test(prov58));
+ok("a sugestao pede pela porta unica, e nao direto ao provedor",
+   /conversarComIa\(\{/.test(rotaSug58) && !/new Anthropic\(/.test(semComentarios(rotaSug58)));
+// O caminho barato precisa estar NO caminho, e nao escondido atras do caro.
+ok("as mensagens prontas ficam antes da caixa e do botao da IA",
+   telaConv58.indexOf("<Modelos") > 0
+   && telaConv58.indexOf("<Modelos") < telaConv58.indexOf("Sugerir resposta"));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

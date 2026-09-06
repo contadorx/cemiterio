@@ -9,6 +9,7 @@ import {
 import { montarSystemPrompt } from "@/lib/persona";
 import { escolherModelo, registrarChamada } from "@/lib/modelo-ia";
 import { podeChamarIa } from "@/lib/custo-ia";
+import { conversarComIa } from "@/lib/ia-provedor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,28 +140,26 @@ export async function POST(
   });
 
   try {
-    const anthropic = new Anthropic({ apiKey: env.anthropicKey() });
-    const r = await anthropic.messages.create({
-      model: escolha.modelo,
-      max_tokens: 700,
+    // A PORTA ÚNICA (0158): quem escreve pode ser Anthropic ou DeepSeek, e a
+    // escolha vem da linha de `modelos_ia`. Esta rota não precisa saber qual.
+    const r = await conversarComIa({
+      provedor: escolha.provedor,
+      modelo: escolha.modelo,
+      maxTokens: 700,
       system: sistema,
       messages: historico.length
         ? historico
         : [{ role: "user", content: "(sem mensagens ainda — escreva uma primeira mensagem cordial)" }],
     });
 
-    const texto = r.content
-      .filter((c: any) => c.type === "text")
-      .map((c: any) => c.text)
-      .join("\n")
-      .trim();
+    const texto = r.texto;
 
     // O custo é registrado como qualquer outra chamada: uma proposta que
     // ninguém envia custou dinheiro do mesmo jeito, e esconder isso do
     // relatório faria a conta do mês não fechar.
     await registrarChamada({
       escolha,
-      usage: r.usage,
+      usage: { input_tokens: r.tokensEntrada, output_tokens: r.tokensSaida },
       clienteId: cliente.id,
       proposito: "atendimento",
       assunto: "outro",

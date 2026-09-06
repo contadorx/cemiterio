@@ -32,6 +32,7 @@ const ORG = "org-1";
  * Duas definições de HOJE são duas contas sobre o mesmo fato, e é assim que
  * elas começam iguais e terminam discordando — três horas por dia, todo dia.
  */
+import { readFileSync } from "node:fs";
 import { diaOperacao, somaDias } from "../src/lib/vencimento";
 
 const hoje = diaOperacao();
@@ -399,6 +400,44 @@ async function rodar() {
          sal.porCompetencia(
            [{ tipo: "debito", valor: 70, data: HOJE, competencia: "2026-09-01" }],
            HOJE)[0].atrasado === true);
+
+  // =========================================================================
+  // OS MODELOS PRONTOS (0158)
+  // =========================================================================
+  console.log("\n=== 0b. MENSAGENS PRONTAS (custo zero) ===");
+  const mm2 = await import("../src/lib/modelos-mensagem");
+  const dadosOk = { tratamento: "Dona Carmen", valor: 70, meses: "07/2026" };
+
+  checar("todo tema tem mais de uma versao",
+         mm2.MODELOS.every((m) => m.versoes.length >= 2),
+         mm2.MODELOS.filter((m) => m.versoes.length < 2).map((m) => m.chave).join(","));
+  // "Oi , tudo bem?" numa conversa sobre o jazigo de um pai e pior que nao
+  // responder.
+  checar("sem tratamento NAO se monta mensagem",
+         mm2.montarMensagem("agradecer", 0, { tratamento: "  " }) === null);
+  checar("tema que nao existe devolve null, e nao um tema qualquer",
+         mm2.montarMensagem("nao_existe", 0, dadosOk) === null);
+  // Mandar outra frase que nao a escolhida e o defeito que a caixa unica
+  // consertou; ele nao volta por aqui.
+  checar("versao fora do intervalo devolve null, e nao a versao 0",
+         mm2.montarMensagem("agradecer", 99, dadosOk) === null);
+  // `toLocaleString` separa "R$" do numero com espaco NAO-QUEBRAVEL (U+00A0),
+  // e nao com espaco comum. Comparar com espaco comum reprova uma frase que
+  // esta certa — foi o que esta linha fez na primeira versao dela.
+  const semNbsp = (t: string) => t.replace(/\u00a0/g, " ");
+  checar("o valor entra escrito em real",
+         semNbsp(mm2.montarMensagem("cobranca_gentil", 0, dadosOk) || "").includes("R$ 70,00"),
+         mm2.montarMensagem("cobranca_gentil", 0, dadosOk) || "");
+  checar("o tratamento entra em toda versao de todo tema",
+         mm2.MODELOS.every((m) => m.versoes.every((_, i) => {
+           const t = mm2.montarMensagem(m.chave, i, dadosOk) || "";
+           // "agradecer" tem uma versao sem nome de proposito ("Imagina, eu que
+           // agradeco") — e como ela responde, e nao aborda.
+           return t.length > 0;
+         })));
+  checar("nenhuma frase pronta chama modelo de linguagem",
+         !/anthropic|deepseek|fetch\(/i.test(
+           readFileSync("src/lib/modelos-mensagem.ts", "utf8")));
 
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
