@@ -38,16 +38,24 @@ import { env } from "./env";
  *   só o segundo é irreversível.
  */
 
-/** Teto de segurança em dólares por dia, quando a org não define o seu. */
-export const TETO_DOLAR_PADRAO = 10;
+/**
+ * Teto de segurança em REAIS por dia, quando a org não define o seu.
+ *
+ * A UNIDADE É REAL, e isto precisa estar escrito porque eu errei aqui: a
+ * primeira versão desta peça chamava o campo de "dólar" e comparava reais
+ * contra ele. `custoDaChamada` devolve R$ — está no comentário dela desde
+ * sempre —, e `chamadas_ia.custo` guarda R$. O incidente de 03/09 foram
+ * R$ 348,18, e não US$ 348,18 como eu relatei.
+ */
+export const TETO_REAIS_PADRAO = 60;
 
 export interface Cota {
   pode: boolean;
   usadas: number;
   teto: number;
-  /** Quanto já se gastou hoje, em dólares, segundo `chamadas_ia`. */
+  /** Quanto já se gastou hoje, em REAIS, segundo `chamadas_ia`. */
   gasto: number;
-  tetoDolar: number;
+  tetoReais: number;
   /** Por que recusou — para a tela dizer, em vez de ficar muda. */
   motivo?: string;
 }
@@ -58,11 +66,11 @@ export async function podeChamarIa(): Promise<Cota> {
 
   try {
     const { data: orgRow, error: eOrg } = await db
-      .from("orgs").select("teto_ia_dia,teto_ia_dolar_dia").eq("id", org).maybeSingle();
+      .from("orgs").select("teto_ia_dia,teto_ia_reais_dia").eq("id", org).maybeSingle();
     if (eOrg) throw eOrg;
 
     const teto = Number((orgRow as any)?.teto_ia_dia) || 0;
-    const tetoDolar = Number((orgRow as any)?.teto_ia_dolar_dia) || TETO_DOLAR_PADRAO;
+    const tetoReais = Number((orgRow as any)?.teto_ia_reais_dia) || TETO_REAIS_PADRAO;
 
     // A MESMA TABELA QUE REGISTRA A CHAMADA É A QUE CONTA A CHAMADA.
     // O dia é o de operação (Brasília), e não o de UTC: um teto que vira às 21h
@@ -86,20 +94,20 @@ export async function podeChamarIa(): Promise<Cota> {
     // apagá-lo agora seria trocar um defeito por uma tela vazia
     await db.rpc("sureya_registrar_uso_ia", { p_org: org }).then(() => null, () => null);
 
-    if (tetoDolar > 0 && gasto >= tetoDolar) {
-      return { pode: false, usadas, teto, gasto, tetoDolar,
-               motivo: `o gasto do dia chegou a US$ ${gasto.toFixed(2)} (teto US$ ${tetoDolar.toFixed(2)})` };
+    if (tetoReais > 0 && gasto >= tetoReais) {
+      return { pode: false, usadas, teto, gasto, tetoReais,
+               motivo: `o gasto do dia chegou a R$ ${gasto.toFixed(2)} (teto R$ ${tetoReais.toFixed(2)})` };
     }
     if (teto > 0 && usadas >= teto) {
-      return { pode: false, usadas, teto, gasto, tetoDolar,
+      return { pode: false, usadas, teto, gasto, tetoReais,
                motivo: `foram ${usadas} chamadas hoje (teto ${teto})` };
     }
-    return { pode: true, usadas, teto, gasto, tetoDolar };
+    return { pode: true, usadas, teto, gasto, tetoReais };
   } catch (e) {
     // FECHADO. Ver o cabeçalho: não medir não é permissão para gastar.
     console.error("[custo-ia] nao consegui medir o gasto — RECUSANDO:", (e as any)?.message || e);
     return {
-      pode: false, usadas: 0, teto: 0, gasto: 0, tetoDolar: 0,
+      pode: false, usadas: 0, teto: 0, gasto: 0, tetoReais: 0,
       motivo: "não consegui medir o gasto de IA de hoje, então não vou gastar mais",
     };
   }

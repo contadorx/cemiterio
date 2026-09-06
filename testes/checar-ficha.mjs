@@ -2536,8 +2536,18 @@ ok("nao medir o gasto NAO e permissao para gastar",
 // 150 chamadas de Haiku custam centavos; 150 de Sonnet com contexto grande
 // custam dezenas de dolares. O teto que protege e o de dinheiro.
 ok("o teto vale em DINHEIRO, e nao so em numero de chamadas",
-   /tetoDolar > 0 && gasto >= tetoDolar/.test(custo57)
-   && /TETO_DOLAR_PADRAO/.test(custo57));
+   /tetoReais > 0 && gasto >= tetoReais/.test(custo57)
+   && /TETO_REAIS_PADRAO/.test(custo57));
+// EU ERREI ISTO NA PRIMEIRA VERSAO: chamei o campo de dolar e comparei reais.
+// `custoDaChamada` devolve R$ e `chamadas_ia.custo` guarda R$ — o incidente de
+// 03/09 foram R$ 348,18, nao US$ 348,18.
+// A guarda olha o CODIGO, e nao o comentario: o texto que explica o erro
+// precisa poder citar "US$ 348,18" para dizer o que foi corrigido. Guarda que
+// proibe falar do defeito apaga a memoria dele.
+ok("a unidade do teto e REAL, e esta escrita",
+   !/dolar|Dolar|DOLAR|US\$/.test(semComentarios(custo57))
+   && /em REAIS/.test(custo57)
+   && /teto_ia_reais_dia/.test(custo57));
 // O contador do teto marcou 14 enquanto chamadas_ia registrava 5.776.
 ok("a conta vem do registro do que aconteceu, nao de um contador paralelo",
    /from\("chamadas_ia"\)/.test(custo57) && /\.select\("custo"\)/.test(custo57));
