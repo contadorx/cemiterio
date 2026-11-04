@@ -2687,6 +2687,42 @@ ok("arquivo sem texto devolve vazio, e a IA segue como plano B",
 ok("o leitor nao depende da margem esquerda",
    /const LINHA = \/\^\\s\*/.test(ext61));
 
+// ===========================================================================
+// 0162 — VOCE SUGERE, EU CONFIRMO. SEMPRE.
+//
+// O cron do dia 1 CHAMAVA `fecharCompetencia` e escrevia os debitos do mes
+// sozinho. Em 02/11/2026 um fechamento lancou 104 debitos cobrindo DOZE meses
+// (11/2026 a 10/2027), R$ 4.185 de uma vez. Isso e grande demais para um robo
+// decidir — e a conta corrente nao e rascunho: e ela que diz quanto cada
+// familia deve e o que a regua cobra.
+// ===========================================================================
+const mensal62 = readFileSync("src/app/api/cron/mensal/route.ts", "utf8");
+const rotRota62 = readFileSync("src/app/api/rotinas/route.ts", "utf8");
+const sinais62 = readFileSync("src/app/painel/SinaisDeVida.tsx", "utf8");
+
+ok("o cron do mes PREPARA, e nao grava",
+   /previewCompetencia\(org\)/.test(mensal62)
+   && !/fecharCompetencia/.test(semComentarios(mensal62)));
+// Duplicar calculo de dinheiro e como um dos dois diverge sem ninguem notar.
+ok("a previa do cron e a MESMA que a tela de Fechamento mostra",
+   /from "@\/lib\/competencia"/.test(mensal62));
+// Trocar lancamento automatico por confirmacao troca um risco por outro: um
+// mes inteiro sem cobranca, e ninguem percebe porque NADA aconteceu.
+ok("a sugestao vira pendencia, e nao morre no log",
+   /aguardandoConfirmacao/.test(mensal62) && /aguardandoConfirmacao/.test(rotRota62));
+ok("e a pendencia conta os DIAS de espera",
+   /diasEsperando/.test(rotRota62) && /diasEsperando/.test(sinais62));
+// Quem nao abre o financeiro e exatamente quem esqueceria de lancar.
+ok("o mes esperando aparece na tela inicial, junto do que parou",
+   /mesEsperando/.test(sinais62)
+   && /!paradas\.length === 0|paradas\.length === 0 && !calado && !surdo && !mes/.test(semComentarios(sinais62)));
+ok("e o aviso leva ao botao de lancar",
+   /\/painel\/fechamento/.test(sinais62));
+// Rotina que nunca carimba nao vira alarme sozinha.
+ok("o fechamento mensal entrou na lista de rotinas vigiadas",
+   /"mensal"/.test(readFileSync("src/lib/rotinas.ts", "utf8"))
+   && /"mensal"\]/.test(rotRota62.replace(/\s/g, "")));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

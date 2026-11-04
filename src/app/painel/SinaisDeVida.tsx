@@ -73,6 +73,19 @@ export default function SinaisDeVida() {
 
   const paradas = rotinas.filter((r) => r.atrasada);
 
+  /**
+   * O MÊS PRONTO QUE NINGUÉM CONFIRMOU (0162).
+   *
+   * Desde a 0162 o fechamento do dia 1 prepara e NÃO lança — a casa confirma.
+   * O risco que isso cria não é o robô errar: é um mês passar inteiro sem
+   * cobrança, e esse fracasso não faz barulho, porque nada aconteceu.
+   *
+   * Por isso ele aparece AQUI, no mesmo bloco de "alguma coisa parou", e não
+   * numa aba do financeiro: quem não abre o financeiro é exatamente quem
+   * esqueceria de lançar.
+   */
+  const mes = dados?.mesEsperando || null;
+
   // O WHATSAPP CALADO É UM AVISO. O WHATSAPP FALANDO E NÃO GRAVANDO É OUTRO.
   //
   // O segundo é o mais traiçoeiro: o carimbo fica verde, o painel fica quieto,
@@ -91,13 +104,39 @@ export default function SinaisDeVida() {
     );
   }
 
-  if (paradas.length === 0 && !calado && !surdo) return null;
+  if (paradas.length === 0 && !calado && !surdo && !mes) return null;
 
   return (
     <div className="mb-4 rounded-xl2 border border-perigo/40 bg-perigo/5 p-4">
       <p className="text-[16px] font-semibold text-perigo">
-        Alguma coisa parou de rodar
+        {paradas.length === 0 && !calado && !surdo
+          ? "Precisa da sua confirmação"
+          : "Alguma coisa parou de rodar"}
       </p>
+
+      {mes && (
+        <div className="mt-2 rounded-lg border border-perigo/40 bg-perigo/10 p-3">
+          <p className="text-[15px] font-semibold text-ink">
+            O mês {String(mes.competencia || "").slice(5)}/{String(mes.competencia || "").slice(0, 4)}
+            {" "}está pronto para lançar e ainda não foi.
+          </p>
+          <p className="mt-1 text-[14px] leading-relaxed text-ink-soft">
+            {mes.aLancar} jazigo(s), {Number(mes.total || 0).toLocaleString("pt-BR",
+              { style: "currency", currency: "BRL" })}
+            {/* OS DIAS SÃO O PONTO. "Pronto para lançar" é informação; "pronto
+                há doze dias" é um problema. Sem a contagem, o aviso vira
+                paisagem e a casa passa o mês sem cobrar. */}
+            {typeof mes.diasEsperando === "number" && mes.diasEsperando > 0
+              ? ` · esperando há ${mes.diasEsperando} dia${mes.diasEsperando > 1 ? "s" : ""}`
+              : ""}
+            . Nada é lançado sem você confirmar.
+          </p>
+          <a href="/painel/fechamento"
+             className="mt-2 inline-block text-[14px] font-semibold text-perigo underline">
+            conferir e lançar
+          </a>
+        </div>
+      )}
 
       <ul className="mt-2 space-y-1.5">
         {calado && whats && (

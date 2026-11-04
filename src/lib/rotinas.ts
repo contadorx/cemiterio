@@ -11,7 +11,7 @@ import { env } from "./env";
  * Nunca lança: um problema no carimbo não pode derrubar a rotina que ele mede.
  */
 
-export type ChaveRotina = "minuto" | "diario" | "convites" | "perfis" | "webhook";
+export type ChaveRotina = "minuto" | "diario" | "convites" | "perfis" | "webhook" | "mensal";
 
 /** Quanto tempo cada rotina pode ficar em silêncio antes de virar aviso. */
 export const LIMITE_MINUTOS: Record<ChaveRotina, number> = {
@@ -21,6 +21,9 @@ export const LIMITE_MINUTOS: Record<ChaveRotina, number> = {
   diario: 26 * 60,
   convites: 26 * 60,
   perfis: 26 * 60,
+  // Roda no dia 1 de cada mês. 33 dias dá folga para mês de 31 dias mais o
+  // atraso da plataforma — e menos que isso acusaria todo fim de mês.
+  mensal: 33 * 24 * 60,
   // o webhook depende de a FAMÍLIA escrever. Silêncio aqui pode ser só um dia
   // calmo — por isso o limite é longo e o texto no painel é ameno.
   webhook: 48 * 60,
@@ -32,6 +35,7 @@ export const NOME_ROTINA: Record<ChaveRotina, string> = {
   convites: "Convites e avaliações (todo dia, à tarde)",
   perfis: "Perfis das famílias (todo dia, de madrugada)",
   webhook: "Chegada de mensagens do WhatsApp",
+  mensal: "Fechamento do mês (dia 1) — PREPARA, não lança",
 };
 
 /** O que quebra na prática quando cada uma para. Texto para o painel. */
@@ -41,6 +45,9 @@ export const IMPACTO_ROTINA: Record<ChaveRotina, string> = {
   convites: "Convites de data e pedidos de avaliação deixam de sair.",
   perfis: "Só o aprendizado da IA sobre as famílias fica desatualizado.",
   webhook: "Mensagem de família pode estar chegando e não entrando no sistema.",
+  // Ele nao lanca nada (0162): so deixa o mes pronto para a Sureya
+  // confirmar. Parado, ninguem e cobrado e nada avisa.
+  mensal: "O mês não fica pronto para lançar — e um mês sem cobrança não faz barulho.",
 };
 
 export async function carimbarRotina(

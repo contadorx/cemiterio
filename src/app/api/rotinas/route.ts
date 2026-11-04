@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * tratada como parada, não como "sem novidade". Era exatamente esse caso que a
  * tela antiga pintava de verde com "Nenhum erro registrado ✓".
  */
-const CHAVES: ChaveRotina[] = ["minuto", "diario", "convites", "perfis", "webhook"];
+const CHAVES: ChaveRotina[] = ["minuto", "diario", "convites", "perfis", "webhook", "mensal"];
 
 export async function GET() {
   const auth = await exigirAdmin();
@@ -77,11 +77,40 @@ export async function GET() {
     if (saude) whatsapp = saude;
   } catch { /* banco sem a 0121: segue sem este bloco */ }
 
+  // ==========================================================================
+  // O MÊS PRONTO QUE NINGUÉM CONFIRMOU (0162)
+  // ==========================================================================
+  //
+  // Desde a 0162 o fechamento do dia 1 PREPARA e não lança — a casa confirma.
+  // Isso troca um risco por outro: antes, o robô podia lançar algo que
+  // ninguém revisou; agora, um mês pode passar inteiro sem cobrança nenhuma,
+  // e esse fracasso NÃO FAZ BARULHO, porque nada aconteceu.
+  //
+  // Por isso a espera é publicada à parte, com os dias contados. Uma rotina
+  // "em dia" que preparou R$ 4.185 e está esperando há doze dias não é uma
+  // rotina saudável — e o alarme de rotina atrasada, sozinho, não a pegaria.
+  const rMensal = rotinas.find((r) => r.chave === "mensal") as any;
+  const resumoMensal = rMensal?.resumo || null;
+  let mesEsperando: any = null;
+  if (resumoMensal?.aguardandoConfirmacao && Number(resumoMensal.aLancar) > 0) {
+    const desde = rMensal?.ultimoSucesso || rMensal?.ultimaTentativa || null;
+    const dias = desde
+      ? Math.floor((Date.now() - new Date(desde).getTime()) / 86400000)
+      : null;
+    mesEsperando = {
+      competencia: resumoMensal.competencia || null,
+      aLancar: Number(resumoMensal.aLancar) || 0,
+      total: Number(resumoMensal.total) || 0,
+      diasEsperando: dias,
+    };
+  }
+
   return NextResponse.json({
     ok: true,
     rotinas,
     whatsapp,
+    mesEsperando,
     // o Início só precisa disto para decidir se mostra a faixa vermelha
-    problemas: rotinas.filter((r) => r.atrasada).length,
+    problemas: rotinas.filter((r) => r.atrasada).length + (mesEsperando ? 1 : 0),
   });
 }
