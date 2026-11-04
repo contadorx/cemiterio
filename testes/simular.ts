@@ -478,6 +478,57 @@ async function rodar() {
   checar("tirando um movimento, a prova do saldo ACUSA",
          ext.conferir(linhasPdf.filter((l) => !/RENTAB/.test(l.historico))).fecha === false);
 
+  // =========================================================================
+  // O TEXTO SAI DO PDF SEM DEPENDENCIA NOVA (0161)
+  //
+  // O PDF e montado AQUI, com o zlib do proprio Node, em vez de guardado como
+  // arquivo: assim a prova diz o que ela testa — Flate, operadores de texto e
+  // as coordenadas — em vez de depender de um binario que ninguem le no code
+  // review.
+  // =========================================================================
+  console.log("\n=== 0d. TEXTO DO PDF (sem dependencia) ===");
+  const { deflateSync } = await import("node:zlib");
+  const pdfT = await import("../src/lib/pdf-texto");
+
+  const conteudo = [
+    "BT /F1 10 Tf",
+    "1 0 0 1 60 700 Tm (PIX RECEBIDO) Tj",
+    "1 0 0 1 300 680 Tm (0833332) Tj",
+    "1 0 0 1 420 680 Tm (40,00) Tj",
+    "1 0 0 1 520 680 Tm (8.600,95) Tj",
+    "1 0 0 1 60 660 Tm [(REM: FULANO) -300 (DE TAL 01/10)] TJ",
+    "ET",
+  ].join("\n");
+  const z = deflateSync(Buffer.from(conteudo, "latin1"));
+  const pdfFalso = Buffer.concat([
+    Buffer.from("%PDF-1.5\n1 0 obj\n<< /Length " + z.length + " /Filter /FlateDecode >>\nstream\n", "latin1"),
+    z,
+    Buffer.from("\nendstream\nendobj\n%%EOF\n", "latin1"),
+  ]);
+
+  const txtPdf = pdfT.textoDoPdf(pdfFalso);
+  checar("tira o texto de um fluxo comprimido com Flate",
+         txtPdf.includes("PIX RECEBIDO"), JSON.stringify(txtPdf.slice(0, 120)));
+  // "endstream" TERMINA em "stream": sem tratar isso, a busca casa com o
+  // fechamento do fluxo anterior e passa a inflar lixo. No extrato real,
+  // 19 dos 20 fluxos falhavam por causa disto.
+  checar("nao confunde o fim de um fluxo com o comeco de outro",
+         !/endstream/.test(txtPdf));
+  // Sem as coordenadas, credito e debito do Bradesco viram a mesma coisa:
+  // o que separa as duas colunas e o recuo, nao o texto.
+  const l0 = txtPdf.split("\n").find((l) => l.includes("0833332")) || "";
+  checar("preserva a POSICAO horizontal de cada trecho",
+         l0.indexOf("40,00") > l0.indexOf("0833332")
+         && l0.indexOf("8.600,95") > l0.indexOf("40,00"), JSON.stringify(l0));
+  // Um deslocamento grande dentro de um TJ e um espaco que a fonte nao
+  // escreveu; ignora-lo colaria "FULANODE TAL".
+  checar("o deslocamento dentro de um TJ vira espaco",
+         /REM: FULANO DE TAL/.test(txtPdf),
+         JSON.stringify(txtPdf.split("\n").find((l) => l.includes("REM"))));
+  // PDF escaneado e imagem: nao ha texto, e isso NAO e erro.
+  checar("arquivo sem texto devolve vazio, e nao lanca",
+         pdfT.textoDoPdf(Buffer.from("%PDF-1.5\nsem fluxo nenhum\n%%EOF")) === "");
+
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
   const sCec = await fin.calcularSaldo("c-cec");

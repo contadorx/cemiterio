@@ -1,3 +1,4 @@
+import { textoDoPdf } from "./pdf-texto";
 import { inflateRawSync } from "node:zlib";
 
 /**
@@ -411,7 +412,11 @@ export function lerPdfTexto(texto: string): LinhaExtrato[] {
   // que `conferir()` pegou na primeira passada contra o extrato de verdade.
   // Uma linha pulada no meio de dezessete páginas é exatamente o que a prova
   // do saldo existe para não deixar passar.
-  const LINHA = /^(\d{2}\/\d{2}\/\d{4})?\s*(\D[^\d]*?[^\s])?\s+(\d{6,8})\s+([\d.,\s]+)$/;
+  // O `^\s*` do começo não é detalhe: a margem esquerda depende de QUEM
+  // extraiu o texto. O `pdftotext` põe a data na coluna 0; o nosso extrator a
+  // põe recuada. Um leitor que dependa da margem funciona com uma ferramenta
+  // e devolve zero movimento com a outra — sem erro, só vazio.
+  const LINHA = /^\s*(\d{2}\/\d{2}\/\d{4})?\s*(\D[^\d]*?[^\s])?\s+(\d{6,8})\s+([\d.,\s]+)$/;
   const SO_DATA = /^\s*(\d{2}\/\d{2}\/\d{4})\s*$/;
   const DINHEIRO = /\d{1,3}(?:\.\d{3})*,\d{2}/g;
 
@@ -532,7 +537,18 @@ export function lerArquivo(bytes: Buffer, nome?: string):
     case "csv":  return { formato, linhas: lerCSV(bytes.toString("utf8")) };
     case "html": return { formato, linhas: lerHTML(bytes.toString("latin1")) };
     case "xlsx": return { formato, linhas: lerXLSX(bytes) };
-    case "pdf":  return { formato, linhas: [] };   // vai pela IA, na rota
+    case "pdf": {
+      // O PDF DEIXA DE IR PARA A IA (0161). `textoDoPdf` tira o texto com o
+      // `zlib` que o Node já traz, e `lerPdfTexto` o interpreta — provado
+      // contra o extrato de outubro/2026: 288 movimentos, 248 PIX com o nome
+      // do remetente em todos, e a coluna de saldo fechando.
+      //
+      // Lista vazia continua sendo resposta válida, e é o que mantém a IA
+      // como plano B: PDF escaneado é imagem e não tem texto para extrair.
+      // Quem chama já sabe tratar `linhas: []`.
+      const texto = textoDoPdf(bytes);
+      return { formato, linhas: texto ? lerPdfTexto(texto) : [] };
+    }
     case "xls_antigo":
       return {
         formato, linhas: [],

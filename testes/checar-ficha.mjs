@@ -2651,6 +2651,42 @@ ok("a tela devolve o endereco guardado, e nao o link assinado",
 ok("a fila sabe o que ja virou lavagem olhando o servico",
    /\.in\("foto_depois_url", urls\)/.test(fila60));
 
+// ===========================================================================
+// 0161 — O PDF DO EXTRATO E LIDO SEM IA E SEM DEPENDENCIA NOVA
+//
+// Provado contra o extrato real de outubro/2026: 17 paginas, 288 movimentos,
+// 248 PIX com o nome do remetente em TODOS, e a coluna de saldo fechando do
+// primeiro ao ultimo lancamento.
+// ===========================================================================
+const pdfT61 = readFileSync("src/lib/pdf-texto.ts", "utf8");
+const ext61 = readFileSync("src/lib/extrato.ts", "utf8");
+const pkg61 = JSON.parse(readFileSync("package.json", "utf8"));
+
+// O projeto tem dez dependencias e isso e escolha, nao descuido.
+ok("o leitor de PDF nao trouxe dependencia nova",
+   !Object.keys(pkg61.dependencies || {}).some((d) => /pdf|mupdf|unpdf/i.test(d))
+   && /from "node:zlib"/.test(pdfT61));
+ok("o PDF deixou de ir para a IA no importador",
+   /const texto = textoDoPdf\(bytes\);/.test(ext61)
+   && !/vai pela IA, na rota/.test(ext61));
+// Sem as coordenadas, credito e debito do Bradesco viram a mesma coisa.
+ok("o texto sai com a POSICAO preservada, e nao so as palavras",
+   /PONTOS_POR_ESPACO/.test(pdfT61) && /MESMA_LINHA/.test(pdfT61));
+// Cada pagina comeca o Y do zero: juntar tudo antes de agrupar empilha a
+// terceira linha de cada pagina numa linha so.
+ok("cada pagina e remontada sozinha",
+   /for \(const f of fluxos\(bytes\)\) \{[\s\S]{0,200}?remontar\(t\)/.test(pdfT61));
+// "endstream" TERMINA em "stream": 19 dos 20 fluxos do extrato real falhavam.
+ok("o fim de um fluxo nao e confundido com o comeco de outro",
+   /=== "end"/.test(pdfT61));
+// PDF escaneado e imagem. Devolver vazio deixa quem chama dizer "me manda o
+// OFX" em vez de importar um mes como se nao tivesse movimento.
+ok("arquivo sem texto devolve vazio, e a IA segue como plano B",
+   /linhas: texto \? lerPdfTexto\(texto\) : \[\]/.test(ext61));
+// A margem esquerda depende de quem extraiu o texto.
+ok("o leitor nao depende da margem esquerda",
+   /const LINHA = \/\^\\s\*/.test(ext61));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 
