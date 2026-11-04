@@ -439,6 +439,45 @@ async function rodar() {
          !/anthropic|deepseek|fetch\(/i.test(
            readFileSync("src/lib/modelos-mensagem.ts", "utf8")));
 
+  // =========================================================================
+  // O PDF DO BRADESCO, LIDO SEM IA (0161)
+  //
+  // Provado contra o extrato real de outubro/2026: 17 paginas, 288 movimentos,
+  // 248 PIX recebidos com o nome do remetente em TODOS, e a coluna de saldo
+  // fechando do primeiro ao ultimo lancamento. A fixture aqui tem o mesmo
+  // layout com nomes inventados — nome de cliente nao vai para o repositorio.
+  // =========================================================================
+  console.log("\n=== 0c. EXTRATO EM PDF (sem IA) ===");
+  const ext = await import("../src/lib/extrato");
+  const linhasPdf = ext.lerPdfTexto(
+    readFileSync("testes/fixtures/extrato-bradesco.txt", "utf8"));
+  const confPdf = ext.conferir(linhasPdf);
+
+  checar("le todos os movimentos, inclusive o de uma linha so",
+         linhasPdf.length === 5, `veio ${linhasPdf.length}`);
+  // Este foi pulado na primeira versao: "RENTAB" traz o historico na MESMA
+  // linha dos numeros, e o padrao exigia que a linha comecasse pelo documento.
+  // Dois centavos que a prova do saldo pegou contra o arquivo de verdade.
+  checar("o movimento com historico na propria linha NAO e pulado",
+         linhasPdf.some((l) => /RENTAB/.test(l.historico) && l.valor === 0.02));
+  // Nao ha sinal nem palavra separando: o que distingue e o RECUO da coluna.
+  checar("credito e debito saem da POSICAO da coluna",
+         confPdf.creditos === 3 && confPdf.debitos === 2,
+         `${confPdf.creditos}c / ${confPdf.debitos}d`);
+  checar("a data vale para o dia inteiro, e nao so para a primeira linha",
+         linhasPdf.filter((l) => l.data === "2026-10-01").length === 4);
+  checar("o remetente sai truncado, como o banco manda",
+         linhasPdf[0].remetente === "FULANO DE TAL SOBRENO",
+         String(linhasPdf[0].remetente));
+  checar("o documento vem junto: e a chave contra importar duas vezes",
+         linhasPdf[0].documento === "0833332");
+  checar("o extrato FECHA pela coluna de saldo",
+         confPdf.fecha === true, confPdf.problema || "");
+  // Um extrato que nao fecha deve ser recusado INTEIRO, nunca importado pela
+  // metade: meia importacao de dinheiro e pior que nenhuma.
+  checar("tirando um movimento, a prova do saldo ACUSA",
+         ext.conferir(linhasPdf.filter((l) => !/RENTAB/.test(l.historico))).fecha === false);
+
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");
   const sCec = await fin.calcularSaldo("c-cec");

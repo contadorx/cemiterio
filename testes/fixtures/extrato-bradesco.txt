@@ -1,0 +1,30 @@
+                                           Bradesco Celular
+                                           Data: 03/11/2026 - 05h17
+                                           Nome: NOME DA CASA
+
+
+Extrato de: Agência: 0000 | Conta: 000-0                                                                     Folha: 1/2
+
+
+Data               Histórico                                          Docto.    Crédito (R$)   Débito (R$)    Saldo (R$)
+
+
+                   PIX RECEBIDO
+01/10/2026                                                            0833332          40,00                   1.040,00
+                   REM: FULANO DE TAL SOBRENO 01/10
+
+                   PIX RECEBIDO
+                                                                      0853563         150,00                   1.190,00
+                   REM: BELTRANA M DE SOUZA 01/10
+
+
+                   COMPRA CARTAO VISA
+                                                                      0302033                        138,24    1.051,76
+                   PADARIA DA ESQUINA
+
+
+                   RENTAB.INVEST FACILCRED*                           1696453           0,02                   1.051,78
+
+
+02/10/2026         PIX ENVIADO                                        1551072                         51,78    1.000,00
+                   DES: CICRANO PAGAMENTOS
