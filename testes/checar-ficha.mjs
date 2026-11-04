@@ -2723,6 +2723,81 @@ ok("o fechamento mensal entrou na lista de rotinas vigiadas",
    /"mensal"/.test(readFileSync("src/lib/rotinas.ts", "utf8"))
    && /"mensal"\]/.test(rotRota62.replace(/\s/g, "")));
 
+// ===========================================================================
+// 0163/0164 — DE QUEM E ESTE PIX, E A QUE MESES ELE SE REFERE
+//
+// Extrato de outubro/2026: 248 Pix, 196 nomes distintos, R$ 19.805,00 — e o
+// sistema registrou R$ 0. Dos 196 nomes, 69 casam com o cadastro e 127 nao,
+// porque quem paga nem sempre e quem esta cadastrado e porque o Bradesco corta
+// o nome em ~21 letras.
+// ===========================================================================
+const tri63 = readFileSync("src/lib/triangulacao.ts", "utf8");
+const rotaTri63 = readFileSync("src/app/api/financeiro/conciliar/triangular/route.ts", "utf8");
+const tela63 = readFileSync("src/app/painel/financeiro/Triangular.tsx", "utf8");
+const mig63 = readFileSync("migrations/0163_o_banco_aprende_quem_e_quem.sql", "utf8");
+const mig64 = readFileSync("migrations/0164_o_pagamento_diz_a_que_meses_se_refere.sql", "utf8");
+
+// A FORMA NORMALIZADA TEM UM DONO SO, e ele esta no TypeScript. O banco
+// CONFERE a forma (um check) em vez de refazer a regra — duas implementacoes
+// da mesma regra e o defeito de forma que ja custou nove migrations.
+ok("so o TypeScript normaliza o nome do banco",
+   /export function normalizarNomeBanco/.test(tri63)
+   && /apelidos_banco_forma/.test(mig63)
+   && !/unaccent|translate\(/.test(semComentarios(mig63)));
+
+// EMPATE NAO VIRA SORTEIO. Duas familias pagando R$ 40 no mesmo dia produzem
+// dois comprovantes identicos; pegar "o primeiro" acerta metade das vezes e
+// erra a outra metade em silencio, com as DUAS saindo quitadas.
+ok("comprovante so decide quando ha UM candidato",
+   /candidatos\.length === 1/.test(tri63));
+ok("e o nome do cadastro so decide quando ha UM",
+   /iguais\.length === 1/.test(tri63));
+
+// O VALOR TEM DE BATER EXATO. "Mais ou menos R$ 40" casa o pagamento de uma
+// familia com o comprovante de outra.
+ok("o valor do comprovante bate ao centavo, nao por aproximacao",
+   /< 0\.005/.test(tri63));
+
+// APRENDER SOZINHO FARIA O SISTEMA ESTUDAR OS PROPRIOS CHUTES: o nome do
+// cadastro, que e a fonte mais fraca, viraria licao confirmada sem ninguem
+// olhar. A licao so nasce de uma confirmacao de gente, e nunca no ensaio.
+ok("a licao so e guardada quando uma pessoa confirma",
+   /!ensaio && b\?\.aprender === true/.test(rotaTri63));
+
+// O ENSAIO E O MESMO LACO COM A ESCRITA DESLIGADA. Uma previa calculada por
+// outro caminho mente exatamente no dia em que os dois divergirem.
+ok("a previa dos meses sai da MESMA funcao que grava",
+   /p_ensaio: ensaio/.test(rotaTri63)
+   && /if not p_ensaio then/.test(mig64)
+   && !/sureya_ensaiar_entrada/.test(mig64));
+
+// `current_org_id()` e nulo fora de sessao e o `where` com org nula nao da
+// erro: devolve ZERO debitos, e o anual inteiro viraria adiantamento.
+ok("a lista de debitos recebe p_org, e nao confia na sessao",
+   /sureya_debitos_em_aberto\(p_cliente, v_org\)/.test(mig64));
+
+// DUAS PORTAS PARA A MESMA REGRA DIVERGEM. A de dois argumentos delega.
+ok("a porta antiga de identificar delega, em vez de repetir a regra",
+   /perform \* from sureya_identificar_entrada_meses\(/.test(mig64));
+
+// O CREDITO DO ANUAL CARIMBADO NO MES DO EXTRATO faz o relatorio por
+// competencia mentir em onze dos doze meses.
+ok("o credito nasce na competencia mais antiga que paga",
+   /select min\(x\.competencia\) into v_comp/.test(mig64));
+
+// A TELA MOSTRA O MOTIVO, em portugues, para a confirmacao ser uma leitura e
+// nao uma aposta.
+ok("a tela mostra por que o palpite e aquele",
+   /porque \{p\.porque\}|porque \{/.test(tela63) && /porque:/.test(tri63));
+// E mostra o plano ANTES de gravar: dois botoes, nao um.
+ok("ver o que vai acontecer vem antes de confirmar",
+   /Ver o que vai acontecer/.test(tela63) && /Confirmar e creditar/.test(tela63));
+
+// CONCILIAR NAO AVISA NINGUEM. O disparo e a fila de conversas, no comando de
+// uma pessoa — "nenhuma mensagem deve ir automatica".
+ok("a triangulacao nao manda mensagem nenhuma",
+   !/enviarTexto|enviarWhatsapp|outbox/i.test(semComentarios(rotaTri63)));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

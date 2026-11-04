@@ -155,7 +155,10 @@ ESPERADO_TABELAS=${ESPERADO_TABELAS:-55}
 #             11 (44%) prometiam voltar, ZERO diziam prazo e ZERO deixavam
 #             registro. A promessa saia e evaporava; do lado de ca nao havia
 #             nem lista nem relogio nem dono.
-TABELAS_DELTA=${TABELAS_DELTA:-15}
+#   0163  +1  apelidos_banco — o nome que o banco imprime -> familia. Dos 196
+#             nomes do extrato de outubro/2026, 127 nao casavam com o cadastro:
+#             sem guardar de quem e cada um, sao 196 perguntas todo mes.
+TABELAS_DELTA=${TABELAS_DELTA:-16}
 ESPERADO_FUNCOES=${ESPERADO_FUNCOES:-56}
 ESPERADO_GATILHOS=${ESPERADO_GATILHOS:-14}
 
@@ -235,7 +238,9 @@ POLICIES_DUPLICADAS=${POLICIES_DUPLICADAS:-7}
 #              fecha para o campo. Um arquivo que se apaga nao e arquivo.
 #   0142  +5  compromissos: a da org e uma restritiva POR COMANDO — de novo a
 #              licao da 0079, `delete` nunca consulta `with check`.
-POLICIES_DELTA=${POLICIES_DELTA:-104}
+#   0163  +5  apelidos_banco: a da org e uma restritiva POR COMANDO — de novo a
+#              licao da 0079, `delete` nunca consulta `with check`.
+POLICIES_DELTA=${POLICIES_DELTA:-109}
 
 # DELTA DELIBERADO DE FUNCOES
 #   0066  +1  sureya_concluir_lavagem
@@ -362,7 +367,13 @@ POLICIES_DELTA=${POLICIES_DELTA:-104}
 #   0147  +2  sureya_familias_sem_jazigo e sureya_apagar_familia_sem_jazigo.
 #             Depois da fusao sobraram 122 familias sem jazigo — 103 pessoas da
 #             importacao de 19/08 — e TRES que escreveram de verdade.
-FUNCOES_DELTA=${FUNCOES_DELTA:-95}
+#   0163  +2  sureya_aprender_apelido_banco e sureya_esquecer_apelido_banco:
+#             quem diz de quem e um nome do extrato e uma pessoa, e a licao
+#             tem de dar para desfazer.
+#   0164  +1  sureya_identificar_entrada_meses. Outubro/2026: R$ 19.805
+#             entraram, o sistema registrou R$ 0 — identificar uma entrada
+#             jogava o valor solto e ninguem dizia a que meses se referia.
+FUNCOES_DELTA=${FUNCOES_DELTA:-98}
 
 tb=$(psql -q $ALVO -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 fn=$(psql -q $ALVO -tAc "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'sureya\_%';")
@@ -1061,6 +1072,25 @@ if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/quem_acerta_a_conta.sql 
   echo "$saida" | grep -E "PAGADORES FALHOU|ERROR" | sed 's/^/  /'
   echo
   echo "Ou a familia volta a ter um pagador so, ou pode ficar sem nenhum."
+  echo "============================================================"
+  exit 1
+fi
+echo "$saida" | sed -n 's/.*NOTICE: *ok */  ok  /p' || true
+echo
+
+# ---------------------------------------------------------------------------
+# DE QUEM E ESTE PIX, E A QUE MESES ELE SE REFERE
+#
+# Outubro/2026: 248 Pix, R$ 19.805 recebidos, R$ 0 registrados. O teste cobra
+# que a previa NAO escreva, que o anual caia nos doze meses certos, que o
+# mesmo Pix nao vire dois creditos, que a sobra apareca em vez de se esconder
+# dentro de um mes, e que uma licao de nome nunca aponte para duas familias.
+# ---------------------------------------------------------------------------
+echo "DE QUEM E ESTE PIX — a previa nao escreve, e o anual cai nos meses certos"
+if ! saida=$(psql -q $ALVO -v ON_ERROR_STOP=1 -f testes/de_quem_e_este_pix.sql 2>&1); then
+  echo "$saida" | grep -E "FALHOU|ERROR" | sed 's/^/  /'
+  echo
+  echo "Conciliar extrato mexe em dinheiro, e todo erro aqui e silencioso."
   echo "============================================================"
   exit 1
 fi

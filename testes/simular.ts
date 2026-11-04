@@ -2101,6 +2101,122 @@ async function rodar() {
            deduplicar(velho).fila[0].estado === "guardado");
   }
 
+  console.log("\n=== 14. DE QUEM E ESTE PIX (triangulacao) ===");
+  {
+    const { normalizarNomeBanco, palpitarDono } =
+      await import("../src/lib/triangulacao");
+
+    // --- a forma normalizada ------------------------------------------------
+    //
+    // O banco escreve "JOSÉ  da Silva" e o cadastro "Jose Da Silva". Se os dois
+    // nao virarem a MESMA string, 196 nomes viram 196 perguntas todo mes.
+    checar("acento, caixa e espaco dobrado somem",
+           normalizarNomeBanco("JOSÉ  da Silva") === "JOSE DA SILVA",
+           normalizarNomeBanco("JOSÉ  da Silva"));
+    checar("ponto e virgula viram espaco, sem colar as palavras",
+           normalizarNomeBanco("M.ROSA,LTDA") === "M ROSA LTDA",
+           normalizarNomeBanco("M.ROSA,LTDA"));
+    checar("vazio nao estoura e nao inventa nome",
+           normalizarNomeBanco(null as any) === "");
+
+    const cadastro = [
+      { nome: "SANDRA REGINA MENDES DE LIMA", familiaId: "f-mendes", clienteId: "c-sandra", familia: "Mendes" },
+      { nome: "MARIA TONELLOTI",             familiaId: "f-tone",   clienteId: "c-maria",  familia: "Tonelloti" },
+      { nome: "JOAO TONELLOTI",              familiaId: "f-tone",   clienteId: "c-joao",   familia: "Tonelloti" },
+    ];
+
+    // --- 1. O COMPROVANTE MANDA -------------------------------------------
+    //
+    // A familia mandou a foto no WhatsApp: a conversa ja esta ligada ao
+    // cliente. Valor exato e data perto = e o mesmo dinheiro, e o nome do
+    // banco deixa de ser a chave.
+    const comp = [{ id: "cp-1", clienteId: "c-katia", familiaId: "f-tone",
+                    familia: "Tonelloti", valor: 40, data: "2026-10-03" }];
+    const p1 = palpitarDono(
+      { id: "e1", valor: 40, data: "2026-10-04", remetente: "KATIA F DOS SANTOS" },
+      { comprovantes: comp, licoes: [], cadastro });
+    checar("comprovante de mesmo valor, um dia depois, decide",
+           p1?.forca === "comprovante" && p1?.familiaId === "f-tone", JSON.stringify(p1));
+    checar("e o motivo diz qual comprovante foi",
+           !!p1 && p1.porque.includes("40,00") && p1.porque.includes("03/10"), p1?.porque);
+
+    // TRES DIAS JA E LONGE. A folga de dois dias cobre "mandei a foto amanha";
+    // esticar mais comeca a casar o pagamento de uma familia com o
+    // comprovante de outra.
+    checar("comprovante de tres dias antes nao decide",
+           palpitarDono({ id: "e2", valor: 40, data: "2026-10-06", remetente: "ZZZ" },
+                        { comprovantes: comp, licoes: [], cadastro }) === null);
+
+    // VALOR APROXIMADO NAO CASA. R$ 40,05 e outro pagamento.
+    checar("valor parecido nao e o mesmo valor",
+           palpitarDono({ id: "e3", valor: 40.05, data: "2026-10-03", remetente: "ZZZ" },
+                        { comprovantes: comp, licoes: [], cadastro }) === null);
+
+    // --- O EMPATE NAO VIRA SORTEIO ----------------------------------------
+    //
+    // Duas familias pagando R$ 40 no dia 3 produzem dois candidatos iguais.
+    // Pegar "o primeiro" acertaria metade das vezes e erraria a outra metade
+    // em silencio — com as DUAS saindo quitadas e uma sem ter pago.
+    const doisIguais = [
+      { id: "cp-a", clienteId: "c-a", familiaId: "f-a", familia: "Alves",  valor: 40, data: "2026-10-03" },
+      { id: "cp-b", clienteId: "c-b", familiaId: "f-b", familia: "Barros", valor: 40, data: "2026-10-03" },
+    ];
+    checar("dois comprovantes iguais no mesmo dia nao desempatam",
+           palpitarDono({ id: "e4", valor: 40, data: "2026-10-03", remetente: "NOME QUE NAO ESTA NO CADASTRO" },
+                        { comprovantes: doisIguais, licoes: [], cadastro }) === null);
+
+    // --- 2. A LICAO VEM ANTES DO NOME -------------------------------------
+    //
+    // "a Katia e responsavel da Tonelloti e pagou para os Tonelloti": o nome
+    // dela nao casa com nada no cadastro, e so a licao resolve. E ela tem de
+    // ganhar do nome, senao um sobrenome parecido desfaz o que a pessoa
+    // ensinou.
+    const licoes = [{ nomeBanco: "MARIA TONELLOTI", familiaId: "f-mendes",
+                      clienteId: "c-sandra", familia: "Mendes" }];
+    const p5 = palpitarDono(
+      { id: "e5", valor: 99, data: "2026-10-10", remetente: "Maria Tonelloti" },
+      { comprovantes: [], licoes, cadastro });
+    checar("a licao ganha do nome do cadastro",
+           p5?.forca === "licao" && p5?.familiaId === "f-mendes", JSON.stringify(p5));
+
+    // --- 3. O NOME, QUE E A FONTE MAIS FRACA ------------------------------
+    //
+    // O Bradesco TRUNCA em ~21 letras: "SANDRA REGINA M DE LI". Comparar por
+    // igualdade nao acha ninguem; por PREFIXO, acha.
+    const p6 = palpitarDono(
+      { id: "e6", valor: 55, data: "2026-10-11", remetente: "SANDRA REGINA MENDES" },
+      { comprovantes: [], licoes: [], cadastro });
+    checar("nome cortado pelo banco casa por prefixo",
+           p6?.forca === "nome" && p6?.clienteId === "c-sandra", JSON.stringify(p6));
+
+    // DOIS IRMAOS COM O MESMO SOBRENOME: o nome nao decide.
+    checar("dois candidatos pelo nome nao decidem",
+           palpitarDono({ id: "e7", valor: 55, data: "2026-10-11", remetente: "TONELLOTI" },
+                        { comprovantes: [], licoes: [], cadastro }) === null);
+
+    // NOME CURTO NAO CASA NADA. "ANA" como prefixo pegaria meio cadastro.
+    checar("nome curto nao vira palpite",
+           palpitarDono({ id: "e8", valor: 55, data: "2026-10-11", remetente: "ANA" },
+                        { comprovantes: [], licoes: [], cadastro }) === null);
+
+    // SEM REMETENTE: vazio nao e zero, e nao e palpite.
+    checar("entrada sem nome no extrato volta sem palpite",
+           palpitarDono({ id: "e9", valor: 55, data: "2026-10-11", remetente: null },
+                        { comprovantes: [], licoes: [], cadastro }) === null);
+
+    // --- A FORMA QUE O BANCO EXIGE ----------------------------------------
+    //
+    // A 0163 tem um CHECK que recusa nome fora da forma normalizada, para nao
+    // existirem duas licoes para a mesma pessoa. Se `normalizarNomeBanco`
+    // mudar e passar a devolver minusculo ou espaco dobrado, o insert passa a
+    // estourar em producao — e e aqui que isso tem de aparecer.
+    for (const cru of ["José  da Silva", " maria ", "M.ROSA,LTDA", "ÇÃO Ç"]) {
+      const n = normalizarNomeBanco(cru);
+      checar(`"${cru}" sai na forma que a 0163 aceita`,
+             n === n.toUpperCase() && n === n.trim() && !/\s\s/.test(n), n);
+    }
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

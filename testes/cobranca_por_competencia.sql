@@ -568,20 +568,27 @@ select ci15('inicio_cobranca continua sendo julho',
 
 -- A ANCORA E COISA DO POS-PAGO, E SO DELE.
 --
+-- OS IDS DESTE CASO FORAM TROCADOS (nov/2026). Eles eram ...0161, o MESMO id
+-- que `painel_do_mes.sql` usa para o jazigo CI-PN-A. Os testes rodam todos
+-- contra o mesmo banco, em sequencia, e o `on conflict do nothing` abaixo
+-- virou um no-op: a Aurea nunca entrou, e este assert passou meses cobrando o
+-- jazigo do outro teste — valor 100 e competencia do mes corrente em vez de
+-- 40 e agosto. Um teste de dinheiro desligado sem fazer barulho.
+--
 -- Este caso e a AUREA de producao: contrato antigo (dez/2025), cobrada por
 -- fora ate agora, mensal, pre-pago, proxima cobranca em agosto. Ler a ancora
 -- aqui lancaria a competencia de DEZEMBRO DE 2025 vencendo em agosto de 2026 —
 -- receita no mes errado, e o atraso pingando um mes por vez.
 insert into familias (id, org_id, nome, contratado)
-values ('ff000000-0000-0000-0000-000000000161','aaaaaaaa-0000-0000-0000-000000000015',
+values ('ff000000-0000-0000-0000-0000000a0e15','aaaaaaaa-0000-0000-0000-000000000015',
         'Familia Aurea', true)
 on conflict do nothing;
 
 insert into tumulos (id, org_id, quadra_id, familia_id, identificacao,
                      contratado, valor_mensal, inicio_cobranca, proxima_cobranca,
                      cobranca_no_fim)
-values ('11100000-0000-0000-0000-000000000161','aaaaaaaa-0000-0000-0000-000000000015',
-        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-000000000161','CI-COB-AUREA',
+values ('11100000-0000-0000-0000-0000000a0e15','aaaaaaaa-0000-0000-0000-000000000015',
+        'eeeeeeee-0000-0000-0000-000000000015','ff000000-0000-0000-0000-0000000a0e15','CI-COB-AUREA',
         true, 40, '2025-12-01', '2026-08-01', false)
 on conflict do nothing;
 
@@ -590,10 +597,10 @@ select sureya_cobrar_competencias('2026-08-23'::date, 'aaaaaaaa-0000-0000-0000-0
 select ci15('pre-pago com contrato antigo cobra AGOSTO, nao dezembro de 2025',
   (select count(*) = 1 and min(competencia) = '2026-08-01'::date
      from conta_corrente
-    where tumulo_id='11100000-0000-0000-0000-000000000161' and origem='competencia'),
+    where tumulo_id='11100000-0000-0000-0000-0000000a0e15' and origem='competencia'),
   'a ancora do pos-pago aplicada no pre-pago poe receita oito meses atras');
 
 select ci15('e vence no dia da casa em agosto',
   (select data = '2026-08-10'::date from conta_corrente
-    where tumulo_id='11100000-0000-0000-0000-000000000161' and origem='competencia'),
+    where tumulo_id='11100000-0000-0000-0000-0000000a0e15' and origem='competencia'),
   'quem paga adiantado deve na data em que paga');
