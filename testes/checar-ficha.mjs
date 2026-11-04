@@ -2604,6 +2604,53 @@ ok("as mensagens prontas ficam antes da caixa e do botao da IA",
    telaConv58.indexOf("<Modelos") > 0
    && telaConv58.indexOf("<Modelos") < telaConv58.indexOf("Sugerir resposta"));
 
+// ===========================================================================
+// 0160 — A FOTO QUE SAI PELO CELULAR TAMBEM E GUARDADA
+//
+// Medido em 04/11/2026: 71 fotos entraram pelas familias e TODAS tem o arquivo
+// salvo. As 8 que sairam do celular da Sureya viraram a frase "[foto/arquivo
+// enviado pelo celular]" e o arquivo foi jogado fora — o webhook passava
+// `temMidia: boolean` para o espelho, e um booleano nao tem bytes.
+//
+// Sao justamente as fotos de lavagem: 7 servicos executados, 3 com foto.
+// ===========================================================================
+const esp60 = readFileSync("src/lib/espelho.ts", "utf8");
+const hook60 = readFileSync("src/app/api/webhook/evolution/route.ts", "utf8");
+const feito60 = readFileSync("src/app/api/servico/registrar-feito/route.ts", "utf8");
+const fila60 = readFileSync("src/app/api/fotos-que-sairam/route.ts", "utf8");
+const tela60 = readFileSync("src/app/painel/lavagens-sem-registro/page.tsx", "utf8");
+
+ok("o webhook manda os BYTES da foto que saiu, e nao so um booleano",
+   /const midiaSaida = p\.temMidia \? await baixarMidiaBase64\(body\?\.data\) : null;/.test(hook60)
+   && /midia: midiaSaida,/.test(hook60));
+ok("e o espelho guarda a imagem no balde fechado",
+   /guardarMidiaDoEspelho/.test(esp60) && /BUCKET_CONVERSAS/.test(esp60)
+   && /midia_url: midiaUrl,/.test(esp60));
+// Falhar o Storage nao pode levar a mensagem junto.
+ok("se o Storage falhar, a mensagem ainda entra na conversa",
+   /guardarMidiaDoEspelho[\s\S]{0,900}?return null;/.test(esp60));
+// Uma porta so para "a limpeza foi feita": servico, data, conclusao e
+// cobranca seguem o mesmo caminho de sempre.
+ok("registrar a foto guardada passa pelo MESMO registrador de lavagem",
+   /fotoDepoisUrl/.test(feito60) && /baixarComoBase64/.test(feito60));
+// A foto do servico e prova do servico: apagar a conversa a pedido nao pode
+// levar junto a prova da lavagem que a familia pagou.
+ok("os bytes sao COPIADOS para o balde dos servicos, nao apontados do outro",
+   /subirFotoServico\(servicoId!, b\.fotoDepoisBase64 \|\| base64Guardada/.test(feito60));
+ok("foto que nao abriu RECUSA o registro, em vez de registrar sem ela",
+   /foto_nao_abriu/.test(feito60) && /A limpeza NÃO foi registrada/.test(feito60));
+// Chutar "o unico jazigo dela" erra nas familias grandes, que sao as que mais
+// pagam — e lavagem no jazigo errado vira cobranca no jazigo errado.
+ok("a fila NAO adivinha o jazigo: quem escolhe e gente",
+   /De qual jazigo é esta limpeza\?/.test(tela60) && /jazigos: porFamilia\.get/.test(fila60));
+// Link assinado expira; endereco guardado nao.
+ok("a tela devolve o endereco guardado, e nao o link assinado",
+   /fotoDepoisUrl: item\.fotoOriginal/.test(tela60) && /fotoOriginal: m\.midia_url/.test(fila60));
+// "Ja virou lavagem" e lido do proprio servico, e nao de uma coluna nova que
+// alguem precisaria lembrar de marcar.
+ok("a fila sabe o que ja virou lavagem olhando o servico",
+   /\.in\("foto_depois_url", urls\)/.test(fila60));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 

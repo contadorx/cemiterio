@@ -3,6 +3,8 @@ import { exigirAdmin } from "@/lib/roles";
 import { orgAtual } from "@/lib/org";
 import { subirFotoServico } from "@/lib/servico";
 import { registrarErro } from "@/lib/monitor";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assinar } from "@/lib/storage";
 import { rascunhoDaLavagem } from "@/lib/mensagens";
 
 export const runtime = "nodejs";
@@ -52,8 +54,30 @@ export const maxDuration = 120;
  * porque não há o que mandar. A resposta diz isso, para a tela poder avisar.
  */
 
-// POST { tumuloId, data, fotoDepoisBase64?, fotoAntesBase64?, mimetype?,
+// POST { tumuloId, data, fotoDepoisBase64?, fotoDepoisUrl?, fotoAntesBase64?, mimetype?,
 //        executoraId?, duracaoMinutos?, observacao? }
+/**
+ * Baixa um arquivo que já está num balde nosso e devolve base64.
+ *
+ * Devolve `null` quando não consegue — e quem chama RECUSA a operação, em vez
+ * de registrar a lavagem sem a foto que a pessoa escolheu. Registrar pela
+ * metade aqui faria a foto sumir sem ninguém notar, que é o defeito que esta
+ * peça inteira existe para consertar.
+ */
+async function baixarComoBase64(url: string): Promise<string | null> {
+  try {
+    const adm = supabaseAdmin();
+    const assinada = await assinar(adm, url, 300);
+    if (!assinada) return null;
+    const r = await fetch(assinada);
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.length ? buf.toString("base64") : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const auth = await exigirAdmin();
   if (auth.erro) return auth.erro;
@@ -153,8 +177,32 @@ export async function POST(req: NextRequest) {
 
   // ------------------------------------------------------------ as fotos
   const mime = b?.mimetype || "image/jpeg";
-  const urlDepois = b?.fotoDepoisBase64
-    ? await subirFotoServico(servicoId!, b.fotoDepoisBase64, mime, "depois") : null;
+
+  // A FOTO QUE JÁ ESTÁ GUARDADA (0160).
+  //
+  // A foto de lavagem normalmente chega pelo WhatsApp, do celular da Nina, e
+  // desde a 0160 ela fica no balde das conversas. Aceitar o endereço dela aqui
+  // — em vez de escrever um segundo registrador de lavagem só para esse caso —
+  // é o que mantém UMA porta para "a limpeza foi feita": o serviço, a data, a
+  // conclusão e a cobrança seguem exatamente o mesmo caminho.
+  //
+  // Os bytes são COPIADOS para o balde dos serviços, e não apontados de lá.
+  // A foto do serviço é um registro do serviço: se ela morasse no balde da
+  // conversa, apagar a conversa a pedido da família (0140) levaria junto a
+  // prova da lavagem que a própria família pagou.
+  const base64Guardada = b?.fotoDepoisUrl
+    ? await baixarComoBase64(String(b.fotoDepoisUrl))
+    : null;
+  if (b?.fotoDepoisUrl && !base64Guardada) {
+    return NextResponse.json(
+      { ok: false, erro: "foto_nao_abriu",
+        mensagem: "Não consegui abrir a foto guardada. A limpeza NÃO foi registrada — "
+                + "tente de novo, ou registre sem a foto." },
+      { status: 502 });
+  }
+
+  const urlDepois = b?.fotoDepoisBase64 || base64Guardada
+    ? await subirFotoServico(servicoId!, b.fotoDepoisBase64 || base64Guardada, mime, "depois") : null;
   const urlAntes = b?.fotoAntesBase64
     ? await subirFotoServico(servicoId!, b.fotoAntesBase64, mime, "antes") : null;
 

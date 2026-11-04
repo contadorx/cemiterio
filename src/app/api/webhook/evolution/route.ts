@@ -216,11 +216,17 @@ export async function POST(req: NextRequest) {
     // o painel mostrava so metade da conversa. Agora vira mensagem de saida na
     // conversa da familia (ou na thread do lead que ja existe).
     if (p.fromMe) {
+      // OS BYTES VÃO JUNTO (0160). Antes daqui ia só `temMidia: boolean`, e um
+      // booleano não tem imagem: a foto de lavagem que ela mandou do celular
+      // virava a frase "[foto enviada pelo celular]" e o arquivo sumia.
+      // Baixar aqui é o mesmo passo que a entrada já dava três linhas abaixo.
+      const midiaSaida = p.temMidia ? await baixarMidiaBase64(body?.data) : null;
       const esp = await registrarSaidaExterna({
         telefone: p.telefone,
         texto: p.texto,
         temMidia: p.temMidia,
         temAudio: p.temAudio,
+        midia: midiaSaida,
       });
       // O ESPELHO TAMBÉM PRECISA DIZER O QUE FEZ. `{tipo:"nada"}` é o caso
       // em que a mensagem é descartada de propósito — mídia sem legenda para

@@ -3,6 +3,8 @@ import { env } from "./env";
 import { acharCliente } from "./context";
 import { garantirConversa } from "./atendimento";
 import type { MsgLead } from "./leads";
+import { subirArquivo, BUCKET_CONVERSAS } from "./storage";
+import { registrarErro } from "./monitor";
 
 /**
  * O ESPELHO — o que ela digita direto no WhatsApp do celular.
@@ -45,11 +47,49 @@ function textoDaSaida(texto: string, temMidia?: boolean, temAudio?: boolean): st
   return "";
 }
 
+/**
+ * A FOTO QUE SAI PELO CELULAR TAMBÉM É GUARDADA (0160).
+ *
+ * MEDIDO EM 04/11/2026: 71 fotos entraram pelas famílias e TODAS têm a imagem
+ * salva. As 8 que a Sureya mandou do próprio celular viraram a frase
+ * "[foto/arquivo enviado pelo celular]" e o arquivo foi jogado fora — o
+ * webhook passava `temMidia: boolean` para cá, e um booleano não tem bytes.
+ *
+ * São justamente as fotos de lavagem: o registro que a família paga para
+ * receber, e a prova de que o serviço foi feito. Só 3 dos 7 serviços
+ * executados têm foto, e não é porque a Nina não fotografou.
+ */
+/**
+ * Guarda a imagem no balde FECHADO das conversas, igual à entrada. Devolve
+ * `null` quando não consegue — e quem chama grava a mensagem mesmo assim.
+ */
+async function guardarMidiaDoEspelho(
+  clienteId: string,
+  midia: { base64: string; mimetype: string },
+): Promise<string | null> {
+  try {
+    const bytes = Buffer.from(midia.base64, "base64");
+    const ext = (midia.mimetype.split("/")[1] || "jpg").split(";")[0].replace(/[^a-z0-9]/gi, "");
+    const caminho = `${env.orgId()}/clientes/${clienteId}/saida-${Date.now()}.${ext}`;
+    const r = await subirArquivo(supabaseAdmin(), BUCKET_CONVERSAS, caminho, bytes, midia.mimetype);
+    if (!r.ok) {
+      await registrarErro("espelho: nao consegui guardar a foto que saiu", r.erro, { clienteId });
+      return null;
+    }
+    return r.url;
+  } catch (e: any) {
+    await registrarErro("espelho: nao consegui guardar a foto que saiu", e?.message || String(e), { clienteId });
+    return null;
+  }
+}
+
 export async function registrarSaidaExterna(params: {
   telefone: string;
   texto: string;
   temMidia?: boolean;
   temAudio?: boolean;
+  /** Os bytes, quando o webhook conseguiu baixá-los. */
+  midia?: { base64: string; mimetype: string } | null;
 }): Promise<ResultadoEspelho> {
   const texto = textoDaSaida(params.texto, params.temMidia, params.temAudio);
   if (!texto) return { tipo: "nada" };
@@ -80,6 +120,13 @@ export async function registrarSaidaExterna(params: {
 
     // 2) grava. `pelo_celular` só existe depois da migration 0033 — se não
     //    existir, grava sem a coluna em vez de perder a mensagem.
+    // GUARDA PRIMEIRO, GRAVA DEPOIS — a mesma ordem da entrada. Se o Storage
+    // falhar, a mensagem ainda entra na conversa, só sem a imagem; perder a
+    // linha inteira por causa do arquivo seria trocar um defeito por outro.
+    const midiaUrl = params.midia
+      ? await guardarMidiaDoEspelho(cliente.id, params.midia)
+      : null;
+
     const base: any = {
       org_id: org,
       conversa_id: conv.id,
@@ -88,6 +135,7 @@ export async function registrarSaidaExterna(params: {
       autor: "humano",
       texto,
       processada: true,
+      midia_url: midiaUrl,
     };
     const { error } = await db.from("mensagens").insert({ ...base, pelo_celular: true });
     if (error) await db.from("mensagens").insert(base);
