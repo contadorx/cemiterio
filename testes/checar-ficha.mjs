@@ -2536,8 +2536,18 @@ ok("nao medir o gasto NAO e permissao para gastar",
 // 150 chamadas de Haiku custam centavos; 150 de Sonnet com contexto grande
 // custam dezenas de dolares. O teto que protege e o de dinheiro.
 ok("o teto vale em DINHEIRO, e nao so em numero de chamadas",
-   /tetoDolar > 0 && gasto >= tetoDolar/.test(custo57)
-   && /TETO_DOLAR_PADRAO/.test(custo57));
+   /tetoReais > 0 && gasto >= tetoReais/.test(custo57)
+   && /TETO_REAIS_PADRAO/.test(custo57));
+// EU ERREI ISTO NA PRIMEIRA VERSAO: chamei o campo de dolar e comparei reais.
+// `custoDaChamada` devolve R$ e `chamadas_ia.custo` guarda R$ — o incidente de
+// 03/09 foram R$ 348,18, nao US$ 348,18.
+// A guarda olha o CODIGO, e nao o comentario: o texto que explica o erro
+// precisa poder citar "US$ 348,18" para dizer o que foi corrigido. Guarda que
+// proibe falar do defeito apaga a memoria dele.
+ok("a unidade do teto e REAL, e esta escrita",
+   !/dolar|Dolar|DOLAR|US\$/.test(semComentarios(custo57))
+   && /em REAIS/.test(custo57)
+   && /teto_ia_reais_dia/.test(custo57));
 // O contador do teto marcou 14 enquanto chamadas_ia registrava 5.776.
 ok("a conta vem do registro do que aconteceu, nao de um contador paralelo",
    /from\("chamadas_ia"\)/.test(custo57) && /\.select\("custo"\)/.test(custo57));
@@ -2552,6 +2562,166 @@ for (const f of semTeto) console.log(`      ${f}`);
 // geraram 3.905 rascunhos que ninguem pediu.
 ok("atendimento finalizado nao volta para a IA",
    /if \(\(conv as any\)\.resolvida\) return \{ acao: "nada_novo" \};/.test(atend57));
+
+// ===========================================================================
+// 0158 — A IA SO FALA QUANDO CHAMADA
+//
+// Dos 196 rascunhos anteriores ao laco de 03/09: 4 aprovados como estavam, 6
+// editados, 155 descartados. Cinco por cento de acerto — e o assunto que ela
+// mais escrevia era o que menos servia (cobranca: 170 rascunhos, 152 no lixo).
+// ===========================================================================
+const atend58 = readFileSync("src/lib/atendimento.ts", "utf8");
+const env58 = readFileSync("src/lib/env.ts", "utf8");
+const prov58 = readFileSync("src/lib/ia-provedor.ts", "utf8");
+const modIa58 = readFileSync("src/lib/modelo-ia.ts", "utf8");
+const telaConv58 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const rotaSug58 = readFileSync("src/app/api/conversas/[id]/sugerir/route.ts", "utf8");
+
+// Rascunho que ninguem pediu custa dinheiro, entope a fila de "precisa de
+// voce" e arrisca alguem aprovar texto escrito sobre uma conversa que virou
+// outra. So o primeiro custo aparece na fatura.
+ok("o caminho automatico nao chama mais a IA",
+   /if \(!env\.IA_ESCREVE_SOZINHA\) \{\s*return \{ acao: "nada_novo" \};/.test(atend58));
+ok("e o automatico nasce DESLIGADO",
+   /IA_ESCREVE_SOZINHA: process\.env\.IA_ESCREVE_SOZINHA === "1"/.test(env58));
+// Trocar quem escreve e decisao de gente, tomada olhando uma resposta de
+// verdade — nao efeito colateral de uma coluna em branco.
+ok("existe uma porta so para os dois provedores",
+   /export async function conversarComIa/.test(prov58)
+   && /api\.deepseek\.com/.test(prov58));
+ok("na duvida o provedor e o que ja rodava",
+   /provedor: m\?\.provedor === "deepseek" \? "deepseek" : "anthropic"/.test(modIa58));
+// O dialeto da OpenAI devolve os argumentos como TEXTO JSON. Um parse solto
+// derrubaria a rota por causa de uma virgula do modelo.
+ok("o JSON do DeepSeek e lido com rede embaixo",
+   /try \{ dados = JSON\.parse\(chamada\.function\.arguments\); \} catch \{ dados = null; \}/.test(prov58));
+ok("sem chave o DeepSeek diz que falta chave, e nao 'nao estruturou'",
+   /DEEPSEEK_API_KEY não está configurada/.test(prov58));
+ok("a sugestao pede pela porta unica, e nao direto ao provedor",
+   /conversarComIa\(\{/.test(rotaSug58) && !/new Anthropic\(/.test(semComentarios(rotaSug58)));
+// O caminho barato precisa estar NO caminho, e nao escondido atras do caro.
+ok("as mensagens prontas ficam antes da caixa e do botao da IA",
+   telaConv58.indexOf("<Modelos") > 0
+   && telaConv58.indexOf("<Modelos") < telaConv58.indexOf("Sugerir resposta"));
+
+// ===========================================================================
+// 0160 — A FOTO QUE SAI PELO CELULAR TAMBEM E GUARDADA
+//
+// Medido em 04/11/2026: 71 fotos entraram pelas familias e TODAS tem o arquivo
+// salvo. As 8 que sairam do celular da Sureya viraram a frase "[foto/arquivo
+// enviado pelo celular]" e o arquivo foi jogado fora — o webhook passava
+// `temMidia: boolean` para o espelho, e um booleano nao tem bytes.
+//
+// Sao justamente as fotos de lavagem: 7 servicos executados, 3 com foto.
+// ===========================================================================
+const esp60 = readFileSync("src/lib/espelho.ts", "utf8");
+const hook60 = readFileSync("src/app/api/webhook/evolution/route.ts", "utf8");
+const feito60 = readFileSync("src/app/api/servico/registrar-feito/route.ts", "utf8");
+const fila60 = readFileSync("src/app/api/fotos-que-sairam/route.ts", "utf8");
+const tela60 = readFileSync("src/app/painel/lavagens-sem-registro/page.tsx", "utf8");
+
+ok("o webhook manda os BYTES da foto que saiu, e nao so um booleano",
+   /const midiaSaida = p\.temMidia \? await baixarMidiaBase64\(body\?\.data\) : null;/.test(hook60)
+   && /midia: midiaSaida,/.test(hook60));
+ok("e o espelho guarda a imagem no balde fechado",
+   /guardarMidiaDoEspelho/.test(esp60) && /BUCKET_CONVERSAS/.test(esp60)
+   && /midia_url: midiaUrl,/.test(esp60));
+// Falhar o Storage nao pode levar a mensagem junto.
+ok("se o Storage falhar, a mensagem ainda entra na conversa",
+   /guardarMidiaDoEspelho[\s\S]{0,900}?return null;/.test(esp60));
+// Uma porta so para "a limpeza foi feita": servico, data, conclusao e
+// cobranca seguem o mesmo caminho de sempre.
+ok("registrar a foto guardada passa pelo MESMO registrador de lavagem",
+   /fotoDepoisUrl/.test(feito60) && /baixarComoBase64/.test(feito60));
+// A foto do servico e prova do servico: apagar a conversa a pedido nao pode
+// levar junto a prova da lavagem que a familia pagou.
+ok("os bytes sao COPIADOS para o balde dos servicos, nao apontados do outro",
+   /subirFotoServico\(servicoId!, b\.fotoDepoisBase64 \|\| base64Guardada/.test(feito60));
+ok("foto que nao abriu RECUSA o registro, em vez de registrar sem ela",
+   /foto_nao_abriu/.test(feito60) && /A limpeza NÃO foi registrada/.test(feito60));
+// Chutar "o unico jazigo dela" erra nas familias grandes, que sao as que mais
+// pagam — e lavagem no jazigo errado vira cobranca no jazigo errado.
+ok("a fila NAO adivinha o jazigo: quem escolhe e gente",
+   /De qual jazigo é esta limpeza\?/.test(tela60) && /jazigos: porFamilia\.get/.test(fila60));
+// Link assinado expira; endereco guardado nao.
+ok("a tela devolve o endereco guardado, e nao o link assinado",
+   /fotoDepoisUrl: item\.fotoOriginal/.test(tela60) && /fotoOriginal: m\.midia_url/.test(fila60));
+// "Ja virou lavagem" e lido do proprio servico, e nao de uma coluna nova que
+// alguem precisaria lembrar de marcar.
+ok("a fila sabe o que ja virou lavagem olhando o servico",
+   /\.in\("foto_depois_url", urls\)/.test(fila60));
+
+// ===========================================================================
+// 0161 — O PDF DO EXTRATO E LIDO SEM IA E SEM DEPENDENCIA NOVA
+//
+// Provado contra o extrato real de outubro/2026: 17 paginas, 288 movimentos,
+// 248 PIX com o nome do remetente em TODOS, e a coluna de saldo fechando do
+// primeiro ao ultimo lancamento.
+// ===========================================================================
+const pdfT61 = readFileSync("src/lib/pdf-texto.ts", "utf8");
+const ext61 = readFileSync("src/lib/extrato.ts", "utf8");
+const pkg61 = JSON.parse(readFileSync("package.json", "utf8"));
+
+// O projeto tem dez dependencias e isso e escolha, nao descuido.
+ok("o leitor de PDF nao trouxe dependencia nova",
+   !Object.keys(pkg61.dependencies || {}).some((d) => /pdf|mupdf|unpdf/i.test(d))
+   && /from "node:zlib"/.test(pdfT61));
+ok("o PDF deixou de ir para a IA no importador",
+   /const texto = textoDoPdf\(bytes\);/.test(ext61)
+   && !/vai pela IA, na rota/.test(ext61));
+// Sem as coordenadas, credito e debito do Bradesco viram a mesma coisa.
+ok("o texto sai com a POSICAO preservada, e nao so as palavras",
+   /PONTOS_POR_ESPACO/.test(pdfT61) && /MESMA_LINHA/.test(pdfT61));
+// Cada pagina comeca o Y do zero: juntar tudo antes de agrupar empilha a
+// terceira linha de cada pagina numa linha so.
+ok("cada pagina e remontada sozinha",
+   /for \(const f of fluxos\(bytes\)\) \{[\s\S]{0,200}?remontar\(t\)/.test(pdfT61));
+// "endstream" TERMINA em "stream": 19 dos 20 fluxos do extrato real falhavam.
+ok("o fim de um fluxo nao e confundido com o comeco de outro",
+   /=== "end"/.test(pdfT61));
+// PDF escaneado e imagem. Devolver vazio deixa quem chama dizer "me manda o
+// OFX" em vez de importar um mes como se nao tivesse movimento.
+ok("arquivo sem texto devolve vazio, e a IA segue como plano B",
+   /linhas: texto \? lerPdfTexto\(texto\) : \[\]/.test(ext61));
+// A margem esquerda depende de quem extraiu o texto.
+ok("o leitor nao depende da margem esquerda",
+   /const LINHA = \/\^\\s\*/.test(ext61));
+
+// ===========================================================================
+// 0162 — VOCE SUGERE, EU CONFIRMO. SEMPRE.
+//
+// O cron do dia 1 CHAMAVA `fecharCompetencia` e escrevia os debitos do mes
+// sozinho. Em 02/11/2026 um fechamento lancou 104 debitos cobrindo DOZE meses
+// (11/2026 a 10/2027), R$ 4.185 de uma vez. Isso e grande demais para um robo
+// decidir — e a conta corrente nao e rascunho: e ela que diz quanto cada
+// familia deve e o que a regua cobra.
+// ===========================================================================
+const mensal62 = readFileSync("src/app/api/cron/mensal/route.ts", "utf8");
+const rotRota62 = readFileSync("src/app/api/rotinas/route.ts", "utf8");
+const sinais62 = readFileSync("src/app/painel/SinaisDeVida.tsx", "utf8");
+
+ok("o cron do mes PREPARA, e nao grava",
+   /previewCompetencia\(org\)/.test(mensal62)
+   && !/fecharCompetencia/.test(semComentarios(mensal62)));
+// Duplicar calculo de dinheiro e como um dos dois diverge sem ninguem notar.
+ok("a previa do cron e a MESMA que a tela de Fechamento mostra",
+   /from "@\/lib\/competencia"/.test(mensal62));
+// Trocar lancamento automatico por confirmacao troca um risco por outro: um
+// mes inteiro sem cobranca, e ninguem percebe porque NADA aconteceu.
+ok("a sugestao vira pendencia, e nao morre no log",
+   /aguardandoConfirmacao/.test(mensal62) && /aguardandoConfirmacao/.test(rotRota62));
+ok("e a pendencia conta os DIAS de espera",
+   /diasEsperando/.test(rotRota62) && /diasEsperando/.test(sinais62));
+// Quem nao abre o financeiro e exatamente quem esqueceria de lancar.
+ok("o mes esperando aparece na tela inicial, junto do que parou",
+   /mesEsperando/.test(sinais62)
+   && /!paradas\.length === 0|paradas\.length === 0 && !calado && !surdo && !mes/.test(semComentarios(sinais62)));
+ok("e o aviso leva ao botao de lancar",
+   /\/painel\/fechamento/.test(sinais62));
+// Rotina que nunca carimba nao vira alarme sozinha.
+ok("o fechamento mensal entrou na lista de rotinas vigiadas",
+   /"mensal"/.test(readFileSync("src/lib/rotinas.ts", "utf8"))
+   && /"mensal"\]/.test(rotRota62.replace(/\s/g, "")));
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

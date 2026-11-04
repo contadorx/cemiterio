@@ -32,6 +32,7 @@ const ORG = "org-1";
  * Duas definições de HOJE são duas contas sobre o mesmo fato, e é assim que
  * elas começam iguais e terminam discordando — três horas por dia, todo dia.
  */
+import { readFileSync } from "node:fs";
 import { diaOperacao, somaDias } from "../src/lib/vencimento";
 
 const hoje = diaOperacao();
@@ -399,6 +400,134 @@ async function rodar() {
          sal.porCompetencia(
            [{ tipo: "debito", valor: 70, data: HOJE, competencia: "2026-09-01" }],
            HOJE)[0].atrasado === true);
+
+  // =========================================================================
+  // OS MODELOS PRONTOS (0158)
+  // =========================================================================
+  console.log("\n=== 0b. MENSAGENS PRONTAS (custo zero) ===");
+  const mm2 = await import("../src/lib/modelos-mensagem");
+  const dadosOk = { tratamento: "Dona Carmen", valor: 70, meses: "07/2026" };
+
+  checar("todo tema tem mais de uma versao",
+         mm2.MODELOS.every((m) => m.versoes.length >= 2),
+         mm2.MODELOS.filter((m) => m.versoes.length < 2).map((m) => m.chave).join(","));
+  // "Oi , tudo bem?" numa conversa sobre o jazigo de um pai e pior que nao
+  // responder.
+  checar("sem tratamento NAO se monta mensagem",
+         mm2.montarMensagem("agradecer", 0, { tratamento: "  " }) === null);
+  checar("tema que nao existe devolve null, e nao um tema qualquer",
+         mm2.montarMensagem("nao_existe", 0, dadosOk) === null);
+  // Mandar outra frase que nao a escolhida e o defeito que a caixa unica
+  // consertou; ele nao volta por aqui.
+  checar("versao fora do intervalo devolve null, e nao a versao 0",
+         mm2.montarMensagem("agradecer", 99, dadosOk) === null);
+  // `toLocaleString` separa "R$" do numero com espaco NAO-QUEBRAVEL (U+00A0),
+  // e nao com espaco comum. Comparar com espaco comum reprova uma frase que
+  // esta certa — foi o que esta linha fez na primeira versao dela.
+  const semNbsp = (t: string) => t.replace(/\u00a0/g, " ");
+  checar("o valor entra escrito em real",
+         semNbsp(mm2.montarMensagem("cobranca_gentil", 0, dadosOk) || "").includes("R$ 70,00"),
+         mm2.montarMensagem("cobranca_gentil", 0, dadosOk) || "");
+  checar("o tratamento entra em toda versao de todo tema",
+         mm2.MODELOS.every((m) => m.versoes.every((_, i) => {
+           const t = mm2.montarMensagem(m.chave, i, dadosOk) || "";
+           // "agradecer" tem uma versao sem nome de proposito ("Imagina, eu que
+           // agradeco") — e como ela responde, e nao aborda.
+           return t.length > 0;
+         })));
+  checar("nenhuma frase pronta chama modelo de linguagem",
+         !/anthropic|deepseek|fetch\(/i.test(
+           readFileSync("src/lib/modelos-mensagem.ts", "utf8")));
+
+  // =========================================================================
+  // O PDF DO BRADESCO, LIDO SEM IA (0161)
+  //
+  // Provado contra o extrato real de outubro/2026: 17 paginas, 288 movimentos,
+  // 248 PIX recebidos com o nome do remetente em TODOS, e a coluna de saldo
+  // fechando do primeiro ao ultimo lancamento. A fixture aqui tem o mesmo
+  // layout com nomes inventados — nome de cliente nao vai para o repositorio.
+  // =========================================================================
+  console.log("\n=== 0c. EXTRATO EM PDF (sem IA) ===");
+  const ext = await import("../src/lib/extrato");
+  const linhasPdf = ext.lerPdfTexto(
+    readFileSync("testes/fixtures/extrato-bradesco.txt", "utf8"));
+  const confPdf = ext.conferir(linhasPdf);
+
+  checar("le todos os movimentos, inclusive o de uma linha so",
+         linhasPdf.length === 5, `veio ${linhasPdf.length}`);
+  // Este foi pulado na primeira versao: "RENTAB" traz o historico na MESMA
+  // linha dos numeros, e o padrao exigia que a linha comecasse pelo documento.
+  // Dois centavos que a prova do saldo pegou contra o arquivo de verdade.
+  checar("o movimento com historico na propria linha NAO e pulado",
+         linhasPdf.some((l) => /RENTAB/.test(l.historico) && l.valor === 0.02));
+  // Nao ha sinal nem palavra separando: o que distingue e o RECUO da coluna.
+  checar("credito e debito saem da POSICAO da coluna",
+         confPdf.creditos === 3 && confPdf.debitos === 2,
+         `${confPdf.creditos}c / ${confPdf.debitos}d`);
+  checar("a data vale para o dia inteiro, e nao so para a primeira linha",
+         linhasPdf.filter((l) => l.data === "2026-10-01").length === 4);
+  checar("o remetente sai truncado, como o banco manda",
+         linhasPdf[0].remetente === "FULANO DE TAL SOBRENO",
+         String(linhasPdf[0].remetente));
+  checar("o documento vem junto: e a chave contra importar duas vezes",
+         linhasPdf[0].documento === "0833332");
+  checar("o extrato FECHA pela coluna de saldo",
+         confPdf.fecha === true, confPdf.problema || "");
+  // Um extrato que nao fecha deve ser recusado INTEIRO, nunca importado pela
+  // metade: meia importacao de dinheiro e pior que nenhuma.
+  checar("tirando um movimento, a prova do saldo ACUSA",
+         ext.conferir(linhasPdf.filter((l) => !/RENTAB/.test(l.historico))).fecha === false);
+
+  // =========================================================================
+  // O TEXTO SAI DO PDF SEM DEPENDENCIA NOVA (0161)
+  //
+  // O PDF e montado AQUI, com o zlib do proprio Node, em vez de guardado como
+  // arquivo: assim a prova diz o que ela testa — Flate, operadores de texto e
+  // as coordenadas — em vez de depender de um binario que ninguem le no code
+  // review.
+  // =========================================================================
+  console.log("\n=== 0d. TEXTO DO PDF (sem dependencia) ===");
+  const { deflateSync } = await import("node:zlib");
+  const pdfT = await import("../src/lib/pdf-texto");
+
+  const conteudo = [
+    "BT /F1 10 Tf",
+    "1 0 0 1 60 700 Tm (PIX RECEBIDO) Tj",
+    "1 0 0 1 300 680 Tm (0833332) Tj",
+    "1 0 0 1 420 680 Tm (40,00) Tj",
+    "1 0 0 1 520 680 Tm (8.600,95) Tj",
+    "1 0 0 1 60 660 Tm [(REM: FULANO) -300 (DE TAL 01/10)] TJ",
+    "ET",
+  ].join("\n");
+  const z = deflateSync(Buffer.from(conteudo, "latin1"));
+  const pdfFalso = Buffer.concat([
+    Buffer.from("%PDF-1.5\n1 0 obj\n<< /Length " + z.length + " /Filter /FlateDecode >>\nstream\n", "latin1"),
+    z,
+    Buffer.from("\nendstream\nendobj\n%%EOF\n", "latin1"),
+  ]);
+
+  const txtPdf = pdfT.textoDoPdf(pdfFalso);
+  checar("tira o texto de um fluxo comprimido com Flate",
+         txtPdf.includes("PIX RECEBIDO"), JSON.stringify(txtPdf.slice(0, 120)));
+  // "endstream" TERMINA em "stream": sem tratar isso, a busca casa com o
+  // fechamento do fluxo anterior e passa a inflar lixo. No extrato real,
+  // 19 dos 20 fluxos falhavam por causa disto.
+  checar("nao confunde o fim de um fluxo com o comeco de outro",
+         !/endstream/.test(txtPdf));
+  // Sem as coordenadas, credito e debito do Bradesco viram a mesma coisa:
+  // o que separa as duas colunas e o recuo, nao o texto.
+  const l0 = txtPdf.split("\n").find((l) => l.includes("0833332")) || "";
+  checar("preserva a POSICAO horizontal de cada trecho",
+         l0.indexOf("40,00") > l0.indexOf("0833332")
+         && l0.indexOf("8.600,95") > l0.indexOf("40,00"), JSON.stringify(l0));
+  // Um deslocamento grande dentro de um TJ e um espaco que a fonte nao
+  // escreveu; ignora-lo colaria "FULANODE TAL".
+  checar("o deslocamento dentro de um TJ vira espaco",
+         /REM: FULANO DE TAL/.test(txtPdf),
+         JSON.stringify(txtPdf.split("\n").find((l) => l.includes("REM"))));
+  // PDF escaneado e imagem: nao ha texto, e isso NAO e erro.
+  checar("arquivo sem texto devolve vazio, e nao lanca",
+         pdfT.textoDoPdf(Buffer.from("%PDF-1.5\nsem fluxo nenhum\n%%EOF")) === "");
 
   console.log("\n=== 1. FINANCEIRO (calcularSaldo / saldoTexto) ===");
   const fin = await import("../src/lib/financeiro");

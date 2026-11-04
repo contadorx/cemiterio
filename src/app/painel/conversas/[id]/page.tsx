@@ -7,6 +7,7 @@ import { PedidosAdicionais, AnotarPedido } from "../../PedidosAdicionais";
 import Compromissos from "../Compromissos";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 import ContaDaFamilia from "./ContaDaFamilia";
+import Modelos from "./Modelos";
 
 export default function Thread() {
   const recado = useRecado();
@@ -492,6 +493,11 @@ export default function Thread() {
         )}
 
         <div>
+          {/* AS MENSAGENS PRONTAS VÊM ANTES DA CAIXA e antes do botão da IA:
+              o caminho barato precisa estar no caminho, não escondido atrás
+              dele. Ver Modelos.tsx para os números que justificam isso. */}
+          <Modelos conversaId={id} temTexto={!!texto.trim()} aoEscolher={setTexto} />
+
           {/* O RECADO DO ENVIO FICA COLADO NA CAIXA, e nao no topo da tela: e
               aqui que a pessoa esta olhando quando clica em Enviar. */}
           {avisoEnvio && (

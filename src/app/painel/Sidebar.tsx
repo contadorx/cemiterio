@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, ClipboardCheck, Flower, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Flower, Flower2, Home, Inbox, Landmark, LogOut, MapPin, Receipt, Settings, Sparkles, Users, Camera} from "lucide-react";
 
 /**
  * A COLUNA — a identidade do produto.
@@ -32,6 +32,11 @@ const DIA_A_DIA = [
   // (0117) — flor não é lavagem e não pode ser contada como uma.
   { href: "/painel/flores", label: "Flores", icon: Flower },
   { href: "/campo", label: "Campo", icon: MapPin },
+  // A FOTO QUE SAIU DO CELULAR E AINDA NAO VIROU REGISTRO (0160). Mora no dia
+  // a dia porque e trabalho de expediente: ela fotografa no cemiterio, manda
+  // pelo WhatsApp, e aqui diz de qual jazigo era. Fica DEPOIS de Campo, que e
+  // onde a foto nasce.
+  { href: "/painel/lavagens-sem-registro", label: "Fotos sem registro", icon: Camera },
 ];
 
 const CARTEIRA = [

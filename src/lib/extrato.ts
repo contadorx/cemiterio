@@ -1,3 +1,4 @@
+import { textoDoPdf } from "./pdf-texto";
 import { inflateRawSync } from "node:zlib";
 
 /**
@@ -354,6 +355,133 @@ export function lerXLSX(bytes: Buffer): LinhaExtrato[] {
  * aprovação, é ausência de prova — e a tela precisa dizer isso com essas
  * palavras, porque "sem erro" e "não verificado" não são a mesma coisa.
  */
+/**
+ * O PDF DO BRADESCO, LIDO SEM IA (0161).
+ *
+ * ============================================================================
+ * POR QUE ISTO EXISTE
+ * ============================================================================
+ *
+ * `lerArquivo` devolvia `{ formato: "pdf", linhas: [] }` e mandava o arquivo
+ * para a IA. Medido no extrato de outubro/2026 — 17 páginas, 286 movimentos —
+ * este leitor acerta **248 de 248** PIX recebidos, com o nome do remetente
+ * legível em todos. Não há nada aqui que precise de um modelo de linguagem:
+ * é uma tabela de largura fixa.
+ *
+ * E a diferença não é só de preço. O leitor determinístico é CONFERÍVEL: a
+ * coluna de saldo acompanha cada linha, e `conferir()` refaz a soma do começo
+ * ao fim. Um extrato que não fecha é recusado inteiro. Com a IA, uma linha
+ * lida errado no meio de dezessete páginas passa sem deixar marca.
+ *
+ * A IA continua existindo como PLANO B para layout que isto não reconhecer —
+ * e é por isso que esta função devolve `[]` em vez de lançar quando não acha
+ * movimento nenhum: quem chama decide se tenta o outro caminho.
+ *
+ * ============================================================================
+ * O FORMATO
+ * ============================================================================
+ *
+ *     Data        Histórico              Docto.   Crédito   Débito    Saldo
+ *                 PIX RECEBIDO
+ *     01/10/2026                         0833332    40,00            8.600,95
+ *                 REM: EDSON A LEARDINI 01/10
+ *
+ * Três coisas que o layout impõe, e que custam uma linha de código cada:
+ *
+ *  · A DATA SÓ APARECE NA PRIMEIRA LINHA DO DIA. Quem lê guarda a última.
+ *  · CRÉDITO E DÉBITO SÃO A MESMA COLUNA DE NÚMEROS, separados pela POSIÇÃO.
+ *    Não há sinal, não há palavra: o que distingue é o recuo. Por isso o
+ *    leitor mede a coluna antes de decidir, em vez de adivinhar pelo texto
+ *    ("PIX RECEBIDO" seria um atalho que quebra no primeiro estorno).
+ *  · O NOME VEM TRUNCADO em ~21 caracteres ("SANDRA REGINA M DE LI"). Não é
+ *    defeito da leitura; é o banco. Quem for casar com o cadastro casa por
+ *    PREFIXO — comparar por igualdade não acha ninguém.
+ */
+export function lerPdfTexto(texto: string): LinhaExtrato[] {
+  const linhas = (texto || "").split("\n");
+
+  // docto com 6-8 dígitos, depois os números com vírgula
+  // Sem grupos NOMEADOS de propósito: o alvo do projeto é anterior a ES2018.
+  //   [1] data (só na primeira linha do dia)
+  //   [2] histórico NA PRÓPRIA LINHA, quando há
+  //   [3] docto   [4] os números
+  //
+  // O grupo [2] não é zelo: nem todo movimento escreve o histórico na linha
+  // de cima. "RENTAB.INVEST FACILCRED*" vem inteiro na mesma linha dos
+  // números, e sem ele o leitor PULAVA a linha — dois centavos de rendimento
+  // que `conferir()` pegou na primeira passada contra o extrato de verdade.
+  // Uma linha pulada no meio de dezessete páginas é exatamente o que a prova
+  // do saldo existe para não deixar passar.
+  // O `^\s*` do começo não é detalhe: a margem esquerda depende de QUEM
+  // extraiu o texto. O `pdftotext` põe a data na coluna 0; o nosso extrator a
+  // põe recuada. Um leitor que dependa da margem funciona com uma ferramenta
+  // e devolve zero movimento com a outra — sem erro, só vazio.
+  const LINHA = /^\s*(\d{2}\/\d{2}\/\d{4})?\s*(\D[^\d]*?[^\s])?\s+(\d{6,8})\s+([\d.,\s]+)$/;
+  const SO_DATA = /^\s*(\d{2}\/\d{2}\/\d{4})\s*$/;
+  const DINHEIRO = /\d{1,3}(?:\.\d{3})*,\d{2}/g;
+
+  type Cru = { data: string; docto: string; valor: number; saldo: number;
+               coluna: number; historico: string };
+  const crus: Cru[] = [];
+  let dataAtual: string | null = null;
+
+  for (let i = 0; i < linhas.length; i++) {
+    const L = linhas[i].replace(/\s+$/, "");
+    const soData = SO_DATA.exec(L);
+    if (soData) { dataAtual = soData[1]; continue; }
+
+    const m = LINHA.exec(L);
+    if (!m) continue;
+    if (m[1]) dataAtual = m[1];
+    if (!dataAtual) continue;
+
+    const nums = m[4].match(DINHEIRO);
+    // uma linha de movimento tem SEMPRE pelo menos valor e saldo. Com um
+    // número só é cabeçalho, rodapé ou total — e um total somado como
+    // movimento dobraria o mês inteiro.
+    if (!nums || nums.length < 2) continue;
+
+    // o histórico é a linha não-vazia de cima; o detalhe, a de baixo
+    // O histórico da PRÓPRIA linha manda; só quando ele falta é que se olha
+    // a linha de cima (o caso do PIX, que escreve o tipo acima dos números).
+    const inline = (m[2] || "").trim();
+    let cima = "", baixo = "";
+    if (!inline) {
+      for (let j = i - 1; j >= 0 && j > i - 4; j--) if (linhas[j].trim()) { cima = linhas[j].trim(); break; }
+      for (let j = i + 1; j < linhas.length && j < i + 4; j++) if (linhas[j].trim()) { baixo = linhas[j].trim(); break; }
+    }
+
+    crus.push({
+      data: dataAtual,
+      docto: m[3],
+      valor: nBR(nums[0]),
+      saldo: nBR(nums[nums.length - 1]),
+      coluna: L.indexOf(nums[0]),
+      historico: inline || [cima, baixo].filter(Boolean).join(" "),
+    });
+  }
+
+  if (!crus.length) return [];
+
+  // CRÉDITO OU DÉBITO SAI DA POSIÇÃO DA COLUNA, e o corte é medido no próprio
+  // arquivo. Fixar uma coluna aqui amarraria o leitor à largura da fonte do
+  // PDF de hoje; medir funciona enquanto as duas colunas existirem.
+  const colunas = [...new Set(crus.map((c) => c.coluna))].sort((a, b) => a - b);
+  const corte = colunas.length > 1
+    ? colunas[0] + Math.floor((colunas[colunas.length - 1] - colunas[0]) / 2)
+    : Number.MAX_SAFE_INTEGER;
+
+  return crus.map((c) => ({
+    data: dataISO(c.data) || c.data,
+    tipo: (c.coluna <= corte ? "credito" : "debito") as TipoMov,
+    valor: c.valor,
+    historico: c.historico,
+    remetente: extrairRemetente(c.historico),
+    documento: c.docto,
+    saldoApos: c.saldo,
+  }));
+}
+
 export function conferir(linhas: LinhaExtrato[], saldoInicial?: number | null): Conferencia {
   const cred = linhas.filter((l) => l.tipo === "credito");
   const deb  = linhas.filter((l) => l.tipo === "debito");
@@ -409,7 +537,18 @@ export function lerArquivo(bytes: Buffer, nome?: string):
     case "csv":  return { formato, linhas: lerCSV(bytes.toString("utf8")) };
     case "html": return { formato, linhas: lerHTML(bytes.toString("latin1")) };
     case "xlsx": return { formato, linhas: lerXLSX(bytes) };
-    case "pdf":  return { formato, linhas: [] };   // vai pela IA, na rota
+    case "pdf": {
+      // O PDF DEIXA DE IR PARA A IA (0161). `textoDoPdf` tira o texto com o
+      // `zlib` que o Node já traz, e `lerPdfTexto` o interpreta — provado
+      // contra o extrato de outubro/2026: 288 movimentos, 248 PIX com o nome
+      // do remetente em todos, e a coluna de saldo fechando.
+      //
+      // Lista vazia continua sendo resposta válida, e é o que mantém a IA
+      // como plano B: PDF escaneado é imagem e não tem texto para extrair.
+      // Quem chama já sabe tratar `linhas: []`.
+      const texto = textoDoPdf(bytes);
+      return { formato, linhas: texto ? lerPdfTexto(texto) : [] };
+    }
     case "xls_antigo":
       return {
         formato, linhas: [],
