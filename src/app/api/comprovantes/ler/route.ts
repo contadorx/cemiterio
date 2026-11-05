@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       valor: leitura.valor,
       data: leitura.data,
       idTransacao: leitura.idTransacao,
+      nomePagador: leitura.nomePagador,
       mensagem: leitura.mensagem,
     });
   } catch (e: any) {

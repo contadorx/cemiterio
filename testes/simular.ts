@@ -2103,7 +2103,7 @@ async function rodar() {
 
   console.log("\n=== 14. DE QUEM E ESTE PIX (triangulacao) ===");
   {
-    const { normalizarNomeBanco, palpitarDono } =
+    const { normalizarNomeBanco, palpitarDono, mesmoPagador } =
       await import("../src/lib/triangulacao");
 
     // --- a forma normalizada ------------------------------------------------
@@ -2203,6 +2203,107 @@ async function rodar() {
     checar("entrada sem nome no extrato volta sem palpite",
            palpitarDono({ id: "e9", valor: 55, data: "2026-10-11", remetente: null },
                         { comprovantes: [], licoes: [], cadastro }) === null);
+
+    // --- O MESMO PAGADOR, ESCRITO DE DUAS MANEIRAS ------------------------
+    //
+    // O banco abrevia e TRUNCA. Comparar string com string nao acha ninguem.
+    checar("inicial bate com o nome inteiro",
+           mesmoPagador("KATIA F DOS SANTOS", "Katia Ferreira dos Santos"));
+    checar("nome cortado em 21 letras bate",
+           mesmoPagador("SANDRA REGINA M DE LI", "Sandra Regina Mendes de Lima"));
+    checar("acento e caixa nao atrapalham",
+           mesmoPagador("JOSE DA SILVA", "José da Silva"));
+    // DUAS PALAVRAS, NO MINIMO. Com uma so, "MARIA" bateria com meia cidade.
+    checar("primeiro nome sozinho NAO basta",
+           !mesmoPagador("MARIA", "Maria Tonelloti"));
+    checar("sobrenome sozinho NAO basta",
+           !mesmoPagador("TONELLOTI", "Maria Tonelloti"));
+    // E O SOBRENOME TEM DE FECHAR.
+    checar("mesmo primeiro nome com outro sobrenome nao bate",
+           !mesmoPagador("MARIA SILVA", "Maria Souza"));
+    checar("ordem trocada nao bate",
+           !mesmoPagador("SILVA MARIA", "Maria Silva"));
+
+    // --- 0. O E2E DO PIX: CERTEZA, E NAO PALPITE --------------------------
+    //
+    // MEDIDO em producao: 20 de 20 comprovantes guardam o E2E. Quando o
+    // extrato traz o mesmo identificador, nao ha o que adivinhar.
+    const comE2e = [{ id: "cp-e", clienteId: "c-k", familiaId: "f-tone",
+                      familia: "Tonelloti", valor: 40, data: "2026-10-03",
+                      idTransacao: "E18236120202610031200abcdef01" }];
+    const pe = palpitarDono(
+      { id: "ee", valor: 999, data: "2027-01-01", remetente: "NOME QUALQUER",
+        documento: "E18236120202610031200ABCDEF01" },
+      { comprovantes: comE2e, licoes: [], cadastro });
+    checar("o E2E decide mesmo com valor e data diferentes",
+           pe?.forca === "e2e" && pe?.familiaId === "f-tone", JSON.stringify(pe));
+    // Documento curto do PDF do Bradesco NAO e E2E: seis digitos casariam com
+    // qualquer coisa se fossem aceitos como identificador.
+    checar("numero curto de documento nao vira identificador",
+           palpitarDono({ id: "ec", valor: 999, data: "2027-01-01",
+                          remetente: "ZZZ", documento: "402137" },
+                        { comprovantes: comE2e, licoes: [], cadastro }) === null);
+
+    // --- 1. O NOME DESFAZ O EMPATE ----------------------------------------
+    //
+    // ERA AQUI QUE A CONCILIACAO DESISTIA. Duas familias pagando R$ 40 no dia
+    // 3 davam dois candidatos iguais, e o valor sozinho nao separa. Com o nome
+    // lido no comprovante, o extrato diz de quem e aquele Pix.
+    const empateComNome = [
+      { id: "cp-k", clienteId: "c-k", familiaId: "f-tone", familia: "Tonelloti",
+        valor: 40, data: "2026-10-03", nomePagador: "KATIA FERREIRA DOS SANTOS" },
+      { id: "cp-j", clienteId: "c-j", familiaId: "f-mendes", familia: "Mendes",
+        valor: 40, data: "2026-10-03", nomePagador: "JOSIANE APARECIDA LIMA" },
+    ];
+    const pn = palpitarDono(
+      { id: "en", valor: 40, data: "2026-10-03", remetente: "KATIA F DOS SANTOS" },
+      { comprovantes: empateComNome, licoes: [], cadastro });
+    checar("com o nome lido, o empate de valor acaba",
+           pn?.forca === "comprovante" && pn?.comprovanteId === "cp-k", JSON.stringify(pn));
+    checar("e o motivo diz que foi o nome do pagador",
+           !!pn && pn.porque.includes("nome do pagador"), pn?.porque);
+
+    // E O NOME QUE NAO CONHECE NINGUEM CONTINUA SEM DECIDIR.
+    checar("empate com nome que nao e de nenhum dos dois nao decide",
+           palpitarDono({ id: "en2", valor: 40, data: "2026-10-03",
+                          remetente: "OUTRA PESSOA QUALQUER" },
+                        { comprovantes: empateComNome, licoes: [], cadastro }) === null);
+
+    // --- O NOME LIDO TAMBEM DESCARTA, E AVISA -----------------------------
+    //
+    // Um comprovante so, valor batendo, mas o comprovante diz que quem pagou
+    // foi outra pessoa. O valor continua valendo — e a tela TEM de dizer que o
+    // nome nao bate, em vez de apresentar o palpite como confirmado.
+    const soUmDiscordando = [
+      { id: "cp-d", clienteId: "c-j", familiaId: "f-mendes", familia: "Mendes",
+        valor: 40, data: "2026-10-03", nomePagador: "JOSIANE APARECIDA LIMA" },
+    ];
+    const pd = palpitarDono(
+      { id: "ed", valor: 40, data: "2026-10-03", remetente: "KATIA F DOS SANTOS" },
+      { comprovantes: soUmDiscordando, licoes: [], cadastro });
+    checar("candidato unico com nome divergente ainda e palpite",
+           pd?.forca === "comprovante", JSON.stringify(pd));
+    checar("mas o motivo avisa que quem pagou foi outra pessoa",
+           !!pd && pd.porque.includes("JOSIANE") && pd.porque.includes("confira"),
+           pd?.porque);
+
+    // AUSENCIA NAO E DISCORDANCIA. Os 20 comprovantes de producao nao tem nome
+    // lido; descarta-los por isso apagaria a fonte mais forte que existe hoje.
+    const semNomeLido = [
+      { id: "cp-s", clienteId: "c-k", familiaId: "f-tone", familia: "Tonelloti",
+        valor: 40, data: "2026-10-03" },
+      { id: "cp-t", clienteId: "c-j", familiaId: "f-mendes", familia: "Mendes",
+        valor: 40, data: "2026-10-03" },
+    ];
+    checar("comprovante sem nome lido nao e descartado, so nao desempata",
+           palpitarDono({ id: "es", valor: 40, data: "2026-10-03", remetente: "ZZZ AAA" },
+                        { comprovantes: semNomeLido, licoes: [], cadastro }) === null);
+    // Mas o nome da FAMILIA ainda desempata quando aponta para um so.
+    const pf = palpitarDono(
+      { id: "ef", valor: 40, data: "2026-10-03", remetente: "MARIA TONELLOTI" },
+      { comprovantes: semNomeLido, licoes: [], cadastro });
+    checar("sem nome lido, o nome da familia desempata",
+           pf?.comprovanteId === "cp-s", JSON.stringify(pf));
 
     // --- A FORMA QUE O BANCO EXIGE ----------------------------------------
     //

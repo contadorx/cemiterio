@@ -94,18 +94,20 @@ export default function Triangular({ aoMudar }: { aoMudar?: () => void }) {
                             gap: 8, marginBottom: 12 }}>
                 <Ficha r="sem dono" v={String(res.semDono)} s={money(res.valorSemDono)} c={cor.navy} />
                 <Ficha r="com palpite" v={String(res.comPalpite)} s={money(res.valorComPalpite)} c={cor.teal} />
-                <Ficha r="por comprovante" v={String(res.porComprovante)} s="a fonte mais forte" c={cor.teal} />
+                <Ficha r="pelo id do Pix" v={String(res.porE2e || 0)} s="certeza, nao palpite" c={cor.teal} />
+                <Ficha r="por comprovante" v={String(res.porComprovante)} s="valor e nome" c={cor.teal} />
                 <Ficha r="por lição" v={String(res.porLicao)} s="já foi dito antes" c={cor.teal} />
                 <Ficha r="pelo nome" v={String(res.porNome)} s="confira este" c="rgb(var(--zm-aviso))" />
                 <Ficha r="sem palpite" v={String(res.semPalpite)} s="precisa de você" c={cor.cinza} />
               </div>
 
               <div data-filtros style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                {(["todas", "comprovante", "licao", "nome", "sem"] as const).map((f) => (
+                {(["todas", "e2e", "comprovante", "licao", "nome", "sem"] as const).map((f) => (
                   <button key={f}
                     style={f === forca ? painel.botaoMini : painel.botaoMiniSec}
                     onClick={() => setForca(f)}>
                     {f === "todas" ? "todas" : f === "sem" ? "sem palpite"
+                      : f === "e2e" ? "pelo id do Pix"
                       : f === "licao" ? "por lição" : f === "nome" ? "pelo nome" : "por comprovante"}
                   </button>
                 ))}
@@ -129,6 +131,8 @@ export default function Triangular({ aoMudar }: { aoMudar?: () => void }) {
 }
 
 const TOM: Record<string, { cor: string; selo: string }> = {
+  // O E2E nao e palpite: e o numero que o Banco Central deu ao pagamento.
+  e2e:         { cor: "rgb(var(--zm-positivo))", selo: "identificador do Pix" },
   comprovante: { cor: "rgb(var(--zm-positivo))", selo: "comprovante" },
   licao:       { cor: "rgb(var(--zm-positivo))", selo: "já aprendido" },
   nome:        { cor: "rgb(var(--zm-aviso))",    selo: "só pelo nome" },

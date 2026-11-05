@@ -48,6 +48,8 @@ export async function registrarComprovante(
       valor_extraido: dados.valor,
       data_extraida: dados.data,
       id_transacao: dados.id_transacao,
+      // O NOME DE QUEM PAGOU, para casar com o remetente do extrato depois.
+      nome_pagador: dados.nome_pagador ?? null,
       status: "a_conferir",
     })
     .select("id")

@@ -2789,6 +2789,48 @@ ok("o credito nasce na competencia mais antiga que paga",
 // nao uma aposta.
 ok("a tela mostra por que o palpite e aquele",
    /porque \{p\.porque\}|porque \{/.test(tela63) && /porque:/.test(tri63));
+// ---------------------------------------------------------------------------
+// 0165 — O COMPROVANTE DIZ QUEM PAGOU
+//
+// Medido em 05/11/2026: dos 20 comprovantes lidos, 20 guardavam o E2E do Pix e
+// ZERO guardavam o nome de quem pagou — a leitura nunca pediu. O extrato traz o
+// nome do remetente nas 248 linhas de Pix. Eram as duas pontas do mesmo fio.
+// ---------------------------------------------------------------------------
+const comp65 = readFileSync("src/lib/comprovante.ts", "utf8");
+const conc65 = readFileSync("src/lib/conciliacao.ts", "utf8");
+
+// O nome sai na MESMA chamada que ja lia valor, data e E2E: custo zero.
+ok("a leitura do comprovante pede o nome de quem pagou",
+   /nome_pagador/.test(comp65) && /"nome_pagador"/.test(comp65)
+   && (comp65.match(/messages\.create/g) || []).length === 1);
+// PAGADOR, NAO BENEFICIARIO. Trocar os dois casaria todo Pix com a Sureya.
+ok("e o pedido diz pagador, nunca recebedor",
+   /nunca o recebedor/.test(comp65));
+// Nome errado nao enche campo na tela: ele DESCARTA o comprovante certo na
+// conciliacao do mes seguinte, calado.
+ok("fora da confianca, o nome nao sai",
+   /nomePagador: confiavel \? \(dados\.nome_pagador \|\| null\) : null/.test(comp65));
+ok("e o caminho do WhatsApp guarda o nome lido",
+   /nome_pagador: dados\.nome_pagador/.test(conc65));
+
+// O E2E VEM ANTES DE TUDO: e o unico que nao pode errar.
+ok("o identificador do Pix e a primeira fonte",
+   tri63.indexOf('forca: "e2e"') < tri63.indexOf('forca: "comprovante"'));
+// Seis digitos de "docto" do PDF do Bradesco casariam com qualquer coisa.
+ok("identificador curto nao e aceito como E2E",
+   /length >= 10/.test(tri63));
+
+// ERA AQUI QUE A CONCILIACAO DESISTIA: valor sozinho empata.
+ok("o nome lido desfaz o empate de valor",
+   /semContradicao/.test(tri63) && /mesmoPagador\(c\.nomePagador, nome\)/.test(tri63));
+// AUSENCIA NAO E DISCORDANCIA: os 20 de producao nao tem nome lido.
+ok("comprovante sem nome lido nao e descartado",
+   /!c\.nomePagador \|\| mesmoPagador/.test(tri63));
+// Candidato unico com nome divergente ainda vale pelo valor — mas a tela tem
+// de dizer que o nome nao bate, em vez de apresentar como confirmado.
+ok("nome divergente aparece no motivo, e nao e escondido",
+   /mas o comprovante diz que quem pagou foi/.test(tri63));
+
 // E mostra o plano ANTES de gravar: dois botoes, nao um.
 ok("ver o que vai acontecer vem antes de confirmar",
    /Ver o que vai acontecer/.test(tela63) && /Confirmar e creditar/.test(tela63));

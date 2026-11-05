@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   // tempo de quem está olhando a tela.
   const [rEnt, rComp, rLic, rCli, rFam] = await Promise.all([
     auth.db.from("entradas_banco")
-      .select("id, valor, data, remetente, documento, historico")
+      .select("id, valor, data, remetente, documento, identificador, historico")
       .is("identificada_em", null)
       .gte("data", desdeIso)
       .order("data", { ascending: true })
@@ -42,10 +42,13 @@ export async function GET(req: NextRequest) {
     // Comprovantes que JÁ TÊM DONO são a fonte mais forte: a conversa que
     // mandou a imagem está ligada ao cliente, e o cliente à família.
     auth.db.from("comprovantes")
-      .select("id, cliente_id, valor_extraido, data_extraida, status, clientes(nome, familia_id, familias(nome))")
+      .select("id, cliente_id, valor_extraido, data_extraida, status, id_transacao, nome_pagador, clientes(nome, familia_id, familias(nome))")
       .not("cliente_id", "is", null)
       .neq("status", "rejeitado")
-      .gte("data_extraida", desdeIso)
+      // `or` E NÃO `gte`: o casamento pelo E2E do Pix não depende de data
+      // nenhuma, e um comprovante sem `data_extraida` lida ficaria de fora
+      // justamente por não ter a informação que o E2E dispensa.
+      .or(`data_extraida.gte.${desdeIso},data_extraida.is.null,id_transacao.not.is.null`)
       .limit(2000),
     auth.db.from("apelidos_banco")
       .select("nome_banco, nome_cru, familia_id, cliente_id, acertos, familias(nome)")
@@ -95,6 +98,8 @@ export async function GET(req: NextRequest) {
     familia: c.clientes?.familias?.nome ?? c.clientes?.nome ?? null,
     valor: c.valor_extraido == null ? null : Number(c.valor_extraido),
     data: c.data_extraida ? String(c.data_extraida).slice(0, 10) : null,
+    nomePagador: c.nome_pagador ?? null,
+    idTransacao: c.id_transacao ?? null,
   }));
 
   const licoes: LicaoBanco[] = (rLic.data || []).map((l: any) => ({
@@ -126,13 +131,14 @@ export async function GET(req: NextRequest) {
       id: e.id, valor: Number(e.valor),
       data: String(e.data).slice(0, 10),
       remetente: e.remetente,
+      documento: e.documento ?? null,
+      identificador: e.identificador ?? null,
     };
     const p = palpitarDono(entrada, fontes);
     const pessoa = p ? (p.clienteId ? clientes.find((c: any) => c.id === p.clienteId) : null)
                       || pessoaDaFamilia(p.familiaId) : null;
     return {
       ...entrada,
-      documento: e.documento ?? null,
       historico: e.historico ?? null,
       nomeNormalizado: normalizarNomeBanco(e.remetente || ""),
       palpite: p && pessoa
@@ -156,6 +162,7 @@ export async function GET(req: NextRequest) {
       semDono: lista.length,
       comPalpite: comPalpite.length,
       semPalpite: lista.length - comPalpite.length,
+      porE2e: comPalpite.filter((x) => x.palpite!.forca === "e2e").length,
       porComprovante: comPalpite.filter((x) => x.palpite!.forca === "comprovante").length,
       porLicao: comPalpite.filter((x) => x.palpite!.forca === "licao").length,
       porNome: comPalpite.filter((x) => x.palpite!.forca === "nome").length,

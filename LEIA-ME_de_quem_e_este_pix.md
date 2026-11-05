@@ -31,11 +31,19 @@ E muita gente pagou o **anual**.
 
 ---
 
-## As três fontes, por ordem de força
+## As quatro fontes, por ordem de força
 
-A conciliação não adivinha. Ela pergunta a três lugares, nesta ordem:
+A conciliação não adivinha. Ela pergunta a quatro lugares, nesta ordem:
 
-**1. O comprovante.** A família mandou a foto no WhatsApp; aquela conversa já
+**0. O identificador do Pix (o E2E).** Certeza, não palpite. Medido em
+produção: **20 de 20** comprovantes lidos guardam o E2E. Quando o extrato traz
+o mesmo identificador na linha, não há o que adivinhar — é o número que o Banco
+Central deu àquele pagamento. O PDF do Bradesco imprime só um nº de documento
+curto, então esta fonte quase nunca acende lendo PDF; **no OFX ela acende**, e
+quando acende não erra. (Seis dígitos de "docto" não são aceitos como
+identificador: casariam com qualquer coisa.)
+
+**1. O comprovante, por valor *e nome*.** A família mandou a foto no WhatsApp; aquela conversa já
 está ligada ao cliente, e o cliente à família e aos jazigos. Se existe um
 comprovante de R$ 40 do dia 03 e o extrato tem um Pix de R$ 40 no dia 03, é o
 mesmo dinheiro — e aí o nome do banco deixa de ser a chave e passa a ser
@@ -45,10 +53,40 @@ O valor bate **ao centavo**, e a data com dois dias de folga (a família manda a
 foto quando lembra). "Mais ou menos R$ 40" casaria o pagamento de uma família
 com o comprovante de outra, e as duas sairiam quitadas — uma delas sem ter pago.
 
-**Empate não vira sorteio.** Duas famílias pagando R$ 40 no dia 3 produzem dois
-candidatos idênticos. Escolher "o primeiro" acertaria metade das vezes e erraria
-a outra metade em silêncio. Com empate, o comprovante não decide: cai para a
-fonte seguinte.
+**O valor faz o candidato; o nome decide.** Isto mudou depois que você
+perguntou: *"ele não consegue olhar os dados do comprovante mais o que tem no
+extrato? Não pelo valor, mas valor e nome."* Estava certo — o valor sozinho
+empata, e era aí que a conciliação desistia.
+
+O nome vem de dois lugares, e eles não valem o mesmo:
+
+- **`nome_pagador`, lido no próprio comprovante** (0165): é o nome que o banco
+  imprimiu de quem pagou, a mesma coisa que o extrato traz. Discordar aqui é
+  prova de que são pagamentos **diferentes**, e o candidato sai.
+- **o nome da família no cadastro**: confirma quando bate, mas **não acusa**
+  quando não bate — quem paga muitas vezes não é quem contratou.
+
+A comparação é **palavra por palavra**, porque o banco abrevia e trunca:
+
+| extrato | cadastro | |
+|---|---|---|
+| `KATIA F DOS SANTOS` | Katia **Ferreira** dos Santos | bate |
+| `SANDRA REGINA M DE LI` | Sandra Regina **Mendes** de **Lima** | bate |
+| `MARIA SILVA` | Maria Souza | não bate |
+| `MARIA` | Maria Tonelloti | não bate — uma palavra só não afirma nada |
+
+**Empate que o nome não separou não vira sorteio.** Escolher "o primeiro"
+acertaria metade das vezes e erraria a outra metade em silêncio. Aí o
+comprovante não decide: cai para a fonte seguinte.
+
+**Ausência não é discordância.** Os 20 comprovantes que já existem não têm nome
+lido — a leitura nunca pedia. Eles continuam valendo pelo valor; só não têm essa
+prova a favor. E não vale reler imagem antiga para preencher coluna: seria gastar
+IA em cima de pagamento já conferido.
+
+**Candidato único com nome divergente ainda é palpite** — o valor continua
+valendo — mas a tela **diz** que o comprovante aponta outra pessoa, em vez de
+apresentar o palpite como confirmado.
 
 **2. A lição aprendida.** Alguém já disse, uma vez, de quem é aquele nome. É o
 que faz 196 nomes virarem trabalho de um mês só — no mês seguinte quase tudo
@@ -144,15 +182,28 @@ regra própria: ela **delega**.
 ## O que falta aplicar em produção
 
 A tabela `apelidos_banco` e a RLS dela já estão em produção. **As três funções
-não.** O pedido de permissão do conector expirou sem resposta duas vezes.
+e a coluna `nome_pagador` não.** O pedido de permissão do conector Supabase
+expirou sem resposta **quatro vezes** (230s cada) — parei de insistir.
 
-Rode no editor SQL do Supabase, nesta ordem:
+Rode no editor SQL do Supabase, na ordem de `APLICAR/LEIA-ME_ORDEM.md`:
 
 ```
 APLICAR/0163_funcoes_apelidos_banco.sql
 APLICAR/0164_identificar_entrada_meses.sql
+APLICAR/0165_nome_de_quem_pagou.sql
 ```
 
 Até lá, o painel "De quem é cada Pix" **abre e mostra os palpites** (ele só lê
 tabelas), mas o botão de confirmar responde erro. O caminho antigo, de
 identificar uma entrada por vez, continua funcionando como sempre.
+
+## E o extrato de outubro nunca foi importado
+
+Medido agora: **`entradas_banco` tem zero linhas.** O PDF foi lido — a leitura
+funciona, 288 movimentos, saldo fechando — mas a importação nunca foi
+confirmada. Sem isso a triangulação não tem o que mastigar.
+
+**Se der, importe o OFX em vez do PDF.** O OFX traz o E2E do Pix no FITID, e aí
+a fonte 0 acende: conciliação por identificador não é palpite, é certeza. O PDF
+só imprime um nº de documento curto, e a conta volta a depender de valor e
+nome.

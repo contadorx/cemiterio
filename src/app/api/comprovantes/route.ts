@@ -38,7 +38,7 @@ export async function GET() {
 
   const { data } = await db
     .from("comprovantes")
-    .select("id,imagem_url,valor_extraido,data_extraida,id_transacao,created_at,cliente_id," +
+    .select("id,imagem_url,valor_extraido,data_extraida,id_transacao,nome_pagador,created_at,cliente_id," +
             "clientes(nome,telefone,familia_id)")
     .eq("status", "a_conferir")
     .eq("org_id", org)
@@ -121,6 +121,7 @@ export async function GET() {
       valor: c.valor_extraido === null ? null : Number(c.valor_extraido),
       data: c.data_extraida,
       idTransacao: c.id_transacao,
+      nomePagador: c.nome_pagador ?? null,
       cliente: c.clientes?.nome || c.clientes?.telefone || "—",
       clienteId: c.cliente_id,
       quando: c.created_at,

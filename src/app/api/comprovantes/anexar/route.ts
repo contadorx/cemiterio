@@ -123,6 +123,9 @@ export async function POST(req: NextRequest) {
       valor_extraido: isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : null,
       data_extraida: b?.data || diaOperacao(),
       id_transacao: idTransacao,
+      // Quem anexa a mao tambem pode trazer o nome lido: e ele que desempata
+      // dois Pix de mesmo valor no mesmo dia na conciliacao do extrato.
+      nome_pagador: String(b?.nomePagador || "").trim() || null,
       status: "confirmado",
     })
     .select("id,imagem_url")
