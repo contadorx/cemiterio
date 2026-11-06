@@ -6,6 +6,7 @@ import Link from "next/link";
 import { painel, cor } from "../ui";
 import { diaOperacao } from "@/lib/vencimento";
 import ImportarExtrato from "./ImportarExtrato";
+import Triangular from "./Triangular";
 import { useConfirmar, useRecado } from "@/components/Dialogos";
 
 /**
@@ -76,6 +77,12 @@ export default function Entradas() {
           porque o único caminho era digitar uma a uma, e em agosto entraram
           112 Pix. O caminho que escala fica em cima; o de exceção, embaixo. */}
       <ImportarExtrato aoImportar={carregar} />
+
+      {/* DEPOIS DE IMPORTAR, A PERGUNTA E DE QUEM E.
+          Outubro trouxe 248 Pix de 196 nomes; identificar um por um, abrindo
+          a busca em cada card, foi o que deixou esta tabela com ZERO linha
+          conciliada. O palpite com motivo vem antes da lista crua. */}
+      <Triangular aoMudar={carregar} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12, marginBottom: 14 }}>

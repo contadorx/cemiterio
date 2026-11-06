@@ -42,18 +42,19 @@ begin
   perform ci39('conversas fechou', v_pub is false,
                'o que a familia mandou no privado abrindo para quem tiver o link');
 
-  -- SERVICOS CONTINUA ABERTO DE PROPOSITO, e o teste diz isso em voz alta.
+  -- SERVICOS FECHOU NA 0154, E ESTE ASSERT FEZ O QUE FOI ESCRITO PARA FAZER.
   --
-  -- Sao 817 arquivos lidos por URL direta em quatro lugares — a pagina da
-  -- familia por token, o site, o painel e o proprio envio (o Evolution BAIXA a
-  -- URL para entregar a imagem no WhatsApp). Fecha-lo e um build proprio.
-  -- Este assert existe para o dia em que alguem fizer esse build: ele vai
-  -- FALHAR, e a falha e o lembrete de vir aqui apagar esta linha em vez de
-  -- fechar o balde e descobrir depois que as fotos pararam de chegar.
+  -- Ele dizia "continua aberto de proposito" e avisava: no dia em que alguem
+  -- fizer o build de fechar, EU VOU FALHAR, e a falha e o lembrete de vir aqui.
+  -- A 0154 fechou o balde — 534 dos 822 arquivos eram a lapide inteira, com o
+  -- nome e as datas de quem esta ali, abrindo para qualquer pessoa de posse do
+  -- endereco — e os quatro leitores por URL direta passaram a usar `assinar()`
+  -- no mesmo commit. O vermelho ficou no CI ate aqui; agora o assert cobra o
+  -- estado novo, que e o certo.
   select public into v_pub from storage.buckets where id = 'servicos';
-  perform ci39('servicos continua aberto — e isso ainda e uma decisao, nao um esquecimento',
-               v_pub is true,
-               'servicos foi fechado: confira a pagina da familia, o site e o envio pelo WhatsApp antes de apagar este teste');
+  perform ci39('servicos fechou (0154)', v_pub is false,
+               'a lapide com nome e datas volta a abrir para quem tiver o link — '
+               'e esse link trafega pelo WhatsApp das familias');
 
   -- A PORTA DOS FUNDOS. Uma policy de leitura para `anon` em storage.objects
   -- devolveria por baixo exatamente o que o `public = false` acabou de trancar.

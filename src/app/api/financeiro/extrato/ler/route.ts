@@ -48,11 +48,18 @@ export async function POST(req: NextRequest) {
 
   let { formato, linhas, erro } = lerArquivo(bytes, nome);
 
-  // O PDF NÃO TEM PARSER. Ele vai para a IA — e volta para a mesma conferência
-  // de saldo que os outros formatos enfrentam, sem desconto.
+  // O PDF AGORA TEM PARSER (0161), e a IA virou plano B.
+  //
+  // `lerArquivo` tira o texto com o zlib do Node e interpreta o layout —
+  // provado contra o extrato de outubro/2026: 288 movimentos, 248 PIX com o
+  // nome do remetente em todos, saldo fechando. Só quando ele volta VAZIO é
+  // que a IA entra: PDF escaneado é imagem e não tem texto para extrair.
+  //
+  // A condição é `!linhas.length`, e não `formato === "pdf"`: um PDF que o
+  // leitor entende não deve custar uma chamada de modelo só porque é PDF.
   let porIa = false;
   let abertura = saldoInicial;
-  if (formato === "pdf") {
+  if (formato === "pdf" && !linhas.length) {
     const r = await lerExtratoPorIa(bytes);
     if (r.erro) return NextResponse.json({ ok: false, erro: "leitura_ia", mensagem: r.erro });
     linhas = r.linhas;

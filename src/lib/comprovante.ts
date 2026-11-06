@@ -17,6 +17,8 @@ export interface DadosComprovante {
   valor: number | null;
   data: string | null; // ISO yyyy-mm-dd
   id_transacao: string | null;
+  /** O nome de quem pagou, como o comprovante escreve. */
+  nome_pagador: string | null;
   confianca: "alta" | "media" | "baixa";
 }
 
@@ -44,13 +46,25 @@ const ferramenta = {
         type: ["string", "null"],
         description: "Identificador da transação / E2E / autenticação, se visível. null se não.",
       },
+      // O NOME DE QUEM PAGOU — a peça que faltava para casar com o extrato.
+      //
+      // O extrato do banco traz o nome do remetente; o comprovante traz o
+      // mesmo nome. Sem ele, dois Pix de R$ 40 no mesmo dia eram um empate que
+      // ninguem desfazia. Vem na MESMA chamada que ja lia valor e data: custo
+      // zero a mais por comprovante.
+      nome_pagador: {
+        type: ["string", "null"],
+        description:
+          "Nome COMPLETO de quem PAGOU (o remetente/pagador, nunca o recebedor/beneficiario), "
+          + "exatamente como esta escrito, sem abreviar nem corrigir. null se nao achar.",
+      },
       confianca: {
         type: "string",
         enum: ["alta", "media", "baixa"],
         description: "Sua confiança na leitura.",
       },
     },
-    required: ["eh_comprovante", "valor", "data", "id_transacao", "confianca"],
+    required: ["eh_comprovante", "valor", "data", "id_transacao", "nome_pagador", "confianca"],
   },
 };
 
@@ -73,7 +87,7 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
       model: env.ANTHROPIC_MODEL,
       max_tokens: 400,
       system:
-        "Você lê comprovantes de Pix/transferência bancária do Brasil. Extraia valor, data e identificador da transação com precisão. Se a imagem não for um comprovante, marque eh_comprovante=false.",
+        "Você lê comprovantes de Pix/transferência bancária do Brasil. Extraia valor, data, identificador da transação e o NOME DE QUEM PAGOU com precisão. Quem paga é o remetente/pagador/origem — nunca o recebedor, favorecido ou beneficiário. Se a imagem não for um comprovante, marque eh_comprovante=false.",
       messages: [
         {
           role: "user",
@@ -86,12 +100,12 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
 
     const b = resp.content.find((x) => x.type === "tool_use");
     if (!b || b.type !== "tool_use") {
-      return { eh_comprovante: false, valor: null, data: null, id_transacao: null, confianca: "baixa" };
+      return { eh_comprovante: false, valor: null, data: null, id_transacao: null, nome_pagador: null, confianca: "baixa" };
     }
     return b.input as DadosComprovante;
   } catch (e) {
     console.error("[comprovante] falha na leitura:", (e as any)?.message || e);
-    return { eh_comprovante: false, valor: null, data: null, id_transacao: null, confianca: "baixa" };
+    return { eh_comprovante: false, valor: null, data: null, id_transacao: null, nome_pagador: null, confianca: "baixa" };
   }
 }
 
@@ -116,6 +130,8 @@ export interface Leitura {
   valor: number | null;
   data: string | null;
   idTransacao: string | null;
+  /** O nome de quem pagou — é ele que casa com o remetente do extrato. */
+  nomePagador: string | null;
   /** O que dizer para quem está olhando a tela. `null` = nada a dizer. */
   mensagem: string | null;
 }
@@ -130,6 +146,10 @@ export function decidirLeitura(dados: DadosComprovante): Leitura {
     valor: confiavel ? (dados.valor ?? null) : null,
     data: confiavel ? (dados.data ?? null) : null,
     idTransacao: confiavel ? (dados.id_transacao || null) : null,
+    // O NOME SEGUE A MESMA REGRA DO VALOR: fora da confiança, nada sai. Um
+    // nome errado guardado aqui não enche um campo na tela — ele DESCARTA o
+    // comprovante certo na conciliação do mês seguinte, calado.
+    nomePagador: confiavel ? (dados.nome_pagador || null) : null,
     mensagem: !dados.eh_comprovante
       ? "Isto não me parece um comprovante. Se for, digite o valor e a data à mão."
       : !confiavel
