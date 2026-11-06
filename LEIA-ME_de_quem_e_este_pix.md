@@ -179,23 +179,23 @@ regra própria: ela **delega**.
 
 ---
 
-## O que falta aplicar em produção
+## Aplicado em produção, e conferido
 
-A tabela `apelidos_banco` e a RLS dela já estão em produção. **As três funções
-e a coluna `nome_pagador` não.** O pedido de permissão do conector Supabase
-expirou sem resposta **quatro vezes** (230s cada) — parei de insistir.
+0163, 0164 e 0165 estão no banco de produção. A prova, lida depois de aplicar:
 
-Rode no editor SQL do Supabase, na ordem de `APLICAR/LEIA-ME_ORDEM.md`:
+| | |
+|---|---|
+| `comprovantes.nome_pagador` | existe |
+| `apelidos_banco` | existe, com 5 policies |
+| funções novas | 3 de 3 |
+| `sureya_debitos_em_aberto` | agora com `p_org` |
+| porta antiga delega | sim |
+| portas abertas para o anônimo | **0** |
+| tabelas / funções `sureya_*` | 71 / 154 — igual ao harness local |
 
-```
-APLICAR/0163_funcoes_apelidos_banco.sql
-APLICAR/0164_identificar_entrada_meses.sql
-APLICAR/0165_nome_de_quem_pagou.sql
-```
-
-Até lá, o painel "De quem é cada Pix" **abre e mostra os palpites** (ele só lê
-tabelas), mas o botão de confirmar responde erro. O caminho antigo, de
-identificar uma entrada por vez, continua funcionando como sempre.
+E a função rodando em cima de dado de verdade: numa família com dívida aberta,
+**2 débitos, os 2 com competência preenchida**. Nada foi escrito para provar
+isso — a prévia é leitura, e a trava de entrada inexistente recusa sem gravar.
 
 ## E o extrato de outubro nunca foi importado
 

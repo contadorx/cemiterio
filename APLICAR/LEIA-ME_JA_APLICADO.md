@@ -1,6 +1,13 @@
-# O que falta rodar em produção
+# Já aplicado em produção (06/11/2026)
 
-Cole no editor SQL do Supabase, **nesta ordem**:
+Os três rodaram e foram conferidos — a tabela de prova está no
+`LEIA-ME_de_quem_e_este_pix.md`. Os arquivos ficam aqui porque são a mesma
+coisa que as migrations, prontos para colar caso algum banco novo precise
+deles.
+
+## O que cada um fez
+
+Ordem em que foram rodados:
 
 | # | arquivo | o que faz |
 |---|---|---|
@@ -8,11 +15,7 @@ Cole no editor SQL do Supabase, **nesta ordem**:
 | 2 | `0164_identificar_entrada_meses.sql` | identificar a entrada dizendo **a que meses** ela se refere, com ensaio |
 | 3 | `0165_nome_de_quem_pagou.sql` | a coluna `comprovantes.nome_pagador` |
 
-A tabela `apelidos_banco` e a RLS dela **já estão aplicadas** — foi a única
-coisa que o conector deixou passar antes de os pedidos de permissão começarem a
-expirar sem resposta.
-
-Nenhum dos três toca em dado nenhum: criam funções, uma coluna e um índice.
+Nenhum dos três tocou em dado nenhum: criaram funções, uma coluna e um índice.
 
 ## Como saber que deu certo
 
