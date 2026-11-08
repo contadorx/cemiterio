@@ -56,10 +56,24 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   // mensagem apareceria como se a família nunca tivesse mandado foto nenhuma.
   // É o mesmo defeito que fez 39 imagens sumirem antes da 0134, agora pela
   // porta do link em vez da porta do upload.
+  // E O TIPO VEM DAQUI, NÃO DA TELA.
+  //
+  // MEDIDO em 08/11/2026: das 25 mídias que as famílias mandaram, SEIS são
+  // PDF — e a tela desenhava todas com `<img>`. Navegador nenhum renderiza PDF
+  // num `<img>`: a Sureya via o ícone de imagem quebrada e o texto alternativo,
+  // num comprovante que estava inteiro no balde, com o link assinando certo.
+  // Seis comprovantes invisíveis por causa de uma etiqueta.
+  //
+  // O tipo é decidido AQUI porque o endereço guardado ainda tem a extensão; o
+  // link assinado que vai para a tela leva `?token=` atrás e a extensão deixa
+  // de ser o fim da string. Perguntar à tela o que ela não tem mais como saber
+  // é como este defeito nasceria de novo.
   const msgs = await Promise.all(((msgsCruas || []) as any[]).map(async (m) => {
     if (!m.midia_url) return m;
+    const ehPdf = /\.pdf(\?|$)/i.test(String(m.midia_url));
     const link = await assinar(adm139, m.midia_url);
-    return { ...m, midia_url: link, midia_falhou: !link };
+    return { ...m, midia_url: link, midia_falhou: !link,
+             midia_tipo: ehPdf ? "pdf" : "imagem" };
   }));
 
   // abriu = leu (mas ainda não respondeu)

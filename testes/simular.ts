@@ -2318,6 +2318,68 @@ async function rodar() {
     }
   }
 
+  console.log("\n=== 15. O PDF E UM ARQUIVO, E NAO UMA IMAGEM QUEBRADA ===");
+  {
+    const { decidirLeitura } = await import("../src/lib/comprovante");
+
+    // --- TRES RESPOSTAS, E NAO DUAS ---------------------------------------
+    //
+    // MEDIDO em 08/11/2026: ZERO comprovantes registrados desde que a chave da
+    // IA foi desligada, e a nota na conversa dizia a mesma coisa de sempre —
+    // "a familia mandou uma imagem". A Sureya nao tinha como saber se o papel
+    // nao era comprovante ou se o sistema estava cego.
+    const falhou = decidirLeitura({
+      eh_comprovante: false, valor: null, data: null, id_transacao: null,
+      nome_pagador: null, confianca: "baixa", falhou: true,
+    });
+    checar("leitura que nem aconteceu se declara", falhou.falhou === true);
+    checar("e a frase diz que esta fora do ar, nao que nao e comprovante",
+           falhou.mensagem!.includes("fora do ar")
+           && !falhou.mensagem!.includes("nao me parece")
+           && !falhou.mensagem!.includes("não me parece"),
+           falhou.mensagem || "");
+    checar("e nada de dinheiro sai de uma leitura que nao aconteceu",
+           !falhou.confiavel && falhou.valor === null && falhou.data === null);
+
+    const naoEh = decidirLeitura({
+      eh_comprovante: false, valor: null, data: null, id_transacao: null,
+      nome_pagador: null, confianca: "alta",
+    });
+    checar("'li e nao e comprovante' continua dizendo isso",
+           naoEh.falhou === false && naoEh.mensagem!.includes("comprovante"),
+           naoEh.mensagem || "");
+
+    const fraca = decidirLeitura({
+      eh_comprovante: true, valor: 40, data: "2026-11-07", id_transacao: "E1",
+      nome_pagador: "KATIA F DOS SANTOS", confianca: "baixa",
+    });
+    checar("confianca baixa nao e falha, e tambem nao preenche",
+           fraca.falhou === false && !fraca.confiavel && fraca.valor === null);
+
+    const boa = decidirLeitura({
+      eh_comprovante: true, valor: 40, data: "2026-11-07", id_transacao: "E1",
+      nome_pagador: "KATIA F DOS SANTOS", confianca: "alta",
+    });
+    checar("leitura boa traz o nome de quem pagou",
+           boa.confiavel && boa.nomePagador === "KATIA F DOS SANTOS" && boa.falhou === false);
+
+    // --- O TIPO DA MIDIA, QUE A TELA PRECISA PARA NAO DESENHAR PDF EM <img>
+    //
+    // Seis das 25 midias recebidas sao PDF. A rota decide o tipo pelo endereco
+    // GUARDADO, antes de assinar — depois de assinado vem "?token=" atras e a
+    // extensao deixa de ser o fim da string.
+    const ehPdf = (u: string) => /\.pdf(\?|$)/i.test(u);
+    checar("endereco guardado de pdf e reconhecido",
+           ehPdf("https://x.supabase.co/storage/v1/object/public/conversas/o/c/1.pdf"));
+    checar("e tambem depois de assinado, com token atras",
+           ehPdf("https://x.supabase.co/storage/v1/object/sign/conversas/o/c/1.pdf?token=abc"));
+    checar("jpeg nao e confundido com pdf",
+           !ehPdf("https://x.supabase.co/storage/v1/object/public/conversas/o/c/1.jpeg"));
+    // "pdf" no meio do caminho nao faz do arquivo um pdf.
+    checar("a palavra pdf no meio do caminho nao conta",
+           !ehPdf("https://x.supabase.co/storage/v1/object/public/conversas/pdf/c/1.jpg"));
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

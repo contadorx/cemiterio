@@ -2840,6 +2840,44 @@ ok("ver o que vai acontecer vem antes de confirmar",
 ok("a triangulacao nao manda mensagem nenhuma",
    !/enviarTexto|enviarWhatsapp|outbox/i.test(semComentarios(rotaTri63)));
 
+// ---------------------------------------------------------------------------
+// 0166 — O PDF E UM ARQUIVO, E NAO UMA IMAGEM QUEBRADA
+//
+// Medido em 08/11/2026: das 25 midias que as familias mandaram, SEIS sao PDF —
+// e a tela desenhava todas com <img>. Navegador nenhum renderiza PDF ali. A
+// Sureya via o icone de imagem quebrada num comprovante que estava inteiro no
+// balde, com o link assinando certo. Seis comprovantes invisiveis.
+//
+// E junto: ZERO comprovantes registrados desde que a chave da IA foi
+// desligada, com a nota dizendo a mesma coisa de sempre.
+// ---------------------------------------------------------------------------
+const rotaConv66 = readFileSync("src/app/api/conversas/[id]/route.ts", "utf8");
+const telaConv66 = readFileSync("src/app/painel/conversas/[id]/page.tsx", "utf8");
+const atend66 = readFileSync("src/lib/atendimento.ts", "utf8");
+
+// O TIPO SAI DA ROTA, do endereco GUARDADO. Depois de assinado vem "?token="
+// atras, e a extensao deixa de ser o fim da string — perguntar a tela o que
+// ela nao tem mais como saber e como este defeito nasceria de novo.
+ok("a rota diz o tipo da midia, e nao deixa a tela adivinhar",
+   /midia_tipo: ehPdf \? "pdf" : "imagem"/.test(rotaConv66));
+ok("e o <img> deixa de receber PDF",
+   /midia_tipo !== "pdf"[\s\S]{0,400}<img/.test(telaConv66));
+ok("o PDF ganha quadro proprio, e um link para abrir inteiro",
+   /type="application\/pdf"/.test(telaConv66) && /abrir o PDF/.test(telaConv66));
+// Celular que nao embute PDF nao pode mostrar quadro branco calado.
+ok("e quem nao embute PDF recebe uma frase, nao um quadro vazio",
+   /Este aparelho n[aã]o mostra PDF/.test(telaConv66));
+
+// "NAO CONSEGUI LER" NAO E "NAO E COMPROVANTE": a primeira e um problema meu,
+// a segunda e um fato sobre o papel.
+ok("a leitura que nem aconteceu se declara",
+   /falhou\?: boolean/.test(comp65) && /falhou: true/.test(comp65));
+ok("e a nota da conversa trata os dois casos diferente",
+   /leitura\.falhou/.test(atend66) && /N[AÃ]O CONSEGUI LER/.test(atend66));
+// Chamar PDF de "imagem" manda procurar o que nao esta la.
+ok("e um PDF e chamado de arquivo, nao de imagem",
+   /ehPdf \? "um arquivo \(PDF\)" : "uma imagem"/.test(atend66));
+
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));
 
