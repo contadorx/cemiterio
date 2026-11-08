@@ -1,4 +1,5 @@
 import { textoDoPdf } from "./pdf-texto";
+import { tocaONome } from "./triangulacao";
 import type { DadosComprovante } from "./comprovante";
 
 /**
@@ -128,6 +129,56 @@ function acharPagador(linhas: string[]): string | null {
 }
 
 /**
+ * QUEM PAGOU, QUANDO O PAPEL NÃO TEM RÓTULO — pela casa que recebeu.
+ *
+ * MEDIDO em 08/11/2026, passando OCR numa FOTO de tela de celular: o valor, a
+ * data e os dois nomes saem certos, e os RÓTULOS somem. "PAGADOR" e
+ * "RECEBEDOR" são escritos em cinza pequeno, e é justamente isso que não
+ * sobrevive ao brilho, ao moiré e à compressão do WhatsApp.
+ *
+ * Sem rótulo, "Katia Ferreira dos Santos" e "Sureya Serviços de Limpeza" são
+ * dois nomes e nada mais. Escolher o primeiro poria o nome da casa em cima de
+ * metade dos pagamentos — e a triangulação passaria a casar tudo com tudo.
+ *
+ * MAS A CASA A GENTE CONHECE. Ela recebe TODO comprovante que chega aqui.
+ * Então tiro o nome dela dos candidatos; se sobrar exatamente UM, foi ele quem
+ * pagou. Sobrando zero ou mais de um, devolvo `null` — dedução que precisa
+ * escolher entre dois já não é dedução.
+ *
+ * Isto nunca produz confiança "alta": é raciocínio por eliminação, não leitura.
+ */
+function deduzirPagador(linhas: string[], nomeDaCasa?: string | null): string | null {
+  if (!nomeDaCasa) return null;
+
+  const candidatos: string[] = [];
+  for (const l of linhas) {
+    if (NAO_E_NOME.test(l)) continue;
+    // NOME DE GENTE NÃO TEM NÚMERO — e aqui não há rótulo para ancorar nada,
+    // então a linha tem de se defender sozinha. Sem isto, "07 de novembro de
+    // 2026 - 14:32" virava candidato ("de novembro de" são três palavras com
+    // letras suficientes), ficavam DOIS candidatos, e a dedução desistia de
+    // um caso que ela resolvia. Foi o OCR da foto torta que mostrou.
+    if (/\d/.test(l)) continue;
+    const limpo = soLetras(l);
+    if (limpo.length < 8) continue;
+    // DUAS PALAVRAS DE TRÊS LETRAS, no mínimo.
+    //
+    // Nome de gente tem nome e sobrenome. "io DA TRANSA" — o que sobrou de
+    // "ID DA TRANSACAO" depois do OCR numa foto torta — também tem três
+    // "palavras", e virava um segundo candidato: a dedução via dois nomes e
+    // desistia de um caso que ela resolvia. Exigir três letras separa pessoa
+    // de cisco, sem precisar listar cada jeito de o OCR errar.
+    if (limpo.split(" ").filter((p) => p.length >= 3).length < 2) continue;
+    // `tocaONome` é a mesma regra que a triangulação usa para reconhecer uma
+    // família pelo sobrenome. Uma segunda cópia dela discordaria sobre quem é
+    // a casa, e aí o nome dela passaria por pagador.
+    if (tocaONome(nomeDaCasa, limpo)) continue;
+    if (!candidatos.includes(limpo)) candidatos.push(limpo);
+  }
+  return candidatos.length === 1 ? candidatos[0] : null;
+}
+
+/**
  * O VALOR.
  *
  * Um comprovante tem vários "R$" — valor, tarifa, saldo. Prefiro o que está
@@ -188,6 +239,43 @@ export function lerComprovantePdf(bytes: Buffer): DadosComprovante | null {
   } catch {
     return null;
   }
+  return interpretarComprovante(texto);
+}
+
+/**
+ * O QUE ESTAS LINHAS QUEREM DIZER — e isto NÃO sabe de onde elas vieram.
+ *
+ * O texto chega do PDF (`textoDoPdf`) ou do OCR de uma foto
+ * (`comprovante-ocr.ts`), e a interpretação é a MESMA: onde está o valor, qual
+ * data vale, quem pagou. Escrever isso duas vezes é o defeito de forma que já
+ * custou nove migrations a este projeto — e aqui ele custaria caro de um jeito
+ * novo, porque as duas cópias leriam o mesmo papel e dariam respostas
+ * diferentes conforme o arquivo fosse PDF ou foto.
+ *
+ * O que muda entre as duas portas é o CUIDADO, não a leitura — e isso vem em
+ * `opts`, não numa segunda cópia desta função.
+ */
+export interface ComoLer {
+  /**
+   * O OCR erra um caractere e ninguém percebe. Com isto ligado, o E2E não é
+   * devolvido: ver `comprovante-ocr.ts`.
+   */
+  semIdentificador?: boolean;
+  /** Teto da confiança. O OCR nunca chega a "alta". */
+  tetoDaConfianca?: "alta" | "media";
+  /**
+   * O NOME DA CASA — quem RECEBE todo comprovante que chega aqui.
+   *
+   * Serve para duas coisas, e a segunda só o OCR precisa: descartar o
+   * recebedor quando ele aparece sem rótulo, e, sobrando um único outro nome,
+   * deduzir que foi ele quem pagou.
+   */
+  nomeDaCasa?: string | null;
+}
+
+export function interpretarComprovante(
+  texto: string, opts: ComoLer = {},
+): DadosComprovante | null {
   if (!texto || texto.trim().length < 20) return null;
 
   const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -199,10 +287,14 @@ export function lerComprovantePdf(bytes: Buffer): DadosComprovante | null {
   const pareceComprovante =
     /(comprovante|pix|transfer[êe]ncia|ted\b|doc\b|pagamento efetuado|pagamento realizado)/i.test(junto);
 
-  const e2e = junto.match(E2E)?.[0] || null;
+  const e2eLido = junto.match(E2E)?.[0] || null;
+  const e2e = opts.semIdentificador ? null : e2eLido;
   const valor = acharValor(linhas);
-  const data = acharData(linhas, e2e);
-  const pagador = acharPagador(linhas);
+  // A data sai do E2E LIDO mesmo quando ele não é devolvido: um dígito trocado
+  // no meio do identificador quase nunca cai nas oito casas da data, e ela
+  // ainda é conferida contra a data escrita no papel.
+  const data = acharData(linhas, e2eLido);
+  const pagador = acharPagador(linhas) || deduzirPagador(linhas, opts.nomeDaCasa);
 
   // A CONFIANÇA SAI DO QUE FOI ACHADO, e não de otimismo.
   //
@@ -212,10 +304,11 @@ export function lerComprovantePdf(bytes: Buffer): DadosComprovante | null {
   //   media = valor + data, sem identificador. Serve para preencher a tela,
   //           e a conciliação depois vai depender de valor e nome.
   //   baixa = o resto. E baixa NÃO PREENCHE nada (`decidirLeitura`).
-  const confianca: DadosComprovante["confianca"] =
+  let confianca: DadosComprovante["confianca"] =
     valor != null && data && e2e ? "alta"
     : valor != null && data ? "media"
     : "baixa";
+  if (opts.tetoDaConfianca === "media" && confianca === "alta") confianca = "media";
 
   return {
     eh_comprovante: pareceComprovante && valor != null,

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
 import { lerComprovantePdf } from "./comprovante-pdf";
+import { lerComprovanteImagem } from "./comprovante-ocr";
 
 let _cli: Anthropic | null = null;
 function anthropic(): Anthropic {
@@ -31,8 +32,8 @@ export interface DadosComprovante {
    * desde que a chave foi desligada, e nenhum aviso em lugar nenhum.
    */
   falhou?: boolean;
-  /** De onde veio a leitura: o texto do próprio PDF, ou um modelo. */
-  fonte?: "pdf" | "ia";
+  /** De onde veio: o texto do PDF, o OCR da foto, ou um modelo. */
+  fonte?: "pdf" | "ocr" | "ia";
 }
 
 const IMAGENS_OK = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -81,7 +82,21 @@ const ferramenta = {
   },
 };
 
-export async function extrairComprovante(midia: Midia): Promise<DadosComprovante> {
+export interface QuemLe {
+  /**
+   * COMO O BANCO ESCREVE O NOME DA CASA (0166).
+   *
+   * O comprovante traz quem pagou E quem recebeu, e numa foto os rótulos
+   * somem. Sabendo quem recebe — e é sempre a casa —, o outro nome é o de
+   * quem pagou. Sem isto, foto sem rótulo não devolve pagador: o que é
+   * melhor que devolver o nome errado.
+   */
+  nomeDaCasa?: string | null;
+}
+
+export async function extrairComprovante(
+  midia: Midia, quem: QuemLe = {},
+): Promise<DadosComprovante> {
   const isPdf = midia.mimetype === "application/pdf";
 
   // ==========================================================================
@@ -109,6 +124,27 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
       // Ler o PDF falhar não pode impedir a IA de tentar: o plano B existe
       // exatamente para o arquivo que o leitor não entende.
       console.error("[comprovante] leitor de PDF falhou:", (e as any)?.message || e);
+    }
+  }
+
+  // ==========================================================================
+  // E A FOTO SE LÊ AQUI TAMBÉM, SEM IA (0166).
+  //
+  // "Pedir o PDF" era a saída barata, e o Leandro matou a ideia com uma frase:
+  // pedir é complicado para idosos. Quem manda comprovante aqui cuida do
+  // túmulo de alguém há trinta anos; não vai aprender a exportar PDF porque o
+  // sistema prefere assim. MEDIDO: dos 90 arquivos recebidos, 67 são JPEG.
+  //
+  // O OCR devolve `null` quando não alcança — foto escura demais, reconhecimento
+  // abaixo de 60 — e aí a IA segue como plano B, igual ao PDF escaneado.
+  // ==========================================================================
+  if (!isPdf) {
+    try {
+      const bytes = Buffer.from(midia.base64, "base64");
+      const lido = await lerComprovanteImagem(bytes, { nomeDaCasa: quem.nomeDaCasa });
+      if (lido && lido.confianca !== "baixa") return { ...lido, fonte: "ocr" };
+    } catch (e) {
+      console.error("[comprovante] OCR falhou:", (e as any)?.message || e);
     }
   }
 
@@ -175,8 +211,8 @@ export interface Leitura {
   confiavel: boolean;
   /** A leitura nem aconteceu — diferente de "li e não é comprovante". */
   falhou: boolean;
-  /** De onde veio: o texto do próprio PDF, ou um modelo. */
-  fonte: "pdf" | "ia" | null;
+  /** De onde veio: o texto do PDF, o OCR da foto, ou um modelo. */
+  fonte: "pdf" | "ocr" | "ia" | null;
   valor: number | null;
   data: string | null;
   idTransacao: string | null;

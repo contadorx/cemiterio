@@ -1251,9 +1251,15 @@ ok("a imagem da conversa e guardada, comprovante ou nao",
 // A ORDEM E O CONSERTO: se o leitor estourar, a imagem ja esta salva. Guardar
 // DEPOIS da leitura faria a falha do leitor levar a imagem junto — a forma
 // antiga do mesmo defeito.
+// E O ASSERT EXIGE QUE OS DOIS EXISTAM, e nao so que um venha antes.
+// Ele casava `extrairComprovante(midia)` ao pe da letra, e quando a chamada
+// ganhou um segundo argumento (0166) o indexOf virou -1: a comparacao passou a
+// ser "alguma coisa < -1", sempre falsa. Deu vermelho, e podia ter dado verde
+// pelo motivo oposto se o primeiro tambem sumisse.
+const iGuarda = atendVisivel.indexOf("guardarMidiaDaConversa(cliente.id, midia)");
+const iLeitor = atendVisivel.indexOf("extrairComprovante(midia");
 ok("e guardada ANTES de o leitor tentar entender",
-   atendVisivel.indexOf("guardarMidiaDaConversa(cliente.id, midia)") <
-   atendVisivel.indexOf("extrairComprovante(midia)"));
+   iGuarda >= 0 && iLeitor >= 0 && iGuarda < iLeitor);
 
 // `gravarMensagem` ja aceitava midiaUrl desde sempre. Ninguem passava.
 ok("e a url chega mesmo na mensagem",
@@ -2903,11 +2909,27 @@ ok("o PDF e lido antes de qualquer chamada de modelo",
 // Plano B, e nao substituto: PDF escaneado e imagem com capa de PDF.
 ok("e a IA continua existindo para o que o leitor nao alcanca",
    /local\.confianca !== "baixa"/.test(comp65) && /messages\.create/.test(comp65));
-// O leitor nao pode trazer dependencia: o projeto tem dez, de proposito.
-ok("o leitor de comprovante nao trouxe dependencia nova",
+// ESTE ASSERT MUDOU EM 08/11/2026, e a razao e uma frase do Leandro.
+//
+// Ele proibia QUALQUER dependencia de leitura, OCR incluido — o projeto tem
+// dez, de proposito. A saida era pedir o PDF para a familia, e a resposta foi:
+// "pedir e complicado para idosos". Quem manda comprovante aqui cuida do
+// tumulo de alguem ha trinta anos e nao vai aprender a exportar PDF porque o
+// sistema prefere assim. MEDIDO: dos 90 arquivos recebidos, 67 sao JPEG.
+//
+// Entao o OCR entrou, com nome e sobrenome, e sao DOIS pacotes: o motor e os
+// dados de portugues. O que o assert continua cobrando e que o LEITOR DE PDF
+// nao trouxe nada (ele le com o zlib do Node) e que nada alem desses dois
+// entrou de carona.
+const deps68 = Object.keys(
+  JSON.parse(readFileSync("package.json", "utf8")).dependencies || {});
+ok("o leitor de PDF continua sem dependencia nenhuma",
    /from "\.\/pdf-texto"/.test(pdfComp67)
-   && !Object.keys(JSON.parse(readFileSync("package.json","utf8")).dependencies || {})
-        .some((d) => /pdf|ocr|tesseract/i.test(d)));
+   && !deps68.some((d) => /pdf|mupdf|unpdf/i.test(d)));
+ok("e o OCR sao exatamente dois pacotes, nem um a mais",
+   deps68.filter((d) => /tesseract|ocr/i.test(d)).sort().join(",")
+     === "@tesseract.js-data/por,tesseract.js",
+   deps68.filter((d) => /tesseract|ocr/i.test(d)).join(","));
 
 // A SUREYA E A RECEBEDORA DE TODO COMPROVANTE QUE CHEGA. Confundir pagador com
 // recebedor devolveria o nome dela em cima de cada pagamento, e a triangulacao
@@ -2929,6 +2951,130 @@ ok("confianca sai do que foi achado, e nao de otimismo",
 // conciliacao do mes seguinte, calado.
 ok("sem rotulo de pagador, o nome volta nulo",
    /if \(iPag < 0\) return null;/.test(pdfComp67));
+
+// ---------------------------------------------------------------------------
+// 0166 — A FOTO DO COMPROVANTE SE LE SEM IA
+//
+// MEDIDO passando OCR numa FOTO de tela de celular: valor, data e os dois
+// nomes saem certos; os ROTULOS "PAGADOR"/"RECEBEDOR" somem (sao cinza pequeno
+// e nao sobrevivem ao brilho e a compressao); e o E2E vira lixo. No print, que
+// e mais limpo, o E2E saiu com UM caractere trocado — zero lido como letra o.
+// ---------------------------------------------------------------------------
+const ocr66 = readFileSync("src/lib/comprovante-ocr.ts", "utf8");
+const cfg66 = readFileSync("next.config.js", "utf8");
+
+// UM CARACTERE ERRADO NO E2E NAO DEIXA DE CASAR: casa ERRADO, com cara de
+// certeza, e credita o pagamento de uma familia na conta de outra. O E2E e a
+// fonte 0 da triangulacao, a unica que nao e palpite.
+ok("o OCR nunca devolve o identificador do Pix",
+   /semIdentificador: true/.test(ocr66) && /semIdentificador/.test(pdfComp67));
+// Ler foto e reconhecimento, nao transcricao.
+ok("e a confianca do OCR nunca chega a alta",
+   /tetoDaConfianca: "media"/.test(ocr66) && /tetoDaConfianca === "media"/.test(pdfComp67));
+// Reconhecimento abaixo de 60 e chute letra por letra: interpretar chute e
+// construir conta em cima de areia.
+ok("reconhecimento fraco devolve nulo, e a IA segue como plano B",
+   /< 60\) return null/.test(ocr66));
+
+// SEM ROTULO, SOBRAM DOIS NOMES. Pegar o primeiro poria o nome DA CASA em
+// metade dos pagamentos, e a triangulacao passaria a casar tudo com tudo.
+ok("sem rotulo, o pagador sai por eliminacao da casa",
+   /deduzirPagador/.test(pdfComp67) && /nomeDaCasa/.test(ocr66));
+ok("e sem saber quem e a casa, a deducao nao acontece",
+   /if \(!nomeDaCasa\) return null;/.test(pdfComp67));
+// Uma segunda copia da regra de "quem e a casa" discordaria da triangulacao.
+ok("e quem reconhece a casa e a MESMA regra da triangulacao",
+   /import \{ tocaONome \}/.test(pdfComp67));
+
+// DUAS PORTAS QUE LEEM O MESMO PAPEL TEM DE RESPONDER IGUAL: sem isto, a
+// mesma foto daria pagador no WhatsApp e nao daria na tela (ou o contrario).
+ok("as duas portas de leitura recebem quem e a casa",
+   /nomeDaCasa: await nomeDaCasa\(\)/.test(atend66)
+   && /nome_no_recebimento/.test(readFileSync("src/app/api/comprovantes/ler/route.ts","utf8")));
+
+// A INTERPRETACAO E UMA SO. PDF e foto chegam como texto, e o que as linhas
+// querem dizer nao pode depender de onde elas vieram.
+ok("PDF e foto passam pela MESMA interpretacao",
+   /interpretarComprovante/.test(pdfComp67) && /interpretarComprovante/.test(ocr66));
+
+// O IDIOMA VEM DO PACOTE, e nao de um CDN: dependencia de rede no meio do
+// recebimento de um comprovante quebra calada quando o CDN cai.
+ok("os dados de portugues saem do pacote, nao da internet",
+   /@tesseract.js-data\/por/.test(ocr66) && /langPath/.test(ocr66));
+
+// O RASTREADOR DO NEXT SO VE O QUE TEM `import`. O motor e os dados sao
+// carregados por caminho montado na hora: sem isto o build passa, o deploy
+// sobe, e a primeira foto falha EM PRODUCAO procurando arquivo que ficou para
+// tras — defeito que teste nenhum daqui pega.
+ok("o motor e o idioma entram no pacote da funcao",
+   /outputFileTracingIncludes/.test(cfg66)
+   && /tesseract\.js-core/.test(cfg66)
+   && /4\.0\.0_best_int/.test(cfg66)
+   && /api\/webhook\/evolution/.test(cfg66));
+
+// ---------------------------------------------------------------------------
+// TODA COLUNA DE `orgs` QUE O CODIGO USA TEM DE NASCER DE UMA MIGRATION
+//
+// CUSTOU UM VERMELHO NO HARNESS PARA APARECER. A 0166 citava `marca_nome` num
+// `select` de prova e o banco reconstruido respondeu "column does not exist":
+// em producao ela existe e CINCO arquivos de `src/` a usam; em migration
+// nenhuma. Com ela vieram outras SEIS.
+//
+// E a pergunta central do Build 0 de novo — "o repositorio reconstroi o
+// banco?" —, ja respondida com "nao" tres vezes, uma delas por este mesmo
+// motivo: "32 colunas e 15 funcoes so existiam dentro do banco".
+//
+// POR QUE VOLTOU SEM NINGUEM VER: o placar conta TABELAS, FUNCOES, GATILHOS e
+// POLICIES. Nunca contou coluna. Um `add column` feito a mao no painel do
+// Supabase passa por baixo dele inteiro, e so aparece no dia em que alguem
+// reconstroi o banco e uma tela quebra.
+//
+// Este guarda e estatico e cobre `orgs`, que e a tabela de ajustes onde esse
+// tipo de coluna nasce a mao.
+// ---------------------------------------------------------------------------
+{
+  // `arquivosDe` so devolve .ts/.tsx — aqui o que importa e .sql.
+  const sql = _lerDir("migrations").filter((f) => f.endsWith(".sql"))
+    .map((f) => readFileSync(`migrations/${f}`, "utf8")).join("\n");
+
+  const nasceram = new Set();
+  for (const m of sql.matchAll(
+      /alter\s+table\s+(?:public\.)?orgs\s+add\s+column(?:\s+if\s+not\s+exists)?\s+([a-z_]+)/gi)) {
+    nasceram.add(m[1].toLowerCase());
+  }
+  for (const m of sql.matchAll(
+      /alter\s+table\s+(?:public\.)?orgs\s+rename\s+column\s+[a-z_]+\s+to\s+([a-z_]+)/gi)) {
+    nasceram.add(m[1].toLowerCase());
+  }
+  const criaTabela = sql.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?orgs\s*\(([\s\S]*?)\n\s*\);/i);
+  if (criaTabela) {
+    for (const linha of criaTabela[1].split("\n")) {
+      const m = linha.match(/^\s*([a-z_]+)\s+[a-z]/i);
+      if (m) nasceram.add(m[1].toLowerCase());
+    }
+  }
+
+  // O que o codigo pede de `orgs`: os `select("a,b,c")` sobre a tabela.
+  const pedidas = new Set();
+  for (const f of arquivosDe("src")) {
+    const texto = readFileSync(f, "utf8");
+    for (const m of texto.matchAll(
+        /from\("orgs"\)\s*\n?\s*\.select\(\s*"([^"]+)"/g)) {
+      for (const c of m[1].split(",")) {
+        const nome = c.trim().split(":")[0].trim().toLowerCase();
+        if (/^[a-z_]+$/.test(nome) && nome !== "*") pedidas.add(nome);
+      }
+    }
+  }
+
+  const orfas = [...pedidas].filter((c) => !nasceram.has(c)).sort();
+  ok(`toda coluna de orgs usada no codigo nasce de uma migration (${pedidas.size} usadas)`,
+     orfas.length === 0);
+  if (orfas.length) {
+    for (const c of orfas) console.log(`      orgs.${c} — usada em src/, criada em migration nenhuma`);
+    console.log("      o banco reconstruido nao tem esta coluna: a tela quebra la, nao aqui");
+  }
+}
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

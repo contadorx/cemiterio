@@ -2458,6 +2458,76 @@ async function rodar() {
            || lerComprovantePdf(Buffer.from("nao sou pdf")) === null);
   }
 
+  console.log("\n=== 17. A FOTO DO COMPROVANTE SE LE SEM IA (OCR) ===");
+  {
+    const { lerComprovanteImagem } = await import("../src/lib/comprovante-ocr");
+    const CASA = "Sureya Servicos de Limpeza";
+    const ler = (f: string) =>
+      lerComprovanteImagem(readFileSync(`testes/fixtures/${f}`), { nomeDaCasa: CASA });
+
+    // AS DUAS IMAGENS SAO RENDERIZADAS DE VERDADE (Chromium, 390px de largura,
+    // comprimidas como JPEG do jeito que o WhatsApp comprime) por
+    // `testes/fixtures/fazer-print-e-foto.mjs`. Nomes inventados.
+    //
+    //   comprovante-print.jpg  print de tela, texto digital limpo (50 KB)
+    //   comprovante-foto.jpg   FOTO da tela: torta, com reflexo, moire (23 KB)
+    //                          — e o que chega de quem nao sabe tirar print.
+
+    // --- o print ----------------------------------------------------------
+    const p = (await ler("comprovante-print.jpg"))!;
+    checar("o print devolve leitura", !!p, JSON.stringify(p));
+    checar("com o valor certo", p.valor === 40, String(p.valor));
+    checar("e a data certa", p.data === "2026-11-07", String(p.data));
+    checar("e o nome de quem pagou", p.nome_pagador === "Katia Ferreira dos Santos",
+           String(p.nome_pagador));
+
+    // --- A FOTO TORTA, que e o caso dificil -------------------------------
+    //
+    // Aqui os ROTULOS somem: "PAGADOR" e "RECEBEDOR" sao cinza pequeno e nao
+    // sobrevivem ao brilho, ao moire e a compressao. Sobram dois nomes sem
+    // etiqueta — e a casa e tirada da conta, sobrando um.
+    const f = (await ler("comprovante-foto.jpg"))!;
+    checar("a foto torta tambem devolve leitura", !!f, JSON.stringify(f));
+    checar("com o valor certo", f.valor === 40, String(f.valor));
+    checar("e a data certa", f.data === "2026-11-07", String(f.data));
+    checar("e o pagador sai POR ELIMINACAO, sem rotulo nenhum",
+           f.nome_pagador === "Katia Ferreira dos Santos", String(f.nome_pagador));
+
+    // SEM SABER QUEM E A CASA, A DEDUCAO NAO ACONTECE — e tem de nao
+    // acontecer: com dois nomes e nenhuma etiqueta, escolher poria o nome da
+    // casa em metade dos pagamentos.
+    const semCasa = (await lerComprovanteImagem(
+      readFileSync("testes/fixtures/comprovante-foto.jpg"), {}))!;
+    checar("sem o nome da casa, o pagador volta nulo em vez de chutado",
+           semCasa.nome_pagador === null, String(semCasa.nome_pagador));
+    checar("mas o valor e a data continuam saindo",
+           semCasa.valor === 40 && semCasa.data === "2026-11-07", JSON.stringify(semCasa));
+
+    // --- O OCR NUNCA DEVOLVE O IDENTIFICADOR DO PIX -----------------------
+    //
+    // MEDIDO: no print, o Tesseract leu "...abcdef012ab" como "...abcdefo12ab"
+    // — zero virou letra o. Um caractere, e o E2E continua com 32 posicoes:
+    // passa por qualquer conferencia de forma. E o E2E e a chave MAIS FORTE da
+    // conciliacao, a unica fonte que nao e palpite. Errado, ele nao deixa de
+    // casar: ele casa ERRADO, com cara de certeza, e credita o pagamento de
+    // uma familia na conta de outra.
+    checar("o print NAO devolve identificador", p.id_transacao === null, String(p.id_transacao));
+    checar("a foto tambem nao", f.id_transacao === null, String(f.id_transacao));
+
+    // --- E A CONFIANCA NUNCA CHEGA A "ALTA" -------------------------------
+    //
+    // Ler foto e reconhecimento, nao transcricao. "media" preenche a tela e
+    // deixa a conciliacao depender de valor e nome; quem confere continua
+    // olhando o papel.
+    checar("o print fica em media, nunca alta", p.confianca === "media", p.confianca);
+    checar("a foto tambem", f.confianca === "media", f.confianca);
+
+    // --- O QUE NAO DA PARA LER DEVOLVE NULO, e nao um palpite -------------
+    checar("imagem que nao e comprovante nao vira leitura",
+           (await lerComprovanteImagem(Buffer.from("isto nao e uma imagem"), { nomeDaCasa: CASA }))
+             === null);
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {
