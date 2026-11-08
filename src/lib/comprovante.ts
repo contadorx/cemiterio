@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
+import { lerComprovantePdf } from "./comprovante-pdf";
 
 let _cli: Anthropic | null = null;
 function anthropic(): Anthropic {
@@ -30,6 +31,8 @@ export interface DadosComprovante {
    * desde que a chave foi desligada, e nenhum aviso em lugar nenhum.
    */
   falhou?: boolean;
+  /** De onde veio a leitura: o texto do próprio PDF, ou um modelo. */
+  fonte?: "pdf" | "ia";
 }
 
 const IMAGENS_OK = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -80,6 +83,35 @@ const ferramenta = {
 
 export async function extrairComprovante(midia: Midia): Promise<DadosComprovante> {
   const isPdf = midia.mimetype === "application/pdf";
+
+  // ==========================================================================
+  // O PDF SE LÊ AQUI, SEM IA.
+  //
+  // Um comprovante em PDF TEM TEXTO DENTRO: o banco escreveu "R$ 40,00",
+  // "07/11/2026" e o E2E ali, em caracteres. Mandar isso para um modelo de
+  // visão é pagar para alguém ler em voz alta o que já está escrito.
+  //
+  // É a mesma decisão da 0161, quando o extrato do Bradesco deixou de ir para
+  // a IA. E vale mais agora: MEDIDO em 08/11/2026, seis das 25 mídias que as
+  // famílias mandaram são PDF, e com a chave desligada ZERO comprovantes
+  // estavam sendo registrados.
+  //
+  // A IA continua existindo como PLANO B, e só para o que o leitor não
+  // alcança: PDF escaneado (que é imagem com capa de PDF) e leitura de
+  // confiança baixa. Confiança baixa não preencheria campo nenhum de todo
+  // jeito, então aí vale gastar a chamada.
+  // ==========================================================================
+  if (isPdf) {
+    try {
+      const local = lerComprovantePdf(Buffer.from(midia.base64, "base64"));
+      if (local && local.confianca !== "baixa") return { ...local, fonte: "pdf" };
+    } catch (e) {
+      // Ler o PDF falhar não pode impedir a IA de tentar: o plano B existe
+      // exatamente para o arquivo que o leitor não entende.
+      console.error("[comprovante] leitor de PDF falhou:", (e as any)?.message || e);
+    }
+  }
+
   const mediaType = IMAGENS_OK.includes(midia.mimetype) ? midia.mimetype : "image/jpeg";
 
   const bloco = isPdf
@@ -115,7 +147,7 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
       return { eh_comprovante: false, valor: null, data: null, id_transacao: null,
                nome_pagador: null, confianca: "baixa", falhou: true };
     }
-    return b.input as DadosComprovante;
+    return { ...(b.input as DadosComprovante), fonte: "ia" };
   } catch (e) {
     console.error("[comprovante] falha na leitura:", (e as any)?.message || e);
     return { eh_comprovante: false, valor: null, data: null, id_transacao: null,
@@ -143,6 +175,8 @@ export interface Leitura {
   confiavel: boolean;
   /** A leitura nem aconteceu — diferente de "li e não é comprovante". */
   falhou: boolean;
+  /** De onde veio: o texto do próprio PDF, ou um modelo. */
+  fonte: "pdf" | "ia" | null;
   valor: number | null;
   data: string | null;
   idTransacao: string | null;
@@ -158,6 +192,7 @@ export function decidirLeitura(dados: DadosComprovante): Leitura {
   return {
     confiavel,
     falhou: !!dados.falhou,
+    fonte: dados.fonte ?? null,
     // FORA DA CONFIANÇA, NADA SAI. Devolver o valor "só para mostrar" faria a
     // tela ter um número na mão e a tentação de usá-lo.
     valor: confiavel ? (dados.valor ?? null) : null,

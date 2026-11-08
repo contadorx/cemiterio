@@ -79,6 +79,9 @@ export async function POST(req: NextRequest) {
       data: leitura.data,
       idTransacao: leitura.idTransacao,
       nomePagador: leitura.nomePagador,
+      // "li o texto do PDF" e "um modelo olhou a imagem" não são a mesma
+      // coisa, e quem confere merece saber qual foi.
+      fonte: leitura.fonte,
       mensagem: leitura.mensagem,
     });
   } catch (e: any) {

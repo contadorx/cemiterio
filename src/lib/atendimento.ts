@@ -394,7 +394,12 @@ export async function registrarEntrada(params: {
         await registrarComprovante(cliente.id, midia, dados);
         const v = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : "valor não identificado";
         const d = dados.data || "data não identificada";
-        nota = `[comprovante de Pix recebido: ${v}, ${d} — registrado, aguardando conferência de uma pessoa]`;
+        const quem = dados.nome_pagador ? `, pago por ${dados.nome_pagador}` : "";
+        // DIZER DE ONDE VEIO A LEITURA não é detalhe técnico: é a diferença
+        // entre "o computador leu o que estava escrito no papel" e "um modelo
+        // olhou a imagem e achou". A segunda merece um olho a mais.
+        const fonte = dados.fonte === "pdf" ? " (li o texto do próprio PDF)" : "";
+        nota = `[comprovante de Pix recebido: ${v}, ${d}${quem}${fonte} — registrado, aguardando conferência de uma pessoa]`;
       } else {
         // TRÊS FRASES, PORQUE SÃO TRÊS COISAS DIFERENTES.
         //

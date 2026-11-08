@@ -1272,8 +1272,18 @@ ok("a frase avisa que a imagem esta na conversa",
 ok("a rota da conversa devolve a midia",
    /midia_url/.test(rotaThread));
 
-ok("e a tela mostra a imagem",
-   /m\.midia_url && \(/.test(telaThread) && /<img src=\{m\.midia_url\}/.test(telaThread));
+// ESTE ASSERT MUDOU DE FORMA EM 08/11/2026, e a razao importa.
+//
+// Ele cobrava `m.midia_url && (` seguido de `<img>`, que era a verdade da
+// 0134: toda midia era desenhada como imagem. So que SEIS das 25 midias
+// recebidas sao PDF, e navegador nenhum renderiza PDF num <img> — a Sureya via
+// o icone quebrado num comprovante que estava inteiro no balde. O que o assert
+// tem de cobrar e "a tela mostra a midia", e nao "a tela usa <img>".
+ok("e a tela mostra a midia: imagem no <img>, PDF no quadro dele",
+   /midia_tipo !== "pdf"/.test(telaThread)
+   && /<img src=\{m\.midia_url\}/.test(telaThread)
+   && /midia_tipo === "pdf"/.test(telaThread)
+   && /type="application\/pdf"/.test(telaThread));
 
 // A remocao por LGPD ja listava mensagens.midia_url — mas o balde novo
 // precisa ser reconhecido, senao `apagarArquivos` nao acha o caminho e a foto
@@ -2877,6 +2887,48 @@ ok("e a nota da conversa trata os dois casos diferente",
 // Chamar PDF de "imagem" manda procurar o que nao esta la.
 ok("e um PDF e chamado de arquivo, nao de imagem",
    /ehPdf \? "um arquivo \(PDF\)" : "uma imagem"/.test(atend66));
+
+// ---------------------------------------------------------------------------
+// 0167 — O COMPROVANTE EM PDF SE LE SEM IA
+//
+// Um comprovante em PDF TEM TEXTO DENTRO: o banco escreveu "R$ 40,00",
+// "07/11/2026" e o E2E ali, em caracteres. Manda-lo para um modelo de visao e
+// pagar para alguem ler em voz alta o que ja esta escrito. Mesma decisao da
+// 0161, quando o extrato deixou de ir para a IA.
+// ---------------------------------------------------------------------------
+const pdfComp67 = readFileSync("src/lib/comprovante-pdf.ts", "utf8");
+
+ok("o PDF e lido antes de qualquer chamada de modelo",
+   comp65.indexOf("lerComprovantePdf") < comp65.indexOf("messages.create"));
+// Plano B, e nao substituto: PDF escaneado e imagem com capa de PDF.
+ok("e a IA continua existindo para o que o leitor nao alcanca",
+   /local\.confianca !== "baixa"/.test(comp65) && /messages\.create/.test(comp65));
+// O leitor nao pode trazer dependencia: o projeto tem dez, de proposito.
+ok("o leitor de comprovante nao trouxe dependencia nova",
+   /from "\.\/pdf-texto"/.test(pdfComp67)
+   && !Object.keys(JSON.parse(readFileSync("package.json","utf8")).dependencies || {})
+        .some((d) => /pdf|ocr|tesseract/i.test(d)));
+
+// A SUREYA E A RECEBEDORA DE TODO COMPROVANTE QUE CHEGA. Confundir pagador com
+// recebedor devolveria o nome dela em cima de cada pagamento, e a triangulacao
+// passaria a casar tudo com tudo.
+ok("pagador e recebedor sao separados por rotulo",
+   /ROTULO_PAGADOR/.test(pdfComp67) && /ROTULO_RECEBEDOR/.test(pdfComp67));
+// Sem borda de palavra, "de" casa dentro de "Vali(de):" e o rotulo vira nome.
+// Foi o teste contra PDFs de verdade que achou isso.
+ok("os rotulos casam por palavra inteira",
+   pdfComp67.includes("\\bpagador\\b") && pdfComp67.includes("\\brecebedor\\b"));
+// E + 8 ISPB + 12 AAAAMMDDHHMM + 11 livres. Casar frouxo planta identificador
+// falso — e o identificador e a chave mais forte da conciliacao.
+ok("o E2E so e aceito na forma inteira",
+   pdfComp67.includes("E\\d{8}\\d{12}[A-Za-z0-9]{11}"));
+// Valor errado pre-preenchido e pior que campo vazio.
+ok("confianca sai do que foi achado, e nao de otimismo",
+   /valor != null && data && e2e \? "alta"/.test(pdfComp67));
+// Nome chutado nao deixa campo vazio: ele DESCARTA o comprovante certo na
+// conciliacao do mes seguinte, calado.
+ok("sem rotulo de pagador, o nome volta nulo",
+   /if \(iPag < 0\) return null;/.test(pdfComp67));
 
 const comHojeEmUtc = arquivosDe("src").filter((f) =>
   /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/.test(readFileSync(f, "utf8")));

@@ -2380,6 +2380,84 @@ async function rodar() {
            !ehPdf("https://x.supabase.co/storage/v1/object/public/conversas/pdf/c/1.jpg"));
   }
 
+  console.log("\n=== 16. O COMPROVANTE EM PDF SE LE SEM IA ===");
+  {
+    const { lerComprovantePdf } = await import("../src/lib/comprovante-pdf");
+    const ler = (f: string) =>
+      lerComprovantePdf(readFileSync(`testes/fixtures/${f}`));
+
+    // OS ARQUIVOS SAO PDFs DE VERDADE: fluxo comprimido com zlib, texto
+    // posicionado com Td/Tj. O caminho exercitado e o mesmo de producao, do
+    // deflate ate a remontagem das linhas — nada aqui entrega o texto pronto.
+    // (`testes/fixtures/fazer-comprovantes-pdf.mjs` os gera. Os nomes sao
+    // inventados: comprovante de verdade tem nome e CPF de familia real.)
+
+    // --- o formato mais comum: blocos de pagador e recebedor --------------
+    const a = ler("comprovante-blocos.pdf")!;
+    checar("le o valor do comprovante em blocos", a.valor === 40, String(a.valor));
+    checar("e a data", a.data === "2026-11-07", String(a.data));
+    checar("e o E2E inteiro", a.id_transacao === "E18236120202611071432abcdef012ab",
+           String(a.id_transacao));
+    checar("e o nome de QUEM PAGOU, nao o de quem recebeu",
+           a.nome_pagador === "Katia Ferreira dos Santos", String(a.nome_pagador));
+    checar("com os tres, a confianca e alta", a.confianca === "alta", a.confianca);
+
+    // --- rotulo e nome na MESMA linha -------------------------------------
+    const b = ler("comprovante-em-linha.pdf")!;
+    checar("rotulo e nome na mesma linha tambem sao lidos",
+           b.valor === 120 && b.nome_pagador === "Josiane Aparecida Lima",
+           JSON.stringify(b));
+    // A Sureya e a recebedora de TODO comprovante que chega. Confundir os dois
+    // devolveria o nome dela em cima de cada pagamento, e a triangulacao
+    // passaria a casar tudo com tudo.
+    checar("e o recebedor NUNCA e devolvido como pagador",
+           !/sureya/i.test(b.nome_pagador || ""), String(b.nome_pagador));
+
+    // --- o papel com tarifa e saldo ---------------------------------------
+    //
+    // O valor certo NAO e o maior (o saldo de R$ 2.540) nem o primeiro: e o
+    // que tem rotulo de valor.
+    const c = ler("comprovante-com-tarifa.pdf")!;
+    checar("o saldo no papel nao e confundido com o valor pago",
+           c.valor === 80, String(c.valor));
+    checar("e o nome vem do bloco de origem",
+           c.nome_pagador === "Sandra Regina Mendes de Lima", String(c.nome_pagador));
+
+    // --- o papel magro: o leitor fica MODESTO -----------------------------
+    const d = ler("comprovante-magro.pdf")!;
+    checar("sem identificador, a confianca cai para media", d.confianca === "media", d.confianca);
+    checar("e sem rotulo de pagador o nome volta NULO, em vez de chutado",
+           d.nome_pagador === null, String(d.nome_pagador));
+
+    // --- o que NAO e comprovante ------------------------------------------
+    //
+    // Registrar um orcamento seria creditar dinheiro que ninguem mandou.
+    const e = ler("nao-e-comprovante.pdf")!;
+    checar("orcamento com R$ dentro nao e comprovante",
+           e.eh_comprovante === false, JSON.stringify(e));
+    checar("e nao devolve nome nenhum", e.nome_pagador === null, String(e.nome_pagador));
+
+    // --- O E2E TEM FORMA FIXA, E FORA DELA NAO E E2E ----------------------
+    //
+    // E + 8 digitos de ISPB + 12 de AAAAMMDDHHMM + 11 livres = 32. Casar
+    // frouxo plantaria um identificador falso — e o identificador e a chave
+    // mais forte da conciliacao: errado, ele casa o pagamento de uma familia
+    // com o de outra com cara de certeza. (O proprio fixture nasceu com 29
+    // caracteres e o leitor recusou; o errado era o fixture.)
+    checar("E2E curto demais nao e aceito",
+           !/\bE\d{8}\d{12}[A-Za-z0-9]{11}\b/.test("E18236120202611071432abcdef012"));
+    checar("E2E completo e aceito",
+           /\bE\d{8}\d{12}[A-Za-z0-9]{11}\b/.test("E18236120202611071432abcdef012ab"));
+
+    // --- PDF SEM TEXTO e plano B, e nao erro ------------------------------
+    //
+    // Escaneado e imagem com capa de PDF: devolver `null` e o que deixa a IA
+    // entrar — exatamente como o extrato faz desde a 0161.
+    checar("arquivo sem texto devolve null, e a IA segue como plano B",
+           ler("extrato-bradesco.txt" as any) === null
+           || lerComprovantePdf(Buffer.from("nao sou pdf")) === null);
+  }
+
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {
