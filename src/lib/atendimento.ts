@@ -383,22 +383,36 @@ export async function registrarEntrada(params: {
       // imagem já está salva. Guardar depois da leitura faria a falha do
       // leitor levar a imagem junto — que é a forma antiga do mesmo defeito.
       midiaUrl = await guardarMidiaDaConversa(cliente.id, midia);
+      const ehPdf = /pdf/i.test(midia.mimetype || "");
 
       const dados = await extrairComprovante(midia);
+      const leitura = decidirLeitura(dados);
       // MESMA REGRA DA PORTA DA MÃO (`/api/comprovantes/ler`). Era escrita
       // aqui e lá, com as mesmas palavras — e duas cópias de uma regra sempre
       // começam iguais e terminam discordando.
-      if (decidirLeitura(dados).confiavel) {
+      if (leitura.confiavel) {
         await registrarComprovante(cliente.id, midia, dados);
         const v = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : "valor não identificado";
         const d = dados.data || "data não identificada";
         nota = `[comprovante de Pix recebido: ${v}, ${d} — registrado, aguardando conferência de uma pessoa]`;
       } else {
-        // A frase muda: antes ela era um beco sem saída ("não parece um
-        // comprovante" e ponto). Agora ela diz que a imagem está ali.
-        nota = midiaUrl
-          ? "[a família mandou uma imagem — está aqui na conversa]"
-          : "[cliente enviou uma imagem que não consegui guardar]";
+        // TRÊS FRASES, PORQUE SÃO TRÊS COISAS DIFERENTES.
+        //
+        // "Não consegui LER" não é "li e não é comprovante". Medido em
+        // 08/11/2026: zero comprovantes registrados desde que a chave da IA foi
+        // desligada, e a nota dizia a mesma coisa de sempre — a Sureya não
+        // tinha como saber que o sistema estava cego.
+        //
+        // E "imagem" vira ARQUIVO quando é PDF: seis das 25 mídias recebidas
+        // são PDF, e chamá-las de imagem é mandar procurar o que não está lá.
+        const comoChamar = ehPdf ? "um arquivo (PDF)" : "uma imagem";
+        nota = !midiaUrl
+          ? `[cliente enviou ${comoChamar} que não consegui guardar]`
+          : leitura.falhou
+            ? `[a família mandou ${comoChamar} — está aqui na conversa. `
+              + `NÃO CONSEGUI LER: a leitura automática está fora do ar, então `
+              + `isto pode ser um comprovante. Olhe o arquivo.]`
+            : `[a família mandou ${comoChamar} — está aqui na conversa]`;
         escalarDireto = true;
       }
     }

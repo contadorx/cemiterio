@@ -402,13 +402,39 @@ export default function Thread() {
                   olhar. A Sureya lia "não parece um comprovante" e não tinha
                   como saber se era a foto do túmulo, um print de outro banco ou
                   uma dúvida escrita à mão. Tocar abre em tamanho cheio. */}
-              {m.midia_url && (
+              {m.midia_url && m.midia_tipo !== "pdf" && (
                 <a href={m.midia_url} target="_blank" rel="noreferrer"
                    style={{ display: "block", marginBottom: 6 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={m.midia_url} alt="imagem enviada pela família"
                        style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 10, display: "block" }} />
                 </a>
+              )}
+
+              {/* O COMPROVANTE EM PDF, QUE A TELA ESCONDIA SEM SABER.
+                  Seis das 25 mídias recebidas são PDF, e todas eram desenhadas
+                  com `<img>`: navegador nenhum renderiza PDF ali, então o que
+                  aparecia era o ícone de imagem quebrada — com o arquivo
+                  inteiro no balde e o link assinando certo.
+                  O quadro abaixo mostra o PDF de verdade, e o link embaixo
+                  abre em tamanho cheio para quem precisa ler o valor. */}
+              {m.midia_url && m.midia_tipo === "pdf" && (
+                <div style={{ marginBottom: 6 }}>
+                  <object data={m.midia_url} type="application/pdf"
+                          style={{ width: "100%", height: 320, border: `1px solid ${cor.linha}`,
+                                   borderRadius: 10, display: "block", background: "#fff" }}>
+                    {/* Alguns navegadores de celular não embutem PDF. Aí o que
+                        vale é o link, e não um quadro branco calado. */}
+                    <div style={{ padding: 12, fontSize: 13, color: cor.cinza }}>
+                      Este aparelho não mostra PDF aqui dentro — toque em “abrir o PDF”.
+                    </div>
+                  </object>
+                  <a href={m.midia_url} target="_blank" rel="noreferrer"
+                     style={{ display: "inline-block", marginTop: 4, fontSize: 12.5,
+                              color: cor.teal, textDecoration: "underline" }}>
+                    abrir o PDF em tamanho cheio
+                  </a>
+                </div>
               )}
               {/* NÃO CONSEGUI ABRIR ≠ NÃO TEM IMAGEM (0139).
                   O balde das conversas fechou, e a imagem passa a ser lida por
@@ -422,7 +448,7 @@ export default function Thread() {
                   background: "rgb(var(--zm-aviso) / 0.1)",
                   color: "rgb(var(--zm-aviso))", fontSize: 12.5, lineHeight: 1.45,
                 }}>
-                  A família mandou uma imagem aqui e eu não consegui abri-la agora.
+                  A família mandou um arquivo aqui e eu não consegui abri-lo agora.
                   Recarregue a conversa; se continuar, o arquivo pode ter sido removido.
                 </div>
               )}

@@ -20,6 +20,16 @@ export interface DadosComprovante {
   /** O nome de quem pagou, como o comprovante escreve. */
   nome_pagador: string | null;
   confianca: "alta" | "media" | "baixa";
+  /**
+   * A LEITURA NEM ACONTECEU — chave fora, modelo fora do ar, arquivo recusado.
+   *
+   * Sem isto, falhar devolvia `eh_comprovante: false`, que é a MESMA resposta
+   * de "li e não é um comprovante". A Sureya lia "a família mandou uma imagem"
+   * nos dois casos e não tinha como saber se precisava olhar o papel ou se o
+   * sistema estava cego. Medido em 08/11/2026: zero comprovantes registrados
+   * desde que a chave foi desligada, e nenhum aviso em lugar nenhum.
+   */
+  falhou?: boolean;
 }
 
 const IMAGENS_OK = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -100,12 +110,16 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
 
     const b = resp.content.find((x) => x.type === "tool_use");
     if (!b || b.type !== "tool_use") {
-      return { eh_comprovante: false, valor: null, data: null, id_transacao: null, nome_pagador: null, confianca: "baixa" };
+      // O modelo respondeu, mas não pela ferramenta: isso é leitura falhada,
+      // e não "não é comprovante".
+      return { eh_comprovante: false, valor: null, data: null, id_transacao: null,
+               nome_pagador: null, confianca: "baixa", falhou: true };
     }
     return b.input as DadosComprovante;
   } catch (e) {
     console.error("[comprovante] falha na leitura:", (e as any)?.message || e);
-    return { eh_comprovante: false, valor: null, data: null, id_transacao: null, nome_pagador: null, confianca: "baixa" };
+    return { eh_comprovante: false, valor: null, data: null, id_transacao: null,
+             nome_pagador: null, confianca: "baixa", falhou: true };
   }
 }
 
@@ -127,6 +141,8 @@ export async function extrairComprovante(midia: Midia): Promise<DadosComprovante
 export interface Leitura {
   /** Dá para preencher os campos de dinheiro com isto? */
   confiavel: boolean;
+  /** A leitura nem aconteceu — diferente de "li e não é comprovante". */
+  falhou: boolean;
   valor: number | null;
   data: string | null;
   idTransacao: string | null;
@@ -141,6 +157,7 @@ export function decidirLeitura(dados: DadosComprovante): Leitura {
 
   return {
     confiavel,
+    falhou: !!dados.falhou,
     // FORA DA CONFIANÇA, NADA SAI. Devolver o valor "só para mostrar" faria a
     // tela ter um número na mão e a tentação de usá-lo.
     valor: confiavel ? (dados.valor ?? null) : null,
@@ -150,10 +167,16 @@ export function decidirLeitura(dados: DadosComprovante): Leitura {
     // nome errado guardado aqui não enche um campo na tela — ele DESCARTA o
     // comprovante certo na conciliação do mês seguinte, calado.
     nomePagador: confiavel ? (dados.nome_pagador || null) : null,
-    mensagem: !dados.eh_comprovante
-      ? "Isto não me parece um comprovante. Se for, digite o valor e a data à mão."
-      : !confiavel
-        ? "Consegui ler, mas não com confiança suficiente. Confira o valor e a data."
-        : null,
+    // TRÊS RESPOSTAS, E NÃO DUAS. "Não consegui ler" não é "não é
+    // comprovante": a primeira é um problema meu, a segunda é um fato sobre o
+    // papel. Dizer uma pela outra manda a Sureya procurar no lugar errado.
+    mensagem: dados.falhou
+      ? "Não consegui ler este arquivo agora — a leitura automática está fora do ar. "
+        + "O arquivo está aqui na conversa; digite o valor e a data à mão."
+      : !dados.eh_comprovante
+        ? "Isto não me parece um comprovante. Se for, digite o valor e a data à mão."
+        : !confiavel
+          ? "Consegui ler, mas não com confiança suficiente. Confira o valor e a data."
+          : null,
   };
 }
