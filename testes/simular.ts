@@ -2380,6 +2380,157 @@ async function rodar() {
            !ehPdf("https://x.supabase.co/storage/v1/object/public/conversas/pdf/c/1.jpg"));
   }
 
+<<<<<<< HEAD
+=======
+  console.log("\n=== 16. O COMPROVANTE EM PDF SE LE SEM IA ===");
+  {
+    const { lerComprovantePdf } = await import("../src/lib/comprovante-pdf");
+    const ler = (f: string) =>
+      lerComprovantePdf(readFileSync(`testes/fixtures/${f}`));
+
+    // OS ARQUIVOS SAO PDFs DE VERDADE: fluxo comprimido com zlib, texto
+    // posicionado com Td/Tj. O caminho exercitado e o mesmo de producao, do
+    // deflate ate a remontagem das linhas — nada aqui entrega o texto pronto.
+    // (`testes/fixtures/fazer-comprovantes-pdf.mjs` os gera. Os nomes sao
+    // inventados: comprovante de verdade tem nome e CPF de familia real.)
+
+    // --- o formato mais comum: blocos de pagador e recebedor --------------
+    const a = ler("comprovante-blocos.pdf")!;
+    checar("le o valor do comprovante em blocos", a.valor === 40, String(a.valor));
+    checar("e a data", a.data === "2026-11-07", String(a.data));
+    checar("e o E2E inteiro", a.id_transacao === "E18236120202611071432abcdef012ab",
+           String(a.id_transacao));
+    checar("e o nome de QUEM PAGOU, nao o de quem recebeu",
+           a.nome_pagador === "Katia Ferreira dos Santos", String(a.nome_pagador));
+    checar("com os tres, a confianca e alta", a.confianca === "alta", a.confianca);
+
+    // --- rotulo e nome na MESMA linha -------------------------------------
+    const b = ler("comprovante-em-linha.pdf")!;
+    checar("rotulo e nome na mesma linha tambem sao lidos",
+           b.valor === 120 && b.nome_pagador === "Josiane Aparecida Lima",
+           JSON.stringify(b));
+    // A Sureya e a recebedora de TODO comprovante que chega. Confundir os dois
+    // devolveria o nome dela em cima de cada pagamento, e a triangulacao
+    // passaria a casar tudo com tudo.
+    checar("e o recebedor NUNCA e devolvido como pagador",
+           !/sureya/i.test(b.nome_pagador || ""), String(b.nome_pagador));
+
+    // --- o papel com tarifa e saldo ---------------------------------------
+    //
+    // O valor certo NAO e o maior (o saldo de R$ 2.540) nem o primeiro: e o
+    // que tem rotulo de valor.
+    const c = ler("comprovante-com-tarifa.pdf")!;
+    checar("o saldo no papel nao e confundido com o valor pago",
+           c.valor === 80, String(c.valor));
+    checar("e o nome vem do bloco de origem",
+           c.nome_pagador === "Sandra Regina Mendes de Lima", String(c.nome_pagador));
+
+    // --- o papel magro: o leitor fica MODESTO -----------------------------
+    const d = ler("comprovante-magro.pdf")!;
+    checar("sem identificador, a confianca cai para media", d.confianca === "media", d.confianca);
+    checar("e sem rotulo de pagador o nome volta NULO, em vez de chutado",
+           d.nome_pagador === null, String(d.nome_pagador));
+
+    // --- o que NAO e comprovante ------------------------------------------
+    //
+    // Registrar um orcamento seria creditar dinheiro que ninguem mandou.
+    const e = ler("nao-e-comprovante.pdf")!;
+    checar("orcamento com R$ dentro nao e comprovante",
+           e.eh_comprovante === false, JSON.stringify(e));
+    checar("e nao devolve nome nenhum", e.nome_pagador === null, String(e.nome_pagador));
+
+    // --- O E2E TEM FORMA FIXA, E FORA DELA NAO E E2E ----------------------
+    //
+    // E + 8 digitos de ISPB + 12 de AAAAMMDDHHMM + 11 livres = 32. Casar
+    // frouxo plantaria um identificador falso — e o identificador e a chave
+    // mais forte da conciliacao: errado, ele casa o pagamento de uma familia
+    // com o de outra com cara de certeza. (O proprio fixture nasceu com 29
+    // caracteres e o leitor recusou; o errado era o fixture.)
+    checar("E2E curto demais nao e aceito",
+           !/\bE\d{8}\d{12}[A-Za-z0-9]{11}\b/.test("E18236120202611071432abcdef012"));
+    checar("E2E completo e aceito",
+           /\bE\d{8}\d{12}[A-Za-z0-9]{11}\b/.test("E18236120202611071432abcdef012ab"));
+
+    // --- PDF SEM TEXTO e plano B, e nao erro ------------------------------
+    //
+    // Escaneado e imagem com capa de PDF: devolver `null` e o que deixa a IA
+    // entrar — exatamente como o extrato faz desde a 0161.
+    checar("arquivo sem texto devolve null, e a IA segue como plano B",
+           ler("extrato-bradesco.txt" as any) === null
+           || lerComprovantePdf(Buffer.from("nao sou pdf")) === null);
+  }
+
+  console.log("\n=== 17. A FOTO DO COMPROVANTE SE LE SEM IA (OCR) ===");
+  {
+    const { lerComprovanteImagem } = await import("../src/lib/comprovante-ocr");
+    const CASA = "Sureya Servicos de Limpeza";
+    const ler = (f: string) =>
+      lerComprovanteImagem(readFileSync(`testes/fixtures/${f}`), { nomeDaCasa: CASA });
+
+    // AS DUAS IMAGENS SAO RENDERIZADAS DE VERDADE (Chromium, 390px de largura,
+    // comprimidas como JPEG do jeito que o WhatsApp comprime) por
+    // `testes/fixtures/fazer-print-e-foto.mjs`. Nomes inventados.
+    //
+    //   comprovante-print.jpg  print de tela, texto digital limpo (50 KB)
+    //   comprovante-foto.jpg   FOTO da tela: torta, com reflexo, moire (23 KB)
+    //                          — e o que chega de quem nao sabe tirar print.
+
+    // --- o print ----------------------------------------------------------
+    const p = (await ler("comprovante-print.jpg"))!;
+    checar("o print devolve leitura", !!p, JSON.stringify(p));
+    checar("com o valor certo", p.valor === 40, String(p.valor));
+    checar("e a data certa", p.data === "2026-11-07", String(p.data));
+    checar("e o nome de quem pagou", p.nome_pagador === "Katia Ferreira dos Santos",
+           String(p.nome_pagador));
+
+    // --- A FOTO TORTA, que e o caso dificil -------------------------------
+    //
+    // Aqui os ROTULOS somem: "PAGADOR" e "RECEBEDOR" sao cinza pequeno e nao
+    // sobrevivem ao brilho, ao moire e a compressao. Sobram dois nomes sem
+    // etiqueta — e a casa e tirada da conta, sobrando um.
+    const f = (await ler("comprovante-foto.jpg"))!;
+    checar("a foto torta tambem devolve leitura", !!f, JSON.stringify(f));
+    checar("com o valor certo", f.valor === 40, String(f.valor));
+    checar("e a data certa", f.data === "2026-11-07", String(f.data));
+    checar("e o pagador sai POR ELIMINACAO, sem rotulo nenhum",
+           f.nome_pagador === "Katia Ferreira dos Santos", String(f.nome_pagador));
+
+    // SEM SABER QUEM E A CASA, A DEDUCAO NAO ACONTECE — e tem de nao
+    // acontecer: com dois nomes e nenhuma etiqueta, escolher poria o nome da
+    // casa em metade dos pagamentos.
+    const semCasa = (await lerComprovanteImagem(
+      readFileSync("testes/fixtures/comprovante-foto.jpg"), {}))!;
+    checar("sem o nome da casa, o pagador volta nulo em vez de chutado",
+           semCasa.nome_pagador === null, String(semCasa.nome_pagador));
+    checar("mas o valor e a data continuam saindo",
+           semCasa.valor === 40 && semCasa.data === "2026-11-07", JSON.stringify(semCasa));
+
+    // --- O OCR NUNCA DEVOLVE O IDENTIFICADOR DO PIX -----------------------
+    //
+    // MEDIDO: no print, o Tesseract leu "...abcdef012ab" como "...abcdefo12ab"
+    // — zero virou letra o. Um caractere, e o E2E continua com 32 posicoes:
+    // passa por qualquer conferencia de forma. E o E2E e a chave MAIS FORTE da
+    // conciliacao, a unica fonte que nao e palpite. Errado, ele nao deixa de
+    // casar: ele casa ERRADO, com cara de certeza, e credita o pagamento de
+    // uma familia na conta de outra.
+    checar("o print NAO devolve identificador", p.id_transacao === null, String(p.id_transacao));
+    checar("a foto tambem nao", f.id_transacao === null, String(f.id_transacao));
+
+    // --- E A CONFIANCA NUNCA CHEGA A "ALTA" -------------------------------
+    //
+    // Ler foto e reconhecimento, nao transcricao. "media" preenche a tela e
+    // deixa a conciliacao depender de valor e nome; quem confere continua
+    // olhando o papel.
+    checar("o print fica em media, nunca alta", p.confianca === "media", p.confianca);
+    checar("a foto tambem", f.confianca === "media", f.confianca);
+
+    // --- O QUE NAO DA PARA LER DEVOLVE NULO, e nao um palpite -------------
+    checar("imagem que nao e comprovante nao vira leitura",
+           (await lerComprovanteImagem(Buffer.from("isto nao e uma imagem"), { nomeDaCasa: CASA }))
+             === null);
+  }
+
+>>>>>>> 5882b1e5f8532db3fd288e8675e34409b35fd294
   console.log("\n" + "=".repeat(60));
   console.log(`RESULTADO: ${ok} passaram, ${falhas} falharam`);
   if (problemas.length) {

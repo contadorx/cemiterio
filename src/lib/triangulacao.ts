@@ -108,7 +108,11 @@ export function mesmoPagador(a: string, b: string): boolean {
  * é "destes dois comprovantes de R$ 40 do dia 3, qual é?", e o sobrenome
  * responde. Quatro letras no mínimo: "DE", "DA" e "DOS" não respondem nada.
  */
+<<<<<<< HEAD
 function tocaONome(familia: string, nomeDoExtrato: string): boolean {
+=======
+export function tocaONome(familia: string, nomeDoExtrato: string): boolean {
+>>>>>>> 5882b1e5f8532db3fd288e8675e34409b35fd294
   const alvo = normalizarNomeBanco(nomeDoExtrato).split(" ").filter(Boolean);
   return normalizarNomeBanco(familia).split(" ")
     .filter((p) => p.length >= 4)

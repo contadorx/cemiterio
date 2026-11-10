@@ -89,6 +89,30 @@ export async function garantirConversa(
  * pequeno por um grande. Devolve `null` e a nota na conversa diz que não
  * consegui guardar, para a Sureya saber que houve uma imagem.
  */
+/**
+ * COMO O BANCO ESCREVE O NOME DA CASA.
+ *
+ * `nome_no_recebimento` e o nome do titular da conta que recebe o Pix — nao a
+ * marca. A queda para `marca_nome` e `nome` existe para o campo nao precisar
+ * estar preenchido no primeiro dia; enquanto ele estiver vazio e a marca nao
+ * for o que o banco imprime, a deducao de pagador simplesmente nao acontece,
+ * que e o lado seguro.
+ */
+let _nomeDaCasa: string | null | undefined;
+async function nomeDaCasa(): Promise<string | null> {
+  if (_nomeDaCasa !== undefined) return _nomeDaCasa;
+  try {
+    const { data } = await supabaseAdmin()
+      .from("orgs").select("nome_no_recebimento,marca_nome,nome")
+      .eq("id", env.orgId()).maybeSingle();
+    _nomeDaCasa = (data as any)?.nome_no_recebimento
+      || (data as any)?.marca_nome || (data as any)?.nome || null;
+  } catch {
+    _nomeDaCasa = null;
+  }
+  return _nomeDaCasa ?? null;
+}
+
 async function guardarMidiaDaConversa(
   clienteId: string,
   midia: { base64: string; mimetype: string },
@@ -385,7 +409,15 @@ export async function registrarEntrada(params: {
       midiaUrl = await guardarMidiaDaConversa(cliente.id, midia);
       const ehPdf = /pdf/i.test(midia.mimetype || "");
 
+<<<<<<< HEAD
       const dados = await extrairComprovante(midia);
+=======
+      // QUEM RECEBE E SEMPRE A CASA, e e isso que deixa o OCR dizer quem
+      // pagou quando a foto perdeu os rotulos (0166). `nome_no_recebimento`
+      // nasce vazia; sem ela, o nome do pagador volta nulo em foto sem
+      // rotulo — que e melhor que devolver o nome errado.
+      const dados = await extrairComprovante(midia, { nomeDaCasa: await nomeDaCasa() });
+>>>>>>> 5882b1e5f8532db3fd288e8675e34409b35fd294
       const leitura = decidirLeitura(dados);
       // MESMA REGRA DA PORTA DA MÃO (`/api/comprovantes/ler`). Era escrita
       // aqui e lá, com as mesmas palavras — e duas cópias de uma regra sempre
@@ -394,7 +426,14 @@ export async function registrarEntrada(params: {
         await registrarComprovante(cliente.id, midia, dados);
         const v = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : "valor não identificado";
         const d = dados.data || "data não identificada";
-        nota = `[comprovante de Pix recebido: ${v}, ${d} — registrado, aguardando conferência de uma pessoa]`;
+        const quem = dados.nome_pagador ? `, pago por ${dados.nome_pagador}` : "";
+        // DIZER DE ONDE VEIO A LEITURA não é detalhe técnico: é a diferença
+        // entre "o computador leu o que estava escrito no papel" e "um modelo
+        // olhou a imagem e achou". A segunda merece um olho a mais.
+        const fonte = dados.fonte === "pdf" ? " (li o texto do próprio PDF)"
+          : dados.fonte === "ocr" ? " (li a foto por reconhecimento — confira)"
+          : "";
+        nota = `[comprovante de Pix recebido: ${v}, ${d}${quem}${fonte} — registrado, aguardando conferência de uma pessoa]`;
       } else {
         // TRÊS FRASES, PORQUE SÃO TRÊS COISAS DIFERENTES.
         //

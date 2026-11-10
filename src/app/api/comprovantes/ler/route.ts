@@ -64,7 +64,16 @@ export async function POST(req: NextRequest) {
   const mimetype = String(b?.mimetype || "image/jpeg");
 
   try {
-    const dados = await extrairComprovante({ base64: limpo, mimetype });
+    // A PORTA DA MAO LE PELO MESMO CAMINHO DA PORTA DO WHATSAPP, e com a
+    // mesma informacao: sem `nomeDaCasa`, a mesma foto daria pagador aqui e
+    // nao daria la (ou o contrario). Duas portas que leem o mesmo papel e
+    // respondem diferente e o defeito que este projeto mais repete.
+    const { data: casa } = await auth.db
+      .from("orgs").select("nome_no_recebimento,marca_nome,nome").maybeSingle();
+    const dados = await extrairComprovante({ base64: limpo, mimetype }, {
+      nomeDaCasa: (casa as any)?.nome_no_recebimento
+        || (casa as any)?.marca_nome || (casa as any)?.nome || null,
+    });
 
     // A MESMA REGRA DO CAMINHO DO WHATSAPP, e não uma segunda cópia dela:
     // `decidirLeitura` mora em `comprovante.ts` e serve as duas portas.
@@ -79,6 +88,12 @@ export async function POST(req: NextRequest) {
       data: leitura.data,
       idTransacao: leitura.idTransacao,
       nomePagador: leitura.nomePagador,
+<<<<<<< HEAD
+=======
+      // "li o texto do PDF" e "um modelo olhou a imagem" não são a mesma
+      // coisa, e quem confere merece saber qual foi.
+      fonte: leitura.fonte,
+>>>>>>> 5882b1e5f8532db3fd288e8675e34409b35fd294
       mensagem: leitura.mensagem,
     });
   } catch (e: any) {
